@@ -1,0 +1,52 @@
+{
+	"name": "mimbl",
+	"version": "0.1.0",
+	"description": "MiM Base Library for Component Authoring",
+	"homepage": "https://mmichlin66.github.io/mimbl/mimblAbout.html",
+	"repository": "github:mmichlin66/mimbl",
+	"main": "./dist/mimblTypes.d.ts",
+	"module": "./dist/mimblTypes.d.ts",
+	"types": "./dist/mimblTypes.d.ts",
+	"scripts": {
+		"build-dev": "build.bat",
+		"build-prod": "buildProd.bat",
+		"build-doc": "doc.bat"
+	},
+	"author": {
+		"name": "Michael Michlin",
+		"email": "mmichlin@hotmail.com",
+		"url": "https://mmichlin66.github.io"
+	},
+	"keywords": [
+		"Component",
+		"React",
+		"Web UI"
+	],
+	"license": "MIT",
+	"devDependencies": {
+		"ifdef-loader": "^2.1.1",
+		"source-map-loader": "^0.2.4",
+		"ts-loader": "^5.3.3",
+		"typescript": "^3.2.4"
+	},
+	"files": [
+		"dist/mimbl.js",
+		"dist/mimblTypes.d.ts",
+		"dist/core/Utils.d.ts",
+		"dist/core/EventSlot.d.ts",
+		"dist/core/mim.d.ts",
+		"dist/core/ElmAttr.d.ts",
+		"dist/core/LocalStyles.d.ts",
+		"dist/core/HtmlTypes.d.ts",
+		"dist/core/SvgTypes.d.ts",
+		"dist/comp/Router.d.ts"
+	],
+	"dependencies": {
+		"mimurl": "^0.1.0"
+	},
+	"-vs-binding": {
+		"ProjectOpened": [
+			"install_global_deps"
+		]
+	}
+}

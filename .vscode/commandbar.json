@@ -1,0 +1,35 @@
+{
+    "skipTerminateQuickPick": true,
+    "skipSwitchToOutput": false,
+    "skipErrorMessage": true,
+	"commands":
+	[
+        {
+            "text": "mimbl",
+            "tooltip": "build debug mimbl",
+            "color": "white",
+            "commandType": "script",
+            "command": "build-dev",
+            "alignment": "left",
+            "priority": 1
+        },
+        {
+            "text": "mimbl Prod",
+            "tooltip": "build release mimbl",
+            "color": "yellow",
+            "commandType": "script",
+            "command": "build-prod",
+            "alignment": "left",
+            "priority": 1
+        },
+        {
+            "text": "mimbl Doc",
+            "tooltip": "build mimbl API reference documentation",
+            "color": "pink",
+            "commandType": "script",
+            "command": "build-doc",
+            "alignment": "left",
+            "priority": 1
+        }
+    ]
+}

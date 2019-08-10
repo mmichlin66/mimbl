@@ -1,0 +1,2 @@
+@echo off
+typedoc --out dist/reference src/core/mim.ts src/core/HtmlTypes.ts src/core/SvgTypes.ts src/core/ElmAttr.ts src/core/Utils.ts src/core/EventSlot.ts src/core/LocalStyles.ts --readme none --excludeExternals --excludeNotExported --excludePrivate
