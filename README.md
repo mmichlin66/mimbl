@@ -31,9 +31,9 @@ The .tsx files must import the mimbl module as mim: import * as mim from "mimbl"
 import * as mim from "mimbl"
 
 // Define a component
-class MyComp extends mim.Component
+class HelloWorld extends mim.Component
 {
-    @mim.prop txtColor: string;
+    txtColor: string;
 
     constructor( txtColor: string = "black")
     {
@@ -46,10 +46,12 @@ class MyComp extends mim.Component
         return <span style={ {color: this.txtColor} }>Hello World!</span>;
     }
 }
+
+mim.mount( new HelloWorld("red"));
 ```
 
 For more details please see the following resources:
 * [About](https://mmichlin66.github.io/mimbl/mimblAbout.html)
-* [API Reference](https://mmichlin66.github.io/mimurl/mimblReference.html)
-* [Playground](https://mmichlin66.github.io/mimurl/mimblDemo.html) (work in progress)
+* [API Reference](https://mmichlin66.github.io/mimbl/mimblReference.html)
+* [Playground](https://mmichlin66.github.io/mimbl/mimblDemo.html) (work in progress)
 
