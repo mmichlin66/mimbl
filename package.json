@@ -8,9 +8,9 @@
 	"module": "./dist/mimblTypes.d.ts",
 	"types": "./dist/mimblTypes.d.ts",
 	"scripts": {
-		"build-dev": "build.bat",
-		"build-prod": "buildProd.bat",
-		"build-doc": "doc.bat"
+		"buildDev": "buildDev.bat",
+		"buildProd": "buildProd.bat",
+		"doc": "doc.bat"
 	},
 	"author": {
 		"name": "Michael Michlin",

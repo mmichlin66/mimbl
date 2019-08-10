@@ -5,11 +5,11 @@
 	"commands":
 	[
         {
-            "text": "mimbl",
+            "text": "mimbl Dev",
             "tooltip": "build debug mimbl",
             "color": "white",
             "commandType": "script",
-            "command": "build-dev",
+            "command": "buildDev",
             "alignment": "left",
             "priority": 1
         },
@@ -18,7 +18,7 @@
             "tooltip": "build release mimbl",
             "color": "yellow",
             "commandType": "script",
-            "command": "build-prod",
+            "command": "buildProd",
             "alignment": "left",
             "priority": 1
         },
@@ -27,7 +27,7 @@
             "tooltip": "build mimbl API reference documentation",
             "color": "pink",
             "commandType": "script",
-            "command": "build-doc",
+            "command": "doc",
             "alignment": "left",
             "priority": 1
         }

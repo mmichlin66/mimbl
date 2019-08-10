@@ -4,7 +4,7 @@ Mimbl is a TypeScript/JavaScript UI authoring library that combines declarative 
 ## Installation
 
 ```
-npm install mimbl -D
+npm install mimbl
 ```
 
 ## Features
