@@ -1243,7 +1243,7 @@ export function createVNChainFromJSX( tag: any, props: any, children: any[]): VN
 {
 	const chain: VNChain = new VNChain();
 
-	if (tag === mim.Placeholder)
+	if (tag === mim.Placeholder || tag === "m")
 		chain.appendChain( createVNChainFromContent( children));
 	else if (mim.Component.isPrototypeOf( tag))
 		chain.appendVN( new ClassVN( tag as mim.IComponentClass, props, children));

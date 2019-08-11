@@ -819,20 +819,23 @@ export interface ITextVN extends IVNode
 export type StylePropType = Partial<CSSStyleDeclaration>;
 
 /**
- * Event property value is an event handler function. T is DOM event type,e.g. MouseEvent. All
- * DOM events accept event object and return void.
+ * Type of event handler function for DOM events of type T.
+ * @typeparam T DOM event type, e.g. MouseEvent
  */
 export type EventFuncType<T extends Event> = (e: T) => void;
 
 /**
- * Event property value is an event handler function. T is DOM event type,e.g. MouseEvent. All
- * DOM events accept event object and return void.
+ * Tuple combining the event handler type and the Boolean flag indicating whether the event
+ * handler should be attached to the capture (true) or to the bubble (false) phase.
+ * @typeparam T DOM event type, e.g. MouseEvent
  */
 export type EventFuncAndFlagType<T extends Event> = [EventFuncType<T>, boolean];
 
 /**
- * Event property value is an event handler function. T is DOM event type,e.g. MouseEvent. All
- * DOM events accept event object and return void.
+ * Union type that can be passed to an Element's event. It is either an event handler function
+ * or a tuple consisting of the handler function and the flag indicating whether the event
+ * handler should be attached to the capture (true) or to the bubble (false) phase.
+ * @typeparam T DOM event type, e.g. MouseEvent
  */
 export type EventPropType<T extends Event> = EventFuncType<T> | EventFuncAndFlagType<T>;
 
@@ -1037,6 +1040,18 @@ export namespace JSX
 	
 	export interface IntrinsicElements
 	{
+		/**
+		 * Special name to serve as a placeholder, which contains several elements. This is
+		 * needed where only a single JSX element is accepted (e.g. return from render) but we
+		 * want to return more than one.
+		 * 
+		 * This is only necessary because TypeScript doesn't allow "JSX fragment" (<>) if a
+		 * custom JSX factory function is used.
+		 * 
+		 * This element doesn't have any properties.
+		 */
+		m: {};
+
 		// HTML elements
 		a: html.IHtmlAElementProps;
 		abbr: html.IHtmlElementProps;
