@@ -38,12 +38,8 @@
 		"dist/core/ElmAttr.d.ts",
 		"dist/core/LocalStyles.d.ts",
 		"dist/core/HtmlTypes.d.ts",
-		"dist/core/SvgTypes.d.ts",
-		"dist/comp/Router.d.ts"
+		"dist/core/SvgTypes.d.ts"
 	],
-	"dependencies": {
-		"mimurl": "^0.1.1"
-	},
 	"-vs-binding": {
 		"ProjectOpened": [
 			"install_global_deps"
