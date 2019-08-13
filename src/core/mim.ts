@@ -342,14 +342,14 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 
 
 /**
- * The type RefFunc defines event handler that is invoked when reference value changes.
+ * Defines event handler that is invoked when reference value changes.
  */
 export type RefFunc<T> = (newRef: T) => void;
 
 
 
 /**
- * Reference class to use whenever a reference to an object is needed - for example, with JSX ref
+ * Reference class to use whenever a reference to an object is needed - for example, with JSX `ref`
  * attributes and services.
  */
 export class Ref<T>
@@ -461,7 +461,7 @@ export class Ref<T>
 
 /**
  * Type of ref property that can be passed to JSX elements and components. This can be either the
- * Ref class or RefFunc function.
+ * [[Ref]] class or [[RefFunc]] function.
  */
 export type RefPropType<T> = Ref<T> | RefFunc<T>;
 
@@ -469,13 +469,13 @@ export type RefPropType<T> = Ref<T> | RefFunc<T>;
 
 /**
  * Helper function to set the value of the reference that takes care of the different types of
- * references. The optional onlyIf parameter may specify a value so that only if the reference
+ * references. The optional `onlyIf` parameter may specify a value so that only if the reference
  * currently has the same value it will be replaced. This might be needed to not clear a
  * reference if it already points to a different object.
- * @param ref Reference property to be set
- * @param val Reference value to set to the property
+ * @param ref [[Ref]] object to which the new value will be set
+ * @param val Reference value to set to the Ref object
  * @param onlyIf An optional value to which to compare the current (old) value of the reference.
- * The new value will be set only if the old value equals the onlyIf value.
+ * The new value will be set only if the old value equals the `onlyIf` value.
  */
 export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
 {
@@ -495,19 +495,27 @@ export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
  * Decorator function for defining properties with a set method that calls the updateMe method
  * whenever the property value changes.
  *
+ *	```tsx
  *	class Child extends Component
  *	{
- *		@prop text: string = "Hello!";
- *		render() { return <div ref={myDiv}>{text}</div>; }
- *	}
- *
+ *		@mim.prop text: string = "Hello!";
+ *		render()
+ *		{
+ *	 		return <div>{text}</div>
+ *		}
+  *	}
+*
  *	class Parent extends Component
  *	{
  *		child = new Child();
- *		render() { return <div click={() => this.child.text += " again"}>{this.child}</div>; }
+ *		render()
+ *		{
+ *			return <div click={() => this.child.text += " again"}>{this.child}</div>
+ *		}
  *	}
+ *	```
  *
- * In the above example,the Child component will be re-rendered whever its text property changes.
+ * In the above example, the Child component will be re-rendered when its `text` property changes.
  * The Parent component appends the word "again" to the Child component's text whenever the user
  * clicks on it.
  * @param target 
@@ -536,7 +544,7 @@ export function prop( target, name: string)
 /**
  * An artificial "fragment" component that is only used as a temporary collection of other items
  * in places where JSX only allows a single item. Our JSX factory function creates a virtual node
- * for its children,but later this node is thrown away and only children are used. This component
+ * for its children, but later this node is thrown away and only children are used. This component
  * is only needed because currently TypeScript doesn't alow the <> fragment notation if a custom
  * JSX factory function is used.
  *
