@@ -8,9 +8,14 @@ import {RootErrorUI, RootWaitingUI} from "./RootUI"
 /// #endif
 
 
-let g_requestIdleCallback = (window as any).requestIdleCallback
-				? (window as any).requestIdleCallback
-				: ( func: ()=>void) => setTimeout( func);
+
+// let g_requestIdleCallback: (func: ()=>void) => number = (window as any).requestIdleCallback
+// 				? (window as any).requestIdleCallback
+// 				: (func: ()=>void) => setTimeout( func);
+
+// let g_cancelIdleCallback: (handle) => void = (window as any).cancelIdleCallback
+// 				? (window as any).cancelCallback
+// 				: (handle) => clearTimeout( handle);
 
 
 
@@ -24,7 +29,7 @@ let g_requestIdleCallback = (window as any).requestIdleCallback
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 {
-	constructor( anchorDN: DN)
+	private constructor( anchorDN: DN)
 	{
 		super( mim.VNType.Root)
 
@@ -44,15 +49,18 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 
 
 	// Sets the content to be rendered under this root node and triggers update.
-	public setContent( content: any, sync: boolean): void
+	private setContent( content: any, sync: boolean): void
 	{
 		this.content = content;
 
 		if (sync)
 		{
-			let set = new Set<VN>();
-			set.add( this);
-			this.performUpdateCycle( set);
+			this.vnsScheduledForUpdate.add( this);
+			this.onScheduledFrame();
+
+			// let set = new Set<VN>();
+			// set.add( this);
+			// this.performUpdateCycle( set);
 		}
 		else
 			this.requestNodeUpdate( this);
@@ -314,14 +322,21 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	// Schedules an update for the given node.
 	public requestNodeUpdate( vn: VN): void
 	{
+		if (!vn.anchorDN)
+		{
+			console.error( `Update requested for virtual node '${vn.path.join("/")}' that doesn't have anchor DOM node`)
+			return;
+		}
+
 		// add this node to the map of nodes for which either update or replacement or
 		// deletion is scheduled. Note that a node will only be present once in the map no
 		// matter how many times it calls requestUpdate().
 		this.vnsScheduledForUpdate.add( vn);
 
-		// if this is the first node that should be updated, schedule an update to be performed
-		// on the next cycle.
-		this.requestFrameIfNeeded();
+		// the update is scheduled in the next cycle unless the request is made during a
+		// "before update" function execution.
+		if (this.schedulerState !== SchedulerState.BeforeUpdate)
+			this.requestFrameIfNeeded();
 	}
 
 
@@ -335,7 +350,8 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			return;
 
 		// if this was the last node in the set, cancel the request to schedule update processing.
-		this.cancelFrameRequestIfNeeded();
+		if (this.schedulerState !== SchedulerState.BeforeUpdate)
+			this.cancelFrameRequestIfNeeded();
 	}
 
 
@@ -348,11 +364,22 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			return;
 
 		if (beforeUpdate)
+		{
 			this.callsScheduledBeforeUpdate.add( func);
+
+			// a "before update" function is always scheduled in the next frame even if the
+			// call is made from another "before update" function.
+			this.requestFrameIfNeeded();
+		}
 		else
+		{
 			this.callsScheduledAfterUpdate.add( func);
 
-		this.requestFrameIfNeeded();
+			// an "after update" function is scheduled in the next cycle unless the request is made
+			// either from a "before update" function execution or during a node update.
+			if (this.schedulerState !== SchedulerState.BeforeUpdate && this.schedulerState !== SchedulerState.Update)
+				this.requestFrameIfNeeded();
+		}
 	}
 
 
@@ -365,11 +392,16 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			return;
 
 		if (beforeUpdate)
+		{
 			this.callsScheduledBeforeUpdate.delete( func);
+			this.cancelFrameRequestIfNeeded();
+		}
 		else
+		{
 			this.callsScheduledAfterUpdate.delete( func);
-
-		this.cancelFrameRequestIfNeeded();
+			if (this.schedulerState !== SchedulerState.BeforeUpdate && this.schedulerState !== SchedulerState.Update)
+				this.requestFrameIfNeeded();
+		}
 	}
 
 
@@ -402,7 +434,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	private requestFrameIfNeeded(): void
 	{
 		if (this.scheduledFrameHandle === 0)
-			this.scheduledFrameHandle = g_requestIdleCallback( this.onScheduledFrame);
+			this.scheduledFrameHandle = requestAnimationFrame( this.onScheduledFrame);
 	}
 
 
@@ -415,7 +447,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			this.callsScheduledBeforeUpdate.size === 0 &&
 			this.callsScheduledAfterUpdate.size === 0)
 		{
-			(window as any).cancelIdleCallback( this.scheduledFrameHandle);
+			cancelAnimationFrame( this.scheduledFrameHandle);
 			this.scheduledFrameHandle = 0;
 		}
 	}
@@ -429,73 +461,71 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		// schedule a new frame.
 		this.scheduledFrameHandle = 0;
 
-		// remember the internal set of nodes and re-create it so that it is ready for new
-		// update requests
-		let vnsScheduledForUpdate = this.vnsScheduledForUpdate;
-		this.vnsScheduledForUpdate = new Set<VN>();
-
-		// remember the set of functions scheduled to be called before updating nodes
-		const callsScheduledBeforeUpdate = this.callsScheduledBeforeUpdate;
-		this.callsScheduledBeforeUpdate = new Set<mim.ScheduledFuncType>();
-
-		// remember the set of functions scheduled to be called after updating nodes
-		const callsScheduledAfterUpdate = this.callsScheduledAfterUpdate;
-		this.callsScheduledAfterUpdate = new Set<mim.ScheduledFuncType>();
-
-		// call functions scheduled to be invoked before updating components
-		this.performUpdateCycle( vnsScheduledForUpdate, callsScheduledBeforeUpdate, callsScheduledAfterUpdate);
-	};
-
-
-
-	// Callback that is called on a new UI cycle when there is a need to update UI components
-	private performUpdateCycle( vnsToUpdate: Set<VN>,
-				callsBeforeUpdate?: Set<mim.ScheduledFuncType>,
-				callsAfterUpdate?: Set<mim.ScheduledFuncType>): void
-	{
 		// increment tick number.
 		this.currentTick++;
 
-		// call functions scheduled to be invoked before updating components
-		if (callsBeforeUpdate)
-			this.callScheduledFunctions( callsBeforeUpdate, "before");
+		// call functions scheduled to be invoked before updating components. If this function
+		// calls the requestUpdate method or schedules a function to be invoked after updates,
+		// they will be executed in this cycle. However, if it schedules a function to be invoked
+		// after updates, it will be executed in the next cycle.
+		if (this.callsScheduledBeforeUpdate.size > 0)
+		{
+			this.schedulerState = SchedulerState.BeforeUpdate;
+			const callsScheduledBeforeUpdate = this.callsScheduledBeforeUpdate;
+			this.callsScheduledBeforeUpdate = new Set<mim.ScheduledFuncType>();
+			this.callScheduledFunctions( callsScheduledBeforeUpdate, "before");
+		}
 
-		/// #if USE_STATS
-			DetailedStats.stats = new DetailedStats( `Mimbl update cycle ${this.currentTick}: `);
-			DetailedStats.stats.start();
-		/// #endif
+		if (this.vnsScheduledForUpdate.size > 0)
+		{
+			/// #if USE_STATS
+				DetailedStats.stats = new DetailedStats( `Mimbl update cycle ${this.currentTick}: `);
+				DetailedStats.stats.start();
+			/// #endif
 
-		// arrange scheduled nodes by their nesting depths perform updates
-		this.performCommitPhase( this.performRenderPhase( this.arrangeNodesByDepth( vnsToUpdate)));
+			// remember the internal set of nodes and re-create it so that it is ready for new
+			// update requests. Arrange scheduled nodes by their nesting depths and perform updates.
+			this.schedulerState = SchedulerState.Update;
+			let vnsScheduledForUpdate = this.vnsScheduledForUpdate;
+			this.vnsScheduledForUpdate = new Set<VN>();
+			this.performCommitPhase( this.performRenderPhase( this.arrangeNodesByDepth( vnsScheduledForUpdate)));
 
-		/// #if USE_STATS
-			DetailedStats.stats.stop( true);
-			DetailedStats.stats = null;
-		/// #endif
+			/// #if USE_STATS
+				DetailedStats.stats.stop( true);
+				DetailedStats.stats = null;
+			/// #endif
+		}
 
 		// call functions scheduled to be invoked after updating components
-		if (callsAfterUpdate)
-			this.callScheduledFunctions( callsAfterUpdate, "after");
+		if (this.callsScheduledAfterUpdate.size > 0)
+		{
+			this.schedulerState = SchedulerState.AfterUpdate;
+			const callsScheduledAfterUpdate = this.callsScheduledAfterUpdate;
+			this.callsScheduledAfterUpdate = new Set<mim.ScheduledFuncType>();
+			this.callScheduledFunctions( callsScheduledAfterUpdate, "after");
+		}
+
+		this.schedulerState = SchedulerState.Idle;
 	};
 
 
 
 	// Arranges the scheduled nodes by their nesting depths so that we update "upper" nodes before
 	// the lower ones. This can help avoid two conditions:
-	//	- rendering a child component twice (first because it called updateMe) and second
+	//	- rendering a child component twice: first because it called updateMe, and second
 	//		because its parent was also updated.
-	//	- unnecessay rendering a child component before it is removed by the parent
-	// We allocate contiguous array where indexes correspond to depth. Each element in this
+	//	- unnecessary rendering a child component before it is removed by the parent
+	// We allocate contiguous array where indices correspond to depth. Each element in this
 	// array will either be undefined or contain an array of nodes at this depth.
 	private arrangeNodesByDepth( vnsScheduledForUpdate: Set<VN>): VN[][]
 	{
 		/// #if VERBOSE_NODE
-			let label = `arranging ${vnsScheduledForUpdate.size} nodes`;
+			let label = `arranging ${vnsScheduledForUpdate.size} nodes by depth`;
 			console.time( label);
 		/// #endif
 
 		// create a sparse array of certain reasonable size. If we have depths greater than this,
-		// the array will grow automatically (although it is less erformant it is still acceptable).
+		// the array will grow automatically (although it is less performant it is still acceptable).
 		let vnsByDepth: VN[][] = new Array<VN[]>(100);
 		vnsScheduledForUpdate.forEach( (vn: VN) =>
 		{
@@ -549,24 +579,6 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 
 
 
-	// Call functions scheduled before or after update cycle.
-	private callScheduledFunctions( funcs: Set<()=>void>, beforeOrAfter: string)
-	{
-		funcs.forEach( (func) =>
-		{
-			try
-			{
-				func();
-			}
-			catch( err)
-			{
-				console.error( `Exception while invoking function ${beforeOrAfter} updating components\n`, err);
-			}
-		});
-	}
-
-
-
 	// Performs the commit phase for all components scheduled for update and recursively for their
 	// sub-nodes where necessary. The Commit phase consists of updating DOM and calling life-cycle
 	// methods didMount, didUpdate and willUnmount.
@@ -585,6 +597,24 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		updatedNodeDisps.forEach( (disp: VNDisp) =>
 		{
 			this.postUpdate( disp);
+		});
+	}
+
+
+
+	// Call functions scheduled before or after update cycle.
+	private callScheduledFunctions( funcs: Set<()=>void>, beforeOrAfter: string)
+	{
+		funcs.forEach( (func) =>
+		{
+			try
+			{
+				func();
+			}
+			catch( err)
+			{
+				console.error( `Exception while invoking function ${beforeOrAfter} updating components\n`, err);
+			}
 		});
 	}
 
@@ -759,14 +789,8 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 
 
 
-	// Recursively renders this node and updates its sub-nodes if necessary. This method is
-	// invoked when a node is being updated either as a result of updateMe invocation or because
-	// the parent node was updated. If an exception is thrown during the execution of this method
-	// (which can be only from components' shouldUpdate or render methods), the component is asked
-	// to handle the error. If the component handles the error, the content returned from the
-	// error handling method is rendered; otherwise, the exception is re-thrown. Thus, the
-	// exception is propagated up until it is handled by a node that handles it or up to the root
-	// node.
+	// Recursively renders the children if this node. This method is only invoked if a node is
+	// being updated as a result of updateMe invocation.
 	private updateStemVirtual( vn: VN): VNDisp
 	{
 		let disp = new VNDisp();
@@ -865,6 +889,11 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		// get the node whose children are being updated. This is always the oldVN member of
 		// the disp structure.
 		let vn = disp.oldVN;
+
+		// it might happen that the node being updated was already deleted by its parent. Check
+		// for this situation and exit if this is the case
+		if (!vn.anchorDN)
+			return;
 
 		// remove from DOM the old nodes designated to be removed (that is, those for which there
 		// is no counterpart new node that will either update or replace it) and then those
@@ -1117,6 +1146,9 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	// Handle of the animation frame request (in case it should be canceled).
 	private scheduledFrameHandle: number = 0;
 
+	// State of the scheduler.
+	private schedulerState: SchedulerState = SchedulerState.Idle;
+
 	// Number that serves as a unique ID of an update cycle. Each update cycle the root node
 	// increments this number. Each node being updated in this cycle is assigned this number.
 	// This helps prevent double-rendering of when both a component and its parent are
@@ -1128,6 +1160,28 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	// during creation or updating process an exception is thrown and is caught by some upper
 	// level node, this value will still point at the node that caused the exception.
 	private currentVN: VN = null;
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// State of the scheduler indicating in what phase of the update cycle we currently reside.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+enum SchedulerState
+{
+	// The scheduler is not within the update cycle
+	Idle = 0,
+
+	// The scheduler is executing functions before updating nodes
+	BeforeUpdate,
+
+	// The scheduler is updating nodes
+	Update,
+
+	// The scheduler is executing functions after updating nodes
+	AfterUpdate,
 }
 
 
