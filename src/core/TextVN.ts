@@ -87,8 +87,7 @@ export class TextVN extends VN implements mim.ITextVN
 	// Commits updates made to this node to DOM.
 	public commitUpdate( newVN: VN): void
 	{
-		this.text = (newVN as TextVN).text;
-		this.dn.nodeValue = this.text;
+		this.dn.nodeValue = this.text = (newVN as TextVN).text;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Updated);

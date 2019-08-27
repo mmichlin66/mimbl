@@ -794,7 +794,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	private updateStemVirtual( vn: VN): VNDisp
 	{
 		let disp = new VNDisp();
-		disp.action = VNAction.UpdateSubNodesOnly;
+		disp.action = VNAction.Unknown;
 		disp.oldVN = vn;
 		this.updateVirtual( disp);
 		return disp;
@@ -847,7 +847,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	private updateSubNodesVirtual( disp: VNDisp): void
 	{
 		// render the new content and build array of dispositions objects for the sub-nodes.
-		this.buildNodeDisps( disp);
+		this.buildSubNodeDispositions( disp);
 
 		// perform rendering for sub-nodes that should be inserted, replaced or updated
 		for( let subNodeDisp of disp.subNodeDisps)
@@ -902,8 +902,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		for( let svn of disp.subNodesToRemove)
 			this.destroyPhysical( svn);
 
-		// clear our current list of sub-nodes and re-allocate it for new sub-node - we will
-		// populate it while updating them
+		// clear our current list of sub-nodes we will populate it while updating them
 		vn.subNodes.clear();
 
 		// determine the anchor node to use when inserting or moving new nodes
@@ -935,31 +934,54 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 					oldVN.commitUpdate( newVN);
 				}
 
-				// if the updated old VN (or one of its sub-nodes) defines a DOM node and it
-				// is not positioned before the current "beforeDN", move it there. It also
-				// becomes the new DOM node before which next components should be inserted.
-				let firstDN = oldVN.getFirstDN();
-				if (firstDN !== null)
+				// update the sub-nodes if necessary
+				if (subNodeDisp.updateDisp.shouldRender)
+					this.updatePhysical( subNodeDisp);
+
+				// if our sub-node defines its own DN, we need to determine whether it should be moved.
+				let subNodeFirstDN = oldVN.getFirstDN();
+				if (subNodeFirstDN !== null)
 				{
-					// determine whether we need to move our node
-					let nextSubNodeVNDisp: VNDisp = i === disp.subNodeDisps.length - 1
-									? undefined : disp.subNodeDisps[i+1];
-					if (this.shouldMoveVN( subNodeDisp, nextSubNodeVNDisp) && firstDN.nextSibling !== beforeDN)
+					let nextSubNodeVNDisp = i === disp.subNodeDisps.length - 1 ? null : disp.subNodeDisps[i+1];
+					let newNextVN = nextSubNodeVNDisp === null
+										? null
+										: nextSubNodeVNDisp.action === VNAction.Update
+											? nextSubNodeVNDisp.oldVN
+											: nextSubNodeVNDisp.newVN;
+					if (oldVN.next !== newNextVN || subNodeFirstDN.nextSibling !== beforeDN)
 					{
-						anchorDN.insertBefore( firstDN, beforeDN);
+						anchorDN.insertBefore( subNodeFirstDN, beforeDN);
 
 						/// #if USE_STATS
 							DetailedStats.stats.log( vn.getStatsCategory(), StatsAction.Moved);
 						/// #endif
 					}
 
-					beforeDN = firstDN;
+					beforeDN = subNodeFirstDN;
 				}
 
-				// update the sub-nodes if necessary
-				if (subNodeDisp.updateDisp.shouldRender)
-					this.updatePhysical( subNodeDisp);
+				// // if the updated old VN (or one of its sub-nodes) defines a DOM node and it
+				// // is not positioned before the current "beforeDN", move it there. It also
+				// // becomes the new DOM node before which next components should be inserted.
+				// let firstDN = oldVN.getFirstDN();
+				// if (firstDN !== null)
+				// {
+				// 	// determine whether we need to move our node
+				// 	let nextSubNodeVNDisp: VNDisp = i === disp.subNodeDisps.length - 1
+				// 					? undefined : disp.subNodeDisps[i+1];
+				// 	if (this.shouldMoveVN( subNodeDisp, nextSubNodeVNDisp) || firstDN.nextSibling !== beforeDN)
+				// 	{
+				// 		anchorDN.insertBefore( firstDN, beforeDN);
 
+				// 		/// #if USE_STATS
+				// 			DetailedStats.stats.log( vn.getStatsCategory(), StatsAction.Moved);
+				// 		/// #endif
+				// 	}
+
+				// 	beforeDN = firstDN;
+				// }
+
+				// the old node remains as a sub-node
 				vn.subNodes.insertVN( oldVN);
 			}
 			else
@@ -976,9 +998,22 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 				if (firstDN !== null)
 					beforeDN = firstDN;
 
+				// the new node becomes a sub-node
 				vn.subNodes.insertVN( newVN);
 			}
 		}
+	}
+
+
+
+	private shouldMoveVN( vnDisp: VNDisp, nextVNDisp: VNDisp): boolean
+	{
+		if (nextVNDisp === undefined)
+			return vnDisp.oldVN.next !== null;
+		else if (nextVNDisp.action === VNAction.Update)
+			return vnDisp.oldVN.next !== nextVNDisp.oldVN;
+		else
+			return true;
 	}
 
 
@@ -1014,100 +1049,179 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 
 
 
-	// Compares two chains of nodes (old and new) and fills two arrays for sub-nodes:
-	//	- array of node disposition objects corresponding to new sub-nodes. Each disposition
-	//		indicates whether the new sub-node should be just inserted or whether it should update
-	//		the old sub-node.
-	//	- array of old sub-nodes which should be removed.
-	// This method is only invoked with the disp object whose oldVN field is non-null.
-	private buildNodeDisps( disp: VNDisp): void
+	/**
+	 * Compares old and new chains of sub-nodes and determines what nodes should be created, deleted
+	 * or updated. The result is remembered in the given VNDisp object as an array of VNDisp objects
+	 * for each new sub-node and as array of old sub-nodes that should be deleted.
+	 * 
+	 * This method is only invoked with the disp object whose oldVN field is non-null.
+	 * @param disp VNDisp object describing the disposition of the parent node whose sub-nodes are
+	 *   being matched. The parent node is referenced by the disp.oldVN field.
+	 */
+	private buildSubNodeDispositions( disp: VNDisp): void
 	{
-		//disp.subNodeDisps = [];
-		//disp.subNodesToRemove = [];
-
 		// render the new content;
-		let newChain = createVNChainFromContent( disp.oldVN.render());
+		let newChain = createVNChainFromContent( disp.newVN ? disp.newVN.render() : disp.oldVN.render());
 
-		// build map of old keyed nodes and an array of old non-keyed nodes
-		let keyedMap: Map<any,VN> = new Map<any,VN>();
-		let nonKeyedList: VN[] = [];
+		// loop over new nodes and fill an array of VNDisp objects in the parent disp. At the same
+		// time, build a map that includes all new nodes that have keys. The values are VNDisp objects.
+		let newKeyedNodeMap = new Map<any,VNDisp>();
+		for( let newVN = newChain.first; newVN !== null; newVN = newVN.next)
+		{
+			let subNodeDisp = new VNDisp();
+			subNodeDisp.newVN = newVN;
+			disp.subNodeDisps.push( subNodeDisp);
+			if (newVN.key !== undefined)
+				newKeyedNodeMap.set( newVN.key, subNodeDisp);
+		}
+
+		// loop over old nodes and put those that have keys matching new nodes into the new nodes' VNDisp
+		// objects. Put those that don't have keys or that have keys that don't match any new node to
+		// an array of non-matching old nodes
+		let oldNonMatchingNodeList: VN[] = [];
 		let oldChain = disp.oldVN.subNodes;
 		for( let oldVN = oldChain.first; oldVN !== null; oldVN = oldVN.next)
 		{
 			if (oldVN.key === undefined)
-				nonKeyedList.push( oldVN);
+				oldNonMatchingNodeList.push( oldVN);
 			else
-				keyedMap.set( oldVN.key, oldVN);
+			{
+				let subNodeDisp = newKeyedNodeMap.get( oldVN.key);
+				if (subNodeDisp)
+				{
+					subNodeDisp.oldVN = oldVN;
+					subNodeDisp.action = VNAction.Update;
+				}
+				else
+					oldNonMatchingNodeList.push( oldVN);
+			}
 		}
 
-		// loop over new nodes
-		let nonKeyedListLength: number = nonKeyedList.length;
-		let nonKeyedIndex: number = 0;
-		for( let newVN = newChain.first; newVN !== null; newVN = newVN.next)
+		// by now we have all old and new nodes with the same keys matched to one another. Now loop
+		// over new node dispositions and match the not-yet-matched ones (those with Unknown action)
+		// to old nodes sequentially from the list of non-matched old nodes.
+		let oldNonMatchingNodeListLength: number = oldNonMatchingNodeList.length;
+		let oldNonMatchingNodeListIndex: number = 0;
+		for( let subNodeDisp of disp.subNodeDisps)
 		{
-			let action: VNAction;
+			if (subNodeDisp.action)
+				continue;
+
 			let oldVN: VN;
-			if (newVN.key !== undefined)
+			if (oldNonMatchingNodeListIndex < oldNonMatchingNodeListLength)
 			{
-				oldVN = keyedMap.get( newVN.key);
+				let oldVN = oldNonMatchingNodeList[oldNonMatchingNodeListIndex];
+				let newVN = subNodeDisp.newVN;
+				if (oldVN.type === newVN.type && oldVN.isUpdatePossible( newVN))
+				{
+					// we are here if the new node can update the old one
+					subNodeDisp.oldVN = oldVN;
+					subNodeDisp.action = VNAction.Update;
+				}
+				else
+				{
+					// we are here if the new node cannot update the old one and shold completely
+					// replace it. We add the old node to the list of those to be removed and indicate
+					// that the new node should be mounted.
+					disp.subNodesToRemove.push( oldVN);
+					subNodeDisp.action = VNAction.Insert;
+				}
 
-				// if we found old node then remove the old node from the map - this way at
-				// the end of the loop all old nodes remaining in the map should be deleted
-				if (oldVN !== undefined)
-					keyedMap.delete( newVN.key);
-			}
-			else if (nonKeyedIndex < nonKeyedListLength)
-			{
-				oldVN = nonKeyedList[nonKeyedIndex];
-				nonKeyedIndex++;
-			}
-
-			let subNodeDisp = new VNDisp();
-			subNodeDisp.newVN = newVN;
-
-			// by now, if we didn't find an old node, then the new node should be inserted;
-			// otherwise, we decide on whether the new node should be used to update or
-			// replace the old node
-			if (oldVN === undefined)
-				subNodeDisp.action = VNAction.Insert;
-			else if (oldVN.type === newVN.type && oldVN.isUpdatePossible( newVN))
-			{
-				subNodeDisp.action = VNAction.Update;
-				subNodeDisp.oldVN = oldVN;
+				oldNonMatchingNodeListIndex++;
 			}
 			else
 			{
-				// we are here if the new node should replace the old one. We add the old node to
-				// the list of those to be removed and indicate
-				disp.subNodesToRemove.push( oldVN);
+				// we are here if there are no non-matched old nodes left. Indocate that the new node
+				// should be mounted.
 				subNodeDisp.action = VNAction.Insert;
 			}
-
-			disp.subNodeDisps.push( subNodeDisp);
 		}
 
-		// old keyed nodes remaining in the map will be unmounted because these are the old nodes
-		// for which there were no new nodes with the same key.
-		for( let oldVN of keyedMap.values())
-			disp.subNodesToRemove.push( oldVN);
-
-		// old non-keyed nodes from the current index to the end of the list will be unmounted
-		for( let i = nonKeyedIndex; i < nonKeyedListLength; i++)
-			disp.subNodesToRemove.push( nonKeyedList[i]);
+		// old non-matched nodes from the current index to the end of the list will be unmounted
+		for( let i = oldNonMatchingNodeListIndex; i < oldNonMatchingNodeListLength; i++)
+			disp.subNodesToRemove.push( oldNonMatchingNodeList[i]);
 	}
 
 
 
 	// Determines whether the node should be moved based on its disposition.
-	private shouldMoveVN( vnDisp: VNDisp, nextVNDisp: VNDisp): boolean
-	{
-		if (nextVNDisp === undefined)
-			return vnDisp.oldVN.next !== null;
-		else if (nextVNDisp.action === VNAction.Update)
-			return vnDisp.oldVN.next !== nextVNDisp.oldVN;
-		else
-			return true;
-	}
+	// // Compares two chains of nodes (old and new) and fills two arrays for sub-nodes:
+	// //	- array of node disposition objects corresponding to new sub-nodes. Each disposition
+	// //		indicates whether the new sub-node should be just inserted or whether it should update
+	// //		the old sub-node.
+	// //	- array of old sub-nodes which should be removed.
+	// // This method is only invoked with the disp object whose oldVN field is non-null.
+	// private buildSubNodeDispositions( disp: VNDisp): void
+	// {
+	// 	// render the new content;
+	// 	let newChain = createVNChainFromContent( disp.oldVN.render());
+
+	// 	// build map of old keyed nodes and an array of old non-keyed nodes
+	// 	let keyedMap: Map<any,VN> = new Map<any,VN>();
+	// 	let nonKeyedList: VN[] = [];
+	// 	let oldChain = disp.oldVN.subNodes;
+	// 	for( let oldVN = oldChain.first; oldVN !== null; oldVN = oldVN.next)
+	// 	{
+	// 		if (oldVN.key === undefined)
+	// 			nonKeyedList.push( oldVN);
+	// 		else
+	// 			keyedMap.set( oldVN.key, oldVN);
+	// 	}
+
+	// 	// loop over new nodes
+	// 	let nonKeyedListLength: number = nonKeyedList.length;
+	// 	let nonKeyedIndex: number = 0;
+	// 	for( let newVN = newChain.first; newVN !== null; newVN = newVN.next)
+	// 	{
+	// 		let oldVN: VN;
+	// 		if (newVN.key !== undefined)
+	// 		{
+	// 			oldVN = keyedMap.get( newVN.key);
+
+	// 			// if we found old node then remove the old node from the map - this way at
+	// 			// the end of the loop all old nodes remaining in the map should be deleted
+	// 			if (oldVN !== undefined)
+	// 				keyedMap.delete( newVN.key);
+	// 		}
+	// 		else if (nonKeyedIndex < nonKeyedListLength)
+	// 		{
+	// 			oldVN = nonKeyedList[nonKeyedIndex];
+	// 			nonKeyedIndex++;
+	// 		}
+
+	// 		let subNodeDisp = new VNDisp();
+	// 		subNodeDisp.newVN = newVN;
+
+	// 		// by now, if we didn't find an old node, then the new node should be inserted;
+	// 		// otherwise, we decide on whether the new node should be used to update or
+	// 		// replace the old node
+	// 		if (oldVN === undefined)
+	// 			subNodeDisp.action = VNAction.Insert;
+	// 		else if (oldVN.type === newVN.type && oldVN.isUpdatePossible( newVN))
+	// 		{
+	// 			subNodeDisp.action = VNAction.Update;
+	// 			subNodeDisp.oldVN = oldVN;
+	// 		}
+	// 		else
+	// 		{
+	// 			// we are here if the new node should replace the old one. We add the old node to
+	// 			// the list of those to be removed and indicate
+	// 			disp.subNodesToRemove.push( oldVN);
+	// 			subNodeDisp.action = VNAction.Insert;
+	// 		}
+
+	// 		disp.subNodeDisps.push( subNodeDisp);
+	// 	}
+
+	// 	// old keyed nodes remaining in the map will be unmounted because these are the old nodes
+	// 	// for which there were no new nodes with the same key.
+	// 	for( let oldVN of keyedMap.values())
+	// 		disp.subNodesToRemove.push( oldVN);
+
+	// 	// old non-keyed nodes from the current index to the end of the list will be unmounted
+	// 	for( let i = nonKeyedIndex; i < nonKeyedListLength; i++)
+	// 		disp.subNodesToRemove.push( nonKeyedList[i]);
+	// }
 
 
 
@@ -1200,51 +1314,52 @@ class ServiceInfo
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// The VNAction enumeration specifies possible actions to perform for new nodes during
-// reconciliation process.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
+/**
+ * The VNAction enumeration specifies possible actions to perform for new nodes during
+ * reconciliation process.
+ */
 export const enum VNAction
 {
-	// The node's children should beupdated.
-	UpdateSubNodesOnly = 0,
+	/**
+	 * Either it is not yet known what to do with the node itself or this is a component node,
+	 * for which an update was requested; that is, only the node's children should be updated.
+	 */
+	Unknown = 0,
 
-	// The new node should be inserted. This means that either there was no counterpart old node
-	// found or the found node cannot be used to update the old one (e.g. of different type).
+	/**
+	 * The new node should be inserted. This means that either there was no counterpart old node
+	 * found or the found node cannot be used to update the old one nor can the old node be reused
+	 * by the new one (e.g. of different type).
+	 */
 	Insert = 1,
 
-	// The new node should be used to update the old node.
+	/** The new node should be used to update the old node. */
 	Update = 2,
 }
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// The VNDisp class describes a disposition for a node during reconciliation process.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
+/**
+ * The VNDisp class describes a disposition for a node during reconciliation process.
+ */
 class VNDisp
 {
-	// Action to be performed on the node
+	/** Action to be performed on the node */
 	action: VNAction;
 
-	// New virtual node to insert, update or replace an old node
+	/** New virtual node to insert or to update an old node */
 	newVN: VN;
 
-	// Old virtual node to be updated or replaced. This is not used for the insert action.
+	/** Old virtual node to be updated. This is not used for the Insert action. */
 	oldVN: VN;
 
-	// Disposition flags for the Update action. This field is not used for Insert and Replace
-	// actions.
+	/** Disposition flags for the Update action. This is not used for the Insert actions. */
 	updateDisp: VNUpdateDisp;
 
-	// Array of disposition objects for sub-nodes.
+	/** Array of disposition objects for sub-nodes. */
 	subNodeDisps: VNDisp[] = [];
 
-	// Array of sub-nodes that should be removed during update of the sub-nodes.
+	/** Array of sub-nodes that should be removed during update of the sub-nodes. */
 	subNodesToRemove: VN[] = [];
 }
 

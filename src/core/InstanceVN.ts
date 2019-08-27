@@ -1,5 +1,5 @@
 ﻿import * as mim from "./mim"
-import {VN} from "./VN"
+import {VN, VNUpdateDisp} from "./VN"
 import {CompBaseVN} from "./CompBaseVN"
 
 /// #if USE_STATS
@@ -71,10 +71,56 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 	// parameter is guaranteed to point to a VN of the same type as this node.
 	public isUpdatePossible( newVN: VN): boolean
 	{
-		// since the component instance is used as a key, the other node is always for the
-		// same component instance and update is always possible.
-		return true;
+		// update is possible if the components are from the same class
+		return this.comp === (newVN as InstanceVN).comp ||
+				this.comp.constructor === (newVN as InstanceVN).comp.constructor;
 	}
+
+
+
+	// Prepares this node to be updated from the given node. This method is invoked only if update
+	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
+	// point to a VN of the same type as this node. The returned object indicates whether children
+	// should be updated and whether the commitUpdate method should be called.
+	// This method is part of the Render phase.
+	public prepareUpdate?( newVN: VN): VNUpdateDisp
+	{
+		// if it is the same component instance, we don't need to do anything
+		let newComp = (newVN as InstanceVN).comp;
+		let needsUpdating = this.comp !== newComp;
+
+		// if the coponent instance are different, then we need to prepare the new instance for
+		// mounting.
+		if (needsUpdating)
+		{
+			newComp.setSite( this);
+			if (newComp.componentWillMount)
+				newComp.componentWillMount();
+	
+			/// #if USE_STATS
+				DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
+			/// #endif
+		}
+
+		return { shouldCommit: needsUpdating, shouldRender: needsUpdating };
+	}
+
+
+
+	// Commits updates made to this node to DOM.
+	// This method is part of the Commit phase.
+	public commitUpdate?( newVN: VN): void
+	{
+		// we are here only if the component instances are different. In this case we should
+		// replace the old component with the new one and also replace its characteristics.
+		// First indicate that our old component will be unmounted
+		this.willUnmount();
+
+		let newInstanceVN = newVN as InstanceVN;
+		this.comp = this.key = newInstanceVN.comp;
+		this.name = newInstanceVN.name;
+	}
+
 }
 
 
