@@ -796,7 +796,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	{
 		let disp = new VNDisp();
 		disp.action = VNDispAction.Unknown;
-		disp.oldVN = vn;
+		disp.oldVN = disp.newVN = vn;
 		this.updateVirtual( disp);
 		return disp;
 	}

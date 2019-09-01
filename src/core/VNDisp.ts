@@ -1,5 +1,6 @@
 ﻿import {DN, VN, VNUpdateDisp} from "./VN"
 import {createVNChainFromContent} from "./VNChainFuncs"
+import { VNType } from "./mim";
 
 
 
@@ -126,9 +127,9 @@ export class VNDisp
 
 	/**
 	 * If the node has more than this number of sub-nodes, then we build groups. The idea is that
-	 * otherwise, the overhead of building the groups is not worth it.
+	 * otherwise, the overhead of building groups is not worth it.
 	 */
-	private static readonly NO_GROUP_THRESHOLD = 1;
+	private static readonly NO_GROUP_THRESHOLD = 2;
 
 
 
@@ -141,9 +142,16 @@ export class VNDisp
 	 */
 	public buildSubNodeDispositions(): void
 	{
-		// render the new content;
-		let newChain = createVNChainFromContent( this.action === VNDispAction.Insert
-						? this.newVN.render() : this.oldVN.render());
+		// render the new content. Whether we use the old or the new node for rendering depends on
+		// several factors
+		//  - if it is an Insert action, then use the new node (old node isn't even available).
+		//  - if it is an Update operation, then for all types of nodes except InstanceVN, use
+		//    the old node. For InstanceVN use the new node because the old node is still pointing
+		//    to the old component instance. We also rely on the fact that for the stem nodes, we
+		//    have both old and new nodes pointing to the same node.
+		let newChain = createVNChainFromContent(
+				this.action === VNDispAction.Insert || this.oldVN.type === VNType.InstanceComp
+					? this.newVN.render() : this.oldVN.render());
 
 		// loop over new nodes and fill an array of VNDisp objects in the parent disp. At the same
 		// time, build a map that includes all new nodes that have keys. The values are VNDisp objects.

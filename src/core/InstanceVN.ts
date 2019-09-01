@@ -39,13 +39,7 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 	// This method is part of the Render phase.
 	public willMount(): void
 	{
-		this.comp.setSite( this);
-		if (this.comp.componentWillMount)
-			this.comp.componentWillMount();
-
-		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
-		/// #endif
+		this.willMountInstance( this.comp);
 	}
 
 
@@ -55,14 +49,7 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 	// This method is part of the Commit phase.
 	public willUnmount(): void
 	{
-		if (this.comp.componentWillUnmount)
-			this.comp.componentWillUnmount();
-
-		this.comp.setSite( null);
-
-		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
-		/// #endif
+		this.willUnmountInstance( this.comp);
 	}
 
 
@@ -92,15 +79,7 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 		// if the coponent instance are different, then we need to prepare the new instance for
 		// mounting.
 		if (needsUpdating)
-		{
-			newComp.setSite( this);
-			if (newComp.componentWillMount)
-				newComp.componentWillMount();
-	
-			/// #if USE_STATS
-				DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
-			/// #endif
-		}
+			this.willMountInstance( newComp);
 
 		return { shouldCommit: needsUpdating, shouldRender: needsUpdating };
 	}
@@ -114,13 +93,42 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 		// we are here only if the component instances are different. In this case we should
 		// replace the old component with the new one and also replace its characteristics.
 		// First indicate that our old component will be unmounted
-		this.willUnmount();
+		this.willUnmountInstance( this.comp);
 
 		let newInstanceVN = newVN as InstanceVN;
 		this.comp = this.key = newInstanceVN.comp;
 		this.name = newInstanceVN.name;
 	}
 
+
+
+
+	// Notifies the given component that ir will be mounted.
+	private willMountInstance( comp: mim.IComponent): void
+	{
+		comp.setSite( this);
+		if (comp.componentWillMount)
+			comp.componentWillMount();
+
+		/// #if USE_STATS
+			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
+		/// #endif
+	}
+
+
+
+	// Notifies the given component that it will be unmounted.
+	public willUnmountInstance( comp: mim.IComponent): void
+	{
+		if (comp.componentWillUnmount)
+			comp.componentWillUnmount();
+
+		comp.setSite( null);
+
+		/// #if USE_STATS
+			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
+		/// #endif
+	}
 }
 
 

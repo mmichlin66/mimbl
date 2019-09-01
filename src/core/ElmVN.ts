@@ -188,9 +188,13 @@ export class ElmVN extends VN implements mim.IElmVN
 	public isUpdatePossible( newVN: VN): boolean
 	{
 		// update is possible if this is the same type of element; that is, it has the same
-		// name and the same isSvg flag
+		// name.
 		const newElmNode: ElmVN = newVN as ElmVN;
 		return this.elmName === newElmNode.elmName;
+
+		// update is possible if this is the same type of element; that is, it has the same
+		// name and the same isSvg flag
+		// const newElmNode: ElmVN = newVN as ElmVN;
 		// return this.isSvg === newElmNode.isSvg && this.elmName === newElmNode.elmName;
 	}
 
