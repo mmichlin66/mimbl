@@ -190,7 +190,8 @@ export class ElmVN extends VN implements mim.IElmVN
 		// update is possible if this is the same type of element; that is, it has the same
 		// name and the same isSvg flag
 		const newElmNode: ElmVN = newVN as ElmVN;
-		return this.isSvg === newElmNode.isSvg && this.elmName === newElmNode.elmName;
+		return this.elmName === newElmNode.elmName;
+		// return this.isSvg === newElmNode.isSvg && this.elmName === newElmNode.elmName;
 	}
 
 

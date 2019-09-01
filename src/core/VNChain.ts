@@ -151,6 +151,3 @@ export class VNChain implements mim.IVNChain
 	// Number of nodes in the chain.
 	public count: number = 0;
 }
-
-
-

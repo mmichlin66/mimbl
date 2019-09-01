@@ -554,15 +554,15 @@ export function prop( target, name: string)
  *	.....
  *	render()
  *	{
- *		return <mim.Placeholder>
+ *		return <mim.Fragment>
  *			<div1/>
  *			<div2/>
  *			<div3/>
- *		</mim.Placeholder>
+ *		</mim.Fragment>
  *	}
  * @param props 
  */
-export function Placeholder( props: CompProps<{}>): any {}
+export function Fragment( props: CompProps<{}>): any {}
 
 
 
@@ -735,7 +735,7 @@ export interface IVNChain
 
 
 /**
- * The IVNode interface represents a virtual node. Through this interface,callers can perform
+ * The IVNode interface represents a virtual node. Through this interface, callers can perform
  * most common actions that are available on every type of virtual node. Each type of virtual node
  * also implements a more specific interface through which the specific capabilities of the node
  * type are availbale.
@@ -1323,7 +1323,8 @@ export namespace JSX
 // Definitions of functions that depend on VN-derived classes
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-import {createVNChainFromJSX, RootVN} from "../core/RootVN"
+import {RootVN} from "./RootVN"
+import {createVNChainFromJSX} from "./VNChainFuncs"
 
 
 

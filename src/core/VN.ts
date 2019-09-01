@@ -219,22 +219,70 @@ export abstract class VN implements mim.IVNode
 	// This method is only called on the mounted nodes.
 	public getFirstDN(): DN
 	{
-		let dn: DN = this.getOwnDN();
+		let dn = this.getOwnDN();
 		if (dn !== null)
 			return dn;
 
-		// recursively call this method on the sub-nodes until a valid node is returned
-		if (this.subNodes.first !== null)
+		// recursively call this method on the sub-nodes from first to last until a valid node
+		// is returned
+		for( let svn = this.subNodes.first; svn !== null; svn = svn.next)
 		{
-			for( let svn: VN = this.subNodes.first; svn !== null; svn = svn.next)
-			{
-				dn = svn.getFirstDN();
-				if (dn !== null)
-					return dn;
-			}
+			dn = svn.getFirstDN();
+			if (dn !== null)
+				return dn;
 		}
 
 		return null;
+	}
+
+
+
+	// Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
+	// This method is only called on the mounted nodes.
+	public getLastDN(): DN
+	{
+		let dn = this.getOwnDN();
+		if (dn !== null)
+			return dn;
+
+		// recursively call this method on the sub-nodes from last to first until a valid node
+		// is returned
+		for( let svn = this.subNodes.last; svn !== null; svn = svn.prev)
+		{
+			dn = svn.getLastDN();
+			if (dn !== null)
+				return dn;
+		}
+
+		return null;
+	}
+
+
+
+	// Returns the list of DOM nodes that are immediate children of this virtual node; that is,
+	// are NOT children of sub-nodes that have their own DOM node. Never returns null.
+	public getImmediateDNs(): DN[]
+	{
+		let arr: DN[] = [];
+		this.collectImmediateDNs( arr);
+		return arr;
+	}
+
+
+
+	// Collects all DOM nodes that are immediate children of this virtual node (that is,
+	// are NOT children of sub-nodes that have their own DOM node) into the given array.
+	public collectImmediateDNs( arr: DN[]): void
+	{
+		let dn = this.getOwnDN();
+		if (dn !== null)
+			arr.push( dn);
+		else
+		{
+			// recursively call this method on the sub-nodes from first to last
+			for( let svn = this.subNodes.first; svn !== null; svn = svn.next)
+				svn.collectImmediateDNs( arr);
+		}
 	}
 
 

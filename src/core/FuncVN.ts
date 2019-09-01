@@ -15,7 +15,7 @@ export class FuncVN extends VN
 	/** Determines whether this node corresponds to a fragment placeholder. */
 	public static isVNaFragment( vn: VN): boolean
 	{
-		return (vn as FuncVN).func === mim.Placeholder;
+		return (vn as FuncVN).func === mim.Fragment;
 	}
 
 
