@@ -15,7 +15,7 @@ Mimbl provides all the standard React-style functionality that developers expect
 - Context functionality based on publish/subscribe mechanism.
 
 ## Usage
-The mimbl library provides a custom JSX factory function calld `jsx`. In order for this function to be invoked by the TypeScript compiler, the tsconfig.json must have the following option:
+The Mimbl library provides a custom JSX factory function called `jsx`. In order for this function to be invoked by the TypeScript compiler, the tsconfig.json must have the following option:
 
 ```json
 "compilerOptions":
@@ -25,7 +25,7 @@ The mimbl library provides a custom JSX factory function calld `jsx`. In order f
 }
  ```
 
-The .tsx files must import the mimbl module as mim: import * as mim from "mimbl":
+The .tsx files must import the Mimbl module as mim: import * as mim from "mimbl":
 
 ```tsx
 import * as mim from "mimbl"
