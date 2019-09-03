@@ -35,6 +35,16 @@ export class TextVN extends VN implements mim.ITextVN
 
 
 
+	// Creates internal stuctures of the virtual node so that it is ready to produce children.
+	// If the node never has any children (like text nodes), it should return false.
+	// This method is called right after the node has been constructed.
+	// This method is part of the Render phase.
+	public willMount(): boolean
+	{
+		// text nodes don't have children
+		return false;
+	}
+
 	// Inserts the virtual node's content into DOM.
 	// This method is part of the Commit phase.
 	public mount(): void

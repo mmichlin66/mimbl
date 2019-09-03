@@ -90,9 +90,10 @@ export class FuncVN extends VN
 		// Creates internal stuctures of the virtual node so that it is ready to produce children.
 		// This method is called right after the node has been constructed.
 		// This method is part of the Render phase.
-		public willMount(): void
+		public willMount(): boolean
 		{
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
+			return true;
 		}
 
 		// This method is called before the content of node and all its sub-nodes is removed from the

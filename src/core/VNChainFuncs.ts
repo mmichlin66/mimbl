@@ -16,23 +16,22 @@ import {TextVN} from "./TextVN"
 export function createVNChainFromContent( content: any): VNChain
 {
 	const chain = new VNChain();
-	let contentType: string = typeof content;
-	if (content === null || content === undefined || contentType === "boolean" || contentType === "function")
+	if ( content === undefined || content === null ||content === false || typeof content === "function")
 		return chain;
 
-	if (content instanceof VN)
+	if (typeof content === "string")
+		chain.appendVN( new TextVN( content as string));
+	else if (content instanceof VN)
 		chain.appendVN( content as VN);
 	else if (content instanceof VNChain)
 		chain.appendChain( content as VNChain);
-	else if (content instanceof mim.Component)
-		chain.appendVN( new InstanceVN( content as mim.Component));
+	else if (typeof content.render === "function")
+		chain.appendVN( new InstanceVN( content as mim.IComponent));
 	else if (Array.isArray( content))
 	{
 		for( let arrItem of content as Array<any>)
 			chain.appendChain( createVNChainFromContent( arrItem));
 	}
-	else if (contentType === "string")
-		chain.appendVN( new TextVN( content as string));
 	else if (content instanceof Promise)
 		throw content;
 	else
@@ -48,23 +47,20 @@ export function createVNChainFromJSX( tag: any, props: any, children: any[]): VN
 {
 	const chain: VNChain = new VNChain();
 
-	if (tag === mim.Fragment || tag === "m")
+	if (typeof tag === "string")
+		chain.appendVN( new ElmVN( tag as string, props, children));
+	else if (tag === mim.Fragment)
 		chain.appendChain( createVNChainFromContent( children));
-	else if (mim.Component.isPrototypeOf( tag))
+	else if (tag.prototype && typeof tag.prototype.render === "function")
 		chain.appendVN( new ClassVN( tag as mim.IComponentClass, props, children));
+	// else if (mim.Component.isPrototypeOf( tag))
+	// 	chain.appendVN( new ClassVN( tag as mim.IComponentClass, props, children));
+	else if (typeof tag === "function")
+		chain.appendVN( new FuncVN( tag as mim.FuncCompType, props, children));
+	/// #if DEBUG
 	else
-	{
-		let tagType: string = typeof tag;
-		if (tagType === "function")
-			chain.appendVN( new FuncVN( tag as mim.FuncCompType, props, children));
-		else if (tagType === "string")
-			chain.appendVN( new ElmVN( tag as string, props, children));
-
-		/// #if DEBUG
-		else
-			throw new Error( "Invalid tag in jsx processing function: " + tag);
-		/// #endif
-	}
+		throw new Error( "Invalid tag in jsx processing function: " + tag);
+	/// #endif
 
 	return chain;
 }

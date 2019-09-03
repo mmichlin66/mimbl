@@ -15,7 +15,7 @@ import {CompBaseVN} from "./CompBaseVN"
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInstanceVN
 {
-	constructor( comp: mim.Component)
+	constructor( comp: mim.IComponent)
 	{
 		super( mim.VNType.InstanceComp)
 		this.comp = comp;
@@ -37,9 +37,10 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 	// Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
 	// This method is part of the Render phase.
-	public willMount(): void
+	public willMount(): boolean
 	{
 		this.willMountInstance( this.comp);
+		return true;
 	}
 
 
@@ -106,7 +107,11 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 	// Notifies the given component that ir will be mounted.
 	private willMountInstance( comp: mim.IComponent): void
 	{
-		comp.setSite( this);
+		// it is OK for the component to not implement setSite method; however, it will not be
+		// able to use any of the Mimbl services including requests for updates.
+		if (this.comp.setSite)
+			comp.setSite( this);
+
 		if (comp.componentWillMount)
 			comp.componentWillMount();
 
@@ -123,7 +128,8 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 		if (comp.componentWillUnmount)
 			comp.componentWillUnmount();
 
-		comp.setSite( null);
+		if (this.comp.setSite)
+			comp.setSite( null);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);

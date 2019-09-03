@@ -102,7 +102,7 @@ export class ElmVN extends VN implements mim.IElmVN
 	// Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
 	// This method is part of the Render phase.
-	public willMount(): void
+	public willMount(): boolean
 	{
 		// if we don't know yet whether this is an SVG element or not (whch can happen for
 		// dual-purpose elements), determine it now by walking up the chain of parents and
@@ -124,6 +124,7 @@ export class ElmVN extends VN implements mim.IElmVN
 		}
 
 		this.parseProps();
+		return true;
 	}
 
 

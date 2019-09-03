@@ -174,9 +174,10 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	// Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
 	// This method is part of the Render phase.
-	public willMount(): void
+	public willMount(): boolean
 	{
 		this.publishService( "StdErrorHandling", this);
+		return true;
 	}
 
 
@@ -640,26 +641,29 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		/// #if VERBOSE_NODE
 			console.debug( `VERBOSE: Calling willMount() on node ${vn.name}`);
 		/// #endif
-		vn.willMount();
 
-		// if the node doesn't handle errors we don't need to waste time to use try/catch
-		if (!vn.supportsErrorHandling())
-			this.createSubNodesVirtual( vn);
-		else
+		// if willMount returns false, the node doesn't hve any sub-nodes
+		if (vn.willMount())
 		{
-			try
-			{
+			// if the node doesn't handle errors we don't need to waste time to use try/catch
+			if (!vn.supportsErrorHandling())
 				this.createSubNodesVirtual( vn);
-			}
-			catch( err)
+			else
 			{
-				/// #if VERBOSE_NODE
-					console.debug( `VERBOSE: Calling handleError() on node ${vn.name}`);
-				/// #endif
+				try
+				{
+					this.createSubNodesVirtual( vn);
+				}
+				catch( err)
+				{
+					/// #if VERBOSE_NODE
+						console.debug( `VERBOSE: Calling handleError() on node ${vn.name}`);
+					/// #endif
 
-				// let the node handle its own error and re-render
-				vn.handleError( err, this.currentVN.path);
-				this.createSubNodesVirtual( vn);
+					// let the node handle its own error and re-render
+					vn.handleError( err, this.currentVN.path);
+					this.createSubNodesVirtual( vn);
+				}
 			}
 		}
 

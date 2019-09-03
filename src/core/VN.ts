@@ -144,16 +144,17 @@ export abstract class VN implements mim.IVNode
 	public abstract getStatsCategory(): StatsCategory;
 /// #endif
 
-	// Returns content that comprizes the children of the node. If the node doesn't have
+	// Creates internal stuctures of the virtual node so that it is ready to produce children.
+	// If the node never has any children (like text nodes), it should return false.
+	// This method is called right after the node has been constructed.
+	// This method is part of the Render phase.
+	public willMount?(): boolean { return true; }
+
+	// Returns content that comprises the children of the node. If the node doesn't have
 	// sub-nodes, null should be returned. If this method is not implemented it is as though
 	// null is returned.
 	// This method is part of the Render phase.
 	public render?(): any {}
-
-	// Creates internal stuctures of the virtual node so that it is ready to produce children.
-	// This method is called right after the node has been constructed.
-	// This method is part of the Render phase.
-	public willMount?(): void {}
 
 	// Inserts the virtual node's content into DOM.
 	// This method is part of the Commit phase.
@@ -212,78 +213,6 @@ export abstract class VN implements mim.IVNode
 	// Returns DOM node corresponding to the virtual node itself (if any) and not to any of its
 	// sub-nodes.
 	public getOwnDN(): DN { return null; }
-
-
-
-	// Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
-	// This method is only called on the mounted nodes.
-	public getFirstDN(): DN
-	{
-		let dn = this.getOwnDN();
-		if (dn !== null)
-			return dn;
-
-		// recursively call this method on the sub-nodes from first to last until a valid node
-		// is returned
-		for( let svn = this.subNodes.first; svn !== null; svn = svn.next)
-		{
-			dn = svn.getFirstDN();
-			if (dn !== null)
-				return dn;
-		}
-
-		return null;
-	}
-
-
-
-	// Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
-	// This method is only called on the mounted nodes.
-	public getLastDN(): DN
-	{
-		let dn = this.getOwnDN();
-		if (dn !== null)
-			return dn;
-
-		// recursively call this method on the sub-nodes from last to first until a valid node
-		// is returned
-		for( let svn = this.subNodes.last; svn !== null; svn = svn.prev)
-		{
-			dn = svn.getLastDN();
-			if (dn !== null)
-				return dn;
-		}
-
-		return null;
-	}
-
-
-
-	// Returns the list of DOM nodes that are immediate children of this virtual node; that is,
-	// are NOT children of sub-nodes that have their own DOM node. Never returns null.
-	public getImmediateDNs(): DN[]
-	{
-		let arr: DN[] = [];
-		this.collectImmediateDNs( arr);
-		return arr;
-	}
-
-
-
-	// Collects all DOM nodes that are immediate children of this virtual node (that is,
-	// are NOT children of sub-nodes that have their own DOM node) into the given array.
-	public collectImmediateDNs( arr: DN[]): void
-	{
-		let dn = this.getOwnDN();
-		if (dn !== null)
-			arr.push( dn);
-		else
-		{
-			// recursively call this method on the sub-nodes from first to last
-			for( let svn = this.subNodes.first; svn !== null; svn = svn.next)
-				svn.collectImmediateDNs( arr);
-		}
-	}
 
 
 
@@ -456,6 +385,78 @@ export abstract class VN implements mim.IVNode
 		// go up the chain; note that we don't pass the useSelf parameter on.
 		return this.parent !== null ? this.parent.findService( id, true) : undefined;
 	}
+
+
+	// Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
+	// This method is only called on the mounted nodes.
+	public getFirstDN(): DN
+	{
+		let dn = this.getOwnDN();
+		if (dn !== null)
+			return dn;
+
+		// recursively call this method on the sub-nodes from first to last until a valid node
+		// is returned
+		for( let svn = this.subNodes.first; svn !== null; svn = svn.next)
+		{
+			dn = svn.getFirstDN();
+			if (dn !== null)
+				return dn;
+		}
+
+		return null;
+	}
+
+
+
+	// Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
+	// This method is only called on the mounted nodes.
+	public getLastDN(): DN
+	{
+		let dn = this.getOwnDN();
+		if (dn !== null)
+			return dn;
+
+		// recursively call this method on the sub-nodes from last to first until a valid node
+		// is returned
+		for( let svn = this.subNodes.last; svn !== null; svn = svn.prev)
+		{
+			dn = svn.getLastDN();
+			if (dn !== null)
+				return dn;
+		}
+
+		return null;
+	}
+
+
+
+	// Returns the list of DOM nodes that are immediate children of this virtual node; that is,
+	// are NOT children of sub-nodes that have their own DOM node. Never returns null.
+	public getImmediateDNs(): DN[]
+	{
+		let arr: DN[] = [];
+		this.collectImmediateDNs( arr);
+		return arr;
+	}
+
+
+
+	// Collects all DOM nodes that are immediate children of this virtual node (that is,
+	// are NOT children of sub-nodes that have their own DOM node) into the given array.
+	public collectImmediateDNs( arr: DN[]): void
+	{
+		let dn = this.getOwnDN();
+		if (dn !== null)
+			arr.push( dn);
+		else
+		{
+			// recursively call this method on the sub-nodes from first to last
+			for( let svn = this.subNodes.first; svn !== null; svn = svn.next)
+				svn.collectImmediateDNs( arr);
+		}
+	}
+
 
 
 	// Finds the first DOM node in the tree of virtual nodes that comes after our node that is a

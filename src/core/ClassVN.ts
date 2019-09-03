@@ -73,11 +73,16 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 	// Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
 	// This method is part of the Render phase.
-	public willMount(): void
+	public willMount(): boolean
 	{
 		// create component instance
 		this.comp = new this.compClass( this.props);
-		this.comp.setSite( this);
+
+		// it is OK for the component to not implement setSite method; however, it will not be
+		// able to use any of the Mimbl services including requests for updates.
+		if (this.comp.setSite)
+			this.comp.setSite( this);
+
 		if (this.comp.componentWillMount)
 			this.comp.componentWillMount();
 
@@ -88,6 +93,8 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
 		/// #endif
+
+		return true;
 	}
 
 
@@ -107,7 +114,9 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 		if (this.comp.componentWillUnmount)
 			this.comp.componentWillUnmount();
 
-		this.comp.setSite( null);
+		if (this.comp.setSite)
+			this.comp.setSite( null);
+
 		this.comp = undefined;
 
 		/// #if USE_STATS

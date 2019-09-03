@@ -54,7 +54,8 @@ export type CompProps<TProps = {}, TChildren = any> = Readonly<TProps> &
  */
 export interface IComponentClass<TProps = {}, TChildren = any>
 {
-	new( props: TProps): IComponent<TProps,TChildren>;
+	new( props?: TProps): IComponent<TProps,TChildren>;
+	render(): any;
 }
 
 
@@ -74,15 +75,19 @@ export interface IComponent<TProps = {}, TChildren = any>
 
 	/**
 	 * Sets or clears the site object to the component. This method is called twice:
-	 *	1) Before the component is rendered for the first time: the component must remember the
-	 *		passed object.
-	 *	2) Before the component is destroyed: null is passed as a parameter and the component must
-	 *		release the remembered object.
-	 * @param site The site object implementing the IComponentSite interface. The component uses
+	 *  1. Before the component is rendered for the first time: the component must remember the
+	 *    passed object.
+	 *  2. Before the component is destroyed: null is passed as a parameter and the component must
+	 *    release the remembered object.
+	 * 
+	 * This method is optional; however, without implementing it components cannot use Mimbl
+	 * services.
+	 * 
+	 * @param site The site object implementing the IVnode interface. The component uses
 	 * this object to invoke different services provided by the Mimbl infrastructure; for example
 	 * to request a re-rendering.
 	 */
-	setSite( site: IVNode): void;
+	setSite?( site: IVNode): void;
 
 	/**
 	 * Notifies that the component is about to render its content for the first time. This method
@@ -1049,18 +1054,6 @@ export namespace JSX
 	
 	export interface IntrinsicElements
 	{
-		/**
-		 * Special name to serve as a placeholder, which contains several elements. This is
-		 * needed where only a single JSX element is accepted (e.g. return from render) but we
-		 * want to return more than one.
-		 * 
-		 * This is only necessary because TypeScript doesn't allow "JSX fragment" (<>) if a
-		 * custom JSX factory function is used.
-		 * 
-		 * This element doesn't have any properties.
-		 */
-		m: {};
-
 		// HTML elements
 		a: html.IHtmlAElementProps;
 		abbr: html.IHtmlElementProps;
