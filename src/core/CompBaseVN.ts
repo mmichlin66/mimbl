@@ -13,7 +13,7 @@ import {DN, VN} from "./VN"
 // in terms of update requests and lifecycle management.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export abstract class CompBaseVN<TComp extends mim.IComponent> extends VN implements mim.IComponentSite
+export abstract class CompBaseVN<TComp extends mim.IComponent> extends VN
 {
 	constructor( type: mim.VNType)
 	{

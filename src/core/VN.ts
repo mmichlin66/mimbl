@@ -336,7 +336,7 @@ export abstract class VN implements mim.IVNode
 
 	// Registers an object of any type as a service with the given ID that will be available for
 	// consumption by descendant nodes.
-	public publishService( id: string, service: any): void
+	public publishService<K extends keyof mim.IServiceDefinitions>( id: K, service: mim.IServiceDefinitions[K]): void
 	{
 		if (this.publishedServices === undefined)
 			this.publishedServices = new Map<string,any>();
@@ -352,7 +352,7 @@ export abstract class VN implements mim.IVNode
 
 
 	// Unregisters a service with the given ID.
-	public unpublishService( id: string): void
+	public unpublishService<K extends keyof mim.IServiceDefinitions>( id: K): void
 	{
 		if (this.publishedServices === undefined)
 			return;
@@ -371,7 +371,9 @@ export abstract class VN implements mim.IVNode
 	// the Ref object will be set to the defaultValue (if specified) or will remain undefined.
 	// Whenever the value of the service that is registered by a closest ancestor node is
 	// changed, the Ref object will receive the new value.
-	public subscribeService( id: string, ref: mim.RefPropType<any>, defaultService?: any, useSelf?: boolean): void
+	public subscribeService<K extends keyof mim.IServiceDefinitions>( id: K,
+					ref: mim.RefPropType<mim.IServiceDefinitions[K]>,
+					defaultService?: mim.IServiceDefinitions[K], useSelf?: boolean): void
 	{
 		if (this.subscribedServices === undefined)
 			this.subscribedServices = new Map<string,VNSubscribedServiceInfo>();
@@ -390,7 +392,7 @@ export abstract class VN implements mim.IVNode
 
 	// Unsubscribes from a service with the given ID. The Ref object that was used to subscribe,
 	// will be set to undefined.
-	public unsubscribeService( id: string): void
+	public unsubscribeService<K extends keyof mim.IServiceDefinitions>( id: K): void
 	{
 		if (this.subscribedServices === undefined)
 			return;
@@ -409,9 +411,21 @@ export abstract class VN implements mim.IVNode
 
 
 
+	// Retrieves the value for a service with the given ID registered by a closest ancestor
+	// node or the default value if none of the ancestor nodes registered a service with
+	// this ID. This method doesn't establish a subscription and only reflects the current state.
+	public getService<K extends keyof mim.IServiceDefinitions>( id: K,
+					defaultService?: mim.IServiceDefinitions[K], useSelf?: boolean): any
+	{
+		let service = this.findService( id, useSelf);
+		return service !== undefined ? service : defaultService;
+	}
+
+
+
 	// Notifies the node that publication information about the given service (to which the node
 	// has previously subscribed) has changed.
-	public notifyServiceChanged( id: string): void
+	public notifyServiceChanged<K extends keyof mim.IServiceDefinitions>( id: K): void
 	{
 		if (this.subscribedServices === undefined)
 			return;
@@ -425,20 +439,9 @@ export abstract class VN implements mim.IVNode
 
 
 
-	// Retrieves the value for a service with the given ID registered by a closest ancestor
-	// node or the default value if none of the ancestor nodes registered a service with
-	// this ID. This method doesn't establish a subscription and only reflects the current state.
-	public getService( id: string, defaultService?: any, useSelf?: boolean): any
-	{
-		let service = this.findService( id, useSelf);
-		return service !== undefined ? service : defaultService;
-	}
-
-
-
 	// Goes up the chain of nodes looking for a published service with the given ID. Returns
 	// undefined if the service is not found. Note that null might be a valid value.
-	public findService( id: string, useSelf?: boolean): any
+	public findService<K extends keyof mim.IServiceDefinitions>( id: K, useSelf?: boolean): any
 	{
 		if (useSelf)
 		{
@@ -468,7 +471,7 @@ export abstract class VN implements mim.IVNode
 		// not controlled by our component.
 		if (this.subNodes.last !== null)
 		{
-			const dn: DN = this.subNodes.last.getFirstDN();
+			const dn: DN = this.subNodes.last.getLastDN();
 			if (dn !== null)
 			{
 				const nextSibling: DN = dn.nextSibling;
@@ -486,7 +489,7 @@ export abstract class VN implements mim.IVNode
 			// note that getFirstDN call traverses the hierarchy of nodes. Note also that
 			// it cannot find a node under a different anchor element because the first different
 			// anchor element will be returned as a wanted node.
-			const dn: DN = vn.getFirstDN();
+			const dn: DN = vn.getLastDN();
 			if (dn !== null)
 				return dn;
 		}

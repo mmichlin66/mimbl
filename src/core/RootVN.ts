@@ -251,7 +251,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 
 
 	// Informs that a service with the given ID was published by the given node.
-	public notifyServicePublished( id: string, sourceVN: VN): void
+	public notifyServicePublished<K extends keyof mim.IServiceDefinitions>( id: K, sourceVN: VN): void
 	{
 		let info: ServiceInfo = this.serviceInfos.get( id);
 		if (info === undefined)
@@ -270,7 +270,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 
 
 	// Informs that a service with the given ID was unpublished by the given node.
-	public notifyServiceUnpublished( id: string, sourceVN: VN): void
+	public notifyServiceUnpublished<K extends keyof mim.IServiceDefinitions>( id: K, sourceVN: VN): void
 	{
 		let info: ServiceInfo = this.serviceInfos.get( id);
 		if (info === undefined)
@@ -291,7 +291,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 
 
 	// Informs that the given node has subscribed to a service with the given ID.
-	public notifyServiceSubscribed( id: string, sourceVN: VN): void
+	public notifyServiceSubscribed<K extends keyof mim.IServiceDefinitions>( id: K, sourceVN: VN): void
 	{
 		let info: ServiceInfo = this.serviceInfos.get( id);
 		if (info === undefined)
@@ -306,7 +306,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 
 
 	// Informs that the given node has unsubscribed from a service with the given ID.
-	public notifyServiceUnsubscribed( id: string, sourceVN: VN): void
+	public notifyServiceUnsubscribed<K extends keyof mim.IServiceDefinitions>( id: K, sourceVN: VN): void
 	{
 		let info: ServiceInfo = this.serviceInfos.get( id);
 		if (info === undefined)
@@ -896,16 +896,6 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		if (!vn.anchorDN)
 			return;
 
-		// remove from DOM the old nodes designated to be removed (that is, those for which there
-		// is no counterpart new node that will either update or replace it) and then those
-		// designated to be replaced. We need to remove old nodes first before we start inserting
-		// new - one reason is to properly maintain references.
-		for( let svn of disp.subNodesToRemove)
-			this.destroyPhysical( svn);
-
-		// clear our current list of sub-nodes - we will populate it while updating them
-		vn.subNodes.clear();
-
 		// determine the anchor node to use when inserting new or moving existing sub-nodes. If
 		// our node has its own DN, it will be the anchor for the sub-nodes; otherwise, our node's
 		// anchor will be the anchor for the sub-nodes too.
@@ -916,6 +906,16 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		// need to find a DOM node before which to start inserting new nodes. Null means
 		// append to the end of the anchor node's children.
 		let beforeDN = ownDN !== null ? null : vn.getNextDNUnderSameAnchorDN( anchorDN);
+
+		// clear our current list of sub-nodes - we will populate it while updating them
+		vn.subNodes.clear();
+
+		// remove from DOM the old nodes designated to be removed (that is, those for which there
+		// is no counterpart new node that will either update or replace it) and then those
+		// designated to be replaced. We need to remove old nodes first before we start inserting
+		// new - one reason is to properly maintain references.
+		for( let svn of disp.subNodesToRemove)
+			this.destroyPhysical( svn);
 
 		// perform updates and inserts by either groups or individual nodes.
 		if (disp.subNodeGroups && disp.subNodeGroups.length > 0)

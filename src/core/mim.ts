@@ -45,7 +45,7 @@ export type CompProps<TProps = {}, TChildren = any> = Readonly<TProps> &
 
 
 /**
- * Interface that defines constuctor signature for components.
+ * Interface that defines constructor signature for components.
  * 
  * @typeparam TProps Type defining properties that can be passed to the class-based component
  *		of this type. Default type is an empty object (no properties).
@@ -82,7 +82,7 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * this object to invoke different services provided by the Mimbl infrastructure; for example
 	 * to request a re-rendering.
 	 */
-	setSite( site: IComponentSite): void;
+	setSite( site: IVNode): void;
 
 	/**
 	 * Notifies that the component is about to render its content for the first time. This method
@@ -146,87 +146,6 @@ export type ScheduledFuncType = () => void;
 
 
 /**
- * The IComponentSite interface represents a connection of a component to the rendering mechanism.
- * This interface is passed to the component upon initialization and the component calls its
- * methods to get services, e.g. to request being updated or to subscribe to a service.
- */
-export interface IComponentSite
-{
-	/** The component can call this method to set a distinguishing display name identifying the
-	 * component instance. By default, display name is set using the component's class name and
-	 * key (if specified). Upon JavaScript minification, class names can become meaningless and
-	 * components can use this method to set a name with some meaning. Display name is used for
-	 * tracing and debugging only.
-	 * @param name Display name to use for this component.
-	 */
-	setDisplayName( name: string): void;
-
-	/** This method is called by the component when it needs to be updated. */
-	requestUpdate(): void;
-
-	/** This method is called by the component when it decides to cancel a previously requested
-	 * update request.
-	 */
-	cancelUpdate(): void;
-
-	/** Schedules to call the given function either before or after all the scheduled components
-	 * have been updated.
-	 * @param func Function to be called either before or after the update cycle.
-	 * @param beforeUpdate Flag indicating whether the function should be called before (true)
-	 * or after (false) the update cycle.
-	 */
-	scheduleCall( func: ScheduledFuncType, beforeUpdate: boolean): void;
-
-	/** Cancels a call that has been scheduled to be made either before or after all the scheduled
-	 * components have been updated.
-	 * @param func Function that was previously passed to the scheduleCall method.
-	 * @param beforeUpdate Flag that was passed to the scheduleCall method.
-	 */
-	cancelScheduledCall( func: ScheduledFuncType, beforeUpdate: boolean): void;
-
-	/** Registers an object of any type as a service with the given ID that will be available for
-	 * consumption by descendant components.
-	 */
-	publishService<K extends keyof IServiceDefinitions>( id: K, service: IServiceDefinitions[K]): void;
-
-	/** Unregisters a service with the given ID. */
-	unpublishService<K extends keyof IServiceDefinitions>( id: K): void;
-
-	/** Subscribes to a service with the given ID. If the service with the given ID is registered
-	 * by this or one of the ancestor components, the passed Ref object will reference it;
-	 * otherwise, the Ref object will be set to the defaultValue (if specified) or will remain
-	 * undefined. Whenever the value of the service that is registered by this or a closest
-	 * ancestor component is changed,the Ref object will receive the new value.
-	 * The useSelf optional parameter determines whether the component can subscribe to the
-	 * service published by itself. The default is false.
-	 * @param id 
-	 * @param ref 
-	 * @param defaultService 
-	 * @param useSelf 
-	 */
-	subscribeService<K extends keyof IServiceDefinitions>( id: K, ref: RefPropType<IServiceDefinitions[K]>,
-					defaultService?: IServiceDefinitions[K], useSelf?: boolean): void;
-
-	/** Unsubscribes from a service with the given ID. The Ref object that was used to subscribe
-	 * will be set to undefined.
-	 * @param id 
-	 */
-	unsubscribeService<K extends keyof IServiceDefinitions>( id: K): void;
-
-	/** Retrieves the value for a service with the given ID registered by a closest ancestor
-	 * component or the default value if none of the ancestor components registered a service with
-	 * this ID. This method doesn't establish a subscription and only reflects the current state.
-	 * @param id 
-	 * @param defaultService 
-	 * @param useSelf 
-	 */
-	getService<K extends keyof IServiceDefinitions>( id: K, defaultService?: IServiceDefinitions[K],
-					useSelf?: boolean): IServiceDefinitions[K];
-}
-
-
-
-/**
  * The IServiceDefinitions interface serves as a mapping between service names and service types.
  * This interface is intended to be augmented by modules that define and/or use specific services.
  * This allows performing service publishing and subscribing in type-safe manner.
@@ -273,17 +192,18 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 
 	constructor( props?: CompProps<TProps,TChildren>)
 	{
-		this.props = props;
+		if (props)
+			this.props = props;
 	}
 
 	/** Site object through which component can request services. */
-	protected site: IComponentSite = undefined;
+	protected site: IVNode = undefined;
 
 	/** Display name specified by the component. */
 	protected dispalyName: string;
 
 	/** Sets or clears the site object through which component can request services. */
-	public setSite( site: IComponentSite): void
+	public setSite( site: IVNode): void
 	{
 		this.site = site;
 
@@ -367,7 +287,7 @@ export class Ref<T>
 		this._r = initialReferene;
 	}
 
-	/** Adds a callback that will be invoked when the vaue of the refernce changes. */
+	/** Adds a callback that will be invoked when the value of the reference changes. */
 	public addListener( listener: RefFunc<T>)
 	{
 		this.changedEvent.add( listener);
@@ -542,14 +462,14 @@ export function prop( target, name: string)
 
 
 /**
- * An artificial "fragment" component that is only used as a temporary collection of other items
+ * An artificial "Fragment" component that is only used as a temporary collection of other items
  * in places where JSX only allows a single item. Our JSX factory function creates a virtual node
- * for its children, but later this node is thrown away and only children are used. This component
- * is only needed because currently TypeScript doesn't alow the <> fragment notation if a custom
- * JSX factory function is used.
+ * for each of its children the function is never actually called. This component is only needed
+ * because currently TypeScript doesn't allow the <> fragment notation if a custom JSX factory
+ * function is used.
  *
- * Use it as following:
- *
+ * Use it as follows:
+ * ```tsx
  *	import * as mim from "mimbl"
  *	.....
  *	render()
@@ -560,6 +480,8 @@ export function prop( target, name: string)
  *			<div3/>
  *		</mim.Fragment>
  *	}
+  ```
+
  * @param props 
  */
 export function Fragment( props: CompProps<{}>): any {}
@@ -591,7 +513,7 @@ export interface ICustomAttributeFactory<T>
 
 
 /**
- * Registers custom attribute functory for the given property name.
+ * Registers custom attribute factory for the given property name.
  * @param propName name of the custom attribute
  * @param factory custom property factory
  */
@@ -738,7 +660,7 @@ export interface IVNChain
  * The IVNode interface represents a virtual node. Through this interface, callers can perform
  * most common actions that are available on every type of virtual node. Each type of virtual node
  * also implements a more specific interface through which the specific capabilities of the node
- * type are availbale.
+ * type are available.
  */
 export interface IVNode
 {
@@ -759,6 +681,85 @@ export interface IVNode
 
 	/** Gets node's display name. */
 	readonly DisplayName: string;
+
+	/**
+	 * The component can call this method to set a distinguishing display name identifying the
+	 * component instance. By default, display name is set using the component's class name and
+	 * key (if specified). Upon JavaScript minification, class names can become meaningless and
+	 * components can use this method to set a name with some meaning. Display name is used for
+	 * tracing and debugging only.
+	 * @param name Display name to use for this component.
+	 */
+	setDisplayName( name: string): void;
+
+	/** This method is called by the component when it needs to be updated. */
+	requestUpdate(): void;
+
+	/**
+	 * This method is called by the component when it decides to cancel a previously requested
+	 * update request.
+	 */
+	cancelUpdate(): void;
+
+	/**
+	 * Schedules to call the given function either before or after all the scheduled components
+	 * have been updated.
+	 * @param func Function to be called either before or after the update cycle.
+	 * @param beforeUpdate Flag indicating whether the function should be called before (true)
+	 * or after (false) the update cycle.
+	 */
+	scheduleCall( func: ScheduledFuncType, beforeUpdate: boolean): void;
+
+	/**
+	 * Cancels a call that has been scheduled to be made either before or after all the scheduled
+	 * components have been updated.
+	 * @param func Function that was previously passed to the scheduleCall method.
+	 * @param beforeUpdate Flag that was passed to the scheduleCall method.
+	 */
+	cancelScheduledCall( func: ScheduledFuncType, beforeUpdate: boolean): void;
+
+	/**
+	 * Registers an object of any type as a service with the given ID that will be available for
+	 * consumption by descendant components.
+	 */
+	publishService<K extends keyof IServiceDefinitions>( id: K, service: IServiceDefinitions[K]): void;
+
+	/** Unregisters a service with the given ID. */
+	unpublishService<K extends keyof IServiceDefinitions>( id: K): void;
+
+	/**
+	 * Subscribes to a service with the given ID. If the service with the given ID is registered
+	 * by this or one of the ancestor components, the passed Ref object will reference it;
+	 * otherwise, the Ref object will be set to the defaultValue (if specified) or will remain
+	 * undefined. Whenever the value of the service that is registered by this or a closest
+	 * ancestor component is changed,the Ref object will receive the new value.
+	 * The useSelf optional parameter determines whether the component can subscribe to the
+	 * service published by itself. The default is false.
+	 * @param id 
+	 * @param ref 
+	 * @param defaultService 
+	 * @param useSelf 
+	 */
+	subscribeService<K extends keyof IServiceDefinitions>( id: K, ref: RefPropType<IServiceDefinitions[K]>,
+					defaultService?: IServiceDefinitions[K], useSelf?: boolean): void;
+
+	/**
+	 * Unsubscribes from a service with the given ID. The Ref object that was used to subscribe
+	 * will be set to undefined.
+	 * @param id 
+	 */
+	unsubscribeService<K extends keyof IServiceDefinitions>( id: K): void;
+
+	/**
+	 * Retrieves the value for a service with the given ID registered by a closest ancestor
+	 * component or the default value if none of the ancestor components registered a service with
+	 * this ID. This method doesn't establish a subscription and only reflects the current state.
+	 * @param id 
+	 * @param defaultService 
+	 * @param useSelf 
+	 */
+	getService<K extends keyof IServiceDefinitions>( id: K, defaultService?: IServiceDefinitions[K],
+					useSelf?: boolean): IServiceDefinitions[K];
 }
 
 
@@ -1359,7 +1360,7 @@ export function jsx( tag: any, props: any, ...children: any[]): any
 
 /**
  * Renders the given content (usually result of JSX expression) under the given HTML element in a
- * synchronus manner.
+ * synchronous manner.
  * @param content Content to render.
  * @param anchorDN DOM element under which to render the content. If null or undefined, then
  * render under the document.body tag.
