@@ -765,6 +765,46 @@ export interface IVNode
 	 */
 	getService<K extends keyof IServiceDefinitions>( id: K, defaultService?: IServiceDefinitions[K],
 					useSelf?: boolean): IServiceDefinitions[K];
+
+	/**
+	 * Creates a wrapper function with the same signature as the given callback so that if the original
+	 * callback throws an exception, it is processed by the Mimble error handling mechanism so that the
+	 * exception bubles from this virtual node up the hierarchy until a node/component that knows to
+	 * handle errors is found.
+	 * 
+	 * This function should be called by the code that is not part of any component but still has access
+	 * to the IVNode object; for example, custom attribute handlers. Components that derive from the
+	 * mim.Component class should use the wrapCallback method of the mim.Component class.
+	 * 
+	 * Use this method before passing callbacks to document and window event handlers as well as
+	 * non-DOM objects that use callbacks, e.g. promises. For example:
+	 * 
+	 * ```typescript
+	 *	class Adds
+	 *	{
+	 *		private onWindowResize = ( e: Event): void => {};
+	 *
+	 * 		wrapper: (e: Event): void;
+	 * 
+	 * 		public startResizeMonitoring( vn: IVNode)
+	 *		{
+	 *			this.wrapper = vn.wrapCallback( this.onWindowResize);
+	 *			window.addEventListener( "resize", this.wrapper);
+	 *		}
+	 * 
+	 * 		public stopResizeMonitoring()
+	 *		{
+	 *			window.removeEventListener( "resize", this.wrapper);
+	 *			this.wrapper = undefined;
+	 *		}
+	 *	}
+	 * ```
+	 * 
+	 * @param callback Callback to be wrapped
+	 * @returns Function that has the same signature as the given callback and that should be used
+	 *     instead of the original callback
+	 */
+	wrapCallback<T>( callback: T): T;
 }
 
 

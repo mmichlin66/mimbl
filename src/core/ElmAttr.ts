@@ -127,7 +127,8 @@ export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export class ElmAttr
 {
-	// Object that maps property names to PropInfo-derived objects.
+	// Object that maps property names to PropInfo-derived objects. Information about custom
+	// attributes is added to this object when the registerProperty method is called.
 	private static propInfos: {[P:string]: PropInfo} =
 	{
 		// attributes - only those attributes are listed that have non-trivial treatment

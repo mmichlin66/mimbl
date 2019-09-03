@@ -317,7 +317,6 @@ export class ElmVN extends VN implements mim.IElmVN
 				typeof propVal[0] === "function" && typeof propVal[1] === "boolean")
 		{
 			let orgFunc = propVal[0] as mim.EventFuncType<any>;
-			let wrapper = EventHandlerWrapper.bind( this, orgFunc);
 			return { info, orgFunc, useCapture: propVal[1] as boolean };
 		}
 
@@ -396,7 +395,7 @@ export class ElmVN extends VN implements mim.IElmVN
 	// element. This method handles special cases of properties with non-trivial values.
 	private addEvent( name: string, info: EventRunTimeData): void
 	{
-		info.wrapper = EventHandlerWrapper.bind( this, info.orgFunc);
+		info.wrapper = this.wrapCallback( info.orgFunc);
 		this.elm.addEventListener( name, info.wrapper, info.useCapture);
 
 		/// #if USE_STATS
@@ -472,14 +471,14 @@ export class ElmVN extends VN implements mim.IElmVN
 
 		this.elm.removeEventListener( name, oldInfo.wrapper, oldInfo.useCapture);
 
-		newInfo.wrapper = EventHandlerWrapper.bind( this, newInfo.orgFunc);
+		newInfo.wrapper = this.wrapCallback( newInfo.orgFunc);
 		this.elm.addEventListener( name, newInfo.wrapper, newInfo.useCapture);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Event, StatsAction.Updated);
 		/// #endif
 
-		// indicate that there was change in attribute value.
+		// indicate that there was change in event listener value.
 		return true;
 	}
 
@@ -612,26 +611,6 @@ export class ElmVN extends VN implements mim.IElmVN
 
 
 
-// The EventHandlerWrapper function is used to wrap an event handler function assigned to an event
-// of the Element. This function catches exceptions from the original event handler and uses the
-// "StdErrorHandling" service to report the exception to the nearest node that can handle it.
-function EventHandlerWrapper(): void
-{
-	try
-	{
-		let [orgEventHandler, ...rest] = arguments;
-		return orgEventHandler( ...rest);
-	}
-	catch( err)
-	{
-		let errorService = this.findService( "StdErrorHandling") as mim.IErrorHandlingService;
-		if (errorService)
-			errorService.reportError( err, this.path);
-	}
-}
-
-
-
 // Type defining the information we keep about each regular attribute
 interface AttrRunTimeData
 {
@@ -661,7 +640,7 @@ interface EventRunTimeData
 	// handling service. The wrapper is marked optional because it is created only if a new
 	// event listener is added; that is, if during update, the event listener function is the
 	// same, there is no need to create new wrapper because the old one will be used.
-	wrapper?:  () => any;
+	wrapper?:  mim.EventFuncType<any>;
 };
 
 

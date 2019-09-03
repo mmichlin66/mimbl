@@ -387,6 +387,27 @@ export abstract class VN implements mim.IVNode
 	}
 
 
+
+
+	/**
+	 * Creates a wrapper function with the same signature as the given callback so that if the original
+	 * callback throws an exception, it is processed by the Mimble error handling mechanism so that the
+	 * exception bubles from this virtual node up the hierarchy until a node/component that knows
+	 * to handle errors is found.
+	 * 
+	 * This function should be called by the code that is not part of any component but still has access
+	 * to the IVNode object; for example, custom attribute handlers. Components that derive from the
+	 * mim.Component class should use the wrapCallback method of the mim.Component class.
+	 * 
+	 * @param callback 
+	 */
+	public wrapCallback<T>( callback: T): T
+	{
+		return CallbackWrapper.bind( this, callback);
+	}
+
+
+
 	// Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
 	// This method is only called on the mounted nodes.
 	public getFirstDN(): DN
@@ -572,6 +593,33 @@ export abstract class VN implements mim.IVNode
 	// already updated in this update cycle. This helps prevent the double-rendering of a
 	// component if both the component and its parent are updated in the same cycle.
 	public lastUpdateTick: number;
+}
+
+
+
+// 
+/**
+ * The CallbackWrapper function is used to wrap a callback in order to catch exceptions from the
+ * callback and pass it to the "StdErrorHandling" service. The function is bound to two parameters:
+ * a virtual node (accessed as `this`) and the original callback (accessed as the first element
+ * from the `arguments` array). The rest of parameters in the `arguments` array are passed to the
+ * original callback and the value returned by the callback is returned from the wrapper.
+ */
+function CallbackWrapper(): any
+{
+	try
+	{
+		let [orgCallback, ...rest] = arguments;
+		return orgCallback( ...rest);
+	}
+	catch( err)
+	{
+		let errorService = this.findService( "StdErrorHandling") as mim.IErrorHandlingService;
+		if (errorService)
+			errorService.reportError( err, this.path);
+		else
+			throw err;
+	}
 }
 
 
