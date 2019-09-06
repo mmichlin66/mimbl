@@ -14,12 +14,9 @@ export class TextVN extends VN implements mim.ITextVN
 {
 	constructor( text: string)
 	{
-		super( mim.VNType.Text)
+		super();
 
 		this.text = text;
-
-		// node name is #text
-		this.name = "#text";
 	};
 
 
@@ -32,6 +29,18 @@ export class TextVN extends VN implements mim.ITextVN
 /// #if USE_STATS
 	public getStatsCategory(): StatsCategory { return StatsCategory.Text; }
 /// #endif
+
+
+
+	// Node's type.
+	public get type(): mim.VNType { return mim.VNType.Text; }
+
+
+
+	// String representation of the virtual node. This is used mostly for tracing and error
+	// reporting. The name can change during the lifetime of the virtual node; for example,
+	// it can reflect an "id" property of an element (if any).
+	public get name(): string { return "#text"; }
 
 
 

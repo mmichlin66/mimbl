@@ -15,16 +15,9 @@ import {DN, VN} from "./VN"
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export abstract class CompBaseVN<TComp extends mim.IComponent> extends VN
 {
-	constructor( type: mim.VNType)
-	{
-		super( type)
-	};
-
-
-
-/// #if USE_STATS
-	public getStatsCategory(): StatsCategory { return StatsCategory.Comp; }
-/// #endif
+	/// #if USE_STATS
+		public getStatsCategory(): StatsCategory { return StatsCategory.Comp; }
+	/// #endif
 
 
 

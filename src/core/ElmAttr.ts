@@ -331,14 +331,12 @@ function setStyleProp( elm: Element, attrName: string, propVal: any): void
 
 function diffStyleProp( attrName: string, oldPropVal: any, newPropVal: any): any
 {
-	const oldPropType: string = typeof oldPropVal;
-	const newPropType: string = typeof newPropVal;
-	if (oldPropType !== newPropType)
+	if (typeof oldPropVal !== typeof newPropVal)
 		return newPropVal;
 	else
 	{
-		const oldStyle: mim.StylePropType = oldPropVal as mim.StylePropType;
-		const newStyle: mim.StylePropType = newPropVal as mim.StylePropType;
+		const oldStyle = oldPropVal as mim.StylePropType;
+		const newStyle = newPropVal as mim.StylePropType;
 
 		const updateVal: mim.StylePropType = {};
 		let changesExist: boolean = false;

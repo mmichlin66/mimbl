@@ -15,16 +15,12 @@ import {TextVN} from "./TextVN"
 // the process is recursive.
 export function createVNChainFromContent( content: any): VNChain
 {
-	const chain = new VNChain();
 	if ( content === undefined || content === null ||content === false || typeof content === "function")
-		return chain;
+		return null;
 
+	const chain = new VNChain();
 	if (typeof content === "string")
 		chain.appendVN( new TextVN( content as string));
-	else if (content instanceof VN)
-		chain.appendVN( content as VN);
-	else if (content instanceof VNChain)
-		chain.appendChain( content as VNChain);
 	else if (typeof content.render === "function")
 		chain.appendVN( new InstanceVN( content as mim.IComponent));
 	else if (Array.isArray( content))
@@ -32,6 +28,10 @@ export function createVNChainFromContent( content: any): VNChain
 		for( let arrItem of content as Array<any>)
 			chain.appendChain( createVNChainFromContent( arrItem));
 	}
+	else if (content instanceof VN)
+		chain.appendVN( content as VN);
+	else if (content instanceof VNChain)
+		chain.appendChain( content as VNChain);
 	else if (content instanceof Promise)
 		throw content;
 	else

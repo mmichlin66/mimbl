@@ -74,6 +74,13 @@ export interface IComponent<TProps = {}, TChildren = any>
 	props: CompProps<TProps,TChildren>;
 
 	/**
+	 * Components can define display name for tracing purposes; if they don't the default name
+	 * is the component's class constructor name. Note that this method can be called before
+	 * the virtual node is attached to the component.
+	 */
+	getDisplayName?(): string;
+
+	/**
 	 * Sets or clears the site object to the component. This method is called twice:
 	 *  1. Before the component is rendered for the first time: the component must remember the
 	 *    passed object.
@@ -204,30 +211,14 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	/** Site object through which component can request services. */
 	protected site: IVNode = undefined;
 
-	/** Display name specified by the component. */
-	protected dispalyName: string;
-
 	/** Sets or clears the site object through which component can request services. */
 	public setSite( site: IVNode): void
 	{
 		this.site = site;
-
-		// if the site has just be set (that is the component is being mounted) and the displayName
-		// property is defined,pass it on to the site
-		if (site !== undefined && this.dispalyName !== undefined)
-			this.site.setDisplayName( this.dispalyName);
 	}
 
 	/** Returns the component's content that will be ultimately placed into the DOM tree. */
 	public abstract render(): any;
-
-	/** Sets the component's display name */
-	protected setDisplayName( dispalyName: string): void
-	{
-		this.dispalyName = dispalyName;
-		if (this.site !== undefined)
-			this.site.setDisplayName( dispalyName);
-	}
 
 	/** This method is called by the component to request to be updated. */
 	protected updateMe(): void
@@ -685,17 +676,7 @@ export interface IVNode
 	readonly SubNodes: IVNChain;
 
 	/** Gets node's display name. */
-	readonly DisplayName: string;
-
-	/**
-	 * The component can call this method to set a distinguishing display name identifying the
-	 * component instance. By default, display name is set using the component's class name and
-	 * key (if specified). Upon JavaScript minification, class names can become meaningless and
-	 * components can use this method to set a name with some meaning. Display name is used for
-	 * tracing and debugging only.
-	 * @param name Display name to use for this component.
-	 */
-	setDisplayName( name: string): void;
+	readonly Name: string;
 
 	/** This method is called by the component when it needs to be updated. */
 	requestUpdate(): void;

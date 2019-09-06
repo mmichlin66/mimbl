@@ -17,7 +17,7 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 {
 	constructor( compClass: mim.IComponentClass, props: any, children: any[])
 	{
-		super( mim.VNType.ClassComp)
+		super();
 
 		this.compClass = compClass;
 
@@ -55,11 +55,6 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 
 		// remember children as part of props
 		this.props.children = children;
-
-		// default node name is the component's class name plus key if specified
-		this.name = this.compClass.name;
-		if (this.key !== undefined && this.key !== null)
-			this.name += " @" + this.key;
 	};
 
 
@@ -67,6 +62,33 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 	// IClassVN implementation
 	public get CompClass(): mim.IComponentClass { return this.compClass; }
 	public get Comp(): mim.IComponent { return this.comp as mim.IComponent; }
+
+
+
+	// Node's type.
+	public get type(): mim.VNType { return mim.VNType.ClassComp; }
+
+
+
+	// String representation of the virtual node. This is used mostly for tracing and error
+	// reporting. The name can change during the lifetime of the virtual node; for example,
+	// it can reflect an "id" property of an element (if any).
+	public get name(): string
+	{
+		// components can define the getDisplayName method; if they don't then the default name
+		// is the component's constructor name plus key if defined. Note that component instance
+		// might not be created yet when this method is called
+		if (this.comp && this.comp.getDisplayName)
+			return this.comp.getDisplayName();
+		else
+		{
+			let name = this.compClass.name;
+			if (this.key != null)
+				name += "@" + this.key;
+
+			return name;
+		}
+	}
 
 
 

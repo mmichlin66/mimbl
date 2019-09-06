@@ -1,5 +1,6 @@
 ﻿import * as mim from "./mim"
 import {DN, VN, IRootVN} from "./VN"
+import { VNChain } from "./VNChain";
 import {createVNChainFromContent} from "./VNChainFuncs"
 import {VNDispAction, VNDisp, VNDispGroup} from "./VNDisp"
 import {RootErrorUI, RootWaitingUI} from "./RootUI"
@@ -32,10 +33,9 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 {
 	private constructor( anchorDN: DN)
 	{
-		super( mim.VNType.Root)
+		super()
 
 		this.anchorDN = anchorDN;
-		this.name = "Root";
 		this.initialize( null);
 		this.content = null;
 		this.willMount();
@@ -154,6 +154,18 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		rootVN.setContent( null, false);
 		rootVN.scheduleCall( () => rootVN.willUnmount() );
 	}
+
+
+
+	// Node's type.
+	public get type(): mim.VNType { return mim.VNType.Root; }
+
+
+
+	// String representation of the virtual node. This is used mostly for tracing and error
+	// reporting. The name can change during the lifetime of the virtual node; for example,
+	// it can reflect an "id" property of an element (if any).
+	public get name(): string { return "Root"; }
 
 
 
@@ -677,8 +689,11 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	private createSubNodesVirtual( vn: VN): void
 	{
 		let subNodes = createVNChainFromContent( vn.render());
-		for( let svn = subNodes.first; svn !== null; svn = svn.next)
-			this.createVirtual( svn, vn);
+		if (subNodes)
+		{
+			for( let svn = subNodes.first; svn !== null; svn = svn.next)
+				this.createVirtual( svn, vn);
+		}
 
 		vn.subNodes = subNodes;
 	}
@@ -705,7 +720,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			vn.anchorDN.insertBefore( ownDN, beforeDN);
 
 		// if the node has sub-nodes, add DOM nodes for them
-		if (vn.subNodes.count > 0)
+		if (vn.subNodes)
 		{
 			// determine what nodes to use as anchor and "before" for the sub-nodes
 			let newAnchorDN: DN = ownDN === null ? anchorDN : ownDN;
@@ -735,8 +750,11 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			console.error( `Node ${vn.name} threw exception '${err.message}' in didMount`);
 		}
 
-		for( let svn = vn.subNodes.first; svn !== null; svn = svn.next)
-			this.postCreate( svn);
+		if (vn.subNodes)
+		{
+			for( let svn = vn.subNodes.first; svn !== null; svn = svn.next)
+				this.postCreate( svn);
+		}
 	}
 
 
@@ -744,8 +762,11 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	// Recursively calls willUnmount on this VN and its sub-nodes.
 	private preDestroy( vn: VN)
 	{
-		for( let svn = vn.subNodes.first; svn !== null; svn = svn.next)
-			this.preDestroy( svn);
+		if (vn.subNodes)
+		{
+			for( let svn = vn.subNodes.first; svn !== null; svn = svn.next)
+				this.preDestroy( svn);
+		}
 
 		/// #if VERBOSE_NODE
 			console.debug( `VERBOSE: Calling willUnmount() on node ${vn.name}`);
@@ -781,7 +802,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			// our DOM nodes can only be either Element or Text - both derive from ChildNode
 			(ownDN as any as ChildNode).remove();
 		}
-		else
+		else if (vn.subNodes)
 		{
 			// loop over sub-nodes from last to first because this way the DOM element removal is
 			// easier.
@@ -798,9 +819,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	// being updated as a result of updateMe invocation.
 	private updateStemVirtual( vn: VN): VNDisp
 	{
-		let disp = new VNDisp();
-		disp.action = VNDispAction.Unknown;
-		disp.oldVN = disp.newVN = vn;
+		let disp = new VNDisp( vn, VNDispAction.Unknown, vn);
 		this.updateVirtual( disp);
 		return disp;
 	}
@@ -853,6 +872,8 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	{
 		// render the new content and build array of dispositions objects for the sub-nodes.
 		disp.buildSubNodeDispositions();
+		if (!disp.subNodeDisps)
+			return;
 
 		// perform rendering for sub-nodes that should be inserted, replaced or updated
 		for( let subNodeDisp of disp.subNodeDisps)
@@ -878,12 +899,18 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	private preUpdatePhysical( disp: VNDisp)
 	{
 		// first, sub-nodes marked for deletion
-		for( let svn of disp.subNodesToRemove)
-			this.preDestroy( svn);
+		if (disp.subNodesToRemove)
+		{
+			for( let svn of disp.subNodesToRemove)
+				this.preDestroy( svn);
+		}
 
 		// second, sub-nodes marked for update or insert
-		for( let subNodeDisp of disp.subNodeDisps)
-			this.preUpdatePhysical( subNodeDisp);
+		if (disp.subNodeDisps)
+		{
+			for( let subNodeDisp of disp.subNodeDisps)
+				this.preUpdatePhysical( subNodeDisp);
+		}
 	}
 
 
@@ -912,22 +939,25 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		let beforeDN = ownDN !== null ? null : vn.getNextDNUnderSameAnchorDN( anchorDN);
 
 		// clear our current list of sub-nodes - we will populate it while updating them
-		vn.subNodes.clear();
+		vn.subNodes = new VNChain();
 
 		// remove from DOM the old nodes designated to be removed (that is, those for which there
 		// is no counterpart new node that will either update or replace it) and then those
 		// designated to be replaced. We need to remove old nodes first before we start inserting
 		// new - one reason is to properly maintain references.
-		for( let svn of disp.subNodesToRemove)
-			this.destroyPhysical( svn);
+		if (disp.subNodesToRemove)
+		{
+			for( let svn of disp.subNodesToRemove)
+				this.destroyPhysical( svn);
+		}
 
 		// perform updates and inserts by either groups or individual nodes.
-		if (disp.subNodeGroups && disp.subNodeGroups.length > 0)
+		if (disp.subNodeGroups)
 		{
 			this.updatePhysicalByGroups( vn, disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
 			this.arrangeGroups( vn, disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
 		}
-		else if (disp.subNodeDisps && disp.subNodeDisps.length > 0)
+		else if (disp.subNodeDisps)
 		{
 			this.updatePhysicalByNodes( vn, disp.subNodeDisps, anchorDN, beforeDN);
 		}
@@ -1042,18 +1072,6 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		for( let j = group.first; j <= group.last; j++)
 		{
 			let subNodeVN = group.action === VNDispAction.Update ? disps[j].oldVN : disps[j].newVN;
-
-			// let subNodeFirstDN = subNodeVN.getFirstDN();
-			// if (subNodeFirstDN)
-			// {
-			// 	anchorDN.insertBefore( subNodeFirstDN, beforeDN);
-
-			// 	/// #if USE_STATS
-			// 		DetailedStats.stats.log( parentVN.getStatsCategory(), StatsAction.Moved);
-			// 	/// #endif
-			// }
-
-			// determine whether all the nodes under this VN should be moved.
 			let subNodeDNs = subNodeVN.getImmediateDNs();
 			for( let subNodeDN of subNodeDNs)
 				anchorDN.insertBefore( subNodeDN, beforeDN);
@@ -1136,154 +1154,22 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 
 
 
-	// // Recursively performs DOM updates corresponding to this VN and its sub-nodes.
-	// private updatePhysical( disp: VNDisp)
-	// {
-	// 	// get the node whose children are being updated. This is always the oldVN member of
-	// 	// the disp structure.
-	// 	let vn = disp.oldVN;
-
-	// 	// it might happen that the node being updated was already deleted by its parent. Check
-	// 	// for this situation and exit if this is the case
-	// 	if (!vn.anchorDN)
-	// 		return;
-
-	// 	// remove from DOM the old nodes designated to be removed (that is, those for which there
-	// 	// is no counterpart new node that will either update or replace it) and then those
-	// 	// designated to be replaced. We need to remove old nodes first before we start inserting
-	// 	// new - one reason is to properly maintain references.
-	// 	for( let svn of disp.subNodesToRemove)
-	// 		this.destroyPhysical( svn);
-
-	// 	// clear our current list of sub-nodes we will populate it while updating them
-	// 	vn.subNodes.clear();
-
-	// 	// determine the anchor node to use when inserting or moving new nodes
-	// 	let ownDN = vn.getOwnDN();
-	// 	let anchorDN = ownDN !== null ? ownDN : vn.anchorDN;
-
-	// 	// if this virtual node doesn't define its own DOM node (true for components), we will
-	// 	// need to find a DOM node before which to start inserting or moving nodes. Null means
-	// 	// append to the end of the anchor node's children.
-	// 	let beforeDN: DN = ownDN !== null ? null : vn.getNextDNUnderSameAnchorDN( anchorDN);
-
-	// 	// perform DOM operations according to sub-node disposition. We need to decide for each
-	// 	// node what node to use to insert or move it before. We go from the end of the list of
-	// 	// new nodes and on each iteration we decide the value of the "beforeDN".
-	// 	for( let i = disp.subNodeDisps.length - 1; i >= 0; i--)
-	// 	{
-	// 		let subNodeDisp = disp.subNodeDisps[i];
-	// 		let action = subNodeDisp.action;
-	// 		if (action === VNDispAction.Update)
-	// 		{
-	// 			let oldVN = subNodeDisp.oldVN;
-	// 			let newVN = subNodeDisp.newVN;
-	// 			if (subNodeDisp.updateDisp.shouldCommit)
-	// 			{
-	// 				/// #if VERBOSE_NODE
-	// 					console.debug( `VERBOSE: Calling commitUpdate() on node ${oldVN.name}`);
-	// 				/// #endif
-
-	// 				oldVN.commitUpdate( newVN);
-	// 			}
-
-	// 			// update the sub-nodes if necessary
-	// 			if (subNodeDisp.updateDisp.shouldRender)
-	// 				this.updatePhysical( subNodeDisp);
-
-	// 			// if our sub-node defines its own DN, we need to determine whether it should be moved.
-	// 			let subNodeFirstDN = oldVN.getFirstDN();
-	// 			if (subNodeFirstDN !== null)
-	// 			{
-	// 				let nextSubNodeVNDisp = i === disp.subNodeDisps.length - 1 ? null : disp.subNodeDisps[i+1];
-	// 				let newNextVN = nextSubNodeVNDisp === null
-	// 									? null
-	// 									: nextSubNodeVNDisp.action === VNDispAction.Update
-	// 										? nextSubNodeVNDisp.oldVN
-	// 										: nextSubNodeVNDisp.newVN;
-	// 				if (oldVN.next !== newNextVN || subNodeFirstDN.nextSibling !== beforeDN)
-	// 				{
-	// 					anchorDN.insertBefore( subNodeFirstDN, beforeDN);
-
-	// 					/// #if USE_STATS
-	// 						DetailedStats.stats.log( vn.getStatsCategory(), StatsAction.Moved);
-	// 					/// #endif
-	// 				}
-
-	// 				beforeDN = subNodeFirstDN;
-	// 			}
-
-	// 			// // if the updated old VN (or one of its sub-nodes) defines a DOM node and it
-	// 			// // is not positioned before the current "beforeDN", move it there. It also
-	// 			// // becomes the new DOM node before which next components should be inserted.
-	// 			// let firstDN = oldVN.getFirstDN();
-	// 			// if (firstDN !== null)
-	// 			// {
-	// 			// 	// determine whether we need to move our node
-	// 			// 	let nextSubNodeVNDisp: VNDisp = i === disp.subNodeDisps.length - 1
-	// 			// 					? undefined : disp.subNodeDisps[i+1];
-	// 			// 	if (this.shouldMoveVN( subNodeDisp, nextSubNodeVNDisp) || firstDN.nextSibling !== beforeDN)
-	// 			// 	{
-	// 			// 		anchorDN.insertBefore( firstDN, beforeDN);
-
-	// 			// 		/// #if USE_STATS
-	// 			// 			DetailedStats.stats.log( vn.getStatsCategory(), StatsAction.Moved);
-	// 			// 		/// #endif
-	// 			// 	}
-
-	// 			// 	beforeDN = firstDN;
-	// 			// }
-
-	// 			// the old node remains as a sub-node
-	// 			vn.subNodes.insertVN( oldVN);
-	// 		}
-	// 		else
-	// 		{
-	// 			let newVN = subNodeDisp.newVN;
-
-	// 			// since we already destroyed old nodes designated to be replaced, the code is
-	// 			// identical for Replace and Insert actions
-	// 			this.createPhysical( newVN, anchorDN, beforeDN);
-
-	// 			// if the new node defines a DOM node, it becomes the DOM node before which
-	// 			// next components should be inserted/moved
-	// 			let firstDN: DN = newVN.getFirstDN();
-	// 			if (firstDN !== null)
-	// 				beforeDN = firstDN;
-
-	// 			// the new node becomes a sub-node
-	// 			vn.subNodes.insertVN( newVN);
-	// 		}
-	// 	}
-	// }
-
-
-
-	// private shouldMoveVN( vnDisp: VNDisp, nextVNDisp: VNDisp): boolean
-	// {
-	// 	if (nextVNDisp === undefined)
-	// 		return vnDisp.oldVN.next !== null;
-	// 	else if (nextVNDisp.action === VNDispAction.Update)
-	// 		return vnDisp.oldVN.next !== nextVNDisp.oldVN;
-	// 	else
-	// 		return true;
-	// }
-
-
-
 	// Recursively calls appropriate life-cycle methods on this VN and its sub-nodes.
 	private postUpdate( disp: VNDisp)
 	{
-		for( let subNodeDisp of disp.subNodeDisps)
+		if (disp.subNodeDisps)
 		{
-			if (subNodeDisp.action === VNDispAction.Update)
+			for( let subNodeDisp of disp.subNodeDisps)
 			{
-				// if we updated sub-nodes, notify them too
-				if (subNodeDisp.updateDisp.shouldRender)
-					this.postUpdate( subNodeDisp);
+				if (subNodeDisp.action === VNDispAction.Update)
+				{
+					// if we updated sub-nodes, notify them too
+					if (subNodeDisp.updateDisp.shouldRender)
+						this.postUpdate( subNodeDisp);
+				}
+				else if (subNodeDisp.action === VNDispAction.Insert)
+					this.postCreate( subNodeDisp.newVN);
 			}
-			else if (subNodeDisp.action === VNDispAction.Insert)
-				this.postCreate( subNodeDisp.newVN);
 		}
 
 		/// #if VERBOSE_NODE
@@ -1299,87 +1185,6 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			console.error( `Node ${disp.oldVN.name} threw exception '${err.message}' in didUpdate`);
 		}
 	}
-
-
-
-	// Determines whether the node should be moved based on its disposition.
-	// // Compares two chains of nodes (old and new) and fills two arrays for sub-nodes:
-	// //	- array of node disposition objects corresponding to new sub-nodes. Each disposition
-	// //		indicates whether the new sub-node should be just inserted or whether it should update
-	// //		the old sub-node.
-	// //	- array of old sub-nodes which should be removed.
-	// // This method is only invoked with the disp object whose oldVN field is non-null.
-	// private buildSubNodeDispositions( disp: VNDisp): void
-	// {
-	// 	// render the new content;
-	// 	let newChain = createVNChainFromContent( disp.oldVN.render());
-
-	// 	// build map of old keyed nodes and an array of old non-keyed nodes
-	// 	let keyedMap: Map<any,VN> = new Map<any,VN>();
-	// 	let nonKeyedList: VN[] = [];
-	// 	let oldChain = disp.oldVN.subNodes;
-	// 	for( let oldVN = oldChain.first; oldVN !== null; oldVN = oldVN.next)
-	// 	{
-	// 		if (oldVN.key === undefined)
-	// 			nonKeyedList.push( oldVN);
-	// 		else
-	// 			keyedMap.set( oldVN.key, oldVN);
-	// 	}
-
-	// 	// loop over new nodes
-	// 	let nonKeyedListLength: number = nonKeyedList.length;
-	// 	let nonKeyedIndex: number = 0;
-	// 	for( let newVN = newChain.first; newVN !== null; newVN = newVN.next)
-	// 	{
-	// 		let oldVN: VN;
-	// 		if (newVN.key !== undefined)
-	// 		{
-	// 			oldVN = keyedMap.get( newVN.key);
-
-	// 			// if we found old node then remove the old node from the map - this way at
-	// 			// the end of the loop all old nodes remaining in the map should be deleted
-	// 			if (oldVN !== undefined)
-	// 				keyedMap.delete( newVN.key);
-	// 		}
-	// 		else if (nonKeyedIndex < nonKeyedListLength)
-	// 		{
-	// 			oldVN = nonKeyedList[nonKeyedIndex];
-	// 			nonKeyedIndex++;
-	// 		}
-
-	// 		let subNodeDisp = new VNDisp();
-	// 		subNodeDisp.newVN = newVN;
-
-	// 		// by now, if we didn't find an old node, then the new node should be inserted;
-	// 		// otherwise, we decide on whether the new node should be used to update or
-	// 		// replace the old node
-	// 		if (oldVN === undefined)
-	// 			subNodeDisp.action = VNAction.Insert;
-	// 		else if (oldVN.type === newVN.type && oldVN.isUpdatePossible( newVN))
-	// 		{
-	// 			subNodeDisp.action = VNAction.Update;
-	// 			subNodeDisp.oldVN = oldVN;
-	// 		}
-	// 		else
-	// 		{
-	// 			// we are here if the new node should replace the old one. We add the old node to
-	// 			// the list of those to be removed and indicate
-	// 			disp.subNodesToRemove.push( oldVN);
-	// 			subNodeDisp.action = VNAction.Insert;
-	// 		}
-
-	// 		disp.subNodeDisps.push( subNodeDisp);
-	// 	}
-
-	// 	// old keyed nodes remaining in the map will be unmounted because these are the old nodes
-	// 	// for which there were no new nodes with the same key.
-	// 	for( let oldVN of keyedMap.values())
-	// 		disp.subNodesToRemove.push( oldVN);
-
-	// 	// old non-keyed nodes from the current index to the end of the list will be unmounted
-	// 	for( let i = nonKeyedIndex; i < nonKeyedListLength; i++)
-	// 		disp.subNodesToRemove.push( nonKeyedList[i]);
-	// }
 
 
 

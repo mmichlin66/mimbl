@@ -101,6 +101,13 @@ export class VNDispGroup
  */
 export class VNDisp
 {
+	constructor( newVN: VN, action = VNDispAction.Unknown, oldVN?: VN)
+	{
+		this.action = action;
+		this.newVN = newVN;
+		this.oldVN = oldVN;
+	}
+
 	/** Action to be performed on the node */
 	public action: VNDispAction;
 
@@ -114,13 +121,13 @@ export class VNDisp
 	public updateDisp: VNUpdateDisp;
 
 	/** Array of sub-nodes that should be removed during update of the sub-nodes. */
-	public subNodesToRemove: VN[] = [];
+	public subNodesToRemove: VN[];
 
 	/**
 	 * Array of disposition objects for sub-nodes. This includes nodes to be updated
 	 * and to be inserted.
 	 */
-	public subNodeDisps: VNDisp[] = [];
+	public subNodeDisps: VNDisp[];
 
 	/** Array of groups of sub-nodes that should be updated or inserted. */
 	public subNodeGroups: VNDispGroup[];
@@ -152,14 +159,36 @@ export class VNDisp
 		let newChain = createVNChainFromContent(
 				this.action === VNDispAction.Insert || this.oldVN.type === VNType.InstanceComp
 					? this.newVN.render() : this.oldVN.render());
+		let oldChain = this.oldVN.subNodes;
+		if ((!newChain || newChain.count === 0) && (!oldChain || oldChain.count === 0))
+			return;
+		else if (!newChain || newChain.count === 0)
+		{
+			// we just need to delete all old nodes
+			this.subNodesToRemove = [];
+			for( let oldVN = oldChain.first; oldVN !== null; oldVN = oldVN.next)
+				this.subNodesToRemove.push( oldVN);
 
+			return;
+		}
+		else if (!oldChain || oldChain.count === 0)
+		{
+			// we just need to insert all new nodes
+			this.subNodeDisps = [];
+			for( let newVN = newChain.first; newVN !== null; newVN = newVN.next)
+				this.subNodeDisps.push( new VNDisp( newVN, VNDispAction.Insert));
+
+			return;
+		}
+
+		// we are here if both old and new chains contain some nodes.
 		// loop over new nodes and fill an array of VNDisp objects in the parent disp. At the same
 		// time, build a map that includes all new nodes that have keys. The values are VNDisp objects.
+		this.subNodeDisps = [];
 		let newKeyedNodeMap = new Map<any,VNDisp>();
 		for( let newVN = newChain.first; newVN !== null; newVN = newVN.next)
 		{
-			let subNodeDisp = new VNDisp();
-			subNodeDisp.newVN = newVN;
+			let subNodeDisp = new VNDisp( newVN);
 			this.subNodeDisps.push( subNodeDisp);
 			if (newVN.key !== undefined)
 				newKeyedNodeMap.set( newVN.key, subNodeDisp);
@@ -169,7 +198,6 @@ export class VNDisp
 		// objects. Put those that don't have keys or that have keys that don't match any new node to
 		// an array of non-matching old nodes
 		let oldNonMatchingNodeList: VN[] = [];
-		let oldChain = this.oldVN.subNodes;
 		for( let oldVN = oldChain.first; oldVN !== null; oldVN = oldVN.next)
 		{
 			if (oldVN.key === undefined)
@@ -210,9 +238,12 @@ export class VNDisp
 				}
 				else
 				{
-					// we are here if the new node cannot update the old one and shold completely
+					// we are here if the new node cannot update the old one and should completely
 					// replace it. We add the old node to the list of those to be removed and indicate
-					// that the new node should be mounted.
+					// that the new node should be inserted.
+					if (!this.subNodesToRemove)
+						this.subNodesToRemove = [];
+
 					this.subNodesToRemove.push( oldVN);
 					subNodeDisp.action = VNDispAction.Insert;
 				}
@@ -228,8 +259,14 @@ export class VNDisp
 		}
 
 		// old non-matched nodes from the current index to the end of the list will be unmounted
-		for( let i = oldNonMatchingNodeListIndex; i < oldNonMatchingNodeListLength; i++)
-			this.subNodesToRemove.push( oldNonMatchingNodeList[i]);
+		if (oldNonMatchingNodeListIndex < oldNonMatchingNodeListLength)
+		{
+			if (!this.subNodesToRemove)
+				this.subNodesToRemove = [];
+
+			for( let i = oldNonMatchingNodeListIndex; i < oldNonMatchingNodeListLength; i++)
+				this.subNodesToRemove.push( oldNonMatchingNodeList[i]);
+		}
 
 		if (this.subNodeDisps.length > VNDisp.NO_GROUP_THRESHOLD)
 			this.buildSubNodeGroups();
@@ -248,7 +285,7 @@ export class VNDisp
 		/// #if DEBUG
 			// this method is not supposed to be called if the number of sub-nodes is less then
 			// the pre-determined threshold
-			if (count === VNDisp.NO_GROUP_THRESHOLD)
+			if (count <= VNDisp.NO_GROUP_THRESHOLD)
 				return;
 		/// #endif
 
@@ -273,7 +310,7 @@ export class VNDisp
 			if (disp.action !== group.action)
 			{
 				// close the group with the previous index. Decrement the iterating index so that
-				// the nex iteration will open a new group. Note that we cannot be here for a node
+				// the next iteration will open a new group. Note that we cannot be here for a node
 				// that starts a new group because for such node disp.action === groupAction.
 				group.last = --i;
 				group = undefined;

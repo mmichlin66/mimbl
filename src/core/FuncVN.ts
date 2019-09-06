@@ -22,7 +22,7 @@ export class FuncVN extends VN
 
 	constructor( func: mim.FuncCompType, props: any, children: any[])
 	{
-		super( mim.VNType.FuncComp)
+		super();
 
 		this.func = func;
 
@@ -47,7 +47,7 @@ export class FuncVN extends VN
 					this.props[propName] = propVal;
 			}
 
-			// if key property was not specified, use id; if id was not specified key wil remain
+			// if key property was not specified, use id; if id was not specified key will remain
 			// undefined.
 			if (this.key === undefined)
 				this.key = props.id;
@@ -55,11 +55,6 @@ export class FuncVN extends VN
 
 		// remember children as part of props
 		this.props.children = children;
-
-		// node name is the function's name plus key if specified
-		this.name = this.func.name;
-		if (this.key !== undefined && this.key !== null)
-			this.name += " @" + this.key;
 	};
 
 
@@ -67,6 +62,26 @@ export class FuncVN extends VN
 /// #if USE_STATS
 	public getStatsCategory(): StatsCategory { return StatsCategory.Comp; }
 /// #endif
+
+
+
+	// Node's type.
+	public get type(): mim.VNType { return mim.VNType.FuncComp; }
+
+
+
+	// String representation of the virtual node. This is used mostly for tracing and error
+	// reporting. The name can change during the lifetime of the virtual node; for example,
+	// it can reflect an "id" property of an element (if any).
+	public get name(): string
+	{
+		// node name is the function's name plus key (or id) if specified.
+		let name = this.func.name;
+		if (this.key != null)
+			name += "@" + this.key;
+
+		return name;
+	}
 
 
 

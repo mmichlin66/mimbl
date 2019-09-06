@@ -17,20 +17,37 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 {
 	constructor( comp: mim.IComponent)
 	{
-		super( mim.VNType.InstanceComp)
+		super();
 		this.comp = comp;
 
 		// the component object is a key for the node
 		this.key = comp;
-
-		// default node name is the component's constructor name
-		this.name = this.comp.constructor.name;
 	};
 
 
 
 	// IInstanceVN implementation
 	public get Comp(): mim.IComponent { return this.comp; }
+
+
+
+	// Node's type.
+	public get type(): mim.VNType { return mim.VNType.InstanceComp; }
+
+
+
+	// String representation of the virtual node. This is used mostly for tracing and error
+	// reporting. The name can change during the lifetime of the virtual node; for example,
+	// it can reflect an "id" property of an element (if any).
+	public get name(): string
+	{
+		// components can define the getDisplayName method; if they don't then the default name
+		// is the component's constructor name
+		if (this.comp.getDisplayName)
+			return this.comp.getDisplayName();
+		else
+			return this.comp.constructor.name;
+	}
 
 
 
@@ -98,7 +115,6 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 
 		let newInstanceVN = newVN as InstanceVN;
 		this.comp = this.key = newInstanceVN.comp;
-		this.name = newInstanceVN.name;
 	}
 
 

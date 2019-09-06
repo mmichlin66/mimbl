@@ -1,5 +1,4 @@
 ﻿import * as mim from "./mim"
-import {VNChain} from "./VNChain"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
@@ -10,40 +9,6 @@ import {VNChain} from "./VNChain"
 // Use type DN to refer to DOM's Node class. The DOM nodes that we are dealing with are
 // either of type Element or Text.
 export type DN = Node;
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// The IVNLifeCycle interface defines life-cycle and notifications methofs that are called during
-// mounting, unmounting and updates. The IVNLifeCycle interface is implemented by all types of
-// virtual nodes. All methods in this interface are optional because they might not be neeeded
-// for all types of nodes.
-//
-// Mounting sequence:
-//	- constructor
-//	- willMount
-//	- render
-//	- mount
-//	- didMount
-//
-// Unmounting sequence:
-//	- willUnmount
-//	- unmount
-//	- didUnmount
-//
-// Updating sequence when update was caused by the node itself:
-//	- render
-//	- didUpdate
-//
-// Updating sequence when update was caused by parent:
-//	- updateFrom
-//	- render (only if updateFrom indicated that children should be updated)
-//	- commitUpdate (only if updateFrom indicated that commit is necessary)
-//	- move (only if necessary)
-//	- didUpdate
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
@@ -78,21 +43,45 @@ export type DN = Node;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export abstract class VN implements mim.IVNode
 {
-	constructor( type: mim.VNType)
-	{
-		this.type = type;
-	}
-
-
-
 	// IVNode implementation
 	public get Type(): mim.VNType { return this.type; }
 	public get Parent(): mim.IVNode { return this.parent; }
 	public get Next(): mim.IVNode { return this.next; }
 	public get Prev(): mim.IVNode { return this.prev; }
 	public get SubNodes(): mim.IVNChain { return this.subNodes; }
-	public get DisplayName(): string { return this.name; }
+	public get Name(): string { return this.name; }
 
+
+
+	// Node's type.
+	public abstract get type(): mim.VNType;
+
+	// String representation of the virtual node. This is used mostly for tracing and error
+	// reporting. The name can change during the lifetime of the virtual node; for example,
+	// it can reflect an "id" property of an element (if any).
+	public abstract get name(): string;
+
+	// Root node.
+	public get root(): IRootVN
+	{
+		// when this property is read for the first time, it is retrieved from the parent and
+		// then we change the property from the gettter to a regular.
+		delete this.root;
+		return this.root = this.parent ? this.parent.root : this as any as IRootVN;
+	}
+
+	public set root( val: IRootVN) {}
+
+	// Level of nesting at which the node resides relative to the root node.
+	public get depth(): number
+	{
+		// when this property is read for the first time, it is retrieved from the parent and
+		// then we change the property from the gettter to a regular.
+		delete this.depth;
+		return this.depth = this.parent ? this.parent.depth + 1 : 0;
+	}
+
+	public set depth( val: number) {}
 
 
 
@@ -101,16 +90,6 @@ export abstract class VN implements mim.IVNode
 	public initialize( parent: VN): void
 	{
 		this.parent = parent;
-		if (parent === null)
-		{
-			this.root = this as any as IRootVN;
-			this.depth = 0;
-		}
-		else
-		{
-			this.root = parent.root;
-			this.depth = parent.depth + 1;
-		}
 	}
 
 
@@ -132,17 +111,15 @@ export abstract class VN implements mim.IVNode
 		}
 
 		this.anchorDN = null;
-		this.subNodes.clear();
-		this.root = null;
-		this.parent = null;
-		this.depth = 0;
+		this.subNodes = undefined;
+		this.parent = undefined;
 	}
 
 
 
-/// #if USE_STATS
-	public abstract getStatsCategory(): StatsCategory;
-/// #endif
+	/// #if USE_STATS
+		public abstract getStatsCategory(): StatsCategory;
+	/// #endif
 
 	// Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// If the node never has any children (like text nodes), it should return false.
@@ -173,10 +150,6 @@ export abstract class VN implements mim.IVNode
 	// Removes content from the DOM tree.
 	// This method is part of the Commit phase.
 	public unmount?(): void {}
-
-	//// Clears internal structures after the DOM content has been removed from the DOM tree.
-	//// This method is part of the Commit phase.
-	//didUnmount?(): void {}
 
 	// Determines whether the update of this node from the given node is possible. The newVN
 	// parameter is guaranteed to point to a VN of the same type as this node. This method is
@@ -213,15 +186,6 @@ export abstract class VN implements mim.IVNode
 	// Returns DOM node corresponding to the virtual node itself (if any) and not to any of its
 	// sub-nodes.
 	public getOwnDN(): DN { return null; }
-
-
-
-	// This method is called to set a distinguishing display name identifying the object
-	// represented by the node (e.g. component instance).
-	public setDisplayName( name: string): void
-	{
-		this.name = name;
-	}
 
 
 
@@ -415,6 +379,8 @@ export abstract class VN implements mim.IVNode
 		let dn = this.getOwnDN();
 		if (dn !== null)
 			return dn;
+		else if (!this.subNodes)
+			return null;
 
 		// recursively call this method on the sub-nodes from first to last until a valid node
 		// is returned
@@ -437,6 +403,8 @@ export abstract class VN implements mim.IVNode
 		let dn = this.getOwnDN();
 		if (dn !== null)
 			return dn;
+		else if (!this.subNodes)
+			return null;
 
 		// recursively call this method on the sub-nodes from last to first until a valid node
 		// is returned
@@ -470,7 +438,7 @@ export abstract class VN implements mim.IVNode
 		let dn = this.getOwnDN();
 		if (dn !== null)
 			arr.push( dn);
-		else
+		else if (this.subNodes)
 		{
 			// recursively call this method on the sub-nodes from first to last
 			for( let svn = this.subNodes.first; svn !== null; svn = svn.next)
@@ -491,7 +459,7 @@ export abstract class VN implements mim.IVNode
 	{
 		// check if we have sibling DOM nodes after our last sub-node - that might be elements
 		// not controlled by our component.
-		if (this.subNodes.last !== null)
+		if (this.subNodes && this.subNodes.last !== null)
 		{
 			const dn: DN = this.subNodes.last.getLastDN();
 			if (dn !== null)
@@ -508,7 +476,7 @@ export abstract class VN implements mim.IVNode
 			if (vn.anchorDN !== anchorDN)
 				return null;
 
-			// note that getFirstDN call traverses the hierarchy of nodes. Note also that
+			// note that getLastDN call traverses the hierarchy of nodes. Note also that it
 			// it cannot find a node under a different anchor element because the first different
 			// anchor element will be returned as a wanted node.
 			const dn: DN = vn.getLastDN();
@@ -548,27 +516,15 @@ export abstract class VN implements mim.IVNode
 
 
 
-	// Node's type.
-	public type: mim.VNType;
-
 	// Parent node. This is null for the top-level (root) nodes.
 	public parent: VN;
 
-	// Root node.
-	public root: IRootVN;
-
-	// Level of nesting at which the node resides relative to the root node.
-	public depth: number;
+	// DOM node under which all content of this virtual node is rendered.
+	public anchorDN: DN = null;
 
 	// Node's key. The derived classes set it based on their respective content. A key
 	// can be of any type.
 	public key: any;
-
-	// String representation of the virtual node. This is used mostly for tracing and
-	// error reporting. The name must be available right after the node is constructed - which
-	// means before the create method is called. The name can change during the lifetime of the
-	// virtual node; for example, it can reflect an "id" property of an element (if any).
-	public name: string;
 
 	// Next node in the chain of sibling nodes or null if this is the last one.
 	public next: VN = null;
@@ -577,10 +533,7 @@ export abstract class VN implements mim.IVNode
 	public prev: VN = null;
 
 	// Chain of sub-nodes.
-	public subNodes = new VNChain();
-
-	// DOM node under which all content of this virtual node is rendered.
-	public anchorDN: DN = null;
+	public subNodes;
 
 	// Map of service IDs to service objects published by this node.
 	private publishedServices: Map<string,any>;
