@@ -6,7 +6,6 @@
 	[
         {
             "text": "mimbl Dev",
-            "tooltip": "build debug mimbl",
             "color": "white",
             "commandType": "script",
             "command": "buildDev",
@@ -15,7 +14,6 @@
         },
         {
             "text": "mimbl Prod",
-            "tooltip": "build release mimbl",
             "color": "yellow",
             "commandType": "script",
             "command": "buildProd",
@@ -24,7 +22,6 @@
         },
         {
             "text": "mimbl Doc",
-            "tooltip": "build mimbl API reference documentation",
             "color": "pink",
             "commandType": "script",
             "command": "doc",
