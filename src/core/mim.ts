@@ -410,11 +410,10 @@ export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
 /**
  * Decorator function for defining properties with a set method that calls the updateMe method
  * whenever the property value changes.
- *
  *	```tsx
  *	class Child extends Component
  *	{
- *		@mim.prop text: string = "Hello!";
+ *		@mim.updatable text: string = "Hello!";
  *		render()
  *		{
  *	 		return <div>{text}</div>
@@ -430,14 +429,13 @@ export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
  *		}
  *	}
  *	```
- *
  * In the above example, the Child component will be re-rendered when its `text` property changes.
  * The Parent component appends the word "again" to the Child component's text whenever the user
  * clicks on it.
  * @param target 
  * @param name 
  */
-export function prop( target, name: string)
+export function updatable( target, name: string)
 {
 	let attrName = "_m_" + name;
 	Object.defineProperty( target, name,
