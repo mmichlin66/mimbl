@@ -484,38 +484,66 @@ export function Fragment( props: CompProps<{}>): any {}
 
 
 
+/** 
+ * The ICustomAttributeHandlerClass interface represents a class of handlers of custom attributes
+ * that can be applied to intrinsic (HTML or SVG) elements. The requirements on such classes are:
+ * 1. Implement a constructor accepting IElmVN, attribute value and attribute name (this allows
+ *   the same handler to serve different attributes).
+ * 2. Implement the ICustomAttributeHandler interface
+ */
+export interface ICustomAttributeHandlerClass<T>
+{
+	/**
+	 * Constructs a new custom attribute handler that will act on the given element and provides
+	 * the initial value of the attribute. Attribute name is also provided in case the handler
+	 * supports different attributes. By the time this constructor is called, the DOM element had
+	 * already been created and standard attributes and event listeners had been applied.
+	 * @param elmVN Virtual node for this element. The handler can retrieve the DOM element from
+	 *   this interface and also use other methods (e.g. subscribe to services).
+	 * @param attrVal Initial value of the custom attribute
+	 * @param attrName Name of the custom attribute
+	 */
+	new( elmVN: IElmVN, attrVal: T, attrName?: string): ICustomAttributeHandler<T>;
+}
+
+
+
 /**
  * The ICustomAttributeHandler interface represents an ability to handle custom properties that can
  * be applied to intrinsic (HTML or SVG) elements.
  */
 export interface ICustomAttributeHandler<T>
 {
-	initialize( elmVN: IElmVN, propName: string, propVal: T): void;
-	terminate(): void;
-	update( oldPropVal: T, newPropVal: T): boolean;
-}
+	/**
+	 * Updates an existing custom attribute with the new value.
+	 * @param newPropVal New value of the custom attribute.
+	 * @returns True if changes were made and false otherwise.
+	 */
+	update( newPropVal: T): boolean;
 
-
-
-/** 
- * The ICustomAttributeFactory interface represents an ability to create objects for handling
- * custom properties that can be applied to intrinsic (HTML or SVG) elements.
- */
-export interface ICustomAttributeFactory<T>
-{
-	createHandler( propName: string): ICustomAttributeHandler<T>;
+	/**
+	 * Terminates the functioning of the custom attribute handler. This method is invoked either
+	 * when a new rendering of the element doesn't have the attribute anymore or if the element
+	 * is removed. Although this method is optional, most handlers will need to implement it to
+	 * properly cleanup any resources (e.g. event handlers) to avoid leaks.
+	 * @param isRemoval True if the element is being removed and false if the element is being
+	 *   updated and the attribute is no longer provided. If the handler adds any event
+	 *   listeners to the element, then it has to remove them on update but doen't have to do it
+	 *   on element removal.
+	 */
+	terminate?( isRemoval: boolean): void;
 }
 
 
 
 /**
- * Registers custom attribute factory for the given property name.
+ * Registers custom attribute handler class for the given property name.
  * @param propName name of the custom attribute
- * @param factory custom property factory
+ * @param factory custom attribute class
  */
-export function registerCustomAttribute<T>( propName: string, factory: ICustomAttributeFactory<T>): void
+export function registerCustomAttribute<T>( attrName: string, handlerClass: ICustomAttributeHandlerClass<T>): void
 {
-	s_registerCustomAttribute( propName, factory);
+	s_registerCustomAttribute( attrName, handlerClass);
 }
 
 
@@ -1430,9 +1458,9 @@ export function unmount( anchorDN: Node = null): void
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 import {ElmAttr, PropType} from "../core/ElmAttr";
 
-function s_registerCustomAttribute<T>( propName: string, factory: ICustomAttributeFactory<T>): void
+function s_registerCustomAttribute<T>( attrName: string, handlerClass: ICustomAttributeHandlerClass<T>): void
 {
-	ElmAttr.registerProperty( propName, { type: PropType.CustomAttr, factory });
+	ElmAttr.registerProperty( attrName, { type: PropType.CustomAttr, handlerClass });
 }
 
 

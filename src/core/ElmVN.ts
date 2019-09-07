@@ -155,7 +155,7 @@ export class ElmVN extends VN implements mim.IElmVN
 
 		// terminate custom property handlers
 		if (this.customAttrs)
-			this.removeCustomAttrs();
+			this.removeCustomAttrs( true);
 
 		// clean up
 		this.elm = null;
@@ -505,27 +505,27 @@ export class ElmVN extends VN implements mim.IElmVN
 		// create and initialize custom property handlers
 		for( let name in this.customAttrs)
 		{
-			let data = this.customAttrs[name];
+			let customAttr = this.customAttrs[name];
 
 			// create custom property handler. If we cannot create the handler, remove the property
 			// from our object.
-			let handler = data.info.factory.createHandler( name);
-			if (!handler)
+			try
 			{
+				customAttr.handler = new customAttr.info.handlerClass( this, customAttr.val, name);
+			}
+			catch( err)
+			{
+				console.error( `Error creating handler for custom attribute '${name}': ${err.message}`);
 				delete this.customAttrs[name];
 				continue;
 			}
-
-			// initialize the handler and remember it in our object
-			handler.initialize( this, name, data.val);
-			data.handler = handler;
 		}
 	}
 
 
 
 	// Destroys custom attributes of this element.
-	private removeCustomAttrs(): void
+	private removeCustomAttrs( isRemoval: boolean): void
 	{
 		/// #if DEBUG
 			if (!this.customAttrs)
@@ -534,8 +534,15 @@ export class ElmVN extends VN implements mim.IElmVN
 
 		for( let name in this.customAttrs)
 		{
-			let info = this.customAttrs[name];
-			info.handler.terminate();
+			let customAttr = this.customAttrs[name];
+			try
+			{
+				customAttr.handler.terminate( isRemoval);
+			}
+			catch( err)
+			{
+				console.error( `Error terminating handler for custom attribute '${name}': ${err.message}`);
+			}
 		}
 	}
 
@@ -558,12 +565,27 @@ export class ElmVN extends VN implements mim.IElmVN
 				{
 					// if there is no new property with the given name, remove the old property and
 					// terminate its handler
-					oldCustomAttr.handler.terminate();
+					try
+					{
+						oldCustomAttr.handler.terminate( false);
+					}
+					catch( err)
+					{
+						console.error( `Error terminating handler for custom attribute '${name}': ${err.message}`);
+					}
 				}
 				else
 				{
 					// update the custom property and remember the new value
-					oldCustomAttr.handler.update( oldCustomAttr.val, newCustomAttr.val);
+					try
+					{
+						oldCustomAttr.handler.update( newCustomAttr.val);
+					}
+					catch( err)
+					{
+						console.error( `Error updating handler for custom attribute '${name}': ${err.message}`);
+					}
+					
 					newCustomAttr.handler = oldCustomAttr.handler;
 				}
 			}
@@ -581,13 +603,16 @@ export class ElmVN extends VN implements mim.IElmVN
 
 				// create custom property handler. If we cannot create the handler, remove the property
 				// from our object.
-				let handler = newCustomAttr.info.factory.createHandler( name);
-				if (!handler)
+				try
+				{
+					newCustomAttr.handler = new newCustomAttr.info.handlerClass( this, newCustomAttr.val, name);
+				}
+				catch( err)
+				{
+					console.error( `Error creating handler for custom attribute '${name}': ${err.message}`);
+					delete newCustomAttrs[name];
 					continue;
-
-				// initialize the handler and remember it in our object
-				handler.initialize( this, name, newCustomAttr.val);
-				newCustomAttr.handler = handler;
+				}
 			}
 		}
 

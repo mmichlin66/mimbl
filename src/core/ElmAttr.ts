@@ -101,8 +101,8 @@ export interface EventPropInfo extends PropInfoBase
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export interface CustomAttrPropInfo extends PropInfoBase
 {
-	// Factory object responsible for creating custom attribute handlers.
-	factory: mim.ICustomAttributeFactory<any>;
+	// Class object that creates custom attribute handlers.
+	handlerClass: mim.ICustomAttributeHandlerClass<any>;
 }
 
 
