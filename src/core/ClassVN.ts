@@ -213,7 +213,7 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 	// Reference to the component that is specified as a "ref" property. Reference object is
 	// set when analyzing properties in the constructor and during update. Reference value is
 	// set during mount and unset during unmount.
-	private ref: mim.Ref<any>;
+	private ref: mim.RefPropType<any>;
 }
 
 

@@ -58,10 +58,6 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		{
 			this.vnsScheduledForUpdate.add( this);
 			this.onScheduledFrame();
-
-			// let set = new Set<VN>();
-			// set.add( this);
-			// this.performUpdateCycle( set);
 		}
 		else
 			this.requestNodeUpdate( this);
@@ -598,19 +594,10 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	// methods didMount, didUpdate and willUnmount.
 	private performCommitPhase( updatedNodeDisps: VNDisp[]): void
 	{
-		updatedNodeDisps.forEach( (disp: VNDisp) =>
-		{
-			this.preUpdatePhysical( disp);
-		});
-
+		// we don't unticipate any exceptions here because we don't invoke 3rd-party code here.
 		updatedNodeDisps.forEach( (disp: VNDisp) =>
 		{
 			this.updatePhysical( disp);
-		});
-
-		updatedNodeDisps.forEach( (disp: VNDisp) =>
-		{
-			this.postUpdate( disp);
 		});
 	}
 
@@ -654,7 +641,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			console.debug( `VERBOSE: Calling willMount() on node ${vn.name}`);
 		/// #endif
 
-		// if willMount returns false, the node doesn't hve any sub-nodes
+		// if willMount returns false, the node never has any sub-nodes (e.g. text nodes)
 		if (vn.willMount())
 		{
 			// if the node doesn't handle errors we don't need to waste time to use try/catch
@@ -729,31 +716,6 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			// mount all sub-nodes
 			for( let svn = vn.subNodes.first; svn !== null; svn = svn.next)
 				this.createPhysical( svn, newAnchorDN, newBeforeDN);
-		}
-	}
-
-
-
-	// Recursively calls didMount on this VN and its sub-nodes.
-	private postCreate( vn: VN)
-	{
-		/// #if VERBOSE_NODE
-			console.debug( `VERBOSE: Calling didMount() on node ${vn.name}`);
-		/// #endif
-
-		try
-		{
-			vn.didMount();
-		}
-		catch( err)
-		{
-			console.error( `Node ${vn.name} threw exception '${err.message}' in didMount`);
-		}
-
-		if (vn.subNodes)
-		{
-			for( let svn = vn.subNodes.first; svn !== null; svn = svn.next)
-				this.postCreate( svn);
 		}
 	}
 
@@ -872,44 +834,32 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	{
 		// render the new content and build array of dispositions objects for the sub-nodes.
 		disp.buildSubNodeDispositions();
-		if (!disp.subNodeDisps)
-			return;
 
-		// perform rendering for sub-nodes that should be inserted, replaced or updated
-		for( let subNodeDisp of disp.subNodeDisps)
-		{
-			if (subNodeDisp.action === VNDispAction.Update)
-			{
-				/// #if VERBOSE_NODE
-					console.debug( `VERBOSE: Calling prepareUpdate() on node ${subNodeDisp.oldVN.name}`);
-				/// #endif
-
-				subNodeDisp.updateDisp = subNodeDisp.oldVN.prepareUpdate( subNodeDisp.newVN);
-				if (subNodeDisp.updateDisp.shouldRender)
-					this.updateVirtual( subNodeDisp);
-			}
-			else
-				this.createVirtual( subNodeDisp.newVN, disp.oldVN);
-		}
-	}
-
-
-
-	// Recursively calls willUnmount on sub-nodes marked for deletion.
-	private preUpdatePhysical( disp: VNDisp)
-	{
-		// first, sub-nodes marked for deletion
+		// for nodes to be removed, call willUnmount
 		if (disp.subNodesToRemove)
 		{
 			for( let svn of disp.subNodesToRemove)
 				this.preDestroy( svn);
 		}
 
-		// second, sub-nodes marked for update or insert
+		// perform rendering for sub-nodes that should be inserted, replaced or updated
 		if (disp.subNodeDisps)
 		{
 			for( let subNodeDisp of disp.subNodeDisps)
-				this.preUpdatePhysical( subNodeDisp);
+			{
+				if (subNodeDisp.action === VNDispAction.Update)
+				{
+					/// #if VERBOSE_NODE
+						console.debug( `VERBOSE: Calling prepareUpdate() on node ${subNodeDisp.oldVN.name}`);
+					/// #endif
+
+					subNodeDisp.updateDisp = subNodeDisp.oldVN.prepareUpdate( subNodeDisp.newVN);
+					if (subNodeDisp.updateDisp.shouldRender)
+						this.updateVirtual( subNodeDisp);
+				}
+				else
+					this.createVirtual( subNodeDisp.newVN, disp.oldVN);
+			}
 		}
 	}
 
@@ -939,7 +889,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		let beforeDN = ownDN !== null ? null : vn.getNextDNUnderSameAnchorDN( anchorDN);
 
 		// clear our current list of sub-nodes - we will populate it while updating them
-		vn.subNodes = new VNChain();
+		vn.subNodes = disp.subNodeDisps ? new VNChain() : undefined;
 
 		// remove from DOM the old nodes designated to be removed (that is, those for which there
 		// is no counterpart new node that will either update or replace it) and then those
@@ -1149,40 +1099,6 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 				// the new node becomes a sub-node
 				parentVN.subNodes.insertVN( newVN);
 			}
-		}
-	}
-
-
-
-	// Recursively calls appropriate life-cycle methods on this VN and its sub-nodes.
-	private postUpdate( disp: VNDisp)
-	{
-		if (disp.subNodeDisps)
-		{
-			for( let subNodeDisp of disp.subNodeDisps)
-			{
-				if (subNodeDisp.action === VNDispAction.Update)
-				{
-					// if we updated sub-nodes, notify them too
-					if (subNodeDisp.updateDisp.shouldRender)
-						this.postUpdate( subNodeDisp);
-				}
-				else if (subNodeDisp.action === VNDispAction.Insert)
-					this.postCreate( subNodeDisp.newVN);
-			}
-		}
-
-		/// #if VERBOSE_NODE
-			console.debug( `VERBOSE: Calling didUpdate() on node ${disp.oldVN.name}`);
-		/// #endif
-
-		try
-		{
-			disp.oldVN.didUpdate();
-		}
-		catch( err)
-		{
-			console.error( `Node ${disp.oldVN.name} threw exception '${err.message}' in didUpdate`);
 		}
 	}
 

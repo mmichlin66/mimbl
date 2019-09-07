@@ -137,14 +137,9 @@ export abstract class VN implements mim.IVNode
 	// This method is part of the Commit phase.
 	public mount?(): void {}
 
-	// This method is called after the content of node and all its sub-nodes has been inserted
-	// into the DOM tree.
-	// This method is part of the Commit phase.
-	public didMount?(): void {}
-
 	// This method is called before the content of node and all its sub-nodes is removed from the
 	// DOM tree.
-	// This method is part of the Commit phase.
+	// This method is part of the Render phase.
 	public willUnmount?(): void {}
 
 	// Removes content from the DOM tree.
@@ -167,11 +162,6 @@ export abstract class VN implements mim.IVNode
 	// Commits updates made to this node to DOM.
 	// This method is part of the Commit phase.
 	public commitUpdate?( newVN: VN): void {}
-
-	// This method is called after the content of node and all its sub-nodes has been updated
-	// in the DOM tree.
-	// This method is part of the Commit phase.
-	public didUpdate?(): void {}
 
 	// Determines whether the node supports handling of errors; that is, exception thrown during
 	// rendering of the node itself and/or its sub-nodes.
@@ -347,7 +337,7 @@ export abstract class VN implements mim.IVNode
 		}
 
 		// go up the chain; note that we don't pass the useSelf parameter on.
-		return this.parent !== null ? this.parent.findService( id, true) : undefined;
+		return this.parent ? this.parent.findService( id, true) : undefined;
 	}
 
 

@@ -160,23 +160,30 @@ export class VNDisp
 				this.action === VNDispAction.Insert || this.oldVN.type === VNType.InstanceComp
 					? this.newVN.render() : this.oldVN.render());
 		let oldChain = this.oldVN.subNodes;
+
+		// if either old or new or both chains are empty, we do special things
 		if ((!newChain || newChain.count === 0) && (!oldChain || oldChain.count === 0))
+		{
+			// both chain are empty - do nothing
 			return;
+		}
 		else if (!newChain || newChain.count === 0)
 		{
-			// we just need to delete all old nodes
-			this.subNodesToRemove = [];
+			// new chain is empty - just delete all old nodes
+			this.subNodesToRemove = new Array( oldChain.count);
+			let i = 0;
 			for( let oldVN = oldChain.first; oldVN !== null; oldVN = oldVN.next)
-				this.subNodesToRemove.push( oldVN);
+				this.subNodesToRemove[i++] = oldVN;
 
 			return;
 		}
 		else if (!oldChain || oldChain.count === 0)
 		{
-			// we just need to insert all new nodes
-			this.subNodeDisps = [];
+			// old chain is empty - just insert all new nodes
+			this.subNodeDisps = new Array( newChain.count);
+			let i = 0;
 			for( let newVN = newChain.first; newVN !== null; newVN = newVN.next)
-				this.subNodeDisps.push( new VNDisp( newVN, VNDispAction.Insert));
+				this.subNodeDisps[i++] = new VNDisp( newVN, VNDispAction.Insert);
 
 			return;
 		}
@@ -184,12 +191,13 @@ export class VNDisp
 		// we are here if both old and new chains contain some nodes.
 		// loop over new nodes and fill an array of VNDisp objects in the parent disp. At the same
 		// time, build a map that includes all new nodes that have keys. The values are VNDisp objects.
-		this.subNodeDisps = [];
+		this.subNodeDisps = new Array( newChain.count);
 		let newKeyedNodeMap = new Map<any,VNDisp>();
+		let i = 0;
 		for( let newVN = newChain.first; newVN !== null; newVN = newVN.next)
 		{
 			let subNodeDisp = new VNDisp( newVN);
-			this.subNodeDisps.push( subNodeDisp);
+			this.subNodeDisps[i++] = subNodeDisp;
 			if (newVN.key !== undefined)
 				newKeyedNodeMap.set( newVN.key, subNodeDisp);
 		}
