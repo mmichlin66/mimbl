@@ -54,20 +54,22 @@ export class TextVN extends VN implements mim.ITextVN
 		return false;
 	}
 
-	// Inserts the virtual node's content into DOM.
+	// Creates and returns DOM node corresponding to this virtual node.
 	// This method is part of the Commit phase.
-	public mount(): void
+	public mount(): DN
 	{
 		this.dn = document.createTextNode( this.text);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Added);
 		/// #endif
+
+		return this.dn;
 	}
 
 
 
-	// Removes content from the DOM tree.
+	// Destroys DOM node corresponding to this virtual node.
 	// This method is part of the Commit phase.
 	public unmount(): void
 	{

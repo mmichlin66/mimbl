@@ -1,16 +1,15 @@
 {
 	"name": "mimbl",
 	"version": "0.1.5",
-	"description": "MiM Base Library for Component Authoring",
+	"description": "MiM Base Library for Web UI Authoring",
 	"homepage": "https://mmichlin66.github.io/mimbl/mimblAbout.html",
 	"repository": "github:mmichlin66/mimbl",
-	"main": "./dist/mimblTypes.d.ts",
-	"module": "./dist/mimblTypes.d.ts",
+	"main": "./dist/mimbl.js",
+	"module": "./dist/mimbl.js",
 	"types": "./dist/mimblTypes.d.ts",
 	"scripts": {
-		"buildDev": "buildDev.bat",
-		"buildProd": "buildProd.bat",
-		"doc": "doc.bat"
+		"buildDev": "webpack --display-error-details",
+		"buildProd": "webpack -p --display-error-details"
 	},
 	"author": {
 		"name": "Michael Michlin",
@@ -18,19 +17,24 @@
 		"url": "https://mmichlin66.github.io"
 	},
 	"keywords": [
+		"Mimbl",
 		"Component",
-		"React",
+		"Viertual DOM",
 		"Web UI"
 	],
 	"license": "MIT",
 	"devDependencies": {
 		"ifdef-loader": "^2.1.1",
 		"source-map-loader": "^0.2.4",
+		"terser-webpack-plugin": "^2.0.1",
 		"ts-loader": "^5.3.3",
-		"typescript": "^3.2.4"
+		"typescript": "^3.2.4",
+		"webpack": "^4.39.3",
+		"webpack-cli": "^3.3.8"
 	},
 	"files": [
 		"dist/mimbl.js",
+		"dist/mimbl.js.map",
 		"dist/mimblTypes.d.ts",
 		"dist/core/Utils.d.ts",
 		"dist/core/EventSlot.d.ts",

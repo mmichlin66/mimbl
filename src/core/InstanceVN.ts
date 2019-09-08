@@ -64,7 +64,7 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 
 	// This method is called before the content of node and all its sub-nodes is removed from the
 	// DOM tree.
-	// This method is part of the Commit phase.
+	// This method is part of the render phase.
 	public willUnmount(): void
 	{
 		this.willUnmountInstance( this.comp);

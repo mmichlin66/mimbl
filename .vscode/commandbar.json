@@ -23,8 +23,8 @@
         {
             "text": "mimbl Doc",
             "color": "pink",
-            "commandType": "script",
-            "command": "doc",
+            "commandType": "exec",
+            "command": "doc.bat",
             "alignment": "left",
             "priority": 1
         }

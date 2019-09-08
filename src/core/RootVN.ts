@@ -192,7 +192,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 
 	// This method is called before the content of node and all its sub-nodes is removed from the
 	// DOM tree.
-	// This method is part of the Commit phase.
+	// This method is part of the render phase.
 	public willUnmount(): void
 	{
 		this.unpublishService( "StdErrorHandling");
@@ -439,8 +439,8 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 
 
 
-	// Determines whether the call to requestAnimationFrame should be made after an update or a
-	// call has been scheduled.
+	// Determines whether the call to requestAnimationFrame should be made or the frame has already
+	// been scheduled.
 	private requestFrameIfNeeded(): void
 	{
 		if (this.scheduledFrameHandle === 0)
@@ -449,8 +449,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 
 
 
-	// Determines whether the call to cancelAnimationFrame should be made after a scheduled update
-	// or call has been canceled.
+	// Determines whether the call to cancelAnimationFrame should be made.
 	private cancelFrameRequestIfNeeded(): void
 	{
 		if (this.vnsScheduledForUpdate.size === 0 &&
@@ -666,7 +665,10 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			}
 		}
 
-		// restore pointer to the currently being processed node after processing its subnodes
+		// restore pointer to the currently being processed node after processing its sub-nodes.
+		// If this node doesn't support error handling and an exception is thrown either by this
+		// node or by one of its sub-nodes, this line is not executed and thus, this.currentVN
+		// will point to our node when the exception is caught.
 		this.currentVN = currentVN;
 	}
 
@@ -696,22 +698,19 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		/// #if VERBOSE_NODE
 			console.debug( `VERBOSE: Calling mount() on node ${vn.name}`);
 		/// #endif
-		vn.mount();
-
-		// If the virtual node has its own DOM node, add it to the DOM tree and use it as an
-		// anchor for the sub-nodes.
-		let ownDN: DN = vn.getOwnDN();
+		let ownDN = vn.mount();
 
 		// if we have our own DOM node, add it under the anchor node
-		if (ownDN !== null)
+		if (ownDN)
 			vn.anchorDN.insertBefore( ownDN, beforeDN);
 
-		// if the node has sub-nodes, add DOM nodes for them
+		// if the node has sub-nodes, add DOM nodes for them. If the virtual node has its own
+		// DOM node use it as an anchor for the sub-nodes.
 		if (vn.subNodes)
 		{
 			// determine what nodes to use as anchor and "before" for the sub-nodes
-			let newAnchorDN: DN = ownDN === null ? anchorDN : ownDN;
-			let newBeforeDN: DN = ownDN === null ? beforeDN : null;
+			let newAnchorDN = ownDN ? ownDN : anchorDN;
+			let newBeforeDN = ownDN ? null : beforeDN;
 
 			// mount all sub-nodes
 			for( let svn = vn.subNodes.first; svn !== null; svn = svn.next)
@@ -750,17 +749,17 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	private destroyPhysical( vn: VN)
 	{
 		// get the DOM node before we call unmount, because unmount will clear it.
-		let ownDN: DN = vn.getOwnDN();
-
-		/// #if VERBOSE_NODE
-			console.debug( `VERBOSE: Calling unmount() on node ${vn.name}`);
-		/// #endif
-		vn.unmount();
+		let ownDN = vn.getOwnDN();
 
 		// If the virtual node has its own DOM node, we remove it from the DOM tree. In this case,
 		// we don't need to recurse into sub-nodes, because they are removed with the parent.
 		if (ownDN)
 		{
+			/// #if VERBOSE_NODE
+				console.debug( `VERBOSE: Calling unmount() on node ${vn.name}`);
+			/// #endif
+			vn.unmount();
+
 			// our DOM nodes can only be either Element or Text - both derive from ChildNode
 			(ownDN as any as ChildNode).remove();
 		}

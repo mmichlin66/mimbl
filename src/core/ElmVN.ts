@@ -100,9 +100,9 @@ export class ElmVN extends VN implements mim.IElmVN
 
 
 
-	// Inserts the virtual node's content into DOM.
+	// Creates and returns DOM node corresponding to this virtual node.
 	// This method is part of the Commit phase.
-	public mount(): void
+	public mount(): DN
 	{
 		// determine whether this is an SVG or HTML element and create the element
 		let svgInfo = SvgElms.getSvgElmInfo( this.elmName);
@@ -130,11 +130,13 @@ export class ElmVN extends VN implements mim.IElmVN
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Added);
 		/// #endif
+
+		return this.elm;
 	}
 
 
 
-	// Removes content from the DOM tree.
+	// Destroys DOM node corresponding to this virtual node.
 	// This method is part of the Commit phase.
 	public unmount(): void
 	{

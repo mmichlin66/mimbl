@@ -136,7 +136,7 @@ export class VNDisp
 	 * If the node has more than this number of sub-nodes, then we build groups. The idea is that
 	 * otherwise, the overhead of building groups is not worth it.
 	 */
-	private static readonly NO_GROUP_THRESHOLD = 2;
+	private static readonly NO_GROUP_THRESHOLD = 10;
 
 
 
@@ -171,8 +171,7 @@ export class VNDisp
 		{
 			// new chain is empty - just delete all old nodes
 			this.subNodesToRemove = new Array( oldChain.count);
-			let i = 0;
-			for( let oldVN = oldChain.first; oldVN !== null; oldVN = oldVN.next)
+			for( let i = 0, oldVN = oldChain.first; oldVN !== null; oldVN = oldVN.next)
 				this.subNodesToRemove[i++] = oldVN;
 
 			return;
@@ -193,8 +192,7 @@ export class VNDisp
 		// time, build a map that includes all new nodes that have keys. The values are VNDisp objects.
 		this.subNodeDisps = new Array( newChain.count);
 		let newKeyedNodeMap = new Map<any,VNDisp>();
-		let i = 0;
-		for( let newVN = newChain.first; newVN !== null; newVN = newVN.next)
+		for( let i = 0, newVN = newChain.first; newVN !== null; newVN = newVN.next)
 		{
 			let subNodeDisp = new VNDisp( newVN);
 			this.subNodeDisps[i++] = subNodeDisp;
@@ -233,12 +231,10 @@ export class VNDisp
 			if (subNodeDisp.action)
 				continue;
 
-			let oldVN: VN;
 			if (oldNonMatchingNodeListIndex < oldNonMatchingNodeListLength)
 			{
 				let oldVN = oldNonMatchingNodeList[oldNonMatchingNodeListIndex];
-				let newVN = subNodeDisp.newVN;
-				if (oldVN.type === newVN.type && oldVN.isUpdatePossible( newVN))
+				if (oldVN.type ===  subNodeDisp.newVN.type && oldVN.isUpdatePossible( subNodeDisp.newVN))
 				{
 					// we are here if the new node can update the old one
 					subNodeDisp.oldVN = oldVN;
@@ -288,6 +284,7 @@ export class VNDisp
 	 */
 	private buildSubNodeGroups(): void
 	{
+		// we are here only if we have some number of sub-node dispositions
 		let count = this.subNodeDisps.length;
 
 		/// #if DEBUG

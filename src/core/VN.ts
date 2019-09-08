@@ -61,28 +61,6 @@ export abstract class VN implements mim.IVNode
 	// it can reflect an "id" property of an element (if any).
 	public abstract get name(): string;
 
-	// Root node.
-	public get root(): IRootVN
-	{
-		// when this property is read for the first time, it is retrieved from the parent and
-		// then we change the property from the gettter to a regular.
-		delete this.root;
-		return this.root = this.parent ? this.parent.root : this as any as IRootVN;
-	}
-
-	public set root( val: IRootVN) {}
-
-	// Level of nesting at which the node resides relative to the root node.
-	public get depth(): number
-	{
-		// when this property is read for the first time, it is retrieved from the parent and
-		// then we change the property from the gettter to a regular.
-		delete this.depth;
-		return this.depth = this.parent ? this.parent.depth + 1 : 0;
-	}
-
-	public set depth( val: number) {}
-
 
 
 	// Initializes the node by passing the parent node to it. After this, the node knows its
@@ -90,6 +68,8 @@ export abstract class VN implements mim.IVNode
 	public initialize( parent: VN): void
 	{
 		this.parent = parent;
+		this.root = this.parent ? this.parent.root : this as any as IRootVN;
+		this.depth = this.parent ? this.parent.depth + 1 : 0;
 	}
 
 
@@ -113,6 +93,8 @@ export abstract class VN implements mim.IVNode
 		this.anchorDN = null;
 		this.subNodes = undefined;
 		this.parent = undefined;
+		this.root = undefined;
+		this.depth = undefined;
 	}
 
 
@@ -133,16 +115,17 @@ export abstract class VN implements mim.IVNode
 	// This method is part of the Render phase.
 	public render?(): any {}
 
-	// Inserts the virtual node's content into DOM.
+	// Creates and returns DOM node corresponding to this virtual node.
 	// This method is part of the Commit phase.
-	public mount?(): void {}
+	public mount?(): DN { return null; }
 
 	// This method is called before the content of node and all its sub-nodes is removed from the
 	// DOM tree.
 	// This method is part of the Render phase.
 	public willUnmount?(): void {}
 
-	// Removes content from the DOM tree.
+	// Destroys DOM node corresponding to this virtual node. This method is called only on nodes
+	// that have their own DOM nodes.
 	// This method is part of the Commit phase.
 	public unmount?(): void {}
 
@@ -508,6 +491,12 @@ export abstract class VN implements mim.IVNode
 
 	// Parent node. This is null for the top-level (root) nodes.
 	public parent: VN;
+
+	// Root node.
+	public root: IRootVN;
+
+	// Level of nesting at which the node resides relative to the root node.
+	public depth: number;
 
 	// DOM node under which all content of this virtual node is rendered.
 	public anchorDN: DN = null;

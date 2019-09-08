@@ -1,5 +1,5 @@
 # Mimbl - Component Authoring Library
-Mimbl is a TypeScript/JavaScript UI authoring library that combines declarative and imperative programming in one package. Mimbl is proposed as an alternative to React. The accompanying document [React Discussion](http://mmichlin66.github.io/2019/08/10/React-Discussion.html) provides more information about aspects of React that this library strives to improve on.
+Mimbl is a TypeScript/JavaScript UI authoring library that combines declarative and imperative programming in one package. Mimbl is proposed as an alternative to React. The accompanying document [React Discussion](http://mmichlin66.github.io/2019/08/10/React-Discussion.html) provides more information about aspects of React that this library strives to improve upon.
 
 ## Installation
 
@@ -12,10 +12,10 @@ Mimbl provides all the standard React-style functionality that developers expect
 
 - Instance-based components whose lifecycle is controlled by developers and which can be accessed via standard property and method invocation.
 - Custom HTML and SVG attributes defined by developers and supported via handler objects.
-- Context functionality based on publish/subscribe mechanism.
+- Service publish/subscribe mechanism.
 
 ## Usage
-The Mimbl library provides a custom JSX factory function called `jsx`. In order for this function to be invoked by the TypeScript compiler, the tsconfig.json must have the following option:
+The Mimbl library provides a custom JSX factory function called `jsx`. In order for this function to be invoked by the TypeScript compiler, the tsconfig.json file must have the following option:
 
 ```json
 "compilerOptions":
@@ -25,7 +25,7 @@ The Mimbl library provides a custom JSX factory function called `jsx`. In order 
 }
  ```
 
-The .tsx files must import the Mimbl module as mim: import * as mim from "mimbl":
+The .tsx files must import the Mimbl module as mim:
 
 ```tsx
 import * as mim from "mimbl"
@@ -51,7 +51,7 @@ mim.mount( new HelloWorld("red"));
 ```
 
 For more details please see the following resources:
-* [About](https://mmichlin66.github.io/mimbl/mimblAbout.html)
-* [API Reference](https://mmichlin66.github.io/mimbl/mimblReference.html)
-* [Playground](https://mmichlin66.github.io/mimbl/mimblDemo.html) (work in progress)
+- [About](https://mmichlin66.github.io/mimbl/mimblAbout.html)
+- [API Reference](https://mmichlin66.github.io/mimbl/mimblReference.html)
+- [Playground](https://mmichlin66.github.io/mimbl/mimblDemo.html) (work in progress)
 
