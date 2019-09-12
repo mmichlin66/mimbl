@@ -952,8 +952,6 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 				}
 				else
 				{
-					// since we are going from the first node in the group to the last we always use
-					// the same beforeDN for insertion
 					this.createPhysical( newVN, anchorDN, beforeDN);
 
 					// if the new node defines a DOM node, it becomes the DOM node before which

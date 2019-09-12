@@ -200,7 +200,8 @@ export class VNDisp
 		}
 
 		// determine whether replacement of non-matching old keyed sub-nodes by non-matching new
-		// keyed sub-nodes is allowed.
+		// keyed sub-nodes is allowed. If update strategy is not defined for the node, the
+		// replacement is allowed.
 		let allowKeyedSubNodeReplacement = true;
 		let updateStrategy = this.oldVN ? this.oldVN.getUpdateStrategy() : undefined;
 		if (updateStrategy && updateStrategy.allowKeyedSubNodeReplacement !== undefined)
@@ -210,7 +211,7 @@ export class VNDisp
 		// objects. Put those that don't have keys or that have keys that don't match any new node to
 		// an array of non-matching old nodes. Note that even when we find old and new nodes with
 		// matching keys, we still check whether they are of the same type and update is possible. This
-		// is to handle situations when developers erroneously put matching keys on differen types
+		// is to handle situations when developers erroneously put matching keys on different types
 		// of nodes.
 		let oldNonMatchingNodeList: VN[] = [];
 		this.subNodesToRemove = [];
@@ -221,7 +222,7 @@ export class VNDisp
 			else
 			{
 				let subNodeDisp = newKeyedNodeMap.get( oldVN.key);
-				if (subNodeDisp && oldVN.type ===  subNodeDisp.newVN.type &&
+				if (subNodeDisp && oldVN.type === subNodeDisp.newVN.type &&
 					oldVN.isUpdatePossible( subNodeDisp.newVN))
 				{
 					subNodeDisp.oldVN = oldVN;

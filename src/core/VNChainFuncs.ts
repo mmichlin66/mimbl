@@ -22,7 +22,17 @@ export function createVNChainFromContent( content: any): VNChain
 	if (typeof content === "string")
 		chain.appendVN( new TextVN( content));
 	else if (typeof content.render === "function")
+	{
+		// let comp = content as mim.IComponent;
+
+		// // if the component (this can only be an Instance component) is already attached to VN, add
+		// // this existing VN; otherwise create a new one.
+		// chain.appendVN( (content as mim.IComponent).site
+						// ? (content as mim.IComponent).site as VN
+						// : new InstanceVN( content as mim.IComponent));
+
 		chain.appendVN( new InstanceVN( content as mim.IComponent));
+	}
 	else if (Array.isArray( content))
 	{
 		for( let arrItem of content)

@@ -99,11 +99,7 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 	{
 		// create component instance
 		this.comp = new this.compClass( this.props);
-
-		// it is OK for the component to not implement setSite method; however, it will not be
-		// able to use any of the Mimbl services including requests for updates.
-		if (this.comp.setSite)
-			this.comp.setSite( this);
+		this.comp.site = this;
 
 		if (this.comp.componentWillMount)
 			this.comp.componentWillMount();
@@ -136,9 +132,7 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 		if (this.comp.componentWillUnmount)
 			this.comp.componentWillUnmount();
 
-		if (this.comp.setSite)
-			this.comp.setSite( null);
-
+		this.comp.site = undefined;
 		this.comp = undefined;
 
 		/// #if USE_STATS

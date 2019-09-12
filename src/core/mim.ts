@@ -88,20 +88,20 @@ export interface IComponent<TProps = {}, TChildren = any>
 	getDisplayName?(): string;
 
 	/**
-	 * Sets or clears the site object to the component. This method is called twice:
+	 * Sets or clears the site object to the component. This property is set twice:
 	 *  1. Before the component is rendered for the first time: the component must remember the
 	 *    passed object.
 	 *  2. Before the component is destroyed: null is passed as a parameter and the component must
 	 *    release the remembered object.
 	 * 
-	 * This method is optional; however, without implementing it components cannot use Mimbl
+	 * This property is optional; however, without implementing it components cannot use Mimbl
 	 * services.
 	 * 
 	 * @param site The site object implementing the IVnode interface. The component uses
 	 * this object to invoke different services provided by the Mimbl infrastructure; for example
 	 * to request a re-rendering.
 	 */
-	setSite?( site: IVNode): void;
+	site?: IVNode;
 
 	/**
 	 * Notifies that the component is about to render its content for the first time. This method
@@ -231,20 +231,20 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	/** Component properties passed to the constructor */
 	public props: CompProps<TProps,TChildren>;
 
+	/** Remembered site object through which component can request services. */
+	private _site: IVNode = undefined;
+
 	constructor( props?: CompProps<TProps,TChildren>)
 	{
 		if (props)
 			this.props = props;
 	}
 
-	/** Site object through which component can request services. */
-	protected site: IVNode = undefined;
-
 	/** Sets or clears the site object through which component can request services. */
-	public setSite( site: IVNode): void
-	{
-		this.site = site;
-	}
+	public set site( val: IVNode) { this._site = val; }
+
+	/** Gets the site object to which component is attached. */
+	public get site(): IVNode { return this._site; }
 
 	/** Returns the component's content that will be ultimately placed into the DOM tree. */
 	public abstract render(): any;
@@ -252,16 +252,8 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	/** This method is called by the component to request to be updated. */
 	protected updateMe(): void
 	{
-		if (this.site !== undefined)
-			this.site.requestUpdate();
-	}
-
-	// This method is called by the component to ignore any update/delete/replace requests
-	// that have been made by the component during the current JavaScript event loop.
-	protected ignoreMe(): void
-	{
-		if (this.site !== null)
-			this.site.cancelUpdate();
+		if (this._site)
+			this._site.requestUpdate();
 	}
 
 	/** This method is called by the component to schedule a function to be invoked on the next
@@ -272,15 +264,8 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 */
 	protected callMe( func: ScheduledFuncType, beforeUpdate: boolean = false): void
 	{
-		if (this.site !== null)
-			this.site.scheduleCall( func, beforeUpdate);
-	}
-
-	/** This method is called by the component to cancel a scheduled function. */
-	protected dontCallMe( func: ScheduledFuncType, beforeUpdate: boolean = false): void
-	{
-		if (this.site !== null)
-			this.site.cancelScheduledCall( func, beforeUpdate);
+		if (this._site)
+			this._site.scheduleCall( func, beforeUpdate);
 	}
 }
 
