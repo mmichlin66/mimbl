@@ -20,18 +20,18 @@ export function createVNChainFromContent( content: any): VNChain
 
 	const chain = new VNChain();
 	if (typeof content === "string")
-		chain.appendVN( new TextVN( content as string));
+		chain.appendVN( new TextVN( content));
 	else if (typeof content.render === "function")
 		chain.appendVN( new InstanceVN( content as mim.IComponent));
 	else if (Array.isArray( content))
 	{
-		for( let arrItem of content as Array<any>)
+		for( let arrItem of content)
 			chain.appendChain( createVNChainFromContent( arrItem));
 	}
 	else if (content instanceof VN)
-		chain.appendVN( content as VN);
+		chain.appendVN( content);
 	else if (content instanceof VNChain)
-		chain.appendChain( content as VNChain);
+		chain.appendChain( content);
 	else if (content instanceof Promise)
 		throw content;
 	else

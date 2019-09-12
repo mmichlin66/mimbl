@@ -46,6 +46,11 @@ export class ElmVN extends VN implements mim.IElmVN
 					// remember ref property but don't copy it to this.props object
 					this.ref = propVal;
 				}
+				else if (propName === "updateStrategy")
+				{
+					// remember updateStrategy property but don't copy it to this.props object
+					this.updateStrategy = propVal;
+				}
 				else
 					this.props[propName] = propVal;
 			}
@@ -220,9 +225,23 @@ export class ElmVN extends VN implements mim.IElmVN
 		// remeber the new value of the key property (even if it is the same)
 		this.key = newElmVN.key;
 
+		// remeber the new value of the updateStrategy property (even if it is the same)
+		this.updateStrategy = newElmVN.updateStrategy;
+
 		this.updateAttrs( newElmVN.attrs);
 		this.updateEvents( newElmVN.events);
 		this.updateCustomAttrs( newElmVN.customAttrs);
+	}
+
+
+
+	/**
+	 * Retrieves update strategy object that determines different aspects of node behavior
+	 * during updates.
+	 */
+	public getUpdateStrategy?(): mim.UpdateStrategy
+	{
+		return this.updateStrategy;
 	}
 
 
@@ -646,6 +665,9 @@ export class ElmVN extends VN implements mim.IElmVN
 	// set when analyzing properties in the constructor and during update. Reference value is
 	// set during mount and unset during unmount. The ref property can be changed on update.
 	private ref: mim.RefPropType<any>;
+
+	// Optional UpdateStrategy object defining different aspects of node behavior during updates.
+	private updateStrategy: mim.UpdateStrategy;
 
 	// Object that serves as a map between attribute names and their current values.
 	private attrs: { [name: string]: AttrRunTimeData };

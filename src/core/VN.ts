@@ -156,6 +156,12 @@ export abstract class VN implements mim.IVNode
 	// This method is part of the Render phase.
 	public handleError?( vnErr: any, path: string[]): void {}
 
+	/**
+	 * Retrieves update strategy object that determines different aspects of node behavior
+	 * during updates.
+	 */
+	public getUpdateStrategy?(): mim.UpdateStrategy { return undefined; }
+
 	// Returns DOM node corresponding to the virtual node itself (if any) and not to any of its
 	// sub-nodes.
 	public getOwnDN(): DN { return null; }

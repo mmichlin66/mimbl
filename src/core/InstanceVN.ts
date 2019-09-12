@@ -20,8 +20,8 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 		super();
 		this.comp = comp;
 
-		// the component object is a key for the node
-		this.key = comp;
+		// the component can define key; if not, the component instance is the key for the node
+		this.key = comp.key !== undefined ? comp.key : comp;
 	};
 
 
@@ -114,7 +114,8 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 		this.willUnmountInstance( this.comp);
 
 		let newInstanceVN = newVN as InstanceVN;
-		this.comp = this.key = newInstanceVN.comp;
+		this.comp = newInstanceVN.comp;
+		this.key = newInstanceVN.key;
 	}
 
 
@@ -145,7 +146,7 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 			comp.componentWillUnmount();
 
 		if (this.comp.setSite)
-			comp.setSite( null);
+			comp.setSite( undefined);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);

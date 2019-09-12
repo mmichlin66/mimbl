@@ -63,22 +63,13 @@ export abstract class CompBaseVN<TComp extends mim.IComponent> extends VN
 
 
 
-	// This method is called after the content of node and all its sub-nodes has been inserted
-	// into the DOM tree.
-	public didMount(): void
+	/**
+	 * Retrieves update strategy object that determines different aspects of node behavior
+	 * during updates.
+	 */
+	public getUpdateStrategy?(): mim.UpdateStrategy
 	{
-		if (this.comp.componentDidMount)
-			this.comp.componentDidMount();
-	}
-
-
-
-	// This method is called after the content of node and all its sub-nodes has been updated
-	// in the DOM tree.
-	public didUpdate(): void
-	{
-		if (this.comp.componentDidUpdate)
-			this.comp.componentDidUpdate();
+		return this.comp.getUpdateStrategy ? this.comp.getUpdateStrategy() : undefined;
 	}
 
 

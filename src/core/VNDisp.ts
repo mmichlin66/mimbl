@@ -1,6 +1,6 @@
 ﻿import {DN, VN, VNUpdateDisp} from "./VN"
 import {createVNChainFromContent} from "./VNChainFuncs"
-import { VNType } from "./mim";
+import { VNType, UpdateStrategy } from "./mim";
 
 
 
@@ -180,8 +180,7 @@ export class VNDisp
 		{
 			// old chain is empty - just insert all new nodes
 			this.subNodeDisps = new Array( newChain.count);
-			let i = 0;
-			for( let newVN = newChain.first; newVN !== null; newVN = newVN.next)
+			for( let i= 0, newVN = newChain.first; newVN !== null; newVN = newVN.next)
 				this.subNodeDisps[i++] = new VNDisp( newVN, VNDispAction.Insert);
 
 			return;
@@ -200,10 +199,21 @@ export class VNDisp
 				newKeyedNodeMap.set( newVN.key, subNodeDisp);
 		}
 
+		// determine whether replacement of non-matching old keyed sub-nodes by non-matching new
+		// keyed sub-nodes is allowed.
+		let allowKeyedSubNodeReplacement = true;
+		let updateStrategy = this.oldVN ? this.oldVN.getUpdateStrategy() : undefined;
+		if (updateStrategy && updateStrategy.allowKeyedSubNodeReplacement !== undefined)
+			allowKeyedSubNodeReplacement = updateStrategy.allowKeyedSubNodeReplacement;
+
 		// loop over old nodes and put those that have keys matching new nodes into the new nodes' VNDisp
 		// objects. Put those that don't have keys or that have keys that don't match any new node to
-		// an array of non-matching old nodes
+		// an array of non-matching old nodes. Note that even when we find old and new nodes with
+		// matching keys, we still check whether they are of the same type and update is possible. This
+		// is to handle situations when developers erroneously put matching keys on differen types
+		// of nodes.
 		let oldNonMatchingNodeList: VN[] = [];
+		this.subNodesToRemove = [];
 		for( let oldVN = oldChain.first; oldVN !== null; oldVN = oldVN.next)
 		{
 			if (oldVN.key === undefined)
@@ -211,27 +221,44 @@ export class VNDisp
 			else
 			{
 				let subNodeDisp = newKeyedNodeMap.get( oldVN.key);
-				if (subNodeDisp)
+				if (subNodeDisp && oldVN.type ===  subNodeDisp.newVN.type &&
+					oldVN.isUpdatePossible( subNodeDisp.newVN))
 				{
 					subNodeDisp.oldVN = oldVN;
 					subNodeDisp.action = VNDispAction.Update;
 				}
-				else
+				else if (allowKeyedSubNodeReplacement)
 					oldNonMatchingNodeList.push( oldVN);
+				else
+				{
+					// if replacement of keyed nodes is not allowed, the non-matched old node is removed
+					this.subNodesToRemove.push( oldVN);
+				}
 			}
 		}
 
-		// by now we have all old and new nodes with the same keys matched to one another. Now loop
-		// over new node dispositions and match the not-yet-matched ones (those with Unknown action)
-		// to old nodes sequentially from the list of non-matched old nodes.
+		// By now we have all old and new nodes with the same keys matched to one another. What we
+		// do now depends on the reconciliation strategy, which either allows replacing old nodes
+		// by new nodes with non-matching keys or not. Replacement of unkeyed old nodes by unkeyed
+		// new nodes is always allowed. If replacement of keyed nodes is allowed, we match the
+		// not-yet-matched ones (those with Unknown action) to old nodes sequentially from the list
+		// of non-matched old nodes. Replacement matching only works if the types of the old and
+		// the new nodes are the same and the old node's isUpdatePossible returns true. If
+		// replacement of keyed nodes is not allowed, the new ones are inserted. Note that in this
+		// case, the oldNonMatchingNodeList doesn't contain keyed old nodes - they were already
+		// placed into the subNodesToRemove array.
 		let oldNonMatchingNodeListLength: number = oldNonMatchingNodeList.length;
 		let oldNonMatchingNodeListIndex: number = 0;
 		for( let subNodeDisp of this.subNodeDisps)
 		{
+			// skip already matched nodes
 			if (subNodeDisp.action)
 				continue;
 
-			if (oldNonMatchingNodeListIndex < oldNonMatchingNodeListLength)
+			// we allow replcement by non-keyed nodes or by keyed nodes if the "allow replacement"
+			// flag is true.
+			if ((!subNodeDisp.newVN.key || allowKeyedSubNodeReplacement) &&
+				oldNonMatchingNodeListIndex < oldNonMatchingNodeListLength)
 			{
 				let oldVN = oldNonMatchingNodeList[oldNonMatchingNodeListIndex];
 				if (oldVN.type ===  subNodeDisp.newVN.type && oldVN.isUpdatePossible( subNodeDisp.newVN))
@@ -245,9 +272,6 @@ export class VNDisp
 					// we are here if the new node cannot update the old one and should completely
 					// replace it. We add the old node to the list of those to be removed and indicate
 					// that the new node should be inserted.
-					if (!this.subNodesToRemove)
-						this.subNodesToRemove = [];
-
 					this.subNodesToRemove.push( oldVN);
 					subNodeDisp.action = VNDispAction.Insert;
 				}
@@ -265,9 +289,6 @@ export class VNDisp
 		// old non-matched nodes from the current index to the end of the list will be unmounted
 		if (oldNonMatchingNodeListIndex < oldNonMatchingNodeListLength)
 		{
-			if (!this.subNodesToRemove)
-				this.subNodesToRemove = [];
-
 			for( let i = oldNonMatchingNodeListIndex; i < oldNonMatchingNodeListLength; i++)
 				this.subNodesToRemove.push( oldNonMatchingNodeList[i]);
 		}

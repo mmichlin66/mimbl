@@ -74,6 +74,13 @@ export interface IComponent<TProps = {}, TChildren = any>
 	props: CompProps<TProps,TChildren>;
 
 	/**
+	 * Component instances can define keys that will be used to distinguish them from other instances.
+	 * If the component doesn't define a key, then for free components, the instance itself is
+	 * used as a key; for managed components, the key can be provided as a built-in property.
+	 */
+	readonly key?: string;
+
+	/**
 	 * Components can define display name for tracing purposes; if they don't the default name
 	 * is the component's class constructor name. Note that this method can be called before
 	 * the virtual node is attached to the component.
@@ -106,12 +113,6 @@ export interface IComponent<TProps = {}, TChildren = any>
 	render(): any;
 
 	/**
-	 * Notifies that the component's content has been inserted into the DOM tree. This method is
-	 * called after the component has been instantiated and the initial rendering has been done.
-	 */
-	componentDidMount?(): void;
-
-	/**
 	 * Informs the component that new properties have been specified. At the time of the call
 	 * this.props refers to the "old" properties. If the component returns true,then its render
 	 * method will be called. At that time,the original props object that was passed into the
@@ -123,9 +124,6 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * @returns True if the component should have its render method called and false otherwise.
 	 */
 	shouldComponentUpdate?( newProps: CompProps<TProps,TChildren>): boolean;
-
-	/** Notifies that the component's content has been updated in the DOM tree. */
-	componentDidUpdate?(): void;
 
 	/**
 	 * Notifies that the component's content is going to be removed from the DOM tree. After
@@ -146,8 +144,39 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * purposes.
 	 */
 	handleError?( err: any, path: string[]): void;
+
+	/**
+	 * Retrieves update strategy object that determines different aspects of component behavior
+	 * during updates.
+	 */
+	getUpdateStrategy?(): UpdateStrategy;
 }
 
+
+
+/**
+ * The UpdateStrategy object specifies different aspects of update behavior of components and
+ * elements.
+ */
+export type UpdateStrategy = 
+{
+	/**
+	 * Flag determining whether non-matching new keyed sub-nodes are allowed to replace non-
+	 * matching old keyed sub-nodes. Here "non-matching" means those new or old nodes for which
+	 * no old or new sub-nodes respectively were found. If this flag is false, then non-matching
+	 * old sub-nodes will be removed and non-matching new sub-nodes will be inserted. If this
+	 * flag is true, then non-matching old sub-nodes will be updated by the non-matching new
+	 * sub-nodes - provided that the types of sub-nodes are the same.
+	 * 
+	 * If keyed sub-nodes replacement is allowed it can speed up an update process because
+	 * less DOM nodes get removed and inserted, which is more expensive than updating. However,
+	 * this can have some adverse effects under cirtain circumstances if certain data is bound
+	 * to the particular instances of DOM nodes.
+	 * 
+	 * The flag's default value is true.
+	 */
+	allowKeyedSubNodeReplacement?: boolean;
+};
 
 
 /**
@@ -934,15 +963,21 @@ export type ReferrerPolicyPropType = "no-referrer" | "no-referrer-when-downgrade
  */
 export interface IElementProps<TRef,TChildren = any> extends ICommonProps
 {
-	//
-	/** Reference that will be set to the instance of the element after it is created (mounted). The
+	/**
+	 * Reference that will be set to the instance of the element after it is created (mounted). The
 	 * reference will be set to undefined after the element is unmounted.
 	 */
 	ref?: RefPropType<TRef>;
 
+	/**
+	 * Update strategy object that determines different aspects of element behavior during updates.
+	 */
+	updateStrategy?: UpdateStrategy;
+
 	/** Children that can be supplied to the element */
 	children?: TChildren;
 
+	// standard HTML and SVG element properties
 	class?: string
 	draggable?: boolean;
 	dropzone ?: "copy" | "move" | "link";
