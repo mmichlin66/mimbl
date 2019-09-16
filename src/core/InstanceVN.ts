@@ -126,7 +126,7 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 	{
 		// it is OK for the component to not implement the site property; however, it will not be
 		// able to use any of the Mimbl services including requests for updates.
-		this.comp.site = this;
+		comp.site = this;
 
 		if (comp.componentWillMount)
 			comp.componentWillMount();
@@ -144,7 +144,7 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 		if (comp.componentWillUnmount)
 			comp.componentWillUnmount();
 
-		this.comp.site = undefined;
+		comp.site = undefined;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
