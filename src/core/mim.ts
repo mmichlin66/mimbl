@@ -675,24 +675,6 @@ export const enum VNType
 
 
 /**
- * The IVNChain interface represent a doubly-linked list of virtual nodes. This is the object
- * that is returned from the JSX processing function.
- */
-export interface IVNChain
-{
-	/** First node in the chain. */
-	readonly First: IVNode;
-
-	/** Last node in the chain. */
-	readonly Last: IVNode;
-
-	/** Number of nodes in the chain. */
-	readonly Count: number;
-}
-
-
-
-/**
  * The IVNode interface represents a virtual node. Through this interface, callers can perform
  * most common actions that are available on every type of virtual node. Each type of virtual node
  * also implements a more specific interface through which the specific capabilities of the node
@@ -706,14 +688,8 @@ export interface IVNode
 	/** Gets node's parent. */
 	readonly Parent: IVNode;
 
-	/** Gets node's next sibling. */
-	readonly Next: IVNode;
-
-	/** Gets node's previous sibling. */
-	readonly Prev: IVNode;
-
 	/** List of sub-nodes. */
-	readonly SubNodes: IVNChain;
+	readonly SubNodes: IVNode[];
 
 	/** Gets node's display name. */
 	readonly Name: string;
@@ -1109,8 +1085,8 @@ import * as svg from "./SvgTypes";
  */
 export namespace JSX
 {
-	// tslint:disable-next-line:no-empty-interface
-	export interface Element extends IVNChain {}
+	// // tslint:disable-next-line:no-empty-interface
+	// export interface Element extends IVNode[] {}
 
 	// tslint:disable-next-line:no-empty-interface
 	export interface ElementClass extends IComponent {}
@@ -1385,7 +1361,7 @@ export namespace JSX
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 import {RootVN} from "./RootVN"
-import {createVNChainFromJSX} from "./VNChainFuncs"
+import {createNodesFromJSX} from "./ContentFuncs"
 
 
 
@@ -1413,7 +1389,7 @@ export function jsx( tag: any, props: any, ...children: any[]): any
 	//	2) <A>{[t1, t2]}</A>. In this case, children will be [[t1,t2]].
 	// The realChildren variable accommodates both cases.
 	let realChildren = children.length === 1 && Array.isArray( children[0]) ? children[0] : children;
-	return createVNChainFromJSX( tag, props, realChildren);
+	return createNodesFromJSX( tag, props, realChildren);
 }
 
 

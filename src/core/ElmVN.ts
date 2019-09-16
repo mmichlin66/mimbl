@@ -2,6 +2,7 @@
 import {DN, VN, VNUpdateDisp} from "./VN"
 import {ElmAttr, AttrPropInfo, EventPropInfo, CustomAttrPropInfo, PropType} from "./ElmAttr"
 import {SvgElms} from "./SvgElms";
+import {hashObject} from "./Utils";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
@@ -24,14 +25,16 @@ export class ElmVN extends VN implements mim.IElmVN
 		this.elmName = tagName;
 		this.children = children;
 
+		this.propsHash = hashObject(props);
+
 		// copy properties to our own object excluding framework-handled key and ref
-		this.props = {};
 		if (props)
 		{
+			this.props = {};
 			for( let propName in props)
 			{
-				let propVal: any = props[propName];
-				if (propVal === undefined || propVal === null)
+				let propVal = props[propName];
+				if (propVal == null)
 				{
 					// ignore properties with values undefined and null
 					continue;
@@ -52,7 +55,12 @@ export class ElmVN extends VN implements mim.IElmVN
 					this.updateStrategy = propVal;
 				}
 				else
+				{
+					// if (!this.props)
+					// 	this.props = {};
+
 					this.props[propName] = propVal;
+				}
 			}
 
 			// if key property was not specified, use id; if id was not specified key will remain
@@ -192,13 +200,17 @@ export class ElmVN extends VN implements mim.IElmVN
 	// This method is part of the Render phase.
 	public prepareUpdate( newVN: VN): VNUpdateDisp
 	{
-		const newElmVN: ElmVN = newVN as ElmVN;
+		let newElmVN: ElmVN = newVN as ElmVN;
+		let newPropsHash = hashObject( newElmVN.props);
+		// let shouldCommit = this.propsHash != newPropsHash;
 
 		// remember the new props and children
 		this.props = newElmVN.props;
 		this.children = newElmVN.children;
+		this.propsHash = newPropsHash;
 
 		// commitUpdate method should be called and children will have to be updated via render
+		// return { shouldCommit, shouldRender: this.children && this.children.length > 0 };
 		return { shouldCommit: true, shouldRender: true };
 	}
 
@@ -650,6 +662,10 @@ export class ElmVN extends VN implements mim.IElmVN
 
 	// Array of children objects.
 	private children: any[];
+
+	// Hash of the properties to compare in order to understand whether the properties (that is,
+	// attributes and/or events and/or custom attributes) should be updated.
+	private propsHash: number;
 
 	// Instance of an Element. The instance is created when the node is rendered for the first
 	// time.
