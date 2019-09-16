@@ -845,19 +845,14 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			{
 				if (subNodeDisp.action === VNDispAction.Update)
 				{
-					// // if this is the same node (which can only happen for InstanceVN) we don't
-					// // need to do anything - no updates of sub-nodes
-					// if (subNodeDisp.oldVN !== subNodeDisp.newVN)
-					// {
-						/// #if VERBOSE_NODE
-							console.debug( `VERBOSE: Calling prepareUpdate() on node ${subNodeDisp.oldVN.name}`);
-						/// #endif
+					/// #if VERBOSE_NODE
+						console.debug( `VERBOSE: Calling prepareUpdate() on node ${subNodeDisp.oldVN.name}`);
+					/// #endif
 
-						subNodeDisp.updateDisp = subNodeDisp.oldVN.prepareUpdate( subNodeDisp.newVN);
-						if (subNodeDisp.updateDisp.shouldRender)
-							this.updateVirtual( subNodeDisp);
-					}
-				// }
+					subNodeDisp.updateDisp = subNodeDisp.oldVN.prepareUpdate( subNodeDisp.newVN);
+					if (subNodeDisp.updateDisp.shouldRender)
+						this.updateVirtual( subNodeDisp);
+				}
 				else
 					this.createVirtual( subNodeDisp.newVN, disp.oldVN);
 			}
@@ -933,21 +928,18 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 				if (group.action === VNDispAction.Update)
 				{
 					let oldVN = disp.oldVN;
-					// if (oldVN !== newVN)
-					// {
-						if (disp.updateDisp.shouldCommit)
-						{
-							/// #if VERBOSE_NODE
-								console.debug( `VERBOSE: Calling commitUpdate() on node ${oldVN.name}`);
-							/// #endif
+					if (disp.updateDisp.shouldCommit)
+					{
+						/// #if VERBOSE_NODE
+							console.debug( `VERBOSE: Calling commitUpdate() on node ${oldVN.name}`);
+						/// #endif
 
-							oldVN.commitUpdate( newVN);
-						}
+						oldVN.commitUpdate( newVN);
+					}
 
-						// update the sub-nodes if necessary
-						if (disp.updateDisp.shouldRender)
-							this.updatePhysical( disp);
-					// }
+					// update the sub-nodes if necessary
+					if (disp.updateDisp.shouldRender)
+						this.updatePhysical( disp);
 
 					let firstDN = oldVN.getFirstDN();
 					if (firstDN !== null)
@@ -1052,21 +1044,18 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			if (action === VNDispAction.Update)
 			{
 				let oldVN = disp.oldVN;
-				// if (oldVN !== newVN)
-				// {
-					if (disp.updateDisp.shouldCommit)
-					{
-						/// #if VERBOSE_NODE
-							console.debug( `VERBOSE: Calling commitUpdate() on node ${oldVN.name}`);
-						/// #endif
+				if (disp.updateDisp.shouldCommit)
+				{
+					/// #if VERBOSE_NODE
+						console.debug( `VERBOSE: Calling commitUpdate() on node ${oldVN.name}`);
+					/// #endif
 
-						oldVN.commitUpdate( newVN);
-					}
+					oldVN.commitUpdate( newVN);
+				}
 
-					// update the sub-nodes if necessary
-					if (disp.updateDisp.shouldRender)
-						this.updatePhysical( disp);
-				// }
+				// update the sub-nodes if necessary
+				if (disp.updateDisp.shouldRender)
+					this.updatePhysical( disp);
 
 				// determine whether all the nodes under this VN should be moved.
 				let subNodeDNs = oldVN.getImmediateDNs();

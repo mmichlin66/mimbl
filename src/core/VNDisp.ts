@@ -220,7 +220,6 @@ export class VNDisp
 		// is to handle situations when developers erroneously put matching keys on different types
 		// of nodes.
 		let oldNonMatchingNodeList: VN[];
-		let matchedNewNodesCount = 0;
 		for( let i = 0; i < oldChain.length; i++)
 		{
 			let oldVN = oldChain[i];
@@ -244,8 +243,6 @@ export class VNDisp
 					// needed to understand whether the DOM node needs to be moved
 					if (i < oldChain.length - 1)
 						subNodeDisp.oldNextVN = oldChain[i+1];
-
-					matchedNewNodesCount++;
 				}
 				else if (allowKeyedSubNodeReplacement)
 				{
@@ -275,59 +272,56 @@ export class VNDisp
 		// replacement of keyed nodes is not allowed, the new ones are inserted. Note that in this
 		// case, the oldNonMatchingNodeList doesn't contain keyed old nodes - they were already
 		// placed into the subNodesToRemove array.
-		if (matchedNewNodesCount < this.subNodeDisps.length)
+		let oldNonMatchingNodeListLength = !oldNonMatchingNodeList ? 0 : oldNonMatchingNodeList.length;
+		let oldNonMatchingNodeListIndex = 0;
+		for( let subNodeDisp of this.subNodeDisps)
 		{
-			let oldNonMatchingNodeListLength = !oldNonMatchingNodeList ? 0 : oldNonMatchingNodeList.length;
-			let oldNonMatchingNodeListIndex = 0;
-			for( let subNodeDisp of this.subNodeDisps)
+			// skip already matched nodes
+			if (subNodeDisp.action)
+				continue;
+
+			// we allow replcement by non-keyed nodes or by keyed nodes if the "allow replacement"
+			// flag is true.
+			if ((!subNodeDisp.newVN.key || allowKeyedSubNodeReplacement) &&
+				oldNonMatchingNodeListIndex < oldNonMatchingNodeListLength)
 			{
-				// skip already matched nodes
-				if (subNodeDisp.action)
-					continue;
-
-				// we allow replcement by non-keyed nodes or by keyed nodes if the "allow replacement"
-				// flag is true.
-				if ((!subNodeDisp.newVN.key || allowKeyedSubNodeReplacement) &&
-					oldNonMatchingNodeListIndex < oldNonMatchingNodeListLength)
+				let oldVN = oldNonMatchingNodeList[oldNonMatchingNodeListIndex];
+				if (oldVN.type === subNodeDisp.newVN.type && oldVN.isUpdatePossible( subNodeDisp.newVN))
 				{
-					let oldVN = oldNonMatchingNodeList[oldNonMatchingNodeListIndex];
-					if (oldVN.type === subNodeDisp.newVN.type && oldVN.isUpdatePossible( subNodeDisp.newVN))
-					{
-						// we are here if the new node can update the old one
-						subNodeDisp.oldVN = oldVN;
-						subNodeDisp.action = VNDispAction.Update;
-					}
-					else
-					{
-						// we are here if the new node cannot update the old one and should completely
-						// replace it. We add the old node to the list of those to be removed and indicate
-						// that the new node should be inserted.
-						if (!this.subNodesToRemove)
-							this.subNodesToRemove = [];
-
-						this.subNodesToRemove.push( oldVN);
-						subNodeDisp.action = VNDispAction.Insert;
-					}
-
-					oldNonMatchingNodeListIndex++;
+					// we are here if the new node can update the old one
+					subNodeDisp.oldVN = oldVN;
+					subNodeDisp.action = VNDispAction.Update;
 				}
 				else
 				{
-					// we are here if there are no non-matched old nodes left. Indicate that the new node
-					// should be mounted.
+					// we are here if the new node cannot update the old one and should completely
+					// replace it. We add the old node to the list of those to be removed and indicate
+					// that the new node should be inserted.
+					if (!this.subNodesToRemove)
+						this.subNodesToRemove = [];
+
+					this.subNodesToRemove.push( oldVN);
 					subNodeDisp.action = VNDispAction.Insert;
 				}
-			}
 
-			// old non-matched nodes from the current index to the end of the list will be unmounted
-			if (oldNonMatchingNodeListIndex < oldNonMatchingNodeListLength)
-			{
-				if (!this.subNodesToRemove)
-					this.subNodesToRemove = [];
-					
-				for( let i = oldNonMatchingNodeListIndex; i < oldNonMatchingNodeListLength; i++)
-					this.subNodesToRemove.push( oldNonMatchingNodeList[i]);
+				oldNonMatchingNodeListIndex++;
 			}
+			else
+			{
+				// we are here if there are no non-matched old nodes left. Indicate that the new node
+				// should be mounted.
+				subNodeDisp.action = VNDispAction.Insert;
+			}
+		}
+
+		// old non-matched nodes from the current index to the end of the list will be unmounted
+		if (oldNonMatchingNodeListIndex < oldNonMatchingNodeListLength)
+		{
+			if (!this.subNodesToRemove)
+				this.subNodesToRemove = [];
+				
+			for( let i = oldNonMatchingNodeListIndex; i < oldNonMatchingNodeListLength; i++)
+				this.subNodesToRemove.push( oldNonMatchingNodeList[i]);
 		}
 
 		if (this.subNodeDisps.length > VNDisp.NO_GROUP_THRESHOLD)
