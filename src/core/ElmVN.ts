@@ -23,48 +23,15 @@ export class ElmVN extends VN implements mim.IElmVN
 
 		// remember tag name and children
 		this.elmName = tagName;
+		this.props = props;
 		this.children = children;
-
-		this.propsHash = hashObject(props);
 
 		// copy properties to our own object excluding framework-handled key and ref
 		if (props)
 		{
-			this.props = {};
-			for( let propName in props)
-			{
-				let propVal = props[propName];
-				if (propVal == null)
-				{
-					// ignore properties with values undefined and null
-					continue;
-				}
-				else if (propName === "key")
-				{
-					// remember key property but don't copy it to this.props object
-					this.key = propVal;
-				}
-				else if (propName === "ref")
-				{
-					// remember ref property but don't copy it to this.props object
-					this.ref = propVal;
-				}
-				else if (propName === "updateStrategy")
-				{
-					// remember updateStrategy property but don't copy it to this.props object
-					this.updateStrategy = propVal;
-				}
-				else
-				{
-					// if (!this.props)
-					// 	this.props = {};
-
-					this.props[propName] = propVal;
-				}
-			}
-
-			// if key property was not specified, use id; if id was not specified key will remain
-			// undefined.
+			// get the key property. If key property was not specified, use id; if id was not
+			// specified key will remain undefined.
+			this.key = props.key;
 			if (this.key === undefined)
 				this.key = props.id;
 		}
@@ -201,8 +168,9 @@ export class ElmVN extends VN implements mim.IElmVN
 	public prepareUpdate( newVN: VN): VNUpdateDisp
 	{
 		let newElmVN: ElmVN = newVN as ElmVN;
+		let oldHash = this.propsHash !== undefined ? this.propsHash : hashObject( this.props);
 		let newPropsHash = hashObject( newElmVN.props);
-		// let shouldCommit = this.propsHash != newPropsHash;
+		let shouldCommit = oldHash !== newPropsHash;
 
 		// remember the new props and children
 		this.props = newElmVN.props;
@@ -211,7 +179,7 @@ export class ElmVN extends VN implements mim.IElmVN
 
 		// commitUpdate method should be called and children will have to be updated via render
 		// return { shouldCommit, shouldRender: this.children && this.children.length > 0 };
-		return { shouldCommit: true, shouldRender: true };
+		return { shouldCommit, shouldRender: true };
 	}
 
 
@@ -270,42 +238,68 @@ export class ElmVN extends VN implements mim.IElmVN
 	// listeners and custom attributes.
 	private parseProps(): void
 	{
+		if (!this.props)
+			return;
+
 		for( let propName in this.props)
 		{
+			if (propName === "key")
+			{
+				// ignore the key property because we already extracted it in the constructor
+				continue;
+			}
+
 			let propVal: any = this.props[propName];
-
-			// get information about the property and determine its type (regular attribute, event
-			// or custom attribute). Note that getPropertyInfo may return null for most regular
-			// attributes and events; in this case we will check the property value.
-			let propInfo = ElmAttr.getPropertyInfo( propName);
-			let propType = propInfo ? propInfo.type : this.IsEventValue( propVal) ? PropType.Event : PropType.Attr;
-
-			if (propType === PropType.Attr)
+			if (propVal == null)
 			{
-				if (!this.attrs)
-					this.attrs = {};
-
-				this.attrs[propName] = { info: propInfo, val: propVal };
+				// ignore properties with values undefined and null
+				continue;
 			}
-			else if (propType === PropType.Event)
+			else if (propName === "ref")
 			{
-				let eventInfo = this.GetPropAsEventRunTimeData( propInfo, propVal);
-				if (eventInfo)
+				// remember ref property
+				this.ref = propVal;
+			}
+			else if (propName === "updateStrategy")
+			{
+				// remember updateStrategy property but don't copy it to this.props object
+				this.updateStrategy = propVal;
+			}
+			else
+			{
+				// get information about the property and determine its type (regular attribute, event
+				// or custom attribute). Note that getPropertyInfo may return null for most regular
+				// attributes and events; in this case we will check the property value.
+				let propInfo = ElmAttr.getPropertyInfo( propName);
+				let propType = propInfo ? propInfo.type : this.IsEventValue( propVal) ? PropType.Event : PropType.Attr;
+
+				if (propType === PropType.Attr)
 				{
-					if (!this.events)
-						this.events = {}
+					if (!this.attrs)
+						this.attrs = {};
 
-					this.events[propName] = eventInfo;
+					this.attrs[propName] = { info: propInfo, val: propVal };
 				}
-			}
-			else // if (propType === PropType.CustomAttr)
-			{
-				if (!this.customAttrs)
-					this.customAttrs = {};
+				else if (propType === PropType.Event)
+				{
+					let eventInfo = this.GetPropAsEventRunTimeData( propInfo, propVal);
+					if (eventInfo)
+					{
+						if (!this.events)
+							this.events = {}
 
-				// remember custome attributes value. Handler will be created later.
-				this.customAttrs[propName] = { info: propInfo as CustomAttrPropInfo, val: propVal,
-								handler: undefined};
+						this.events[propName] = eventInfo;
+					}
+				}
+				else // if (propType === PropType.CustomAttr)
+				{
+					if (!this.customAttrs)
+						this.customAttrs = {};
+
+					// remember custome attributes value. Handler will be created later.
+					this.customAttrs[propName] = { info: propInfo as CustomAttrPropInfo, val: propVal,
+									handler: undefined};
+				}
 			}
 		}
 	}
