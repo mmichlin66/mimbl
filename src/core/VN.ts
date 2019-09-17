@@ -456,11 +456,12 @@ export abstract class VN implements mim.IVNode
 			return null;
 
 		// loop over our next siblings
-		for( let i = ownIndex + 1; i < this.parent.subNodes.length; i++)
+		// for( let i = ownIndex + 1; i < this.parent.subNodes.length; i++)
+		for( let vn = this.next; vn !== undefined; vn = vn.next)
 		{
-			let vn = this.parent.subNodes[i];
-			if (vn.anchorDN !== anchorDN)
-				return null;
+			// // let vn = this.parent.subNodes[i];
+			// if (vn.anchorDN !== anchorDN)
+			// 	return null;
 
 			// note that getLastDN call traverses the hierarchy of nodes. Note also that it
 			// it cannot find a node under a different anchor element because the first different
@@ -517,6 +518,12 @@ export abstract class VN implements mim.IVNode
 	// can be of any type.
 	public key: any;
 
+	// Reference to the next sibling node or undefined for the last sibling.
+	public next: VN;
+
+	// Reference to the previous sibling node or undefined for the first sibling.
+	public prev: VN;
+
 	// Chain of sub-nodes.
 	public subNodes: VN[];
 
@@ -535,7 +542,6 @@ export abstract class VN implements mim.IVNode
 
 
 
-// 
 /**
  * The CallbackWrapper function is used to wrap a callback in order to catch exceptions from the
  * callback and pass it to the "StdErrorHandling" service. The function is bound to two parameters:

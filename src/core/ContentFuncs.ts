@@ -37,7 +37,9 @@ export function createNodesFromContent( content: any): VN | VN[]
 		for( let item of content)
 		{
 			let itemContent = createNodesFromContent( item);
-			if (Array.isArray( itemContent))
+			if (itemContent === null)
+				continue;
+			else if (Array.isArray( itemContent))
 			{
 				for( let vn of itemContent)
 					chain.push( vn);

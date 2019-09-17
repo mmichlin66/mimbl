@@ -161,21 +161,21 @@ export interface IComponent<TProps = {}, TChildren = any>
 export type UpdateStrategy = 
 {
 	/**
-	 * Flag determining whether non-matching new keyed sub-nodes are allowed to replace non-
+	 * Flag determining whether non-matching new keyed sub-nodes are allowed to recycle non-
 	 * matching old keyed sub-nodes. Here "non-matching" means those new or old nodes for which
 	 * no old or new sub-nodes respectively were found. If this flag is false, then non-matching
 	 * old sub-nodes will be removed and non-matching new sub-nodes will be inserted. If this
 	 * flag is true, then non-matching old sub-nodes will be updated by the non-matching new
 	 * sub-nodes - provided that the types of sub-nodes are the same.
 	 * 
-	 * If keyed sub-nodes replacement is allowed it can speed up an update process because
+	 * If keyed sub-nodes recycling is allowed it can speed up an update process because
 	 * less DOM nodes get removed and inserted, which is more expensive than updating. However,
 	 * this can have some adverse effects under cirtain circumstances if certain data is bound
 	 * to the particular instances of DOM nodes.
 	 * 
 	 * The flag's default value is true.
 	 */
-	allowKeyedSubNodeReplacement?: boolean;
+	allowKeyedNodeRecycling?: boolean;
 };
 
 

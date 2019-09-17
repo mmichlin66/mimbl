@@ -679,8 +679,18 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		vn.subNodes = createVNChainFromContent( vn.render());
 		if (vn.subNodes)
 		{
+			let prevVN: VN;
 			for( let svn of vn.subNodes)
+			{
 				this.createVirtual( svn, vn);
+				if (prevVN)
+				{
+					prevVN.next = svn;
+					svn.prev = prevVN;
+				}
+
+				prevVN = svn;
+			}
 		}
 	}
 
@@ -916,6 +926,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	private updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
 	{
 		let currSubNodeIndex = disps.length - 1;
+		let nextVN: VN;
 		for( let i = groups.length - 1; i >= 0; i--)
 		{
 			let group = groups[i];
@@ -923,6 +934,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			// first update every sub-node in the group and its sub-sub-nodes
 			for( let j = group.last; j >= group.first; j--)
 			{
+				let svn: VN;
 				let disp = disps[j];
 				let newVN = disp.newVN;
 				if (group.action === VNDispAction.Update)
@@ -946,7 +958,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 						beforeDN = firstDN;
 
 					// the old node remains as a sub-node
-					parentVN.subNodes[currSubNodeIndex--] = oldVN;
+					svn = oldVN;
 				}
 				else
 				{
@@ -959,8 +971,18 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 						beforeDN = firstDN;
 
 					// the new node becomes a sub-node
-					parentVN.subNodes[currSubNodeIndex--] = newVN;
+					svn = newVN;
 				}
+
+				parentVN.subNodes[currSubNodeIndex--] = svn;
+				svn.next = svn.prev = undefined;
+				if (nextVN)
+				{
+					nextVN.prev = svn;
+					svn.next = nextVN;
+				}
+
+				nextVN = svn;
 			}
 
 			// now that all nodes in the group have been updated or inserted, we can determine
@@ -1036,11 +1058,13 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		// perform DOM operations according to sub-node disposition. We need to decide for each
 		// node what node to use to insert or move it before. We go from the end of the list of
 		// new nodes and on each iteration we decide the value of the "beforeDN".
+		let nextVN: VN;
 		for( let i = disps.length - 1; i >= 0; i--)
 		{
 			let disp = disps[i];
 			let action = disp.action;
 			let newVN = disp.newVN;
+			let svn: VN;
 			if (action === VNDispAction.Update)
 			{
 				let oldVN = disp.oldVN;
@@ -1077,7 +1101,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 				}
 
 				// the old node remains as a sub-node
-				parentVN.subNodes[i] = oldVN;
+				svn = oldVN;
 			}
 			else
 			{
@@ -1092,8 +1116,18 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 					beforeDN = firstDN;
 
 				// the new node becomes a sub-node
-				parentVN.subNodes[i] = newVN;
+				svn = newVN;
 			}
+
+			parentVN.subNodes[i] = svn;
+			svn.next = svn.prev = undefined;
+			if (nextVN)
+			{
+				nextVN.prev = svn;
+				svn.next = nextVN;
+			}
+
+			nextVN = svn;
 		}
 	}
 

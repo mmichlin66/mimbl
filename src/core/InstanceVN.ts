@@ -77,8 +77,7 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 	public isUpdatePossible( newVN: VN): boolean
 	{
 		// update is possible if the components are from the same class
-		return this.comp === (newVN as InstanceVN).comp ||
-				this.comp.constructor === (newVN as InstanceVN).comp.constructor;
+		return this.comp.constructor === (newVN as InstanceVN).comp.constructor;
 	}
 
 
@@ -94,10 +93,10 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 		let newComp = (newVN as InstanceVN).comp;
 		let needsUpdating = this.comp !== newComp;
 
-		// if the coponent instance are different, then we need to prepare the new instance for
-		// mounting.
-		if (needsUpdating)
-			this.willMountInstance( newComp);
+		// // if the coponent instance are different, then we need to prepare the new instance for
+		// // mounting.
+		// if (needsUpdating)
+		// 	this.willMountInstance( newComp);
 
 		return { shouldCommit: needsUpdating, shouldRender: needsUpdating };
 	}
@@ -108,14 +107,18 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 	// This method is part of the Commit phase.
 	public commitUpdate?( newVN: VN): void
 	{
-		// we are here only if the component instances are different. In this case we should
-		// replace the old component with the new one and also replace its characteristics.
-		// First indicate that our old component will be unmounted
-		this.willUnmountInstance( this.comp);
+		// // we are here only if the component instances are different. In this case we should
+		// // replace the old component with the new one and also replace its characteristics.
+		// // First indicate that our old component will be unmounted
+		// this.willUnmountInstance( this.comp);
 
 		let newInstanceVN = newVN as InstanceVN;
 		this.comp = newInstanceVN.comp;
 		this.key = newInstanceVN.key;
+
+		this.comp.site = this;
+
+		// this.willMountInstance( this.comp);
 	}
 
 
