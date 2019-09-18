@@ -447,14 +447,6 @@ export abstract class VN implements mim.IVNode
 			}
 		}
 
-		// find our index in the parent's list of sub-nodes
-		if (!this.parent || !this.parent.subNodes)
-			return null;
-
-		let ownIndex = this.parent.subNodes.indexOf( this);
-		if (ownIndex < 0)
-			return null;
-
 		// loop over our next siblings
 		// for( let i = ownIndex + 1; i < this.parent.subNodes.length; i++)
 		for( let vn = this.next; vn !== undefined; vn = vn.next)
@@ -472,7 +464,7 @@ export abstract class VN implements mim.IVNode
 		}
 
 		// recurse to our parent if exists
-		return this.parent.anchorDN === anchorDN ? this.parent.getNextDNUnderSameAnchorDN( anchorDN) : null;
+		return this.parent && this.parent.anchorDN === anchorDN ? this.parent.getNextDNUnderSameAnchorDN( anchorDN) : null;
 	}
 
 

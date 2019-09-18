@@ -222,6 +222,7 @@ export class VNDisp
 							this.subNodesToRemove = [];
 
 						this.subNodesToRemove.push( oldVN);
+						subNodeDisp.action = VNDispAction.Insert;
 					}
 
 					// remove the old node from the map - this way the old nodes remaining in the

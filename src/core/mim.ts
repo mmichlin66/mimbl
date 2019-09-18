@@ -74,13 +74,6 @@ export interface IComponent<TProps = {}, TChildren = any>
 	props: CompProps<TProps,TChildren>;
 
 	/**
-	 * Component instances can define keys that will be used to distinguish them from other instances.
-	 * If the component doesn't define a key, then for free components, the instance itself is
-	 * used as a key; for managed components, the key can be provided as a built-in property.
-	 */
-	readonly key?: string;
-
-	/**
 	 * Components can define display name for tracing purposes; if they don't the default name
 	 * is the component's class constructor name. Note that this method can be called before
 	 * the virtual node is attached to the component.
