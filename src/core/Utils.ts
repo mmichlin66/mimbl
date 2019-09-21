@@ -1,5 +1,105 @@
 import * as mim from "./mim"
-import {IEventSlot, EventSlot} from"./EventSlot"
+
+
+
+export function deepCompare( o1: any, o2: any): boolean
+{
+	if (o1 === o2)
+		return true;
+	else if (o1 == null && o2 == null)
+		return true;
+	else if (o1 == null || o2 == null)
+		return false;
+	else if (typeof o1 !== typeof o2)
+		return false;
+	else if (typeof o1 === "string" || typeof o1 === "number" || typeof o1 === "function")
+		return false;
+	else if (Array.isArray(o1) !== Array.isArray(o2))
+		return false;
+	else if (Array.isArray(o1))
+	{
+		if (o1.length !=- o2.length)
+			return false;
+		else
+		{
+			for( let i = 0, len = o1.length; i < len; i++)
+			{
+				if (!deepCompare( o1[i], o2[i]))
+					return false;
+			}
+		}
+	}
+	else
+	{
+		for( let p in o1)
+		{
+			if (!deepCompare( o1[p], o2[p]))
+				return false;
+		}
+
+		for( let p in o2)
+		{
+			if (!(p in o1))
+				return false;
+		}
+	}
+
+	return true;
+}
+
+
+
+export function hashObject( o: any): number
+{
+	if (o === undefined)
+		return 0;
+	else if (o === null)
+		return 1;
+	else if (isNaN(0))
+		return 2;
+	else if (o === true)
+		return 3;
+	else if (o === false)
+		return 4;
+
+	let h = 10;
+
+	if (typeof o === "number")
+		return 10 + o;
+	else if (typeof o === "string")
+		return hashString( o);
+	else if (typeof o === "function")
+		return hashString( o.name);
+	else if (Array.isArray(o))
+	{
+		let len = o.length;
+		let h = 10 + len;
+		for( let i = 0; i < len; i++)
+			 h += i + hashObject( o[i]);
+		return h;
+	}
+	else
+	{
+		let h = 10;
+		for( let p in o)
+			h += hashString(p) + hashObject(o[p]);
+		return h;
+	}
+}
+
+
+
+export function hashString( s: string): number
+{
+	if (!s)
+		return 5;
+
+	let len = s.length;
+	let h = 10 + len;
+	for( let i = 0; i < len; i++)
+		h += s.charCodeAt(i);
+	return h;
+}
 
 
 

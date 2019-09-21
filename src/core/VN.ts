@@ -46,9 +46,7 @@ export abstract class VN implements mim.IVNode
 	// IVNode implementation
 	public get Type(): mim.VNType { return this.type; }
 	public get Parent(): mim.IVNode { return this.parent; }
-	public get Next(): mim.IVNode { return this.next; }
-	public get Prev(): mim.IVNode { return this.prev; }
-	public get SubNodes(): mim.IVNChain { return this.subNodes; }
+	public get SubNodes(): mim.IVNode[] { return this.subNodes; }
 	public get Name(): string { return this.name; }
 
 
@@ -91,7 +89,9 @@ export abstract class VN implements mim.IVNode
 		}
 
 		this.anchorDN = null;
+
 		this.subNodes = undefined;
+		this.keyedSubNodes = undefined;
 		this.parent = undefined;
 		this.root = undefined;
 		this.depth = undefined;
@@ -363,7 +363,7 @@ export abstract class VN implements mim.IVNode
 
 		// recursively call this method on the sub-nodes from first to last until a valid node
 		// is returned
-		for( let svn = this.subNodes.first; svn !== null; svn = svn.next)
+		for( let svn of this.subNodes)
 		{
 			dn = svn.getFirstDN();
 			if (dn !== null)
@@ -387,9 +387,9 @@ export abstract class VN implements mim.IVNode
 
 		// recursively call this method on the sub-nodes from last to first until a valid node
 		// is returned
-		for( let svn = this.subNodes.last; svn !== null; svn = svn.prev)
+		for( let i = this.subNodes.length - 1; i >= 0; i--)
 		{
-			dn = svn.getLastDN();
+			dn = this.subNodes[i].getLastDN();
 			if (dn !== null)
 				return dn;
 		}
@@ -420,7 +420,7 @@ export abstract class VN implements mim.IVNode
 		else if (this.subNodes)
 		{
 			// recursively call this method on the sub-nodes from first to last
-			for( let svn = this.subNodes.first; svn !== null; svn = svn.next)
+			for( let svn of this.subNodes)
 				svn.collectImmediateDNs( arr);
 		}
 	}
@@ -431,41 +431,41 @@ export abstract class VN implements mim.IVNode
 	// child of our own anchor element. We use it as a node before which to insert/move nodes of
 	// our sub-nodes during the reconciliation process. The algorithm first goes to the next
 	// siblings of our node and then to the next siblings of our parent node recursively. It stops
-	// when we either find a DOM node (then it is returned) or find a differen anchor element
+	// when we either find a DOM node (then it is returned) or find a different anchor element
 	// (then null is returned). This method is called before the reconciliation process for our
 	// sub-nodes starts and, therefore, it only traverses mounted nodes.
 	public getNextDNUnderSameAnchorDN( anchorDN: DN): DN
 	{
 		// check if we have sibling DOM nodes after our last sub-node - that might be elements
 		// not controlled by our component.
-		if (this.subNodes && this.subNodes.last !== null)
+		if (this.subNodes && this.subNodes.length > 0)
 		{
-			const dn: DN = this.subNodes.last.getLastDN();
+			const dn = this.subNodes[this.subNodes.length - 1].getLastDN();
 			if (dn !== null)
 			{
-				const nextSibling: DN = dn.nextSibling;
+				const nextSibling = dn.nextSibling;
 				if (nextSibling !== null)
 					return nextSibling;
 			}
 		}
 
 		// loop over our next siblings
-		for( let vn: VN = this.next; vn !== null; vn = vn.next)
+		// for( let i = ownIndex + 1; i < this.parent.subNodes.length; i++)
+		for( let vn = this.next; vn !== undefined; vn = vn.next)
 		{
-			if (vn.anchorDN !== anchorDN)
-				return null;
+			// if (vn.anchorDN === undefined)
+			// 	return null;
 
 			// note that getLastDN call traverses the hierarchy of nodes. Note also that it
 			// it cannot find a node under a different anchor element because the first different
 			// anchor element will be returned as a wanted node.
-			const dn: DN = vn.getLastDN();
+			const dn = vn.getLastDN();
 			if (dn !== null)
 				return dn;
 		}
 
 		// recurse to our parent if exists
-		return this.parent !== null && this.parent.anchorDN === anchorDN
-						? this.parent.getNextDNUnderSameAnchorDN( anchorDN) : null;
+		return this.parent && this.parent.anchorDN === anchorDN ? this.parent.getNextDNUnderSameAnchorDN( anchorDN) : null;
 	}
 
 
@@ -486,7 +486,7 @@ export abstract class VN implements mim.IVNode
 
 
 	// Determines whether the node is mounted.
-	public get IsMounted(): boolean { return this.anchorDN !== null; }
+	public get IsMounted(): boolean { return this.anchorDN != null; }
 
 
 
@@ -511,14 +511,17 @@ export abstract class VN implements mim.IVNode
 	// can be of any type.
 	public key: any;
 
-	// Next node in the chain of sibling nodes or null if this is the last one.
-	public next: VN = null;
+	// Reference to the next sibling node or undefined for the last sibling.
+	public next: VN;
 
-	// Previous node in the chain of sibling nodes or null if this is the first one.
-	public prev: VN = null;
+	// Reference to the previous sibling node or undefined for the first sibling.
+	public prev: VN;
 
-	// Chain of sub-nodes.
-	public subNodes;
+	// List of sub-nodes - both keyed and unkeyed - defined only if there are some sub-nodes.
+	public subNodes: VN[];
+
+	// Map of keyed sub-nodes - defined only if the number of sub-nodes is greater than 1.
+	public keyedSubNodes: Map<any,VN>;
 
 	// Map of service IDs to service objects published by this node.
 	private publishedServices: Map<string,any>;
@@ -528,14 +531,13 @@ export abstract class VN implements mim.IVNode
 
 	// "Tick number" during which the node was last updated. If this node's tick number equals
 	// the current tick number maintained by the root node, this indicates that this node was
-	// already updated in this update cycle. This helps prevent the double-rendering of a
+	// already updated in this update cycle. This helps prevent double-rendering of a
 	// component if both the component and its parent are updated in the same cycle.
 	public lastUpdateTick: number;
 }
 
 
 
-// 
 /**
  * The CallbackWrapper function is used to wrap a callback in order to catch exceptions from the
  * callback and pass it to the "StdErrorHandling" service. The function is bound to two parameters:

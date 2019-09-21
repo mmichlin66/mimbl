@@ -74,13 +74,6 @@ export interface IComponent<TProps = {}, TChildren = any>
 	props: CompProps<TProps,TChildren>;
 
 	/**
-	 * Component instances can define keys that will be used to distinguish them from other instances.
-	 * If the component doesn't define a key, then for free components, the instance itself is
-	 * used as a key; for managed components, the key can be provided as a built-in property.
-	 */
-	readonly key?: string;
-
-	/**
 	 * Components can define display name for tracing purposes; if they don't the default name
 	 * is the component's class constructor name. Note that this method can be called before
 	 * the virtual node is attached to the component.
@@ -161,21 +154,21 @@ export interface IComponent<TProps = {}, TChildren = any>
 export type UpdateStrategy = 
 {
 	/**
-	 * Flag determining whether non-matching new keyed sub-nodes are allowed to replace non-
+	 * Flag determining whether non-matching new keyed sub-nodes are allowed to recycle non-
 	 * matching old keyed sub-nodes. Here "non-matching" means those new or old nodes for which
 	 * no old or new sub-nodes respectively were found. If this flag is false, then non-matching
 	 * old sub-nodes will be removed and non-matching new sub-nodes will be inserted. If this
 	 * flag is true, then non-matching old sub-nodes will be updated by the non-matching new
 	 * sub-nodes - provided that the types of sub-nodes are the same.
 	 * 
-	 * If keyed sub-nodes replacement is allowed it can speed up an update process because
+	 * If keyed sub-nodes recycling is allowed it can speed up an update process because
 	 * less DOM nodes get removed and inserted, which is more expensive than updating. However,
 	 * this can have some adverse effects under cirtain circumstances if certain data is bound
 	 * to the particular instances of DOM nodes.
 	 * 
 	 * The flag's default value is true.
 	 */
-	allowKeyedSubNodeReplacement?: boolean;
+	allowKeyedNodeRecycling?: boolean;
 };
 
 
@@ -232,7 +225,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	public props: CompProps<TProps,TChildren>;
 
 	/** Remembered site object through which component can request services. */
-	private _site: IVNode = undefined;
+	public site: IVNode = undefined;
 
 	constructor( props?: CompProps<TProps,TChildren>)
 	{
@@ -240,20 +233,14 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 			this.props = props;
 	}
 
-	/** Sets or clears the site object through which component can request services. */
-	public set site( val: IVNode) { this._site = val; }
-
-	/** Gets the site object to which component is attached. */
-	public get site(): IVNode { return this._site; }
-
 	/** Returns the component's content that will be ultimately placed into the DOM tree. */
 	public abstract render(): any;
 
 	/** This method is called by the component to request to be updated. */
 	protected updateMe(): void
 	{
-		if (this._site)
-			this._site.requestUpdate();
+		if (this.site)
+			this.site.requestUpdate();
 	}
 
 	/** This method is called by the component to schedule a function to be invoked on the next
@@ -264,8 +251,8 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 */
 	protected callMe( func: ScheduledFuncType, beforeUpdate: boolean = false): void
 	{
-		if (this._site)
-			this._site.scheduleCall( func, beforeUpdate);
+		if (this.site)
+			this.site.scheduleCall( func, beforeUpdate);
 	}
 }
 
@@ -675,24 +662,6 @@ export const enum VNType
 
 
 /**
- * The IVNChain interface represent a doubly-linked list of virtual nodes. This is the object
- * that is returned from the JSX processing function.
- */
-export interface IVNChain
-{
-	/** First node in the chain. */
-	readonly First: IVNode;
-
-	/** Last node in the chain. */
-	readonly Last: IVNode;
-
-	/** Number of nodes in the chain. */
-	readonly Count: number;
-}
-
-
-
-/**
  * The IVNode interface represents a virtual node. Through this interface, callers can perform
  * most common actions that are available on every type of virtual node. Each type of virtual node
  * also implements a more specific interface through which the specific capabilities of the node
@@ -706,14 +675,8 @@ export interface IVNode
 	/** Gets node's parent. */
 	readonly Parent: IVNode;
 
-	/** Gets node's next sibling. */
-	readonly Next: IVNode;
-
-	/** Gets node's previous sibling. */
-	readonly Prev: IVNode;
-
 	/** List of sub-nodes. */
-	readonly SubNodes: IVNChain;
+	readonly SubNodes: IVNode[];
 
 	/** Gets node's display name. */
 	readonly Name: string;
@@ -1109,8 +1072,8 @@ import * as svg from "./SvgTypes";
  */
 export namespace JSX
 {
-	// tslint:disable-next-line:no-empty-interface
-	export interface Element extends IVNChain {}
+	// // tslint:disable-next-line:no-empty-interface
+	// export interface Element extends IVNode[] {}
 
 	// tslint:disable-next-line:no-empty-interface
 	export interface ElementClass extends IComponent {}
@@ -1385,7 +1348,7 @@ export namespace JSX
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 import {RootVN} from "./RootVN"
-import {createVNChainFromJSX} from "./VNChainFuncs"
+import {createNodesFromJSX} from "./ContentFuncs"
 
 
 
@@ -1413,7 +1376,7 @@ export function jsx( tag: any, props: any, ...children: any[]): any
 	//	2) <A>{[t1, t2]}</A>. In this case, children will be [[t1,t2]].
 	// The realChildren variable accommodates both cases.
 	let realChildren = children.length === 1 && Array.isArray( children[0]) ? children[0] : children;
-	return createVNChainFromJSX( tag, props, realChildren);
+	return createNodesFromJSX( tag, props, realChildren);
 }
 
 
