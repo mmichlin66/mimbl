@@ -225,7 +225,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	public props: CompProps<TProps,TChildren>;
 
 	/** Remembered site object through which component can request services. */
-	private _site: IVNode = undefined;
+	public site: IVNode = undefined;
 
 	constructor( props?: CompProps<TProps,TChildren>)
 	{
@@ -233,20 +233,14 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 			this.props = props;
 	}
 
-	/** Sets or clears the site object through which component can request services. */
-	public set site( val: IVNode) { this._site = val; }
-
-	/** Gets the site object to which component is attached. */
-	public get site(): IVNode { return this._site; }
-
 	/** Returns the component's content that will be ultimately placed into the DOM tree. */
 	public abstract render(): any;
 
 	/** This method is called by the component to request to be updated. */
 	protected updateMe(): void
 	{
-		if (this._site)
-			this._site.requestUpdate();
+		if (this.site)
+			this.site.requestUpdate();
 	}
 
 	/** This method is called by the component to schedule a function to be invoked on the next
@@ -257,8 +251,8 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 */
 	protected callMe( func: ScheduledFuncType, beforeUpdate: boolean = false): void
 	{
-		if (this._site)
-			this._site.scheduleCall( func, beforeUpdate);
+		if (this.site)
+			this.site.scheduleCall( func, beforeUpdate);
 	}
 }
 

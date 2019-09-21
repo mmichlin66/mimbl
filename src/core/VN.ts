@@ -89,7 +89,9 @@ export abstract class VN implements mim.IVNode
 		}
 
 		this.anchorDN = null;
+
 		this.subNodes = undefined;
+		this.keyedSubNodes = undefined;
 		this.parent = undefined;
 		this.root = undefined;
 		this.depth = undefined;
@@ -451,8 +453,7 @@ export abstract class VN implements mim.IVNode
 		// for( let i = ownIndex + 1; i < this.parent.subNodes.length; i++)
 		for( let vn = this.next; vn !== undefined; vn = vn.next)
 		{
-			// // let vn = this.parent.subNodes[i];
-			// if (vn.anchorDN !== anchorDN)
+			// if (vn.anchorDN === undefined)
 			// 	return null;
 
 			// note that getLastDN call traverses the hierarchy of nodes. Note also that it
@@ -485,7 +486,7 @@ export abstract class VN implements mim.IVNode
 
 
 	// Determines whether the node is mounted.
-	public get IsMounted(): boolean { return this.anchorDN !== null; }
+	public get IsMounted(): boolean { return this.anchorDN != null; }
 
 
 
@@ -516,8 +517,11 @@ export abstract class VN implements mim.IVNode
 	// Reference to the previous sibling node or undefined for the first sibling.
 	public prev: VN;
 
-	// Chain of sub-nodes.
+	// List of sub-nodes - both keyed and unkeyed - defined only if there are some sub-nodes.
 	public subNodes: VN[];
+
+	// Map of keyed sub-nodes - defined only if the number of sub-nodes is greater than 1.
+	public keyedSubNodes: Map<any,VN>;
 
 	// Map of service IDs to service objects published by this node.
 	private publishedServices: Map<string,any>;
@@ -527,7 +531,7 @@ export abstract class VN implements mim.IVNode
 
 	// "Tick number" during which the node was last updated. If this node's tick number equals
 	// the current tick number maintained by the root node, this indicates that this node was
-	// already updated in this update cycle. This helps prevent the double-rendering of a
+	// already updated in this update cycle. This helps prevent double-rendering of a
 	// component if both the component and its parent are updated in the same cycle.
 	public lastUpdateTick: number;
 }

@@ -167,19 +167,33 @@ export class ElmVN extends VN implements mim.IElmVN
 	// This method is part of the Render phase.
 	public prepareUpdate( newVN: VN): VNUpdateDisp
 	{
+		// hashing doesn't work if anonymous event handlers are used
+
+		// let newElmVN: ElmVN = newVN as ElmVN;
+		// let oldHash = this.propsHash !== undefined ? this.propsHash : hashObject( this.props);
+		// let newPropsHash = hashObject( newElmVN.props);
+		// let shouldCommit = oldHash !== newPropsHash;
+
+		// // remember the new props and children
+		// this.props = newElmVN.props;
+		// this.children = newElmVN.children;
+		// this.propsHash = newPropsHash;
+
+		// // commitUpdate method should be called and children will have to be updated via render
+		// let shouldRender = this.children && this.children.length > 0 &&
+		// 			newElmVN.children && newElmVN.children.length > 0;
+		// return { shouldCommit, shouldRender };
+
 		let newElmVN: ElmVN = newVN as ElmVN;
-		let oldHash = this.propsHash !== undefined ? this.propsHash : hashObject( this.props);
-		let newPropsHash = hashObject( newElmVN.props);
-		let shouldCommit = oldHash !== newPropsHash;
 
 		// remember the new props and children
 		this.props = newElmVN.props;
 		this.children = newElmVN.children;
-		this.propsHash = newPropsHash;
 
 		// commitUpdate method should be called and children will have to be updated via render
-		// return { shouldCommit, shouldRender: this.children && this.children.length > 0 };
-		return { shouldCommit, shouldRender: true };
+		let shouldRender = this.children && this.children.length > 0 &&
+					newElmVN.children && newElmVN.children.length > 0;
+		return { shouldCommit: true, shouldRender };
 	}
 
 
