@@ -16,8 +16,7 @@ export function createNodesFromContent( content: any): VN | VN[]
 {
 	if (content === null || content === undefined || content === false || typeof content === "function")
 		return null;
-
-	if (typeof content === "string")
+	else if (typeof content === "string")
 		return new TextVN( content);
 	else if (content instanceof VN)
 		return content;
@@ -35,7 +34,7 @@ export function createNodesFromContent( content: any): VN | VN[]
 	{
 		if (content.length === 0)
 			return null;
-			
+
 		let nodes: VN[] = [];
 		for( let item of content)
 		{
@@ -82,27 +81,15 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
 	if (typeof tag === "string")
 		return new ElmVN( tag as string, props, children);
 	else if (tag === mim.Fragment)
-	// {
-	// 	if (!children || children.length === 0)
-	// 		return null;
-
-	// 	let chain: VN[] = [];
-	// 	for( let item of children)
-	// 	{
-	// 		let subChain = createVNChainFromContent( item);
-	// 		for( let vn of subChain)
-	// 			chain.push( vn);
-	// 	}
-
-	// 	return chain;
-	// }
 		return createNodesFromContent( children);
-	else if (tag.prototype && typeof tag.prototype.render === "function")
-		return new ClassVN( tag as mim.IComponentClass, props, children);
-	// else if (mim.Component.isPrototypeOf( tag))
-	// 	chain.appendVN( new ClassVN( tag as mim.IComponentClass, props, children));
 	else if (typeof tag === "function")
-		return new FuncVN( tag as mim.FuncCompType, props, children);
+	{
+		if (typeof tag.prototype.render === "function")
+			return new ClassVN( tag as mim.IComponentClass, props, children);
+		else
+			return new FuncVN( tag as mim.FuncCompType, props, children);
+	}
+
 	/// #if DEBUG
 	else
 		throw new Error( "Invalid tag in jsx processing function: " + tag);

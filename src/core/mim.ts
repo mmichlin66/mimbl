@@ -81,18 +81,11 @@ export interface IComponent<TProps = {}, TChildren = any>
 	getDisplayName?(): string;
 
 	/**
-	 * Sets or clears the site object to the component. This property is set twice:
+	 * Sets or gets the site object to the component. This property is set twice:
 	 *  1. Before the component is rendered for the first time: the component must remember the
 	 *    passed object.
 	 *  2. Before the component is destroyed: null is passed as a parameter and the component must
 	 *    release the remembered object.
-	 * 
-	 * This property is optional; however, without implementing it components cannot use Mimbl
-	 * services.
-	 * 
-	 * @param site The site object implementing the IVnode interface. The component uses
-	 * this object to invoke different services provided by the Mimbl infrastructure; for example
-	 * to request a re-rendering.
 	 */
 	site?: IVNode;
 

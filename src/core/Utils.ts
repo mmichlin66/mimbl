@@ -12,24 +12,7 @@ export function deepCompare( o1: any, o2: any): boolean
 		return false;
 	else if (typeof o1 !== typeof o2)
 		return false;
-	else if (typeof o1 === "string" || typeof o1 === "number" || typeof o1 === "function")
-		return false;
-	else if (Array.isArray(o1) !== Array.isArray(o2))
-		return false;
-	else if (Array.isArray(o1))
-	{
-		if (o1.length !=- o2.length)
-			return false;
-		else
-		{
-			for( let i = 0, len = o1.length; i < len; i++)
-			{
-				if (!deepCompare( o1[i], o2[i]))
-					return false;
-			}
-		}
-	}
-	else
+	else if (typeof o1 === "object")
 	{
 		for( let p in o1)
 		{
@@ -42,6 +25,26 @@ export function deepCompare( o1: any, o2: any): boolean
 			if (!(p in o1))
 				return false;
 		}
+	}
+	else if (Array.isArray(o1) !== Array.isArray(o2))
+		return false;
+	else if (Array.isArray(o1))
+	{
+		if (o1.length !== o2.length)
+			return false;
+		else
+		{
+			for( let i = 0, len = o1.length; i < len; i++)
+			{
+				if (!deepCompare( o1[i], o2[i]))
+					return false;
+			}
+		}
+	}
+	else
+	{
+		// we are here if these are strings, numbers, booleans or functions and they are different
+		return false;
 	}
 
 	return true;
