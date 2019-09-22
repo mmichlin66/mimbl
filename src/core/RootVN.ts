@@ -645,16 +645,13 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		// if willMount returns false, the node never has any sub-nodes (e.g. text nodes)
 		if (vn.willMount())
 		{
-			// if the node doesn't handle errors we don't need to waste time to use try/catch
-			if (!vn.supportsErrorHandling())
-				this.createSubNodesVirtual( vn);
-			else
+			try
 			{
-				try
-				{
-					this.createSubNodesVirtual( vn);
-				}
-				catch( err)
+				this.createSubNodesVirtual( vn);
+			}
+			catch( err)
+			{
+				if (vn.supportsErrorHandling())
 				{
 					/// #if VERBOSE_NODE
 						console.debug( `VERBOSE: Calling handleError() on node ${vn.name}`);
@@ -664,6 +661,8 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 					vn.handleError( err, this.currentVN.path);
 					this.createSubNodesVirtual( vn);
 				}
+				else
+					throw err;
 			}
 		}
 
@@ -777,8 +776,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 			/// #endif
 			vn.unmount();
 
-			// our DOM nodes can only be either Element or Text - both derive from ChildNode
-			(ownDN as any as ChildNode).remove();
+			vn.anchorDN.removeChild( ownDN);
 		}
 		else if (vn.subNodes)
 		{
@@ -824,6 +822,11 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		{
 			if (vn.supportsErrorHandling())
 			{
+				/// #if VERBOSE_NODE
+					console.debug( `VERBOSE: Calling handleError() on node ${vn.name}`);
+				/// #endif
+
+				// let the node handle its own error and re-render
 				vn.handleError( err, this.currentVN.path);
 				this.updateSubNodesVirtual( disp);
 			}

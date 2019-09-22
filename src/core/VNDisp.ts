@@ -168,13 +168,13 @@ export class VNDisp
 		}
 		else if (newLen === 0)
 		{
-			// new chain is empty - just delete all old nodes
+			// new chain is empty - delete all old nodes
 			this.subNodesToRemove = oldChain;
 			return;
 		}
 		else if (oldLen === 0)
 		{
-			// old chain is empty - just insert all new nodes
+			// old chain is empty - insert all new nodes
 			this.subNodeDisps = newChain.map( newVN => new VNDisp( newVN, VNDispAction.Insert));
 			return;
 		}
@@ -187,16 +187,13 @@ export class VNDisp
 		if (updateStrategy && updateStrategy.allowKeyedNodeRecycling !== undefined)
 			allowKeyedNodeRecycling = updateStrategy.allowKeyedNodeRecycling;
 
-		// declare variables that will be used throughout the following code
-		let disp: VNDisp, oldVN: VN, newVN: VN, key: any;
-
 		// process the special case with a single sub-node in both old and new chains just
 		// to avoid creating temporary structures
 		if (newLen === 1 && oldLen === 1)
 		{
-			newVN = newChain[0];
-			oldVN = oldChain[0];
-			disp = new VNDisp( newVN);
+			let newVN = newChain[0];
+			let oldVN = oldChain[0];
+			let disp = new VNDisp( newVN);
 			this.subNodeDisps = [disp];
 			if ((oldVN === newVN ||
 				(allowKeyedNodeRecycling || newVN.key === oldVN.key) &&
@@ -215,14 +212,199 @@ export class VNDisp
 		}
 
 		// we are here if both old and new chains contain more than one node; therefore, the map of
-		// keyed sub-nodes exists.
+		// keyed sub-nodes exists (although it might be empty).
 		let oldMap = this.oldVN.keyedSubNodes;
+
+		// prepare arrays for VNDisp objects for new nodes and for old nodes to be removed
+		this.subNodeDisps = new Array( newLen);
+		this.subNodesToRemove = [];
+
+		// if the number of nodes in the old map is equal to the total number of old nodes, that
+		// means that all old nodes are keyed. If this is the case AND recycling of keyed nodes
+		// is not allowed, we will not need to put unkeyed or keyed but unmatched new nodes aside.
+		// We know that they will have to be inserted.
+		if (oldMap.size === oldLen && !allowKeyedNodeRecycling)
+			this.matchOldKeyedOnly( oldMap, newChain, newLen, newLen > VNDisp.NO_GROUP_THRESHOLD);
+		else if (oldMap.size === 0 && allowKeyedNodeRecycling)
+			this.matchOldNonKeyedOnly( oldChain, oldLen, newChain, newLen, newLen > VNDisp.NO_GROUP_THRESHOLD);
+		else
+			this.matchOldMixed( oldChain, oldLen, oldMap, newChain, newLen, allowKeyedNodeRecycling, newLen > VNDisp.NO_GROUP_THRESHOLD);
+
+		if (this.subNodesToRemove.length === 0)
+			this.subNodesToRemove = undefined;
+	}
+
+
+
+	/**
+	 * This method is invoked when we know that all old nodes have keys and the recycling of keyed
+	 * nodes is NOT allowed. Therefore, when we try to match new nodes to old ones we know that
+	 * non-keyed or keyed but unmatched new nodes will be marked for insertion. We also can build
+	 * groups (if requested) in the same loop.
+	 */
+	private matchOldKeyedOnly( oldMap: Map<any,VN>, newChain: VN[], newLen: number, buildGroups: boolean): void
+	{
+		// // if we need to build groups, prepare array of groups
+		// if (buildGroups)
+		// 	this.subNodeGroups = [];
+
+		// declare variables that will be used throughout the following code
+		let disp: VNDisp, oldVN: VN, newVN: VN, key: any;
+
+		// Loop over new nodes, create VNDisp structures try to match new nodes to old ones and
+		// mark unkeyed or keyed but unmatched new nodes for insertion. On each iteration decide
+		// whether we need to open a new group or put the new node into the existing group or
+		// close the existing group and open a new one.
+
+		// let group: VNDispGroup;
+		// let lastDispIndex = newLen - 1;
+
+		for( let i = 0; i < newLen; i++)
+		{
+			newVN = newChain[i];
+			disp = this.subNodeDisps[i] = new VNDisp( newVN);
+			key = newVN.key;
+
+			// decide what to do with the new node
+			if (key === undefined)
+				disp.action = VNDispAction.Insert;
+			else
+			{
+				oldVN = oldMap.get( key)
+				if (oldVN === undefined)
+					disp.action = VNDispAction.Insert;
+				else
+				{
+					if (oldVN === newVN || oldVN.type === newVN.type && oldVN.isUpdatePossible( newVN))
+					{
+						disp.action = VNDispAction.Update;
+						disp.oldVN = oldVN;
+					}
+					else
+					{
+						disp.action = VNDispAction.Insert;
+						this.subNodesToRemove.push(oldVN);
+					}
+
+					// remove the old node from the map - this way the old nodes remaining in the
+					// map are those that are unmatched.
+					oldMap.delete( key);
+				}
+			}
+
+			// if (buildGroups)
+			// {
+			// 	if (!group)
+			// 	{
+			// 		// open a new group
+			// 		group = new VNDispGroup( this, disp.action);
+			// 		group.first = i;
+			// 		this.subNodeGroups.push( group);
+			// 	}
+
+			// 	if (disp.action !== group.action)
+			// 	{
+			// 		// close the group with the previous index. Decrement the iterating index so that
+			// 		// the next iteration will open a new group. Note that we cannot be here for a node
+			// 		// that starts a new group because for such node disp.action === groupAction.
+			// 		group.last = --i;
+			// 		group = undefined;
+			// 	}
+			// 	else if (group.action !== VNDispAction.Insert)
+			// 	{
+			// 		// an "update" or "none" node is out-of-order and should close the current group if
+			// 		// its next sibling in the new list is different from the next sibling in the old list.
+			// 		// The last node will close the last group after the loop.
+			// 		if (i !== lastDispIndex && this.subNodeDisps[i+1].oldVN !== disp.oldVN.next)
+			// 		{
+			// 			// close the group with the current index.
+			// 			group.last = i;
+			// 			group = undefined;
+			// 		}
+			// 	}
+
+			// 	// all consecutive "insert" nodes belong to the same group so we just wait for the
+			// 	// next node
+			// }
+		}
+
+		// // close the last group if requested to build groups
+		// if (buildGroups)
+		// 	group.last = newLen - 1;
+
+		// if we have old nodes left, they should be removed
+		oldMap.forEach( oldVN => this.subNodesToRemove.push( oldVN));
+
+		if (buildGroups)
+			this.buildSubNodeGroups();
+	}
+
+
+
+	/**
+	 * This method is invoked when we know that none of the old nodes have keys and the recycling of keyed
+	 * nodes IS allowed. Therefore, we try to match new nodes to old ones by index. We also can build
+	 * groups (if requested) in the same loop.
+	 */
+	private matchOldNonKeyedOnly( oldChain: VN[], oldLen: number, newChain: VN[], newLen: number, buildGroups: boolean): void
+	{
+		// declare variables that will be used throughout the following code
+		let disp: VNDisp, oldVN: VN, newVN: VN, key: any;
+
+		// Loop over new nodes, create VNDisp structures and try to match new and old nodes by
+		// index. On each iteration decide whether we need to open a new group or put the new node
+		// into the existing group or close the existing group and open a new one.
+
+		let i = 0;
+		for( ; i < newLen && i < oldLen; i++)
+		{
+			newVN = newChain[i];
+			disp = this.subNodeDisps[i] = new VNDisp( newVN);
+			oldVN = oldChain[i];
+
+			// decide what to do with the new node
+			if (oldVN === newVN || oldVN.type === newVN.type && oldVN.isUpdatePossible( newVN))
+			{
+				disp.action = VNDispAction.Update;
+				disp.oldVN = oldVN;
+			}
+			else
+			{
+				disp.action = VNDispAction.Insert;
+				this.subNodesToRemove.push(oldVN);
+			}
+		}
+
+		// remaining new nodes should be inserted
+		for( let j = i; j < newLen; j++)
+			this.subNodeDisps[j] = new VNDisp( newChain[j], VNDispAction.Insert);
+
+		// remaining old nodes should be removed
+		for( let j = i; j < oldLen; j++)
+			this.subNodesToRemove.push( oldChain[j]);
+
+		if (buildGroups)
+			this.buildSubNodeGroups();
+	}
+
+
+
+	/**
+	 * This method is invoked when we know that not all old nodes have keys or the recycling of
+	 * keyed nodes is allowed. Therefore, when we have a non-keyed or keyed but unmatched new
+	 * node, we first put it aside and only after we went over all new nodes we can decide
+	 * what to do with those that we put aside. Also, only after we went over all new nodes we
+	 * can build groups if requested.
+	 */
+	private matchOldMixed( oldChain: VN[], oldLen: number, oldMap: Map<any,VN>, newChain: VN[],
+					newLen: number, allowKeyedNodeRecycling: boolean, buildGroups: boolean): void
+	{
+			// declare variables that will be used throughout the following code
+		let disp: VNDisp, oldVN: VN, newVN: VN, key: any;
 
 		// Loop over new nodes, create VNDisp structures try to match new nodes to old ones and
 		// put unmatched new nodes aside
-		this.subNodeDisps = new Array( newLen);
 		let newUnmatchedDisps: VNDisp[] = [];
-		this.subNodesToRemove = [];
 		for( let i = 0; i < newLen; i++)
 		{
 			newVN = newChain[i];
@@ -298,6 +480,10 @@ export class VNDisp
 			}
 		}
 
+		// if we have new nodes left, they should be inserted
+		for( let j = iNew; j < newUnmatchedLen; j++)
+			newUnmatchedDisps[j].action = VNDispAction.Insert;
+
 		// if we have old nodes left, they should be removed
 		for( let j = iOld; j < oldLen; j++)
 		{
@@ -309,14 +495,7 @@ export class VNDisp
 			this.subNodesToRemove.push( oldVN);
 		}
 
-		// if we have new nodes left, they should be inserted
-		for( let j = iNew; j < newUnmatchedLen; j++)
-			newUnmatchedDisps[j].action = VNDispAction.Insert;
-
-		if (this.subNodesToRemove.length === 0)
-			this.subNodesToRemove = undefined;
-
-		if (newLen > VNDisp.NO_GROUP_THRESHOLD)
+		if (buildGroups)
 			this.buildSubNodeGroups();
 	}
 

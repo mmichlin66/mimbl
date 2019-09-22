@@ -33,22 +33,25 @@ export function createNodesFromContent( content: any): VN | VN[]
 	}
 	else if (Array.isArray( content))
 	{
-		let chain: VN[] = [];
+		if (content.length === 0)
+			return null;
+			
+		let nodes: VN[] = [];
 		for( let item of content)
 		{
-			let itemContent = createNodesFromContent( item);
-			if (itemContent === null)
+			let itemNodes = createNodesFromContent( item);
+			if (itemNodes === null)
 				continue;
-			else if (Array.isArray( itemContent))
+			else if (Array.isArray( itemNodes))
 			{
-				for( let vn of itemContent)
-					chain.push( vn);
+				for( let vn of itemNodes)
+					nodes.push( vn);
 			}
 			else
-				chain.push( itemContent);
+				nodes.push( itemNodes);
 		}
 
-		return chain.length > 0 ? chain : null;
+		return nodes.length > 0 ? nodes : null;
 	}
 	else if (content instanceof Promise)
 		throw content;
