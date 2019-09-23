@@ -51,14 +51,10 @@ export abstract class VN implements mim.IVNode
 
 
 
-	// Node's type.
-	public abstract get type(): mim.VNType;
-
 	// String representation of the virtual node. This is used mostly for tracing and error
 	// reporting. The name can change during the lifetime of the virtual node; for example,
 	// it can reflect an "id" property of an element (if any).
 	public abstract get name(): string;
-
 
 
 	// Initializes the node by passing the parent node to it. After this, the node knows its
@@ -494,6 +490,9 @@ export abstract class VN implements mim.IVNode
 	public toString(): string { return this.name; }
 
 
+
+	// Node's type.
+	public type: mim.VNType;
 
 	// Parent node. This is null for the top-level (root) nodes.
 	public parent: VN;

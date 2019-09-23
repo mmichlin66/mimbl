@@ -19,6 +19,7 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 	{
 		super();
 
+		this.type = mim.VNType.ClassComp;
 		this.compClass = compClass;
 
 		// copy properties to our own object excluding framework-handled key and ref
@@ -62,11 +63,6 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 	// IClassVN implementation
 	public get CompClass(): mim.IComponentClass { return this.compClass; }
 	public get Comp(): mim.IComponent { return this.comp as mim.IComponent; }
-
-
-
-	// Node's type.
-	public get type(): mim.VNType { return mim.VNType.ClassComp; }
 
 
 

@@ -34,6 +34,7 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 	{
 		super()
 
+		this.type = mim.VNType.Root;
 		this.anchorDN = anchorDN;
 		this.initialize( null);
 		this.content = null;
@@ -149,11 +150,6 @@ export class RootVN extends VN implements IRootVN, mim.IErrorHandlingService
 		rootVN.setContent( null, false);
 		rootVN.scheduleCall( () => rootVN.willUnmount() );
 	}
-
-
-
-	// Node's type.
-	public type = mim.VNType.Root;
 
 
 

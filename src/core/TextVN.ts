@@ -16,6 +16,7 @@ export class TextVN extends VN implements mim.ITextVN
 	{
 		super();
 
+		this.type = mim.VNType.Text;
 		this.text = text;
 	};
 
@@ -29,11 +30,6 @@ export class TextVN extends VN implements mim.ITextVN
 /// #if USE_STATS
 	public getStatsCategory(): StatsCategory { return StatsCategory.Text; }
 /// #endif
-
-
-
-	// Node's type.
-	public get type(): mim.VNType { return mim.VNType.Text; }
 
 
 

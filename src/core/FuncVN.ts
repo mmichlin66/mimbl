@@ -24,6 +24,7 @@ export class FuncVN extends VN
 	{
 		super();
 
+		this.type = mim.VNType.FuncComp;
 		this.func = func;
 
 		// copy properties to our own object excluding framework-handled key
@@ -62,11 +63,6 @@ export class FuncVN extends VN
 /// #if USE_STATS
 	public getStatsCategory(): StatsCategory { return StatsCategory.Comp; }
 /// #endif
-
-
-
-	// Node's type.
-	public get type(): mim.VNType { return mim.VNType.FuncComp; }
 
 
 

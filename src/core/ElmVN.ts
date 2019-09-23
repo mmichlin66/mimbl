@@ -22,6 +22,8 @@ export class ElmVN extends VN implements mim.IElmVN
 	{
 		super();
 
+		this.type = mim.VNType.Elm;
+
 		// remember tag name and children
 		this.elmName = tagName;
 		this.props = props;
@@ -50,11 +52,6 @@ export class ElmVN extends VN implements mim.IElmVN
 	/// #if USE_STATS
 		public getStatsCategory(): StatsCategory { return StatsCategory.Elm; }
 	/// #endif
-
-
-
-	// Node's type.
-	public get type(): mim.VNType { return mim.VNType.Elm; }
 
 
 

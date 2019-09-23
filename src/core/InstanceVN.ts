@@ -19,6 +19,8 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 	{
 		super();
 
+		this.type = mim.VNType.InstanceComp;
+
 		// component instance is the key for the node
 		this.comp = this.key = comp;
 	};
@@ -27,11 +29,6 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 
 	// IInstanceVN implementation
 	public get Comp(): mim.IComponent { return this.comp; }
-
-
-
-	// Node's type.
-	public get type(): mim.VNType { return mim.VNType.InstanceComp; }
 
 
 
