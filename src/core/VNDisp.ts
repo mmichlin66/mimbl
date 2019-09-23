@@ -61,10 +61,11 @@ export class VNDispGroup
 
 
 
-	constructor( parentDisp: VNDisp, action: VNDispAction)
+	constructor( parentDisp: VNDisp, action: VNDispAction, first: number)
 	{
 		this.parentDisp = parentDisp;
 		this.action = action;
+		this.first = first;
 	}
 
 
@@ -244,21 +245,17 @@ export class VNDisp
 	 */
 	private matchOldKeyedOnly( oldMap: Map<any,VN>, newChain: VN[], newLen: number, buildGroups: boolean): void
 	{
-		// // if we need to build groups, prepare array of groups
-		// if (buildGroups)
-		// 	this.subNodeGroups = [];
-
 		// declare variables that will be used throughout the following code
-		let disp: VNDisp, oldVN: VN, newVN: VN, key: any;
+		let disp: VNDisp, oldVN: VN, newVN: VN, key: any, action: VNDispAction, group: VNDispGroup;
+
+		// if we need to build groups, prepare array of groups
+		if (buildGroups)
+			this.subNodeGroups = [];
 
 		// Loop over new nodes, create VNDisp structures try to match new nodes to old ones and
 		// mark unkeyed or keyed but unmatched new nodes for insertion. On each iteration decide
 		// whether we need to open a new group or put the new node into the existing group or
 		// close the existing group and open a new one.
-
-		// let group: VNDispGroup;
-		// let lastDispIndex = newLen - 1;
-
 		for( let i = 0; i < newLen; i++)
 		{
 			newVN = newChain[i];
@@ -267,22 +264,22 @@ export class VNDisp
 
 			// decide what to do with the new node
 			if (key === undefined)
-				disp.action = VNDispAction.Insert;
+				action = VNDispAction.Insert;
 			else
 			{
 				oldVN = oldMap.get( key)
 				if (oldVN === undefined)
-					disp.action = VNDispAction.Insert;
+					action = VNDispAction.Insert;
 				else
 				{
 					if (oldVN === newVN || oldVN.type === newVN.type && oldVN.isUpdatePossible( newVN))
 					{
-						disp.action = VNDispAction.Update;
+						action = VNDispAction.Update;
 						disp.oldVN = oldVN;
 					}
 					else
 					{
-						disp.action = VNDispAction.Insert;
+						action = VNDispAction.Insert;
 						this.subNodesToRemove.push(oldVN);
 					}
 
@@ -292,51 +289,51 @@ export class VNDisp
 				}
 			}
 
-			// if (buildGroups)
-			// {
-			// 	if (!group)
-			// 	{
-			// 		// open a new group
-			// 		group = new VNDispGroup( this, disp.action);
-			// 		group.first = i;
-			// 		this.subNodeGroups.push( group);
-			// 	}
+			disp.action = action;
 
-			// 	if (disp.action !== group.action)
-			// 	{
-			// 		// close the group with the previous index. Decrement the iterating index so that
-			// 		// the next iteration will open a new group. Note that we cannot be here for a node
-			// 		// that starts a new group because for such node disp.action === groupAction.
-			// 		group.last = --i;
-			// 		group = undefined;
-			// 	}
-			// 	else if (group.action !== VNDispAction.Insert)
-			// 	{
-			// 		// an "update" or "none" node is out-of-order and should close the current group if
-			// 		// its next sibling in the new list is different from the next sibling in the old list.
-			// 		// The last node will close the last group after the loop.
-			// 		if (i !== lastDispIndex && this.subNodeDisps[i+1].oldVN !== disp.oldVN.next)
-			// 		{
-			// 			// close the group with the current index.
-			// 			group.last = i;
-			// 			group = undefined;
-			// 		}
-			// 	}
+			if (buildGroups)
+			{
+				if (!group)
+				{
+					// open a new group
+					group = new VNDispGroup( this, action, i);
+					this.subNodeGroups.push( group);
+				}
 
-			// 	// all consecutive "insert" nodes belong to the same group so we just wait for the
-			// 	// next node
-			// }
+				if (action !== group.action)
+				{
+					// close the group with the previous index and open a new group. Note that we
+					// cannot be here for a node that starts a new group because for such node
+					// disp.action === groupAction.
+					group.last = i - 1;
+					group = new VNDispGroup( this, action, i);
+					this.subNodeGroups.push( group);
+				}
+				else if (action === VNDispAction.Update)
+				{
+					// an "update" or "none" node is out-of-order and should close the current group if
+					// its next sibling in the new list is different from the next sibling in the old list.
+					// The last node will close the last group after the loop.
+					if (i > 0 && this.subNodeDisps[i-1].oldVN !== oldVN.prev)
+					{
+						// close the group with the previous index and open new group.
+						group.last = i - 1;
+						group = new VNDispGroup( this, action, i);
+						this.subNodeGroups.push( group);
+					}
+				}
+
+				// all consecutive "insert" nodes belong to the same group so we just wait for the
+				// next node
+			}
 		}
 
-		// // close the last group if requested to build groups
-		// if (buildGroups)
-		// 	group.last = newLen - 1;
+		// close the last group if requested to build groups (only in this case we may have a group object)
+		if (group)
+			group.last = newLen - 1;
 
 		// if we have old nodes left, they should be removed
 		oldMap.forEach( oldVN => this.subNodesToRemove.push( oldVN));
-
-		if (buildGroups)
-			this.buildSubNodeGroups();
 	}
 
 
@@ -352,9 +349,7 @@ export class VNDisp
 		let disp: VNDisp, oldVN: VN, newVN: VN, key: any;
 
 		// Loop over new nodes, create VNDisp structures and try to match new and old nodes by
-		// index. On each iteration decide whether we need to open a new group or put the new node
-		// into the existing group or close the existing group and open a new one.
-
+		// index.
 		let i = 0;
 		for( ; i < newLen && i < oldLen; i++)
 		{
@@ -513,46 +508,44 @@ export class VNDisp
 		/// #if DEBUG
 			// this method is not supposed to be called if the number of sub-nodes is less then
 			// the pre-determined threshold
-			if (count <= VNDisp.NO_GROUP_THRESHOLD)
+			if (count <= VNDisp.NO_GROUP_THRESHOLD || count === 0)
 				return;
 		/// #endif
 
+		// create array of groups and create the first group starting from the first node
 		this.subNodeGroups = [];
+		let group: VNDispGroup = new VNDispGroup( this, this.subNodeDisps[0].action, 0);
+		this.subNodeGroups.push( group);
 
 		// loop over sub-nodes and on each iteration decide whether we need to open a new group
 		// or put the current node into the existing group or close the existing group and open
 		// a new one.
-		let group: VNDispGroup;
-		let lastDispIndex = count - 1;
-		for( let i = 0; i < count; i++)
+		let action: VNDispAction;
+		let disp: VNDisp;
+		for( let i = 1; i < count; i++)
 		{
-			let disp = this.subNodeDisps[i];
-			if (!group)
-			{
-				// open a new group
-				group = new VNDispGroup( this, disp.action);
-				group.first = i;
-				this.subNodeGroups.push( group);
-			}
-
-			if (disp.action !== group.action)
+			disp = this.subNodeDisps[i];
+			action = disp.action;
+			if (action !== group.action)
 			{
 				// close the group with the previous index. Decrement the iterating index so that
 				// the next iteration will open a new group. Note that we cannot be here for a node
 				// that starts a new group because for such node disp.action === groupAction.
-				group.last = --i;
-				group = undefined;
+				group.last = i - 1;
+				group = new VNDispGroup( this, action, i);
+				this.subNodeGroups.push( group);
 			}
-			else if (group.action !== VNDispAction.Insert)
+			else if (action === VNDispAction.Update)
 			{
 				// an "update" or "none" node is out-of-order and should close the current group if
 				// its next sibling in the new list is different from the next sibling in the old list.
 				// The last node will close the last group after the loop.
-				if (i !== lastDispIndex && this.subNodeDisps[i+1].oldVN !== disp.oldVN.next)
+				if (this.subNodeDisps[i-1].oldVN !== disp.oldVN.prev)
 				{
 					// close the group with the current index.
-					group.last = i;
-					group = undefined;
+					group.last = i - 1;
+					group = new VNDispGroup( this, action, i);
+					this.subNodeGroups.push( group);
 				}
 			}
 
@@ -561,7 +554,8 @@ export class VNDisp
 		}
 
 		// close the last group
-		group.last = count - 1;
+		if (group !== undefined)
+			group.last = count - 1;
 	}
 }
 
