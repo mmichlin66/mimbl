@@ -1,4 +1,4 @@
-﻿import {DN, VN, VNUpdateDisp} from "./VN"
+﻿import {DN, VN, VNUpdateDisp, getFirstDN, getLastDN} from "./VN"
 import {createVNChainFromContent} from "./ContentFuncs"
 
 
@@ -82,7 +82,7 @@ export class VNDispGroup
 		{
 			disp = this.parentDisp.subNodeDisps[i];
 			vn = this.action === VNDispAction.Update ? disp.oldVN : disp.newVN;
-			this.firstDN = vn.getFirstDN();
+			this.firstDN = getFirstDN( vn);
 			if (this.firstDN)
 				break;
 		}
@@ -91,7 +91,7 @@ export class VNDispGroup
 		{
 			disp = this.parentDisp.subNodeDisps[i];
 			vn = this.action === VNDispAction.Update ? disp.oldVN : disp.newVN;
-			this.lastDN = vn.getLastDN();
+			this.lastDN = getLastDN( vn);
 			if (this.lastDN)
 				break;
 		}
@@ -184,7 +184,7 @@ export class VNDisp
 		// keyed sub-nodes is allowed. If update strategy is not defined for the node, the
 		// recycling is allowed.
 		let allowKeyedNodeRecycling = true;
-		let updateStrategy = this.oldVN ? this.oldVN.getUpdateStrategy() : undefined;
+		let updateStrategy = this.oldVN ? this.oldVN.updateStrategy : undefined;
 		if (updateStrategy && updateStrategy.allowKeyedNodeRecycling !== undefined)
 			allowKeyedNodeRecycling = updateStrategy.allowKeyedNodeRecycling;
 
@@ -196,9 +196,8 @@ export class VNDisp
 			let oldVN = oldChain[0];
 			let disp = new VNDisp( newVN);
 			this.subNodeDisps = [disp];
-			if ((oldVN === newVN ||
-				(allowKeyedNodeRecycling || newVN.key === oldVN.key) &&
-					(oldVN.type === newVN.type && oldVN.isUpdatePossible( newVN))))
+			if (oldVN === newVN ||
+				((allowKeyedNodeRecycling || newVN.key === oldVN.key) && isUpdatePossible( oldVN, newVN)))
 			{
 				disp.action = VNDispAction.Update;
 				disp.oldVN = oldVN;
@@ -272,7 +271,7 @@ export class VNDisp
 					action = VNDispAction.Insert;
 				else
 				{
-					if (oldVN === newVN || oldVN.type === newVN.type && oldVN.isUpdatePossible( newVN))
+					if (oldVN === newVN || isUpdatePossible( oldVN, newVN))
 					{
 						action = VNDispAction.Update;
 						disp.oldVN = oldVN;
@@ -358,7 +357,7 @@ export class VNDisp
 			oldVN = oldChain[i];
 
 			// decide what to do with the new node
-			if (oldVN === newVN || oldVN.type === newVN.type && oldVN.isUpdatePossible( newVN))
+			if (oldVN === newVN || isUpdatePossible( oldVN, newVN))
 			{
 				disp.action = VNDispAction.Update;
 				disp.oldVN = oldVN;
@@ -425,7 +424,7 @@ export class VNDisp
 				}
 				else
 				{
-					if (oldVN === newVN || oldVN.type === newVN.type && oldVN.isUpdatePossible( newVN))
+					if (oldVN === newVN || isUpdatePossible( oldVN, newVN))
 					{
 						disp.action = VNDispAction.Update;
 						disp.oldVN = oldVN;
@@ -463,7 +462,7 @@ export class VNDisp
 				disp.action = VNDispAction.Insert;
 				this.subNodesToRemove.push( oldVN);
 			}
-			else if (oldVN.type === newVN.type && oldVN.isUpdatePossible( newVN))
+			else if (isUpdatePossible( oldVN, newVN))
 			{
 				disp.action = VNDispAction.Update;
 				disp.oldVN = oldVN;
@@ -561,3 +560,17 @@ export class VNDisp
 
 
 
+
+
+
+/**
+ * Determines whether update of the given old node from the given new node is possible. Update
+ * is possible if the types of nodes are the same and either the isUpdatePossible method is not
+ * defined on the old node or it returns true.
+ */
+function isUpdatePossible( oldVN: VN, newVN: VN): boolean
+{
+	return (oldVN.type === newVN.type &&
+			(oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN)));
+
+}

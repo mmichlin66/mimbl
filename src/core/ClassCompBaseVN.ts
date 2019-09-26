@@ -1,5 +1,5 @@
 ﻿import * as mim from "./mim"
-import {DN, VN} from "./VN"
+import {VNBase} from "./VNBase"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
@@ -13,11 +13,22 @@ import {DN, VN} from "./VN"
 // in terms of update requests and lifecycle management.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export abstract class CompBaseVN<TComp extends mim.IComponent> extends VN
+export abstract class ClassCompBaseVN<TComp extends mim.IComponent> extends VNBase
 {
 	/// #if USE_STATS
-		public getStatsCategory(): StatsCategory { return StatsCategory.Comp; }
+		public get statsCategory(): StatsCategory { return StatsCategory.Comp; }
 	/// #endif
+
+
+
+	/**
+	 * Retrieves update strategy object that determines different aspects of node behavior
+	 * during updates.
+	 */
+	public get updateStrategy(): mim.UpdateStrategy
+	{
+		return this.comp.getUpdateStrategy ? this.comp.getUpdateStrategy() : undefined;
+	}
 
 
 
@@ -59,26 +70,6 @@ export abstract class CompBaseVN<TComp extends mim.IComponent> extends VN
 	public handleError( err: any, path: string[]): void
 	{
 		this.comp.handleError( err, path);
-	}
-
-
-
-	/**
-	 * Retrieves update strategy object that determines different aspects of node behavior
-	 * during updates.
-	 */
-	public getUpdateStrategy?(): mim.UpdateStrategy
-	{
-		return this.comp.getUpdateStrategy ? this.comp.getUpdateStrategy() : undefined;
-	}
-
-
-
-	// Returns DOM node corresponding to the virtual node itself and not to any of its sub-nodes.
-	public getOwnDN(): DN
-	{
-		// components don't have their own DOM node
-		return null;
 	}
 
 

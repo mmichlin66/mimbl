@@ -1,6 +1,6 @@
 ﻿import * as mim from "./mim"
 import {VN, VNUpdateDisp} from "./VN"
-import {CompBaseVN} from "./CompBaseVN"
+import {ClassCompBaseVN} from "./ClassCompBaseVN"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
@@ -13,7 +13,7 @@ import {CompBaseVN} from "./CompBaseVN"
 // Represents a component implementing the IComponent<> interface.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
+export class ManagedCompVN extends ClassCompBaseVN<mim.IComponent> implements mim.IClassVN
 {
 	constructor( compClass: mim.IComponentClass, props: any, children: any[])
 	{
@@ -91,7 +91,7 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 	// Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
 	// This method is part of the Render phase.
-	public willMount(): boolean
+	public beforeCreate(): void
 	{
 		// create component instance
 		this.comp = new this.compClass( this.props);
@@ -107,8 +107,6 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
 		/// #endif
-
-		return true;
 	}
 
 
@@ -116,7 +114,7 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 	// This method is called before the content of node and all its sub-nodes is removed from the
 	// DOM tree.
 	// This method is part of the render phase.
-	public willUnmount(): void
+	public beforeDestroy(): void
 	{
 		// unset the reference value if specified. We check whether the reference still points
 		// to our component before setting it to undefined. If the same Ref object is used for
@@ -143,7 +141,7 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 	public isUpdatePossible( newVN: VN): boolean
 	{
 		// update is possible if the component class name is the same
-		return this.compClass === (newVN as ClassVN).compClass;
+		return this.compClass === (newVN as ManagedCompVN).compClass;
 	}
 
 
@@ -153,7 +151,7 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 	// false otherwise.
 	public prepareUpdate( newVN: VN): VNUpdateDisp
 	{
-		let newClassVN = newVN as ClassVN;
+		let newClassVN = newVN as ManagedCompVN;
 
 		// let the component know about the new properties (if it is interested in them)
 		let shouldRender: boolean = true;
@@ -189,10 +187,14 @@ export class ClassVN extends CompBaseVN<mim.IComponent> implements mim.IClassVN
 		// since the rendering produced by a function may depend on factors beyond properties,
 		// we always indicate that it is necessary to update the sub-nodes. The commitUpdate
 		// method should NOT be called.
-		return { shouldCommit: false, shouldRender };
+		return VNUpdateDisp.getStockValue( false, shouldRender);
 	}
 
 
+
+	// Node's key. The derived classes set it based on their respective content. A key
+	// can be of any type.
+	public key: any;
 
 	// Type of the class-based component.
 	private compClass: mim.IComponentClass;

@@ -1,8 +1,8 @@
 ﻿import * as mim from "./mim"
 import {DN, VN, VNUpdateDisp} from "./VN"
+import {VNBase} from "./VNBase"
 import {ElmAttr, AttrPropInfo, EventPropInfo, CustomAttrPropInfo, PropType} from "./ElmAttr"
 import {SvgElms} from "./SvgElms";
-// import {hashObject} from "./Utils";
 import {deepCompare} from "./Utils";
 
 /// #if USE_STATS
@@ -16,15 +16,13 @@ import {deepCompare} from "./Utils";
 // Represents a DOM element created using JSX.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class ElmVN extends VN implements mim.IElmVN
+export class ElmVN extends VNBase implements mim.IElmVN
 {
 	constructor( tagName: string, props: any, children: any[])
 	{
 		super();
 
 		this.type = mim.VNType.Elm;
-
-		// remember tag name and children
 		this.elmName = tagName;
 		this.props = props;
 		this.children = children;
@@ -35,8 +33,8 @@ export class ElmVN extends VN implements mim.IElmVN
 			// get the key property. If key property was not specified, use id; if id was not
 			// specified key will remain undefined.
 			this.key = props.key;
-			if (this.key === undefined)
-				this.key = props.id;
+			// if (this.key === undefined)
+			// 	this.key = props.id;
 		}
 	}
 
@@ -50,7 +48,7 @@ export class ElmVN extends VN implements mim.IElmVN
 
 
 	/// #if USE_STATS
-		public getStatsCategory(): StatsCategory { return StatsCategory.Elm; }
+		public get statsCategory(): StatsCategory { return StatsCategory.Elm; }
 	/// #endif
 
 
@@ -70,6 +68,11 @@ export class ElmVN extends VN implements mim.IElmVN
 
 
 
+	// Returns DOM node corresponding to the virtual node itself and not to any of its sub-nodes.
+	public get ownDN(): DN { return this.elm; }
+
+
+
 	// Generates list of sub-nodes according to the current state
 	public render(): any
 	{
@@ -80,7 +83,7 @@ export class ElmVN extends VN implements mim.IElmVN
 
 	// Creates and returns DOM node corresponding to this virtual node.
 	// This method is part of the Commit phase.
-	public mount(): DN
+	public create(): DN
 	{
 		// determine whether this is an SVG or HTML element and create the element
 		let svgInfo = SvgElms.getSvgElmInfo( this.elmName);
@@ -114,9 +117,9 @@ export class ElmVN extends VN implements mim.IElmVN
 
 
 
-	// Destroys DOM node corresponding to this virtual node.
+	// Releases reference to the DOM node corresponding to this virtual node.
 	// This method is part of the Commit phase.
-	public unmount(): void
+	public destroy(): void
 	{
 		// unset the reference value if specified. We check whether the reference still points
 		// to our element before setting it to undefined. If the same Ref object is used for
@@ -208,25 +211,6 @@ export class ElmVN extends VN implements mim.IElmVN
 		this.updateAttrs( newElmVN.attrs);
 		this.updateEvents( newElmVN.events);
 		this.updateCustomAttrs( newElmVN.customAttrs);
-	}
-
-
-
-	/**
-	 * Retrieves update strategy object that determines different aspects of node behavior
-	 * during updates.
-	 */
-	public getUpdateStrategy?(): mim.UpdateStrategy
-	{
-		return this.updateStrategy;
-	}
-
-
-
-	// Returns DOM node corresponding to the virtual node itself and not to any of its sub-nodes.
-	public getOwnDN(): DN
-	{
-		return this.elm;
 	}
 
 
@@ -645,6 +629,13 @@ export class ElmVN extends VN implements mim.IElmVN
 
 
 
+	// Node's key. The derived classes set it based on their respective content. A key
+	// can be of any type.
+	public key: any;
+
+	// Optional UpdateStrategy object defining different aspects of node behavior during updates.
+	public updateStrategy: mim.UpdateStrategy;
+
 	// Tag name of an Element.
 	private elmName: string;
 
@@ -653,10 +644,6 @@ export class ElmVN extends VN implements mim.IElmVN
 
 	// Array of children objects.
 	private children: any[];
-
-	// Hash of the properties to compare in order to understand whether the properties (that is,
-	// attributes and/or events and/or custom attributes) should be updated.
-	private propsHash: number;
 
 	// Instance of an Element. The instance is created when the node is rendered for the first
 	// time.
@@ -672,9 +659,6 @@ export class ElmVN extends VN implements mim.IElmVN
 	// set when analyzing properties in the constructor and during update. Reference value is
 	// set during mount and unset during unmount. The ref property can be changed on update.
 	private ref: mim.RefPropType<any>;
-
-	// Optional UpdateStrategy object defining different aspects of node behavior during updates.
-	private updateStrategy: mim.UpdateStrategy;
 
 	// Object that serves as a map between attribute names and their current values.
 	private attrs: { [name: string]: AttrRunTimeData };

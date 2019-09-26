@@ -1,6 +1,6 @@
 ﻿import * as mim from "./mim"
 import {VN, VNUpdateDisp} from "./VN"
-import {CompBaseVN} from "./CompBaseVN"
+import {ClassCompBaseVN} from "./ClassCompBaseVN"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
@@ -13,16 +13,14 @@ import {CompBaseVN} from "./CompBaseVN"
 // The class InstanceVN is a node that holds an instance of an IComponent-implementing object.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInstanceVN
+export class IndependentCompVN extends ClassCompBaseVN<mim.IComponent> implements mim.IInstanceVN
 {
 	constructor( comp: mim.IComponent)
 	{
 		super();
 
 		this.type = mim.VNType.InstanceComp;
-
-		// component instance is the key for the node
-		this.comp = this.key = comp;
+		this.comp = comp;
 	};
 
 
@@ -47,13 +45,18 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 
 
 
+	// Node's key. The derived classes set it based on their respective content. A key
+	// can be of any type. The instance of our component is the key.
+	public get key(): any { return this.comp; }
+
+
+
 	// Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
 	// This method is part of the Render phase.
-	public willMount(): boolean
+	public beforeCreate(): void
 	{
 		this.willMountInstance( this.comp);
-		return true;
 	}
 
 
@@ -61,19 +64,9 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 	// This method is called before the content of node and all its sub-nodes is removed from the
 	// DOM tree.
 	// This method is part of the render phase.
-	public willUnmount(): void
+	public beforeDestroy(): void
 	{
 		this.willUnmountInstance( this.comp);
-	}
-
-
-
-	// Determines whether the update of this node from the given node is possible. The newVN
-	// parameter is guaranteed to point to a VN of the same type as this node.
-	public isUpdatePossible( newVN: VN): boolean
-	{
-		// update is always possible
-		return true;
 	}
 
 
@@ -86,7 +79,7 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 	public prepareUpdate( newVN: VN): VNUpdateDisp
 	{
 		// if it is the same component instance, we don't need to do anything
-		let newComp = (newVN as InstanceVN).comp;
+		let newComp = (newVN as IndependentCompVN).comp;
 		let needsUpdating = this.comp !== newComp;
 
 		// if the coponent instance are different, then we need to prepare the new instance for
@@ -95,10 +88,10 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 		{
 			this.willMountInstance( newComp);
 			this.willUnmountInstance( this.comp);
-			this.comp = this.key = newComp;
+			this.comp = newComp;
 		}
 
-		return { shouldCommit: false, shouldRender: needsUpdating };
+		return VNUpdateDisp.getStockValue( false, needsUpdating);
 	}
 
 
@@ -121,7 +114,7 @@ export class InstanceVN extends CompBaseVN<mim.IComponent> implements mim.IInsta
 
 
 	// Notifies the given component that it will be unmounted.
-	public willUnmountInstance( comp: mim.IComponent): void
+	private willUnmountInstance( comp: mim.IComponent): void
 	{
 		if (comp.componentWillUnmount)
 			comp.componentWillUnmount();

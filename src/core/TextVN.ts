@@ -1,5 +1,6 @@
 ﻿import * as mim from "./mim"
 import {DN, VN, VNUpdateDisp} from "./VN"
+import {VNBase} from "./VNBase"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
@@ -10,12 +11,11 @@ import {DN, VN, VNUpdateDisp} from "./VN"
 /**
  * Represents a text node.
  */
-export class TextVN extends VN implements mim.ITextVN
+export class TextVN extends VNBase implements mim.ITextVN
 {
 	constructor( text: string)
 	{
 		super();
-
 		this.type = mim.VNType.Text;
 		this.text = text;
 	};
@@ -23,12 +23,12 @@ export class TextVN extends VN implements mim.ITextVN
 
 
 	public get Text(): string { return this.text; }
-	public get TextNode(): Text { return this.dn; }
+	public get TextNode(): Text { return this.txtNode; }
 
 
 
 /// #if USE_STATS
-	public getStatsCategory(): StatsCategory { return StatsCategory.Text; }
+	public get statsCategory(): StatsCategory { return StatsCategory.Text; }
 /// #endif
 
 
@@ -38,52 +38,34 @@ export class TextVN extends VN implements mim.ITextVN
 	// it can reflect an "id" property of an element (if any).
 	public get name(): string { return "#text"; }
 
+	// Returns DOM node corresponding to the virtual node itself (if any) and not to any of its
+	// sub-nodes.
+	public get ownDN(): DN { return this.txtNode; };
 
 
-	// Creates internal stuctures of the virtual node so that it is ready to produce children.
-	// If the node never has any children (like text nodes), it should return false.
-	// This method is called right after the node has been constructed.
-	// This method is part of the Render phase.
-	public willMount(): boolean
-	{
-		// text nodes don't have children
-		return false;
-	}
 
 	// Creates and returns DOM node corresponding to this virtual node.
 	// This method is part of the Commit phase.
-	public mount(): DN
+	public create(): DN
 	{
-		this.dn = document.createTextNode( this.text);
-
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Added);
 		/// #endif
 
-		return this.dn;
+		return this.txtNode = document.createTextNode( this.text);
 	}
 
 
 
 	// Destroys DOM node corresponding to this virtual node.
 	// This method is part of the Commit phase.
-	public unmount(): void
+	public destroy(): void
 	{
-		this.dn = undefined;
+		this.txtNode = undefined;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Deleted);
 		/// #endif
-	}
-
-
-
-	// Determines whether the update of this node from the given node is possible. The newVN
-	// parameter is guaranteed to point to a VN of the same type as this node.
-	public isUpdatePossible( newVN: VN): boolean
-	{
-		// one text node can always update another text node
-		return true;
 	}
 
 
@@ -96,7 +78,7 @@ export class TextVN extends VN implements mim.ITextVN
 	public prepareUpdate( newVN: VN): VNUpdateDisp
 	{
 		// text nodes don't have sub-nodes
-		return { shouldCommit: this.text !== (newVN as TextVN).text, shouldRender: false };
+		return VNUpdateDisp.getStockValue( this.text !== (newVN as TextVN).text, false);
 	}
 
 
@@ -104,7 +86,7 @@ export class TextVN extends VN implements mim.ITextVN
 	// Commits updates made to this node to DOM.
 	public commitUpdate( newVN: VN): void
 	{
-		this.dn.nodeValue = this.text = (newVN as TextVN).text;
+		this.txtNode.nodeValue = this.text = (newVN as TextVN).text;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Updated);
@@ -113,18 +95,11 @@ export class TextVN extends VN implements mim.ITextVN
 
 
 
-	public getOwnDN(): DN
-	{
-		return this.dn;
-	}
-
-
-
 	// Text for a simple text node.
 	text: string;
 
 	// Text DOM node
-	dn: Text;
+	txtNode: Text;
 }
 
 

@@ -218,7 +218,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	public props: CompProps<TProps,TChildren>;
 
 	/** Remembered site object through which component can request services. */
-	public site: IVNode = undefined;
+	public site: IVNode;
 
 	constructor( props?: CompProps<TProps,TChildren>)
 	{
@@ -373,7 +373,7 @@ export class Ref<T>
  * Type of ref property that can be passed to JSX elements and components. This can be either the
  * [[Ref]] class or [[RefFunc]] function.
  */
-export type RefPropType<T> = Ref<T> | RefFunc<T>;
+export type RefPropType<T = any> = Ref<T> | RefFunc<T>;
 
 
 
@@ -404,7 +404,7 @@ export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
 /**
  * Decorator function for defining properties with a set method that calls the updateMe method
  * whenever the property value changes.
- *	```tsx
+ *	```typescript
  *	class Child extends Component
  *	{
  *		@mim.updatable text: string = "Hello!";
@@ -412,8 +412,8 @@ export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
  *		{
  *	 		return <div>{text}</div>
  *		}
-  *	}
-*
+ *	}
+ *
  *	class Parent extends Component
  *	{
  *		child = new Child();
@@ -424,8 +424,7 @@ export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
  *	}
  *	```
  * In the above example, the Child component will be re-rendered when its `text` property changes.
- * The Parent component appends the word "again" to the Child component's text whenever the user
- * clicks on it.
+ * 
  * @param target 
  * @param name 
  */
@@ -452,12 +451,12 @@ export function updatable( target, name: string)
 /**
  * An artificial "Fragment" component that is only used as a temporary collection of other items
  * in places where JSX only allows a single item. Our JSX factory function creates a virtual node
- * for each of its children the function is never actually called. This component is only needed
- * because currently TypeScript doesn't allow the <> fragment notation if a custom JSX factory
+ * for each of its children and the function is never actually called. This function is only needed
+ * because currently TypeScript doesn't allow the `<>` fragment notation if a custom JSX factory
  * function is used.
  *
  * Use it as follows:
- * ```tsx
+ * ```typescript
  *	import * as mim from "mimbl"
  *	.....
  *	render()
@@ -663,25 +662,31 @@ export const enum VNType
 export interface IVNode
 {
 	/** Gets node type. */
-	readonly Type: VNType;
+	readonly type: VNType;
 
-	/** Gets node's parent. */
-	readonly Parent: IVNode;
+	/** Gets node's parent. This is undefined for the top-level (root) nodes. */
+	readonly parent?: IVNode;
+
+	/** Reference to the next sibling node or undefined for the last sibling. */
+	readonly next?: IVNode;
+
+	/** Reference to the previous sibling node or undefined for the first sibling. */
+	readonly prev?: IVNode;
 
 	/** List of sub-nodes. */
-	readonly SubNodes: IVNode[];
+	readonly subNodes?: IVNode[];
 
-	/** Gets node's display name. */
-	readonly Name: string;
+	/**
+	 * Gets node's display name. This is used mostly for tracing and error reporting. The name
+	 * can change during the lifetime of the virtual node; for example, it can reflect an "id"
+	 * property of an element.
+	 */
+	readonly name?: string;
+
+
 
 	/** This method is called by the component when it needs to be updated. */
 	requestUpdate(): void;
-
-	/**
-	 * This method is called by the component when it decides to cancel a previously requested
-	 * update request.
-	 */
-	cancelUpdate(): void;
 
 	/**
 	 * Schedules to call the given function either before or after all the scheduled components
@@ -692,13 +697,7 @@ export interface IVNode
 	 */
 	scheduleCall( func: ScheduledFuncType, beforeUpdate: boolean): void;
 
-	/**
-	 * Cancels a call that has been scheduled to be made either before or after all the scheduled
-	 * components have been updated.
-	 * @param func Function that was previously passed to the scheduleCall method.
-	 * @param beforeUpdate Flag that was passed to the scheduleCall method.
-	 */
-	cancelScheduledCall( func: ScheduledFuncType, beforeUpdate: boolean): void;
+
 
 	/**
 	 * Registers an object of any type as a service with the given ID that will be available for
@@ -743,6 +742,8 @@ export interface IVNode
 	getService<K extends keyof IServiceDefinitions>( id: K, defaultService?: IServiceDefinitions[K],
 					useSelf?: boolean): IServiceDefinitions[K];
 
+
+
 	/**
 	 * Creates a wrapper function with the same signature as the given callback so that if the original
 	 * callback throws an exception, it is processed by the Mimble error handling mechanism so that the
@@ -757,7 +758,7 @@ export interface IVNode
 	 * non-DOM objects that use callbacks, e.g. promises. For example:
 	 * 
 	 * ```typescript
-	 *	class Adds
+	 *	class ResizeMonitor
 	 *	{
 	 *		private onWindowResize = ( e: Event): void => {};
 	 *

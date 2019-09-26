@@ -1,7 +1,8 @@
 ﻿import * as mim from "./mim"
 import {VN} from "./VN"
-import {InstanceVN} from "./InstanceVN"
-import {ClassVN} from "./ClassVN"
+import {VNBase} from "./VNBase"
+import {IndependentCompVN} from "./IndependentCompVN"
+import {ManagedCompVN} from "./ManagedCompVN"
 import {FuncVN} from "./FuncVN"
 import {ElmVN} from "./ElmVN"
 import {TextVN} from "./TextVN"
@@ -18,7 +19,7 @@ export function createNodesFromContent( content: any): VN | VN[]
 		return null;
 	else if (typeof content === "string")
 		return new TextVN( content);
-	else if (content instanceof VN)
+	else if (content instanceof VNBase)
 		return content;
 	else if (typeof content.render === "function")
 	{
@@ -26,7 +27,7 @@ export function createNodesFromContent( content: any): VN | VN[]
 		// this existing VN; otherwise create a new one.
 		return (content as mim.IComponent).site
 						? (content as mim.IComponent).site as VN
-						: new InstanceVN( content as mim.IComponent);
+						: new IndependentCompVN( content as mim.IComponent);
 
 		// return [new InstanceVN( content as mim.IComponent)];
 	}
@@ -85,7 +86,7 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
 	else if (typeof tag === "function")
 	{
 		if (typeof tag.prototype.render === "function")
-			return new ClassVN( tag as mim.IComponentClass, props, children);
+			return new ManagedCompVN( tag as mim.IComponentClass, props, children);
 		else
 			return new FuncVN( tag as mim.FuncCompType, props, children);
 	}
