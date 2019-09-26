@@ -101,6 +101,14 @@ export class VNDispGroup
 
 
 /**
+ * If a node has more than this number of sub-nodes, then we build groups. The idea is that
+ * otherwise, the overhead of building groups is not worth it.
+ */
+const NO_GROUP_THRESHOLD = 4;
+
+
+
+/**
  * The VNDisp class is a recursive structure that describes a disposition for a node and its
  * sub-nodes during the reconciliation process.
  */
@@ -136,12 +144,6 @@ export class VNDisp
 
 	/** Array of groups of sub-nodes that should be updated or inserted. */
 	public subNodeGroups: VNDispGroup[];
-
-	/**
-	 * If the node has more than this number of sub-nodes, then we build groups. The idea is that
-	 * otherwise, the overhead of building groups is not worth it.
-	 */
-	private static readonly NO_GROUP_THRESHOLD = 10;
 
 
 
@@ -214,6 +216,7 @@ export class VNDisp
 		// we are here if both old and new chains contain more than one node; therefore, the map of
 		// keyed sub-nodes exists (although it might be empty).
 		let oldMap = this.oldVN.keyedSubNodes;
+		let oldMapSize = oldMap ? oldMap.size : 0;
 
 		// prepare arrays for VNDisp objects for new nodes and for old nodes to be removed
 		this.subNodeDisps = new Array( newLen);
@@ -223,12 +226,12 @@ export class VNDisp
 		// means that all old nodes are keyed. If this is the case AND recycling of keyed nodes
 		// is not allowed, we will not need to put unkeyed or keyed but unmatched new nodes aside.
 		// We know that they will have to be inserted.
-		if (oldMap.size === oldLen && !allowKeyedNodeRecycling)
-			this.matchOldKeyedOnly( oldMap, newChain, newLen, newLen > VNDisp.NO_GROUP_THRESHOLD);
-		else if (oldMap.size === 0 && allowKeyedNodeRecycling)
-			this.matchOldNonKeyedOnly( oldChain, oldLen, newChain, newLen, newLen > VNDisp.NO_GROUP_THRESHOLD);
+		if (oldMapSize === oldLen && !allowKeyedNodeRecycling)
+			this.matchOldKeyedOnly( oldMap, newChain, newLen, newLen > NO_GROUP_THRESHOLD);
+		else if (oldMapSize === 0 && allowKeyedNodeRecycling)
+			this.matchOldNonKeyedOnly( oldChain, oldLen, newChain, newLen, newLen > NO_GROUP_THRESHOLD);
 		else
-			this.matchOldMixed( oldChain, oldLen, oldMap, newChain, newLen, allowKeyedNodeRecycling, newLen > VNDisp.NO_GROUP_THRESHOLD);
+			this.matchOldMixed( oldChain, oldLen, oldMap, newChain, newLen, allowKeyedNodeRecycling, newLen > NO_GROUP_THRESHOLD);
 
 		if (this.subNodesToRemove.length === 0)
 			this.subNodesToRemove = undefined;
@@ -507,7 +510,7 @@ export class VNDisp
 		/// #if DEBUG
 			// this method is not supposed to be called if the number of sub-nodes is less then
 			// the pre-determined threshold
-			if (count <= VNDisp.NO_GROUP_THRESHOLD || count === 0)
+			if (count <= NO_GROUP_THRESHOLD || count === 0)
 				return;
 		/// #endif
 

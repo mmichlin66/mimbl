@@ -4,7 +4,7 @@ import {createVNChainFromContent} from "./ContentFuncs"
 import {VNDispAction, VNDisp, VNDispGroup} from "./VNDisp"
 
 /// #if USE_STATS
-	import {DetailedStats, StatsAction} from "./Stats"
+	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
 /// #endif
 
 
@@ -628,20 +628,23 @@ function updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 			disp = disps[j];
 			newVN = disp.newVN;
 			oldVN = disp.oldVN;
-			if (group.action === VNDispAction.Update && oldVN !== newVN)
+			if (group.action === VNDispAction.Update)
 			{
-				if (disp.updateDisp.shouldCommit)
+				if (oldVN !== newVN)
 				{
-					/// #if VERBOSE_NODE
-						console.debug( `VERBOSE: Calling commitUpdate() on node ${oldVN.name}`);
-					/// #endif
+					if (disp.updateDisp.shouldCommit)
+					{
+						/// #if VERBOSE_NODE
+							console.debug( `VERBOSE: Calling commitUpdate() on node ${oldVN.name}`);
+						/// #endif
 
-					oldVN.commitUpdate( newVN);
+						oldVN.commitUpdate( newVN);
+					}
+
+					// update the sub-nodes if necessary
+					if (disp.updateDisp.shouldRender)
+						updatePhysical( disp);
 				}
-
-				// update the sub-nodes if necessary
-				if (disp.updateDisp.shouldRender)
-					updatePhysical( disp);
 
 				firstDN = getFirstDN( oldVN);
 				if (firstDN != null)
@@ -663,8 +666,6 @@ function updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 				// the new node becomes a sub-node
 				svn = newVN;
 			}
-			else
-				svn = newVN;
 
 			parentVN.subNodes[currSubNodeIndex--] = svn;
 			if (parentVN.keyedSubNodes !== undefined && svn.key !== undefined)
@@ -736,10 +737,16 @@ function moveGroup( parentVN: VN, disps: VNDisp[], group: VNDispGroup, anchorDN:
 		let subNodeVN = group.action === VNDispAction.Update ? disps[j].oldVN : disps[j].newVN;
 		let subNodeDNs = getImmediateDNs( subNodeVN);
 		for( let subNodeDN of subNodeDNs)
+		{
 			anchorDN.insertBefore( subNodeDN, beforeDN);
 
+			/// #if USE_STATS
+				DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Moved);
+			/// #endif
+		}
+
 		/// #if USE_STATS
-			DetailedStats.stats.log( parentVN.statsCategory, StatsAction.Moved);
+			DetailedStats.stats.log( subNodeVN.statsCategory, StatsAction.Moved);
 		/// #endif
 
 	}
@@ -759,20 +766,23 @@ function updatePhysicalByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 		disp = disps[i];
 		newVN = disp.newVN;
 		oldVN = disp.oldVN;
-		if (disp.action === VNDispAction.Update && oldVN !== newVN)
+		if (disp.action === VNDispAction.Update)
 		{
-			if (disp.updateDisp.shouldCommit)
+			if (oldVN !== newVN)
 			{
-				/// #if VERBOSE_NODE
-					console.debug( `VERBOSE: Calling commitUpdate() on node ${oldVN.name}`);
-				/// #endif
+				if (disp.updateDisp.shouldCommit)
+				{
+					/// #if VERBOSE_NODE
+						console.debug( `VERBOSE: Calling commitUpdate() on node ${oldVN.name}`);
+					/// #endif
 
-				oldVN.commitUpdate( newVN);
+					oldVN.commitUpdate( newVN);
+				}
+
+				// update the sub-nodes if necessary
+				if (disp.updateDisp.shouldRender)
+					updatePhysical( disp);
 			}
-
-			// update the sub-nodes if necessary
-			if (disp.updateDisp.shouldRender)
-				updatePhysical( disp);
 
 			// determine whether all the nodes under this VN should be moved.
 			let subNodeDNs = getImmediateDNs( oldVN);
@@ -782,10 +792,16 @@ function updatePhysicalByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 				if (subNodeDNs[subNodeDNs.length - 1].nextSibling !== beforeDN)
 				{
 					for( let subNodeDN of subNodeDNs)
+					{
 						anchorDN.insertBefore( subNodeDN, beforeDN);
 
+						/// #if USE_STATS
+							DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Moved);
+						/// #endif
+					}
+
 					/// #if USE_STATS
-						DetailedStats.stats.log( parentVN.statsCategory, StatsAction.Moved);
+						DetailedStats.stats.log( oldVN.statsCategory, StatsAction.Moved);
 					/// #endif
 				}
 
@@ -811,8 +827,6 @@ function updatePhysicalByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 			// the new node becomes a sub-node
 			svn = newVN;
 		}
-		else
-			svn = newVN;
 
 		parentVN.subNodes[i] = svn;
 		if (parentVN.keyedSubNodes !== undefined && svn.key !== undefined)
