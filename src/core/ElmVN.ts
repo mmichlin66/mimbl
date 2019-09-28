@@ -1,7 +1,7 @@
 ﻿import * as mim from "./mim"
 import {DN, VN, VNUpdateDisp} from "./VN"
 import {VNBase} from "./VNBase"
-import {ElmAttr, AttrPropInfo, EventPropInfo, CustomAttrPropInfo, PropType} from "./ElmAttr"
+import {ElmAttr, AttrPropInfo, EventPropInfo, CustomAttrPropInfo, PropType, PropInfo} from "./ElmAttr"
 import {SvgElms} from "./SvgElms";
 import {deepCompare} from "./Utils";
 
@@ -27,14 +27,13 @@ export class ElmVN extends VNBase implements mim.IElmVN
 		this.props = props;
 		this.children = children;
 
-		// copy properties to our own object excluding framework-handled key and ref
 		if (props)
 		{
 			// get the key property. If key property was not specified, use id; if id was not
 			// specified key will remain undefined.
 			this.key = props.key;
-			// if (this.key === undefined)
-			// 	this.key = props.id;
+			if (this.key === undefined)
+				this.key = props.id;
 		}
 	}
 
@@ -222,6 +221,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 		if (!this.props)
 			return;
 
+		let propVal: any, propInfo: PropInfo, propType: PropType;
 		for( let propName in this.props)
 		{
 			if (propName === "key")
@@ -230,7 +230,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 				continue;
 			}
 
-			let propVal: any = this.props[propName];
+			propVal = this.props[propName];
 			if (propVal == null)
 			{
 				// ignore properties with values undefined and null
@@ -243,7 +243,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 			}
 			else if (propName === "updateStrategy")
 			{
-				// remember updateStrategy property but don't copy it to this.props object
+				// remember updateStrategy property
 				this.updateStrategy = propVal;
 			}
 			else
@@ -251,8 +251,8 @@ export class ElmVN extends VNBase implements mim.IElmVN
 				// get information about the property and determine its type (regular attribute, event
 				// or custom attribute). Note that getPropertyInfo may return null for most regular
 				// attributes and events; in this case we will check the property value.
-				let propInfo = ElmAttr.getPropertyInfo( propName);
-				let propType = propInfo ? propInfo.type : this.IsEventValue( propVal) ? PropType.Event : PropType.Attr;
+				propInfo = ElmAttr.getPropertyInfo( propName);
+				propType = propInfo ? propInfo.type : isEventValue( propVal) ? PropType.Event : PropType.Attr;
 
 				if (propType === PropType.Attr)
 				{
@@ -263,7 +263,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 				}
 				else if (propType === PropType.Event)
 				{
-					let eventInfo = this.GetPropAsEventRunTimeData( propInfo, propVal);
+					let eventInfo = getPropAsEventRunTimeData( propInfo, propVal);
 					if (eventInfo)
 					{
 						if (!this.events)
@@ -283,38 +283,6 @@ export class ElmVN extends VNBase implements mim.IElmVN
 				}
 			}
 		}
-	}
-
-
-
-	// Determines whether the given property value is of the type that is used for event handlers.
-	// If yes, then returns EventRunTimeData object; otherwise, returns undefined.
-	private IsEventValue( propVal: any): boolean
-	{
-		return typeof propVal === "function" ||
-			Array.isArray(propVal) && propVal.length > 0 && typeof propVal[0] === "function";
-	}
-
-
-
-	// Determines whether the given property value is of the type that is used for event handlers.
-	// If yes, then returns EventRunTimeData object; otherwise, returns undefined.
-	private GetPropAsEventRunTimeData( info: EventPropInfo, propVal: any): EventRunTimeData
-	{
-		if (typeof propVal === "function")
-		{
-			let orgFunc = propVal as mim.EventFuncType<any>;
-			return { info, orgFunc, useCapture: false };
-		}
-		else if (Array.isArray(propVal) && propVal.length === 2 &&
-				typeof propVal[0] === "function" && typeof propVal[1] === "boolean")
-		{
-			let orgFunc = propVal[0] as mim.EventFuncType<any>;
-			return { info, orgFunc, useCapture: propVal[1] as boolean };
-		}
-
-		// for all other type combinations consider it to be a regular attribute
-		return undefined;
 	}
 
 
@@ -402,7 +370,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 	// element. This method handles special cases of properties with non-trivial values.
 	private addEvent( name: string, event: EventRunTimeData): void
 	{
-		event.wrapper = this.wrapCallback( event.orgFunc);
+		event.wrapper = this.wrapCallback( event.orgFunc, event.that);
 		this.elm.addEventListener( name, event.wrapper, event.useCapture);
 
 		/// #if USE_STATS
@@ -462,13 +430,16 @@ export class ElmVN extends VNBase implements mim.IElmVN
 		}
 
 		// loop over new event listeners and add those that are not found among the old ones
-		for( let name in newEvents)
+		if (newEvents)
 		{
-			if (oldEvents && (name in oldEvents))
-				continue;
+			for( let name in newEvents)
+			{
+				if (oldEvents && (name in oldEvents))
+					continue;
 
-			let newEvent = newEvents[name];
-			this.addEvent( name, newEvent);
+				let newEvent = newEvents[name];
+				this.addEvent( name, newEvent);
+			}
 		}
 
 		this.events = newEvents;
@@ -481,7 +452,10 @@ export class ElmVN extends VNBase implements mim.IElmVN
 	// been detected.
 	private updateEvent( name: string, oldEvent: EventRunTimeData, newEvent: EventRunTimeData): boolean
 	{
-		if (oldEvent.orgFunc === newEvent.orgFunc && oldEvent.useCapture === newEvent.useCapture)
+		// double-equal-sign for useCapture is on purpose, because useCapture can be undefined or boolean
+		if (oldEvent.orgFunc === newEvent.orgFunc &&
+			oldEvent.that === newEvent.that &&
+			oldEvent.useCapture == newEvent.useCapture)
 		{
 			newEvent.wrapper = oldEvent.wrapper;
 			return false;
@@ -489,7 +463,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 
 		this.elm.removeEventListener( name, oldEvent.wrapper, oldEvent.useCapture);
 
-		newEvent.wrapper = this.wrapCallback( newEvent.orgFunc);
+		newEvent.wrapper = this.wrapCallback( newEvent.orgFunc, newEvent.that);
 		this.elm.addEventListener( name, newEvent.wrapper, newEvent.useCapture);
 
 		/// #if USE_STATS
@@ -678,7 +652,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 interface AttrRunTimeData
 {
 	// Information about this attribute - can be null
-	info: AttrPropInfo | null;
+	info: AttrPropInfo;
 
 	// Flag indicating whether this event should be used as Capturing (true) or Bubbling (false)
 	val: any;
@@ -690,13 +664,16 @@ interface AttrRunTimeData
 interface EventRunTimeData
 {
 	// Information about this event - can be null
-	info: EventPropInfo | null;
+	info: EventPropInfo;
 
 	// Original event callback passed as the value of the event property in JSX
 	orgFunc: mim.EventFuncType<any>;
 
+	// Object that will be referenced by "this" within the invoked function
+	that?: any;
+
 	// Flag indicating whether this event should be used as Capturing (true) or Bubbling (false)
-	useCapture: boolean;
+	useCapture?: boolean;
 
 	// Wrapper function that we create and bind to our node and the original function. We need
 	// this wrapper in order to catch exception in the callback and pass them on to an error
@@ -720,6 +697,40 @@ interface CystomAttrRunTimeData
 	// Handler object that knows to deal with the property values
 	handler: mim.ICustomAttributeHandler<any>;
 };
+
+
+
+// Determines whether the given property value is of the type that is used for event handlers.
+function isEventValue( propVal: any): boolean
+{
+	return typeof propVal === "function" ||
+		Array.isArray(propVal) && propVal.length > 0 && typeof propVal[0] === "function";
+}
+
+
+
+// Determines whether the given property value is of the type that is used for event handlers.
+// If yes, then returns EventRunTimeData object; otherwise, returns undefined.
+function getPropAsEventRunTimeData( info: EventPropInfo, propVal: any): EventRunTimeData
+{
+	if (typeof propVal === "function")
+		return { info, orgFunc: propVal as mim.EventFuncType<any> };
+	else if (Array.isArray(propVal))
+	{
+		if (propVal.length === 2)
+		{
+			if (typeof propVal[1] === "boolean")
+				return { info, orgFunc: propVal[0] as mim.EventFuncType<any>, useCapture: propVal[1] as boolean };
+			else
+				return { info, orgFunc: propVal[0] as mim.EventFuncType<any>, that: propVal[1] };
+		}
+		else if (propVal.length === 3)
+			return { info, orgFunc: propVal[0] as mim.EventFuncType<any>, that: propVal[1], useCapture: propVal[2] as boolean };
+	}
+
+	// for all other type combinations the property is not treated as an event handler
+	return undefined;
+}
 
 
 

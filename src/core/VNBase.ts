@@ -264,9 +264,9 @@ export abstract class VNBase implements VN
 	 * 
 	 * @param callback 
 	 */
-	public wrapCallback<T>( callback: T): T
+	public wrapCallback<T>( callback: T, that?: any): T
 	{
-		return CallbackWrapper.bind( this, callback);
+		return CallbackWrapper.bind( this, that, callback);
 	}
 
 
@@ -294,8 +294,8 @@ function CallbackWrapper(): any
 {
 	try
 	{
-		let [orgCallback, ...rest] = arguments;
-		return orgCallback( ...rest);
+		let [that, orgCallback, ...rest] = arguments;
+		return that ? orgCallback.apply( that, rest) : orgCallback( ...rest);
 	}
 	catch( err)
 	{

@@ -77,6 +77,14 @@ export interface VN extends mim.IVNode
 	// Cleans up the node object before it is released.
 	term(): void;
 
+
+
+	///////////////////////////////////////////////////////////////////////////////////////////////
+	//
+	// Life cycle methods
+	//
+	///////////////////////////////////////////////////////////////////////////////////////////////
+
 	// Returns content that comprises the children of the node. If the node doesn't have
 	// sub-nodes, null should be returned. If this method is not implemented that means the node
 	// never has children - for example text nodes.

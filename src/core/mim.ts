@@ -760,7 +760,7 @@ export interface IVNode
 	 * ```typescript
 	 *	class ResizeMonitor
 	 *	{
-	 *		private onWindowResize = ( e: Event): void => {};
+	 *		private onWindowResize = (e: Event): void => {};
 	 *
 	 * 		wrapper: (e: Event): void;
 	 * 
@@ -782,7 +782,7 @@ export interface IVNode
 	 * @returns Function that has the same signature as the given callback and that should be used
 	 *     instead of the original callback
 	 */
-	wrapCallback<T>( callback: T): T;
+	wrapCallback<T>( callback: T, that?: any): T;
 }
 
 
@@ -857,6 +857,13 @@ export type StylePropType = Partial<CSSStyleDeclaration>;
 export type EventFuncType<T extends Event> = (e: T) => void;
 
 /**
+ * Tuple combining the event handler type and object that will be bound as "this" when the handler
+ * is invoked.
+ * @typeparam T DOM event type, e.g. MouseEvent
+ */
+export type EventFuncAndThisType<T extends Event> = [EventFuncType<T>, object];
+
+/**
  * Tuple combining the event handler type and the Boolean flag indicating whether the event
  * handler should be attached to the capture (true) or to the bubble (false) phase.
  * @typeparam T DOM event type, e.g. MouseEvent
@@ -864,12 +871,21 @@ export type EventFuncType<T extends Event> = (e: T) => void;
 export type EventFuncAndFlagType<T extends Event> = [EventFuncType<T>, boolean];
 
 /**
+ * Tuple combining the event handler type, object that will be bound as "this" when the handler
+ * is invoked and the Boolean flag indicating whether the event handler should be attached to the
+ * capture (true) or to the bubble (false) phase.
+ * @typeparam T DOM event type, e.g. MouseEvent
+ */
+export type EventFuncAndThisAndFlagType<T extends Event> = [EventFuncType<T>, any, boolean];
+
+/**
  * Union type that can be passed to an Element's event. It is either an event handler function
  * or a tuple consisting of the handler function and the flag indicating whether the event
  * handler should be attached to the capture (true) or to the bubble (false) phase.
  * @typeparam T DOM event type, e.g. MouseEvent
  */
-export type EventPropType<T extends Event> = EventFuncType<T> | EventFuncAndFlagType<T>;
+export type EventPropType<T extends Event> = EventFuncType<T> | EventFuncAndThisType<T> |
+				EventFuncAndFlagType<T> | EventFuncAndThisAndFlagType<T>;
 
 
 
