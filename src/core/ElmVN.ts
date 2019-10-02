@@ -18,6 +18,21 @@ import {deepCompare} from "./Utils";
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export class ElmVN extends VNBase implements mim.IElmVN
 {
+	// Tag name of an Element.
+	public elmName: string;
+
+	// Instance of an Element. The instance is created when the node is rendered for the first
+	// time.
+	public elm: Element = null;
+
+	// Flag indicating whether the Element is SVG (as opposed to HTLM). There are some SVG
+	// elements that have the same name as regular elements (e.g. <a>). Therefore, in order to
+	// determine whether this is an SVG or not we need to check the namespaceURI of the parent
+	// (anchore) DOM node.
+	public isSvg: boolean;
+
+
+
 	constructor( tagName: string, props: any, children: any[])
 	{
 		super();
@@ -36,13 +51,6 @@ export class ElmVN extends VNBase implements mim.IElmVN
 				this.key = props.id;
 		}
 	}
-
-
-
-	// IElmVN implementation
-	public get ElmName(): string { return this.elmName; }
-	public get Elm(): Element { return this.elm; }
-	public get IsSvg(): boolean { return this.isSvg; }
 
 
 
@@ -397,6 +405,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 	/// #endif
 
 
+
 	// Removes the given event listener from the Element.
 	private removeEvent( name: string, event: EventRunTimeData): void
 	{
@@ -437,8 +446,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 				if (oldEvents && (name in oldEvents))
 					continue;
 
-				let newEvent = newEvents[name];
-				this.addEvent( name, newEvent);
+				this.addEvent( name, newEvents[name]);
 			}
 		}
 
@@ -460,18 +468,21 @@ export class ElmVN extends VNBase implements mim.IElmVN
 			newEvent.wrapper = oldEvent.wrapper;
 			return false;
 		}
+		else
+		{
+			// remove old event listener
+			this.elm.removeEventListener( name, oldEvent.wrapper, oldEvent.useCapture);
 
-		this.elm.removeEventListener( name, oldEvent.wrapper, oldEvent.useCapture);
+			// create new wrapper and add it as event listener
+			newEvent.wrapper = this.wrapCallback( newEvent.orgFunc, newEvent.that);
+			this.elm.addEventListener( name, newEvent.wrapper, newEvent.useCapture);
 
-		newEvent.wrapper = this.wrapCallback( newEvent.orgFunc, newEvent.that);
-		this.elm.addEventListener( name, newEvent.wrapper, newEvent.useCapture);
+			/// #if USE_STATS
+				DetailedStats.stats.log( StatsCategory.Event, StatsAction.Updated);
+			/// #endif
 
-		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Event, StatsAction.Updated);
-		/// #endif
-
-		// indicate that there was change in event listener value.
-		return true;
+			return true;
+		}
 	}
 
 
@@ -610,24 +621,11 @@ export class ElmVN extends VNBase implements mim.IElmVN
 	// Optional UpdateStrategy object defining different aspects of node behavior during updates.
 	public updateStrategy: mim.UpdateStrategy;
 
-	// Tag name of an Element.
-	private elmName: string;
-
 	// Properties that were passed to the element.
 	private props: any;
 
 	// Array of children objects.
 	private children: any[];
-
-	// Instance of an Element. The instance is created when the node is rendered for the first
-	// time.
-	private elm: Element = null;
-
-	// Flag indicating whether the Element is SVG (as opposed to HTLM). There are some SVG
-	// elements that have the same name as regular elements (e.g. <a>). Therefore, in order to
-	// determine whether this is an SVG or not we need to check the namespaceURI of the parent
-	// (anchore) DOM node.
-	private isSvg: boolean;
 
 	// Reference to the component that is specified as a "ref" property. Reference object is
 	// set when analyzing properties in the constructor and during update. Reference value is

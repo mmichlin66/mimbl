@@ -636,10 +636,10 @@ export const enum VNType
 	Root,
 
 	// Class-based (state-full) component created via new
-	InstanceComp,
+	IndependentComp,
 
 	// Class-based (state-full) JSX-based component laid out using JSX
-	ClassComp,
+	ManagedComp,
 
 	// Stateless component (simple rendering function accepting props)
 	FuncComp,
@@ -787,15 +787,24 @@ export interface IVNode
 
 
 
+/**
+ * The IClassCompVN interface represents a virtual node for a JSX-based component.
+ */
+export interface IClassCompVN extends IVNode
+{
+	/** Gets the component instance. */
+	readonly comp: IComponent;
+}
+
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // The IInstanceVN interface represents a virtual node for a component.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export interface IInstanceVN extends IVNode
+export interface IIndependentCompVN extends IVNode
 {
-	/** Gets the component instance. */
-	readonly Comp: IComponent;
 }
 
 
@@ -803,13 +812,10 @@ export interface IInstanceVN extends IVNode
 /**
  * The IClassVN interface represents a virtual node for a JSX-based component.
  */
-export interface IClassVN extends IVNode
+export interface IManagedCompVN extends IVNode
 {
 	/** Gets the component class. */
-	readonly CompClass: IComponentClass;
-
-	/** Gets the component instance. */
-	readonly Comp: IComponent;
+	readonly compClass: IComponentClass;
 }
 
 
@@ -820,13 +826,13 @@ export interface IClassVN extends IVNode
 export interface IElmVN extends IVNode
 {
 	/** Gets the element name. */
-	readonly ElmName: string;
+	readonly elmName: string;
 
 	/** Gets the flag indicating whether this element is an SVG (as opposed to HTML). */
-	readonly IsSvg: boolean;
+	readonly isSvg: boolean;
 
 	/** Gets the element instance. */
-	readonly Elm: Element;
+	readonly elm: Element;
 }
 
 

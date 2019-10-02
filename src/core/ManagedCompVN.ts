@@ -1,6 +1,6 @@
 ﻿import * as mim from "./mim"
 import {VN, VNUpdateDisp} from "./VN"
-import {ClassCompBaseVN} from "./ClassCompBaseVN"
+import {ClassCompVN} from "./ClassCompVN"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
@@ -13,13 +13,18 @@ import {ClassCompBaseVN} from "./ClassCompBaseVN"
 // Represents a component implementing the IComponent<> interface.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class ManagedCompVN extends ClassCompBaseVN<mim.IComponent> implements mim.IClassVN
+export class ManagedCompVN extends ClassCompVN<mim.IComponent> implements mim.IManagedCompVN
 {
+	// Type of the class-based component.
+	public compClass: mim.IComponentClass;
+
+
+
 	constructor( compClass: mim.IComponentClass, props: any, children: any[])
 	{
 		super();
 
-		this.type = mim.VNType.ClassComp;
+		this.type = mim.VNType.ManagedComp;
 		this.compClass = compClass;
 
 		// copy properties to our own object excluding framework-handled key and ref
@@ -57,12 +62,6 @@ export class ManagedCompVN extends ClassCompBaseVN<mim.IComponent> implements mi
 		// remember children as part of props
 		this.props.children = children;
 	};
-
-
-
-	// IClassVN implementation
-	public get CompClass(): mim.IComponentClass { return this.compClass; }
-	public get Comp(): mim.IComponent { return this.comp as mim.IComponent; }
 
 
 
@@ -195,9 +194,6 @@ export class ManagedCompVN extends ClassCompBaseVN<mim.IComponent> implements mi
 	// Node's key. The derived classes set it based on their respective content. A key
 	// can be of any type.
 	public key: any;
-
-	// Type of the class-based component.
-	private compClass: mim.IComponentClass;
 
 	// Properties that were passed to the component.
 	private props: any;

@@ -66,6 +66,24 @@ export abstract class VNBase implements VN
 	// component if both the component and its parent are updated in the same cycle.
 	public lastUpdateTick: number;
 
+	// // Component that created this node or null if created not by a component (e.g. directly in
+	// // mim.mount).
+	// private _creator: mim.IClassCompVN;
+	// public get creator(): mim.IClassCompVN
+	// {
+	// 	if (this._creator === undefined)
+	// 	{
+	// 		// go up the parent chain
+	// 		let ancestor = this.parent;
+	// 		while( ancestor)
+	// 		{
+	// 			if (ancestor.type === mim.VNType.ClassComp || ancestor.type == mim.VNType.InstanceComp)
+	// 		}
+	// 	}
+
+	// 	return this._creator;
+	// }
+
 
 
 	// Initializes the node by passing the parent node to it. After this, the node knows its
@@ -266,13 +284,13 @@ export abstract class VNBase implements VN
 	 */
 	public wrapCallback<T>( callback: T, that?: any): T
 	{
+		// if (!that && (callback as any).boundable === true)
+		// 	that = undefined;
+
 		return CallbackWrapper.bind( this, that, callback);
 	}
 
 
-
-	// Determines whether the node is mounted.
-	public get IsMounted(): boolean { return this.anchorDN != null; }
 
 	// Map of service IDs to service objects published by this node.
 	private publishedServices: Map<string,any>;

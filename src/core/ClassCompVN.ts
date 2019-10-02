@@ -13,8 +13,13 @@ import {VNBase} from "./VNBase"
 // in terms of update requests and lifecycle management.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export abstract class ClassCompBaseVN<TComp extends mim.IComponent> extends VNBase
+export abstract class ClassCompVN<TComp extends mim.IComponent> extends VNBase implements mim.IClassCompVN
 {
+	// Component instance.
+	public comp: TComp;
+
+
+
 	/// #if USE_STATS
 		public get statsCategory(): StatsCategory { return StatsCategory.Comp; }
 	/// #endif
@@ -71,11 +76,6 @@ export abstract class ClassCompBaseVN<TComp extends mim.IComponent> extends VNBa
 	{
 		this.comp.handleError( err, path);
 	}
-
-
-
-	// Component instance.
-	protected comp: TComp;
 }
 
 
