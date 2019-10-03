@@ -23,7 +23,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 
 	// Instance of an Element. The instance is created when the node is rendered for the first
 	// time.
-	public elm: Element = null;
+	public elm: Element;
 
 	// Flag indicating whether the Element is SVG (as opposed to HTLM). There are some SVG
 	// elements that have the same name as regular elements (e.g. <a>). Therefore, in order to

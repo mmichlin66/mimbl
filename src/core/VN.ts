@@ -281,11 +281,11 @@ export function getNextDNUnderSameAnchorDN( vn: VN, anchorDN: DN): DN
 	// loop over our next siblings
 	for( let nvn = vn.next; nvn !== undefined; nvn = nvn.next)
 	{
-		// if (nvn.anchorDN === undefined)
-		// 	return null;
+		if (!nvn.anchorDN)
+			return null;
 
 		// note that getLastDN call traverses the hierarchy of nodes. Note also that it
-		// it cannot find a node under a different anchor element because the first different
+		// cannot find a node under a different anchor element because the first different
 		// anchor element will be returned as a wanted node.
 		const dn = getLastDN( nvn);
 		if (dn)

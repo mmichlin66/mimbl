@@ -1,5 +1,5 @@
 ﻿import * as mim from "./mim"
-import {VN, DN, VNUpdateDisp} from "./VN"
+import {VN, DN, getVNPath} from "./VN"
 import {requestNodeUpdate, scheduleFuncCall} from "./Scheduler"
 import {notifyServicePublished, notifyServiceUnpublished, notifyServiceSubscribed, notifyServiceUnsubscribed} from "./PubSub"
 
@@ -112,17 +112,19 @@ export abstract class VNBase implements VN
 			this.subscribedServices.clear();
 		}
 
-		// disconnect the node from its siblings (if any)
-		if (this.next !== undefined)
-			this.next.prev = undefined;
+		// // disconnect the node from its siblings (if any)
+		// if (this.next !== undefined)
+		// 	this.next.prev = undefined;
 
-		if (this.prev !== undefined)
-			this.prev.next = undefined;
+		// if (this.prev !== undefined)
+		// 	this.prev.next = undefined;
 
+		this.next = undefined;
+		this.prev = undefined;
 		this.subNodes = undefined;
 		this.keyedSubNodes = undefined;
-		this.parent = undefined;
 		this.depth = undefined;
+		this.parent = undefined;
 	}
 
 
@@ -319,7 +321,7 @@ function CallbackWrapper(): any
 	{
 		let errorService = this.findService( "StdErrorHandling") as mim.IErrorHandlingService;
 		if (errorService)
-			errorService.reportError( err, this.path);
+			errorService.reportError( err, getVNPath( this));
 		else
 			throw err;
 	}

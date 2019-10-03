@@ -68,14 +68,38 @@ let s_currentVN: VN = null;
 
 
 
+// Callback that is called on a new UI cycle when there is a need to update UI components
+export function updateNodeSync( vn: VN): void
+{
+	// increment tick number.
+	s_currentTick++;
+
+	/// #if USE_STATS
+		DetailedStats.stats = new DetailedStats( `Mimbl update cycle ${s_currentTick}: `);
+		DetailedStats.stats.start();
+	/// #endif
+
+	let vns: VN[][] = new Array(1);
+	vns[0] = [vn];
+
+	s_schedulerState = SchedulerState.Update;
+	performCommitPhase( performRenderPhase( vns));
+
+	/// #if USE_STATS
+		DetailedStats.stats.stop( true);
+		DetailedStats.stats = null;
+	/// #endif
+
+	s_schedulerState = SchedulerState.Idle;
+};
+
+
+
 // Schedules an update for the given node.
 export function requestNodeUpdate( vn: VN): void
 {
 	if (!vn.anchorDN)
-	{
-		console.error( `Update requested for virtual node '${getVNPath(vn).join("/")}' that doesn't have anchor DOM node`)
-		return;
-	}
+		console.warn( `Update requested for virtual node '${getVNPath(vn).join("->")}' that doesn't have anchor DOM node`)
 
 	// add this node to the map of nodes for which either update or replacement or
 	// deletion is scheduled. Note that a node will only be present once in the map no
@@ -248,7 +272,10 @@ function performRenderPhase( vnsByDepth: VN[][]): VNDisp[]
 			// find the nearest error handling service. If nobody else, it is implemented
 			// by the RootVN object.
 			let errorService: mim.IErrorHandlingService = vn.getService( "StdErrorHandling", undefined, false);
-			errorService.reportError( err, s_currentVN ? getVNPath( s_currentVN) : null);
+			if (errorService)
+				errorService.reportError( err, s_currentVN ? getVNPath( s_currentVN) : null);
+			else
+				throw err;
 		}
 
 		s_currentVN = null;
@@ -326,7 +353,7 @@ function createVirtual( vn: VN, parent: VN): void
 		}
 		catch( err)
 		{
-			if (vn.supportsErrorHandling())
+			if (vn.supportsErrorHandling && vn.supportsErrorHandling())
 			{
 				/// #if VERBOSE_NODE
 					console.debug( `VERBOSE: Calling handleError() on node ${vn.name}`);
@@ -446,17 +473,18 @@ function destroyPhysical( vn: VN)
 	// get the DOM node before we call unmount, because unmount will clear it.
 	let ownDN = vn.ownDN;
 
-	// If the virtual node has its own DOM node, we remove it from the DOM tree. In this case,
-	// we don't need to recurse into sub-nodes, because they are removed with the parent.
-	if (ownDN)
+	if (vn.destroy)
 	{
 		/// #if VERBOSE_NODE
 			console.debug( `VERBOSE: Calling destroy() on node ${vn.name}`);
 		/// #endif
 		vn.destroy();
-
-		vn.anchorDN.removeChild( ownDN);
 	}
+
+	// If the virtual node has its own DOM node, we remove it from the DOM tree. In this case,
+	// we don't need to recurse into sub-nodes, because they are removed with the parent.
+	if (ownDN)
+		(ownDN as any as ChildNode).remove();
 	else if (vn.subNodes)
 	{
 		// loop over sub-nodes from last to first because this way the DOM element removal is
@@ -467,7 +495,7 @@ function destroyPhysical( vn: VN)
 
 	vn.term();
 
-	vn.anchorDN = null;
+	vn.anchorDN = undefined;
 }
 
 
@@ -494,7 +522,7 @@ function updateVirtual( disp: VNDisp): void
 	}
 	catch( err)
 	{
-		if (vn.supportsErrorHandling())
+		if (vn.supportsErrorHandling && vn.supportsErrorHandling())
 		{
 			/// #if VERBOSE_NODE
 				console.debug( `VERBOSE: Calling handleError() on node ${vn.name}`);
@@ -612,6 +640,96 @@ function updatePhysical( disp: VNDisp): void
 
 
 
+// Performs updates and inserts by individual nodes.
+function updatePhysicalByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, beforeDN: DN): void
+{
+	// perform DOM operations according to sub-node disposition. We need to decide for each
+	// node what node to use to insert or move it before. We go from the end of the list of
+	// new nodes and on each iteration we decide the value of the "beforeDN".
+	let nextVN: VN, svn: VN, disp: VNDisp, newVN: VN, oldVN: VN, firstDN: DN;
+	for( let i = disps.length - 1; i >= 0; i--)
+	{
+		disp = disps[i];
+		newVN = disp.newVN;
+		oldVN = disp.oldVN;
+
+		// for the Update operation, the new node becomes a sub-node; for the Insert operation
+		// the new node become a sub-node.
+		svn = disp.action === VNDispAction.Update ? oldVN : newVN;
+		parentVN.subNodes[i] = svn;
+
+		if (disp.action === VNDispAction.Update)
+		{
+			if (oldVN !== newVN)
+			{
+				if (disp.updateDisp.shouldCommit)
+				{
+					/// #if VERBOSE_NODE
+						console.debug( `VERBOSE: Calling commitUpdate() on node ${oldVN.name}`);
+					/// #endif
+
+					oldVN.commitUpdate( newVN);
+				}
+
+				// update the sub-nodes if necessary
+				if (disp.updateDisp.shouldRender)
+					updatePhysical( disp);
+			}
+
+			// determine whether all the nodes under this VN should be moved.
+			let subNodeDNs = getImmediateDNs( oldVN);
+			if (subNodeDNs.length > 0)
+			{
+				// check whether the last of the DOM nodes already resides right before the needed node
+				if (subNodeDNs[subNodeDNs.length - 1].nextSibling !== beforeDN)
+				{
+					for( let subNodeDN of subNodeDNs)
+					{
+						anchorDN.insertBefore( subNodeDN, beforeDN);
+
+						/// #if USE_STATS
+							DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Moved);
+						/// #endif
+					}
+
+					/// #if USE_STATS
+						DetailedStats.stats.log( oldVN.statsCategory, StatsAction.Moved);
+					/// #endif
+				}
+
+				// the first of DOM nodes become the next beforeDN
+				beforeDN = subNodeDNs[0];
+			}
+		}
+		else if (disp.action === VNDispAction.Insert)
+		{
+			// since we already destroyed old nodes designated to be replaced, the code is
+			// identical for Replace and Insert actions
+			createPhysical( newVN, anchorDN, beforeDN);
+
+			// if the new node defines a DOM node, it becomes the DOM node before which
+			// next components should be inserted/moved
+			firstDN = getFirstDN( newVN);
+			if (firstDN != null)
+				beforeDN = firstDN;
+		}
+
+		if (parentVN.keyedSubNodes !== undefined && svn.key !== undefined)
+			parentVN.keyedSubNodes.set( svn.key, svn);
+
+		svn.next = svn.prev = undefined;
+		if (nextVN)
+		{
+			nextVN.prev = svn;
+			svn.next = nextVN;
+		}
+
+		nextVN = svn;
+	}
+}
+
+
+
 // Performs updates and inserts by groups. We go from the end of the list of update groups
 // and on each iteration we decide the value of the "beforeDN".
 function updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
@@ -628,6 +746,12 @@ function updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 			disp = disps[j];
 			newVN = disp.newVN;
 			oldVN = disp.oldVN;
+
+			// for the Update operation, the new node becomes a sub-node; for the Insert operation
+			// the new node become a sub-node.
+			svn = group.action === VNDispAction.Update ? oldVN : newVN;
+			parentVN.subNodes[currSubNodeIndex--] = svn;
+
 			if (group.action === VNDispAction.Update)
 			{
 				if (oldVN !== newVN)
@@ -649,9 +773,6 @@ function updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 				firstDN = getFirstDN( oldVN);
 				if (firstDN != null)
 					beforeDN = firstDN;
-
-				// the old node remains as a sub-node
-				svn = oldVN;
 			}
 			else if (group.action === VNDispAction.Insert)
 			{
@@ -662,12 +783,8 @@ function updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 				firstDN = getFirstDN( newVN);
 				if (firstDN != null)
 					beforeDN = firstDN;
-
-				// the new node becomes a sub-node
-				svn = newVN;
 			}
 
-			parentVN.subNodes[currSubNodeIndex--] = svn;
 			if (parentVN.keyedSubNodes !== undefined && svn.key !== undefined)
 				parentVN.keyedSubNodes.set( svn.key, svn);
 
@@ -749,97 +866,6 @@ function moveGroup( parentVN: VN, disps: VNDisp[], group: VNDispGroup, anchorDN:
 			DetailedStats.stats.log( subNodeVN.statsCategory, StatsAction.Moved);
 		/// #endif
 
-	}
-}
-
-
-
-// Performs updates and inserts by individual nodes.
-function updatePhysicalByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, beforeDN: DN): void
-{
-	// perform DOM operations according to sub-node disposition. We need to decide for each
-	// node what node to use to insert or move it before. We go from the end of the list of
-	// new nodes and on each iteration we decide the value of the "beforeDN".
-	let nextVN: VN, svn: VN, disp: VNDisp, newVN: VN, oldVN: VN, firstDN: DN;
-	for( let i = disps.length - 1; i >= 0; i--)
-	{
-		disp = disps[i];
-		newVN = disp.newVN;
-		oldVN = disp.oldVN;
-		if (disp.action === VNDispAction.Update)
-		{
-			if (oldVN !== newVN)
-			{
-				if (disp.updateDisp.shouldCommit)
-				{
-					/// #if VERBOSE_NODE
-						console.debug( `VERBOSE: Calling commitUpdate() on node ${oldVN.name}`);
-					/// #endif
-
-					oldVN.commitUpdate( newVN);
-				}
-
-				// update the sub-nodes if necessary
-				if (disp.updateDisp.shouldRender)
-					updatePhysical( disp);
-			}
-
-			// determine whether all the nodes under this VN should be moved.
-			let subNodeDNs = getImmediateDNs( oldVN);
-			if (subNodeDNs.length > 0)
-			{
-				// check whether the last of the DOM nodes already resides right before the needed node
-				if (subNodeDNs[subNodeDNs.length - 1].nextSibling !== beforeDN)
-				{
-					for( let subNodeDN of subNodeDNs)
-					{
-						anchorDN.insertBefore( subNodeDN, beforeDN);
-
-						/// #if USE_STATS
-							DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Moved);
-						/// #endif
-					}
-
-					/// #if USE_STATS
-						DetailedStats.stats.log( oldVN.statsCategory, StatsAction.Moved);
-					/// #endif
-				}
-
-				// the first of DOM nodes become the next beforeDN
-				beforeDN = subNodeDNs[0];
-			}
-
-			// the old node remains as a sub-node
-			svn = oldVN;
-		}
-		else if (disp.action === VNDispAction.Insert)
-		{
-			// since we already destroyed old nodes designated to be replaced, the code is
-			// identical for Replace and Insert actions
-			createPhysical( newVN, anchorDN, beforeDN);
-
-			// if the new node defines a DOM node, it becomes the DOM node before which
-			// next components should be inserted/moved
-			firstDN = getFirstDN( newVN);
-			if (firstDN != null)
-				beforeDN = firstDN;
-
-			// the new node becomes a sub-node
-			svn = newVN;
-		}
-
-		parentVN.subNodes[i] = svn;
-		if (parentVN.keyedSubNodes !== undefined && svn.key !== undefined)
-			parentVN.keyedSubNodes.set( svn.key, svn);
-
-		svn.next = svn.prev = undefined;
-		if (nextVN)
-		{
-			nextVN.prev = svn;
-			svn.next = nextVN;
-		}
-
-		nextVN = svn;
 	}
 }
 

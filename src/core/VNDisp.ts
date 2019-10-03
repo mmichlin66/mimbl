@@ -61,11 +61,12 @@ export class VNDispGroup
 
 
 
-	constructor( parentDisp: VNDisp, action: VNDispAction, first: number)
+	constructor( parentDisp: VNDisp, action: VNDispAction, first: number, last?: number)
 	{
 		this.parentDisp = parentDisp;
 		this.action = action;
 		this.first = first;
+		this.last = last;
 	}
 
 
@@ -104,7 +105,7 @@ export class VNDispGroup
  * If a node has more than this number of sub-nodes, then we build groups. The idea is that
  * otherwise, the overhead of building groups is not worth it.
  */
-const NO_GROUP_THRESHOLD = 4;
+const NO_GROUP_THRESHOLD = 8;
 
 
 
@@ -179,6 +180,9 @@ export class VNDisp
 		{
 			// old chain is empty - insert all new nodes
 			this.subNodeDisps = newChain.map( newVN => new VNDisp( newVN, VNDispAction.Insert));
+			if (newLen > NO_GROUP_THRESHOLD)
+				this.subNodeGroups = [new VNDispGroup( this, VNDispAction.Insert, 0, newLen - 1)];
+
 			return;
 		}
 

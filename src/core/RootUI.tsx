@@ -20,10 +20,10 @@ export class RootErrorUI extends mim.Component
 	public render(): any
 	{
 		return <div id="rootError" style={{display:"flex", flexDirection:"column", alignItems: "start"}}>
-			<div>{this.err.Message}</div>
+			<div>{this.err.message}</div>
 			<div>{this.pathString}</div>
 			<hr style={{width:"100%"}}/>
-			<button key="btnRestart" click={this.onRestart}>Restart</button>
+			<button click={this.onRestart}>Restart</button>
 		</div>
 	}
 

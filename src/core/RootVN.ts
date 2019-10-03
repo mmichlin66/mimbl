@@ -1,5 +1,5 @@
 ﻿import * as mim from "./mim"
-import {requestNodeUpdate} from "./Scheduler"
+import {updateNodeSync, requestNodeUpdate} from "./Scheduler"
 import {DN} from "./VN"
 import {VNBase} from "./VNBase"
 import {RootErrorUI, RootWaitingUI} from "./RootUI"
@@ -51,10 +51,7 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 		this.content = content;
 
 		if (sync)
-		{
-			// this.vnsScheduledForUpdate.add( this);
-			// this.onScheduledFrame();
-		}
+			updateNodeSync( this);
 		else
 			requestNodeUpdate( this);
 	}
