@@ -119,16 +119,16 @@ export abstract class ComponentWithLocalStyles<TProps = {}, TChildren = any>
 
 
 
-	public componentDidMount()
+	public willMount()
 	{
-		this.site.publishService( "LocalStyles", this);
+		this.vn.publishService( "LocalStyles", this);
 	}	
 
 
 
-	public componentWillUnmount()
+	public willUnmount()
 	{
-		this.site.unpublishService( "LocalStyles");
+		this.vn.unpublishService( "LocalStyles");
 
 		this.styleElm.remove();
 	}

@@ -94,23 +94,23 @@ export interface VN extends mim.IVNode
 	// Initializes internal stuctures of the virtual node. This method is called right after the
 	// node has been constructed.
 	// This method is part of the Render phase.
-	beforeCreate?(): void;
+	willMount?(): void;
 
 	// Clears internal structures of the virtual node. This method is called before the content
 	// of node and all its sub-nodes is removed from the DOM tree.
 	// This method is part of the Commit phase.
-	beforeDestroy?(): void;
+	willUnmount?(): void;
 
 	// Creates and returns DOM node corresponding to this virtual node. This method is implemented
 	// only on nodes that have their own DOM nodes.
 	// This method is part of the Commit phase.
-	create?(): DN;
+	mount?(): DN;
 
 	// Clears DOM node corresponding to this virtual node. This method is implemented only on nodes
 	// that have their own DOM nodes. This method should only release the internally held reference
 	// to the DOM node - the actual removal of the node from DOM is done by the infrastructure.
 	// This method is part of the Commit phase.
-	destroy?(): void;
+	unmount?(): void;
 
 	// Determines whether the update of this node from the given node is possible. The newVN
 	// parameter is guaranteed to point to a VN of the same type as this node. If this method is

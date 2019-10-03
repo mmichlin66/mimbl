@@ -25,8 +25,8 @@ export function createNodesFromContent( content: any): VN | VN[]
 	{
 		// if the component (this can only be an Instance component) is already attached to VN, add
 		// this existing VN; otherwise create a new one.
-		return (content as mim.IComponent).site
-						? (content as mim.IComponent).site as VN
+		return (content as mim.IComponent).vn
+						? (content as mim.IComponent).vn as VN
 						: new IndependentCompVN( content as mim.IComponent);
 
 		// return [new InstanceVN( content as mim.IComponent)];

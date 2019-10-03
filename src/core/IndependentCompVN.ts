@@ -49,7 +49,7 @@ export class IndependentCompVN extends ClassCompVN<mim.IComponent> implements mi
 	// Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
 	// This method is part of the Render phase.
-	public beforeCreate(): void
+	public willMount(): void
 	{
 		this.willMountInstance( this.comp);
 	}
@@ -59,7 +59,7 @@ export class IndependentCompVN extends ClassCompVN<mim.IComponent> implements mi
 	// This method is called before the content of node and all its sub-nodes is removed from the
 	// DOM tree.
 	// This method is part of the render phase.
-	public beforeDestroy(): void
+	public willUnmount(): void
 	{
 		this.willUnmountInstance( this.comp);
 	}
@@ -94,12 +94,10 @@ export class IndependentCompVN extends ClassCompVN<mim.IComponent> implements mi
 	// Notifies the given component that ir will be mounted.
 	private willMountInstance( comp: mim.IComponent): void
 	{
-		// it is OK for the component to not implement the site property; however, it will not be
-		// able to use any of the Mimbl services including requests for updates.
-		comp.site = this;
+		comp.vn = this;
 
-		if (comp.componentWillMount)
-			comp.componentWillMount();
+		if (comp.willMount)
+			comp.willMount();
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
@@ -111,10 +109,10 @@ export class IndependentCompVN extends ClassCompVN<mim.IComponent> implements mi
 	// Notifies the given component that it will be unmounted.
 	private willUnmountInstance( comp: mim.IComponent): void
 	{
-		if (comp.componentWillUnmount)
-			comp.componentWillUnmount();
+		if (comp.willUnmount)
+			comp.willUnmount();
 
-		comp.site = undefined;
+		comp.vn = undefined;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);

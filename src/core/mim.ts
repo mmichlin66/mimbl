@@ -81,19 +81,20 @@ export interface IComponent<TProps = {}, TChildren = any>
 	getDisplayName?(): string;
 
 	/**
-	 * Sets or gets the site object to the component. This property is set twice:
+	 * Sets or gets the virtual node object to the component. This property is set twice:
 	 *  1. Before the component is rendered for the first time: the component must remember the
 	 *    passed object.
 	 *  2. Before the component is destroyed: null is passed as a parameter and the component must
 	 *    release the remembered object.
 	 */
-	site?: IVNode;
+	vn?: IVNode;
 
 	/**
 	 * Notifies that the component is about to render its content for the first time. This method
-	 * is called when the site has already been set so the component can request services from it.
+	 * is called when the virtual node has already been set so the component can request services
+	 * from it.
 	 */
-	componentWillMount?(): void;
+	willMount?(): void;
 
 	/** Returns the component's content that will be ultimately placed into the DOM tree. */
 	render(): any;
@@ -103,19 +104,19 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * this.props refers to the "old" properties. If the component returns true,then its render
 	 * method will be called. At that time,the original props object that was passed into the
 	 * component's constructor will have these new properties. If the component doesn't implement
-	 * the shouldComponentUpdate method it is as though true is returned. If the component returns
+	 * the shouldUpdate method it is as though true is returned. If the component returns
 	 * false, the render method is not called and the DOM tree of the component remains unchanged.
 	 * The properties of the component, however, still change.
 	 * @param newProps The new properties that the parent component provides to this component.
 	 * @returns True if the component should have its render method called and false otherwise.
 	 */
-	shouldComponentUpdate?( newProps: CompProps<TProps,TChildren>): boolean;
+	shouldUpdate?( newProps: CompProps<TProps,TChildren>): boolean;
 
 	/**
 	 * Notifies that the component's content is going to be removed from the DOM tree. After
 	 * this method returns the component is destroyed.
 	 */
-	componentWillUnmount?(): void;
+	willUnmount?(): void;
 
 	/**
 	 * Handles an exception that occurred during the component's own rendering or rendering of
@@ -217,8 +218,8 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	/** Component properties passed to the constructor */
 	public props: CompProps<TProps,TChildren>;
 
-	/** Remembered site object through which component can request services. */
-	public site: IVNode;
+	/** Remembered vn object through which component can request services. */
+	public vn: IVNode;
 
 	constructor( props?: CompProps<TProps,TChildren>)
 	{
@@ -232,8 +233,8 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	/** This method is called by the component to request to be updated. */
 	protected updateMe(): void
 	{
-		if (this.site)
-			this.site.requestUpdate();
+		if (this.vn)
+			this.vn.requestUpdate();
 	}
 
 	/** This method is called by the component to schedule a function to be invoked on the next
@@ -244,8 +245,8 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 */
 	protected callMe( func: ScheduledFuncType, beforeUpdate: boolean = false): void
 	{
-		if (this.site)
-			this.site.scheduleCall( func, beforeUpdate);
+		if (this.vn)
+			this.vn.scheduleCall( func, beforeUpdate);
 	}
 }
 
@@ -438,7 +439,8 @@ export function updatable( target, name: string)
 				if (this[attrName] !== val)
 				{
 					this[attrName] = val;
-					this.updateMe();
+					if (this.vn)
+						this.vn.requestUpdate();
 				}
 			},
 			get() { return this[attrName]; }
@@ -559,8 +561,8 @@ export class FuncProxy extends Component
 
 	public update = (): void =>
 	{
-		if (this.site)
-			this.site.requestUpdate();
+		if (this.vn)
+			this.vn.requestUpdate();
 	};
 
 	public render(): any

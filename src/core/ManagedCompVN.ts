@@ -90,14 +90,14 @@ export class ManagedCompVN extends ClassCompVN<mim.IComponent> implements mim.IM
 	// Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
 	// This method is part of the Render phase.
-	public beforeCreate(): void
+	public willMount(): void
 	{
 		// create component instance
 		this.comp = new this.compClass( this.props);
-		this.comp.site = this;
+		this.comp.vn = this;
 
-		if (this.comp.componentWillMount)
-			this.comp.componentWillMount();
+		if (this.comp.willMount)
+			this.comp.willMount();
 
 		// set the reference value if specified
 		if (this.ref !== undefined)
@@ -113,7 +113,7 @@ export class ManagedCompVN extends ClassCompVN<mim.IComponent> implements mim.IM
 	// This method is called before the content of node and all its sub-nodes is removed from the
 	// DOM tree.
 	// This method is part of the render phase.
-	public beforeDestroy(): void
+	public willUnmount(): void
 	{
 		// unset the reference value if specified. We check whether the reference still points
 		// to our component before setting it to undefined. If the same Ref object is used for
@@ -122,10 +122,10 @@ export class ManagedCompVN extends ClassCompVN<mim.IComponent> implements mim.IM
 		if (this.ref !== undefined)
 			mim.setRef( this.ref, undefined, this.comp);
 
-		if (this.comp.componentWillUnmount)
-			this.comp.componentWillUnmount();
+		if (this.comp.willUnmount)
+			this.comp.willUnmount();
 
-		this.comp.site = undefined;
+		this.comp.vn = undefined;
 		this.comp = undefined;
 
 		/// #if USE_STATS
@@ -154,8 +154,8 @@ export class ManagedCompVN extends ClassCompVN<mim.IComponent> implements mim.IM
 
 		// let the component know about the new properties (if it is interested in them)
 		let shouldRender: boolean = true;
-		if (this.comp.shouldComponentUpdate !== undefined)
-			shouldRender = this.comp.shouldComponentUpdate( newClassVN.props);
+		if (this.comp.shouldUpdate !== undefined)
+			shouldRender = this.comp.shouldUpdate( newClassVN.props);
 
 		// if reference specification changed then set or unset it as necessary
 		if (newClassVN.ref !== this.ref)
@@ -179,7 +179,7 @@ export class ManagedCompVN extends ClassCompVN<mim.IComponent> implements mim.IM
 
 		// shallow copy the new properties from the other node to our object. This is needed
 		// because the component got our props object in the constructor and will keep
-		// working with it - especially if it doesn't implement the shouldComponentUpdate method.
+		// working with it - especially if it doesn't implement the shouldUpdate method.
 		Object.keys(this.props).forEach( key => delete this.props[key]);
 		Object.assign( this.props, newClassVN.props);
 

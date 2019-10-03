@@ -102,7 +102,7 @@ export class FuncVN extends VNBase
 		// Creates internal stuctures of the virtual node so that it is ready to produce children.
 		// This method is called right after the node has been constructed.
 		// This method is part of the Render phase.
-		public beforeCreate(): void
+		public willMount(): void
 		{
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
 		}
@@ -110,7 +110,7 @@ export class FuncVN extends VNBase
 		// This method is called before the content of node and all its sub-nodes is removed from the
 		// DOM tree.
 		// This method is part of the render phase.
-		public beforeDestroy(): void
+		public willUnmount(): void
 		{
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
 		}

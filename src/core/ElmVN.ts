@@ -90,7 +90,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 
 	// Creates and returns DOM node corresponding to this virtual node.
 	// This method is part of the Commit phase.
-	public create(): DN
+	public mount(): DN
 	{
 		// determine whether this is an SVG or HTML element and create the element
 		let svgInfo = SvgElms.getSvgElmInfo( this.elmName);
@@ -126,7 +126,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 
 	// Releases reference to the DOM node corresponding to this virtual node.
 	// This method is part of the Commit phase.
-	public destroy(): void
+	public unmount(): void
 	{
 		// unset the reference value if specified. We check whether the reference still points
 		// to our element before setting it to undefined. If the same Ref object is used for

@@ -29,7 +29,7 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 		this.parent = null;
 		this.depth = 0;
 		this.content = null;
-		this.beforeCreate();
+		this.willMount();
 	};
 
 
@@ -141,7 +141,7 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 
 		// destruct the root node (asynchronously)
 		rootVN.setContent( null, false);
-		rootVN.scheduleCall( () => rootVN.beforeDestroy() );
+		rootVN.scheduleCall( () => rootVN.willUnmount() );
 	}
 
 
@@ -163,7 +163,7 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 	// Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
 	// This method is part of the Render phase.
-	public beforeCreate(): void
+	public willMount(): void
 	{
 		this.publishService( "StdErrorHandling", this);
 	}
@@ -173,7 +173,7 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 	// This method is called before the content of node and all its sub-nodes is removed from the
 	// DOM tree.
 	// This method is part of the render phase.
-	public beforeDestroy(): void
+	public willUnmount(): void
 	{
 		this.unpublishService( "StdErrorHandling");
 	}

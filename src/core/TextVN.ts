@@ -46,7 +46,7 @@ export class TextVN extends VNBase implements mim.ITextVN
 
 	// Creates and returns DOM node corresponding to this virtual node.
 	// This method is part of the Commit phase.
-	public create(): DN
+	public mount(): DN
 	{
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Added);
@@ -59,7 +59,7 @@ export class TextVN extends VNBase implements mim.ITextVN
 
 	// Destroys DOM node corresponding to this virtual node.
 	// This method is part of the Commit phase.
-	public destroy(): void
+	public unmount(): void
 	{
 		this.txtNode = undefined;
 

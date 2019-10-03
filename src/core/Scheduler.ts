@@ -337,12 +337,32 @@ function createVirtual( vn: VN, parent: VN): void
 	let currentVN = vn;
 	s_currentVN = currentVN;
 
-	/// #if VERBOSE_NODE
-		console.debug( `VERBOSE: Calling beforeCreate() on node ${vn.name}`);
-	/// #endif
+	if (vn.willMount)
+	{
+		/// #if VERBOSE_NODE
+			console.debug( `VERBOSE: Calling willMount() on node ${vn.name}`);
+		/// #endif
 
-	if (vn.beforeCreate)
-		vn.beforeCreate();
+		try
+		{
+			vn.willMount();
+		}
+		catch( err)
+		{
+			if (vn.supportsErrorHandling && vn.supportsErrorHandling())
+			{
+				/// #if VERBOSE_NODE
+					console.debug( `VERBOSE: Calling handleError() on node ${vn.name}`);
+				/// #endif
+
+				// let the node handle its own error and re-render
+				vn.handleError( err, getVNPath( s_currentVN));
+				vn.willMount();
+			}
+			else
+				throw err;
+		}
+	}
 
 	// if the node doesn't implement `render`, the node never has any sub-nodes (e.g. text nodes)
 	if (vn.render)
@@ -415,9 +435,9 @@ function createPhysical( vn: VN, anchorDN: DN, beforeDN: DN)
 	vn.anchorDN = anchorDN;
 
 	/// #if VERBOSE_NODE
-		console.debug( `VERBOSE: Calling create() on node ${vn.name}`);
+		console.debug( `VERBOSE: Calling mount() on node ${vn.name}`);
 	/// #endif
-	let ownDN = vn.create ? vn.create() : undefined;
+	let ownDN = vn.mount ? vn.mount() : undefined;
 
 	// if we have our own DOM node, add it under the anchor node
 	if (ownDN)
@@ -448,19 +468,19 @@ function preDestroy( vn: VN)
 			preDestroy( svn);
 	}
 
-	/// #if VERBOSE_NODE
-		console.debug( `VERBOSE: Calling beforeDestroy() on node ${vn.name}`);
-	/// #endif
-
-	if (vn.beforeDestroy)
+	if (vn.willUnmount)
 	{
+		/// #if VERBOSE_NODE
+			console.debug( `VERBOSE: Calling willUnmount() on node ${vn.name}`);
+		/// #endif
+
 		try
 		{
-			vn.beforeDestroy();
+			vn.willUnmount();
 		}
 		catch( err)
 		{
-			console.error( `Node ${vn.name} threw exception '${err.message}' in beforeDestroy`);
+			console.error( `Node ${vn.name} threw exception '${err.message}' in willUnmount`);
 		}
 	}
 }
@@ -473,12 +493,12 @@ function destroyPhysical( vn: VN)
 	// get the DOM node before we call unmount, because unmount will clear it.
 	let ownDN = vn.ownDN;
 
-	if (vn.destroy)
+	if (vn.unmount)
 	{
 		/// #if VERBOSE_NODE
-			console.debug( `VERBOSE: Calling destroy() on node ${vn.name}`);
+			console.debug( `VERBOSE: Calling unmount() on node ${vn.name}`);
 		/// #endif
-		vn.destroy();
+		vn.unmount();
 	}
 
 	// If the virtual node has its own DOM node, we remove it from the DOM tree. In this case,
