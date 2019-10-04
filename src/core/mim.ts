@@ -836,7 +836,7 @@ export interface IElmVN extends IVNode
 	/** Gets the element instance. */
 	readonly elm: Element;
 
-	/** Gets the component instance. */
+	/** Component that created this element in its render method. */
 	readonly creator: IComponent;
 }
 
@@ -848,10 +848,10 @@ export interface IElmVN extends IVNode
 export interface ITextVN extends IVNode
 {
 	/** Text of the node. */
-	Text: string;
+	text: string;
 
 	/** Text DOM node. */
-	TextNode: Text;
+	textNode: Text;
 }
 
 

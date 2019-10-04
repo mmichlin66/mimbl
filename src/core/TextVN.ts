@@ -13,17 +13,20 @@ import {VNBase} from "./VNBase"
  */
 export class TextVN extends VNBase implements mim.ITextVN
 {
+	// Text for a simple text node.
+	public text: string;
+
+	// Text DOM node
+	public textNode: Text;
+
+
+
 	constructor( text: string)
 	{
 		super();
 		this.type = mim.VNType.Text;
 		this.text = text;
 	};
-
-
-
-	public get Text(): string { return this.text; }
-	public get TextNode(): Text { return this.txtNode; }
 
 
 
@@ -40,7 +43,7 @@ export class TextVN extends VNBase implements mim.ITextVN
 
 	// Returns DOM node corresponding to the virtual node itself (if any) and not to any of its
 	// sub-nodes.
-	public get ownDN(): DN { return this.txtNode; };
+	public get ownDN(): DN { return this.textNode; };
 
 
 
@@ -52,7 +55,7 @@ export class TextVN extends VNBase implements mim.ITextVN
 			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Added);
 		/// #endif
 
-		return this.txtNode = document.createTextNode( this.text);
+		return this.textNode = document.createTextNode( this.text);
 	}
 
 
@@ -61,7 +64,7 @@ export class TextVN extends VNBase implements mim.ITextVN
 	// This method is part of the Commit phase.
 	public unmount(): void
 	{
-		this.txtNode = undefined;
+		this.textNode = undefined;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Deleted);
@@ -86,20 +89,12 @@ export class TextVN extends VNBase implements mim.ITextVN
 	// Commits updates made to this node to DOM.
 	public commitUpdate( newVN: VN): void
 	{
-		this.txtNode.nodeValue = this.text = (newVN as TextVN).text;
+		this.textNode.nodeValue = this.text = (newVN as TextVN).text;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Updated);
 		/// #endif
 	}
-
-
-
-	// Text for a simple text node.
-	text: string;
-
-	// Text DOM node
-	txtNode: Text;
 }
 
 
