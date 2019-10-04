@@ -64,7 +64,7 @@ let s_currentTick: number = 0;
 // every time we recurse into sub-nodes and restored when we return back to the node. If
 // during creation or updating process an exception is thrown and is caught by some upper
 // level node, this value will still point at the node that caused the exception.
-let s_currentVN: VN = null;
+export let s_currentVN: VN = null;
 
 
 

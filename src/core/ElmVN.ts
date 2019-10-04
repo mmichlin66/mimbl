@@ -4,6 +4,8 @@ import {VNBase} from "./VNBase"
 import {ElmAttr, AttrPropInfo, EventPropInfo, CustomAttrPropInfo, PropType, PropInfo} from "./ElmAttr"
 import {SvgElms} from "./SvgElms";
 import {deepCompare} from "./Utils";
+import {s_currentVN} from "./Scheduler"
+import {ClassCompVN} from "./ClassCompVN";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
@@ -31,6 +33,9 @@ export class ElmVN extends VNBase implements mim.IElmVN
 	// (anchore) DOM node.
 	public isSvg: boolean;
 
+	// Component that created this element in its render method.
+	public creator: mim.IComponent;
+
 
 
 	constructor( tagName: string, props: any, children: any[])
@@ -41,6 +46,12 @@ export class ElmVN extends VNBase implements mim.IElmVN
 		this.elmName = tagName;
 		this.props = props;
 		this.children = children;
+
+		// the s_currentVN should point to the virtual node behind the class-based component
+		// whose render method created this element node. We remember it and use it later to
+		// bind event listeners.
+		if (s_currentVN && s_currentVN instanceof ClassCompVN)
+			this.creator = s_currentVN.comp;
 
 		if (props)
 		{
@@ -378,7 +389,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 	// element. This method handles special cases of properties with non-trivial values.
 	private addEvent( name: string, event: EventRunTimeData): void
 	{
-		event.wrapper = this.wrapCallback( event.orgFunc, event.that);
+		event.wrapper = this.createEventWrapper( event);
 		this.elm.addEventListener( name, event.wrapper, event.useCapture);
 
 		/// #if USE_STATS
@@ -474,7 +485,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 			this.elm.removeEventListener( name, oldEvent.wrapper, oldEvent.useCapture);
 
 			// create new wrapper and add it as event listener
-			newEvent.wrapper = this.wrapCallback( newEvent.orgFunc, newEvent.that);
+			newEvent.wrapper = this.createEventWrapper( newEvent);
 			this.elm.addEventListener( name, newEvent.wrapper, newEvent.useCapture);
 
 			/// #if USE_STATS
@@ -483,6 +494,19 @@ export class ElmVN extends VNBase implements mim.IElmVN
 
 			return true;
 		}
+	}
+
+
+
+	// Returns a wrapper function that will be used as an event listener. The wrapper is bound to
+	// the instance of ElmVN and thus can intercept exceptions and process them using the standard
+	// error service. Unless the original callback is already a bound function, it will be called
+	// with "this" set to either the "event.that" object or, if the latter is undefined, to the
+	// "creator" object, which is the class-based component that created the element i its render
+	// method.
+	private createEventWrapper( event: EventRunTimeData): mim.EventFuncType<Event>
+	{
+		return this.wrapCallback( event.orgFunc, event.that ? event.that : this.creator);
 	}
 
 
@@ -678,7 +702,7 @@ interface EventRunTimeData
 	// handling service. The wrapper is marked optional because it is created only if a new
 	// event listener is added; that is, if during update, the event listener function is the
 	// same, there is no need to create new wrapper because the old one will be used.
-	wrapper?:  mim.EventFuncType<any>;
+	wrapper?:  mim.EventFuncType<Event>;
 };
 
 

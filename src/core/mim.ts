@@ -835,6 +835,9 @@ export interface IElmVN extends IVNode
 
 	/** Gets the element instance. */
 	readonly elm: Element;
+
+	/** Gets the component instance. */
+	readonly creator: IComponent;
 }
 
 
