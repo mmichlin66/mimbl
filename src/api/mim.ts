@@ -1,8 +1,4 @@
-﻿import {IEventSlot, EventSlot} from "./EventSlot"
-
-
-
-/**
+﻿/**
  * Type used to define properties that can be passed to a functional component.
  * 
  * @typeparam TProps Type defining properties that can be passed to the functional component
@@ -81,7 +77,7 @@ export interface IComponent<TProps = {}, TChildren = any>
 	getDisplayName?(): string;
 
 	/**
-	 * Sets or gets the virtual node object to the component. This property is set twice:
+	 * Sets, gets or clears the virtual node object of the component. This property is set twice:
 	 *  1. Before the component is rendered for the first time: the component must remember the
 	 *    passed object.
 	 *  2. Before the component is destroyed: null is passed as a parameter and the component must
@@ -259,6 +255,10 @@ export type RefFunc<T> = (newRef: T) => void;
 
 
 
+import {IEventSlot, EventSlot} from "../utils/EventSlot"
+
+
+
 /**
  * Reference class to use whenever a reference to an object is needed - for example, with JSX `ref`
  * attributes and services.
@@ -268,7 +268,7 @@ export class Ref<T>
 	private _r: T;
 
 	/** Event that is fired when the referenced value changes */
-	public changedEvent: IEventSlot<RefFunc<T>> = new EventSlot<RefFunc<T>>();
+	private changedEvent: IEventSlot<RefFunc<T>> = new EventSlot<RefFunc<T>>();
 
 	constructor( listener?: RefFunc<T>, initialReferene?: T)
 	{
@@ -525,18 +525,6 @@ export interface ICustomAttributeHandler<T>
 	 *   on element removal.
 	 */
 	terminate?( isRemoval: boolean): void;
-}
-
-
-
-/**
- * Registers custom attribute handler class for the given property name.
- * @param propName name of the custom attribute
- * @param factory custom attribute class
- */
-export function registerCustomAttribute<T>( attrName: string, handlerClass: ICustomAttributeHandlerClass<T>): void
-{
-	s_registerCustomAttribute( attrName, handlerClass);
 }
 
 
@@ -853,6 +841,24 @@ export interface ITextVN extends IVNode
 	/** Text DOM node. */
 	textNode: Text;
 }
+
+
+
+/**
+ * The Slice type defines an object structure describing
+ * parameters for rendering an element. They include: Class, Style, Properties, Content. This
+ * structure is intended to be passed either in the constructor or via the protected methods of
+ * derived classes, so that they can control parameters of elements rendered by the upper classes.
+ * The main purpose of this structure is to combine parameters defining an element into a single
+ * object to minimize the number of properties callers of classes should deal with.
+ */
+export type Slice =
+{
+	className?: string;
+	style?: StylePropType;
+	props?: object
+	content?: any;
+};
 
 
 
@@ -1365,13 +1371,10 @@ export namespace JSX
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Definitions of functions that depend on VN-derived classes
+// Definition of mim.jsx function - JSX Factory
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-import {RootVN} from "./RootVN"
-import {createNodesFromJSX} from "./ContentFuncs"
-
-
+import {createNodesFromJSX} from "../core/ContentFuncs"
 
 /**
  * JSX Factory function. In order for this function to be invoked by the TypeScript compiler, the
@@ -1390,17 +1393,17 @@ import {createNodesFromJSX} from "./ContentFuncs"
  */
 export function jsx( tag: any, props: any, ...children: any[]): any
 {
-	// children parameter is always an array. A component can specify that its children are an array
-	// of a certain type, e.g. class A extends mim.Component<{},T[]>. In this case there are two
-	// ways to specify children in JSX:
-	//	1) <A>{t1}{t2}</A>. In this case, children will be [t1, t2].
-	//	2) <A>{[t1, t2]}</A>. In this case, children will be [[t1,t2]].
-	// The realChildren variable accommodates both cases.
-	let realChildren = children.length === 1 && Array.isArray( children[0]) ? children[0] : children;
-	return createNodesFromJSX( tag, props, realChildren);
+	return createNodesFromJSX( tag, props, children);
 }
 
 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Definitions of mount/unmount functions
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+import * as root from "../core/RootVN"
 
 /**
  * Renders the given content (usually result of JSX expression) under the given HTML element in a
@@ -1411,10 +1414,8 @@ export function jsx( tag: any, props: any, ...children: any[]): any
  */
 export function mountSync( content: any, anchorDN: Node = null): void
 {
-	RootVN.mountRootSync( content, anchorDN);
+	root.mountRootSync( content, anchorDN);
 }
-
-
 
 // 
 /**
@@ -1423,10 +1424,8 @@ export function mountSync( content: any, anchorDN: Node = null): void
  */
 export function unmountSync( anchorDN: Node = null): void
 {
-	RootVN.unmountRootSync( anchorDN);
+	root.unmountRootSync( anchorDN);
 }
-
-
 
 /**
  * Renders the given content (usually result of JSX expression) under the given HTML element
@@ -1437,10 +1436,8 @@ export function unmountSync( anchorDN: Node = null): void
  */
 export function mount( content: any, anchorDN: Node = null): void
 {
-	RootVN.mountRoot( content, anchorDN);
+	root.mountRoot( content, anchorDN);
 }
-
-
 
 /**
  * Removes the content that was originally generated by the mount function.
@@ -1448,7 +1445,7 @@ export function mount( content: any, anchorDN: Node = null): void
  */
 export function unmount( anchorDN: Node = null): void
 {
-	RootVN.unmountRoot( anchorDN);
+	root.unmountRoot( anchorDN);
 }
 
 
@@ -1458,11 +1455,77 @@ export function unmount( anchorDN: Node = null): void
 // Provide implementation for the registerCustomAttribute exported function.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-import {ElmAttr, PropType} from "../core/ElmAttr";
+import {ElmAttr, PropType} from "../utils/ElmAttr";
 
-function s_registerCustomAttribute<T>( attrName: string, handlerClass: ICustomAttributeHandlerClass<T>): void
+/**
+ * Registers custom attribute handler class for the given property name.
+ * @param propName name of the custom attribute
+ * @param factory custom attribute class
+ */
+export function registerCustomAttribute<T>( attrName: string, handlerClass: ICustomAttributeHandlerClass<T>): void
 {
 	ElmAttr.registerProperty( attrName, { type: PropType.CustomAttr, handlerClass });
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Provide implementation of utility functions.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+import * as utils from "../utils/Utils";
+
+/**
+ * Combines arbitrary number of Slice objects merging classes, styles, properties and content
+ * @param slices Array of Slice objects to merge.
+ * @returns Resultant Slice object.
+ */
+export function mergeSlices( ...slices: Slice[]): Slice
+{
+	return utils.mergeSlices( ...slices);
+}
+
+/**
+ * Combines arbitrary number of Slice objects merging classes, styles, properties and content
+ * into the given resultant slice.
+ * @param resSlice Resultant Slice object.
+ * @param slices Array of Slice objects to merge.
+ */
+export function mergeSlicesTo( resSlice: Slice, ...slices: Slice[]): void
+{
+	utils.mergeSlicesTo( resSlice, ...slices);
+}
+
+/**
+ * Combines arbitrary number of class properties merging later into the earlier ones. This method
+ * returns a string or undefined - if all classNames were undefined.
+ * @param classNames Array of strings or string arrays with class names
+ * @returns Resultant class string.
+ */
+export function mergeClasses( ...classNames: (string | string[])[]): string
+{
+	return utils.mergeClasses( ...classNames);
+}
+
+/**
+ * Combines arbitrary number of style objects merging later into the earlier ones. This method
+ * always returns an object - even if empty
+ * @param styles Array of style objects to merge.
+ */
+export function mergeStyles( ...styles: StylePropType[]): StylePropType
+{
+	return utils.mergeStyles( ...styles);
+}
+
+/**
+ * Combines arbitrary number of style objects merging later into the first one.
+ * @param resStyle Resultant style object
+ * @param styles Array of style objects to merge.
+ */
+export function mergeStylesTo( resStyle: StylePropType, ...styles: (StylePropType | string)[] ): void
+{
+	utils.mergeStylesTo( resStyle, ...styles);
 }
 
 

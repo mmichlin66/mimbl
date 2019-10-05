@@ -1,4 +1,4 @@
-﻿import * as mim from "./mim"
+﻿import * as mim from "../api/mim"
 import {RootVN} from "./RootVN"
 
 

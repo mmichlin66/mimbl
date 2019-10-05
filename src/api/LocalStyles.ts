@@ -1,9 +1,9 @@
-import * as mim from "./mim"
-import {IEventSlot, EventSlot} from"./EventSlot"
+import * as mim from "../api/mim"
+import {IEventSlot, EventSlot} from"../utils/EventSlot"
 
 
 
-declare module "./mim"
+declare module "../api/mim"
 {
     export interface IServiceDefinitions
 	{

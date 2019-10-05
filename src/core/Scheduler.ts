@@ -1,10 +1,10 @@
-﻿import * as mim from "./mim"
+﻿import * as mim from "../api/mim"
 import {DN, VN, getFirstDN, getLastDN, getImmediateDNs, getNextDNUnderSameAnchorDN, getVNPath} from "./VN"
 import {createVNChainFromContent} from "./ContentFuncs"
 import {VNDispAction, VNDisp, VNDispGroup} from "./VNDisp"
 
 /// #if USE_STATS
-	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
+	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
 
 

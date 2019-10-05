@@ -26,7 +26,7 @@ const ifdefLoaderOptions =
 //const DtsBundleWebpack = require('dts-bundle-webpack');
 //const DtsBundleOptions = {
 //    name: "mimbl",
-//    main: "dist/index.d.ts",
+//    main: "lib/index.d.ts",
 //    out: "mimbl.d.ts",
 //	outputAsModuleFolder: false,
 //	removeSource: true
@@ -40,7 +40,7 @@ module.exports =
     output:
     {
         filename: outputFilename,
-        path: __dirname + "/dist",
+        path: __dirname + "/lib",
 		library: 'mimbl',
 		libraryTarget: 'umd',
 		globalObject: 'this'

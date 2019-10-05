@@ -1,14 +1,14 @@
-﻿import * as mim from "./mim"
+﻿import * as mim from "../api/mim"
 import {DN, VN, VNUpdateDisp} from "./VN"
 import {VNBase} from "./VNBase"
-import {ElmAttr, AttrPropInfo, EventPropInfo, CustomAttrPropInfo, PropType, PropInfo} from "./ElmAttr"
-import {SvgElms} from "./SvgElms";
-import {deepCompare} from "./Utils";
+import {ElmAttr, AttrPropInfo, EventPropInfo, CustomAttrPropInfo, PropType, PropInfo} from "../utils/ElmAttr"
+import {SvgElms} from "../utils/SvgElms";
+import {deepCompare} from "../utils/Utils";
 import {s_currentVN} from "./Scheduler"
 import {ClassCompVN} from "./ClassCompVN";
 
 /// #if USE_STATS
-	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
+	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
 
 

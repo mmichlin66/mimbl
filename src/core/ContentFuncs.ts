@@ -1,4 +1,4 @@
-﻿import * as mim from "./mim"
+﻿import * as mim from "../api/mim"
 import {VN} from "./VN"
 import {VNBase} from "./VNBase"
 import {IndependentCompVN} from "./IndependentCompVN"
@@ -28,31 +28,9 @@ export function createNodesFromContent( content: any): VN | VN[]
 		return (content as mim.IComponent).vn
 						? (content as mim.IComponent).vn as VN
 						: new IndependentCompVN( content as mim.IComponent);
-
-		// return [new InstanceVN( content as mim.IComponent)];
 	}
 	else if (Array.isArray( content))
-	{
-		if (content.length === 0)
-			return null;
-
-		let nodes: VN[] = [];
-		for( let item of content)
-		{
-			let itemNodes = createNodesFromContent( item);
-			if (itemNodes === null)
-				continue;
-			else if (Array.isArray( itemNodes))
-			{
-				for( let vn of itemNodes)
-					nodes.push( vn);
-			}
-			else
-				nodes.push( itemNodes);
-		}
-
-		return nodes.length > 0 ? nodes : null;
-	}
+		return createNodesFromArray( content);
 	else if (content instanceof Promise)
 		throw content;
 	else
@@ -82,19 +60,54 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
 	if (typeof tag === "string")
 		return new ElmVN( tag as string, props, children);
 	else if (tag === mim.Fragment)
-		return createNodesFromContent( children);
+		return createNodesFromArray( children);
 	else if (typeof tag === "function")
 	{
+		// children parameter is always an array. A component can specify that its children are
+		// an array of a certain type, e.g. class A extends mim.Component<{},T[]>. In this case
+		// there are two ways to specify children in JSX that would be accepted by the TypeScript
+		// compiler:
+		//	1) <A>{t1}{t2}</A>. In this case, children will be [t1, t2] (as expected by A).
+		//	2) <A>{[t1, t2]}</A>. In this case, children will be [[t1,t2]] (as NOT expected by A).
+		//		This looks like a TypeScript bug.
+		// The realChildren variable accommodates both cases.
+		let realChildren = children.length === 1 && Array.isArray( children[0]) ? children[0] : children;
 		if (typeof tag.prototype.render === "function")
-			return new ManagedCompVN( tag as mim.IComponentClass, props, children);
+			return new ManagedCompVN( tag as mim.IComponentClass, props, realChildren);
 		else
-			return new FuncVN( tag as mim.FuncCompType, props, children);
+			return new FuncVN( tag as mim.FuncCompType, props, realChildren);
 	}
 
 	/// #if DEBUG
 	else
 		throw new Error( "Invalid tag in jsx processing function: " + tag);
 	/// #endif
+}
+
+
+
+// Creates array of virtual nodes from the given array of items.
+function createNodesFromArray( arr: any[]): VN[]
+{
+	if (arr.length === 0)
+		return null;
+
+	let nodes: VN[] = [];
+	for( let item of arr)
+	{
+		let itemNodes = createNodesFromContent( item);
+		if (itemNodes === null)
+			continue;
+		else if (Array.isArray( itemNodes))
+		{
+			for( let vn of itemNodes)
+				nodes.push( vn);
+		}
+		else
+			nodes.push( itemNodes);
+	}
+
+	return nodes.length > 0 ? nodes : null;
 }
 
 

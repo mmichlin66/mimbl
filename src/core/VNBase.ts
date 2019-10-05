@@ -1,10 +1,10 @@
-﻿import * as mim from "./mim"
+﻿import * as mim from "../api/mim"
 import {VN, DN, getVNPath} from "./VN"
 import {requestNodeUpdate, scheduleFuncCall} from "./Scheduler"
 import {notifyServicePublished, notifyServiceUnpublished, notifyServiceSubscribed, notifyServiceUnsubscribed} from "./PubSub"
 
 /// #if USE_STATS
-	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
+	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
 
 

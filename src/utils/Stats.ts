@@ -5,6 +5,7 @@
 // Categories of changed entities to gather statistics about.
 export enum StatsCategory
 {
+	Root,
 	Comp,
 	Elm,
 	Text,

@@ -1,9 +1,9 @@
-﻿import * as mim from "./mim"
+﻿import * as mim from "../api/mim"
 import {VN, VNUpdateDisp} from "./VN"
 import {ClassCompVN} from "./ClassCompVN"
 
 /// #if USE_STATS
-	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
+	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
 
 

@@ -1,4 +1,4 @@
-﻿import * as mim from "./mim"
+﻿import * as mim from "../api/mim"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"

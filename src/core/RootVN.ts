@@ -1,11 +1,11 @@
-﻿import * as mim from "./mim"
+﻿import * as mim from "../api/mim"
 import {updateNodeSync, requestNodeUpdate} from "./Scheduler"
 import {DN} from "./VN"
 import {VNBase} from "./VNBase"
 import {RootErrorUI, RootWaitingUI} from "./RootUI"
 
 /// #if USE_STATS
-	import {StatsCategory} from "./Stats"
+	import {StatsCategory} from "../utils/Stats"
 /// #endif
 
 
@@ -20,22 +20,20 @@ import {RootErrorUI, RootWaitingUI} from "./RootUI"
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export class RootVN extends VNBase implements mim.IErrorHandlingService
 {
-	private constructor( anchorDN: DN)
+	public constructor( anchorDN: DN)
 	{
 		super();
 		
 		this.type = mim.VNType.Root;
 		this.anchorDN = anchorDN;
-		this.parent = null;
 		this.depth = 0;
-		this.content = null;
-		this.willMount();
+		// this.willMount();
 	};
 
 
 
 	/// #if USE_STATS
-		public get statsCategory(): StatsCategory { return StatsCategory.Comp; }
+		public get statsCategory(): StatsCategory { return StatsCategory.Root; }
 	/// #endif
 
 	// String representation of the virtual node. This is used mostly for tracing and error
@@ -46,7 +44,7 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 
 
 	// Sets the content to be rendered under this root node and triggers update.
-	private setContent( content: any, sync: boolean): void
+	public setContent( content: any, sync: boolean): void
 	{
 		this.content = content;
 
@@ -54,94 +52,6 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 			updateNodeSync( this);
 		else
 			requestNodeUpdate( this);
-	}
-
-
-
-	// Renders the given content (usually a result of JSX expression or a component instance)
-	// under the given HTML element in a synchronous way.
-	public static mountRootSync( content: any, anchorDN: DN): void
-	{
-		let realAnchorDN: DN = anchorDN ? anchorDN : document.body;
-
-		// check whether we already have root node remembered in the anchor element's well-known
-		// property
-		let rootVN: RootVN = realAnchorDN[RootVN.mimblAnchorPropName];
-		if (!rootVN)
-		{
-			// create root node and remember it in the anchor element's well-known property
-			rootVN = new RootVN( realAnchorDN);
-			(realAnchorDN as any)[RootVN.mimblAnchorPropName] = rootVN;
-		}
-
-
-		// set content to the root node and trigger synchronous update
-		rootVN.setContent( content, true);
-	}
-
-
-
-	// Unmounts a root node that was created using mountRootSync.
-	public static unmountRootSync( anchorDN: DN): void
-	{
-		let realAnchorDN: DN = anchorDN ? anchorDN : document.body;
-		if (!realAnchorDN)
-			return;
-
-		// get our root node from the anchor element's well-known property.
-		let rootVN: RootVN = realAnchorDN[RootVN.mimblAnchorPropName];
-		if (!rootVN)
-			return;
-
-		// remove our root node from the anchor element's well-known property
-		delete realAnchorDN[RootVN.mimblAnchorPropName];
-
-		rootVN.setContent( null, true);
-		rootVN.term();
-	}
-
-
-
-	// Renders the given content (usually a result of JSX expression or a component instance)
-	// under the given HTML element.
-	public static mountRoot( content: any, anchorDN: DN): void
-	{
-		let realAnchorDN: DN = anchorDN ? anchorDN : document.body;
-
-		// check whether we already have root node remembered in the anchor element's well-known
-		// property
-		let rootVN: RootVN = realAnchorDN[RootVN.mimblAnchorPropName];
-		if (!rootVN)
-		{
-			// create root node and remember it in the anchor element's well-known property
-			rootVN = new RootVN( realAnchorDN);
-			(realAnchorDN as any)[RootVN.mimblAnchorPropName] = rootVN;
-		}
-
-		// set content to the root node, which will trigger update
-		rootVN.setContent( content, false);
-	}
-
-
-
-	// Unmounts a root node that was created using mountRoot.
-	public static unmountRoot( anchorDN: DN): void
-	{
-		let realAnchorDN: DN = anchorDN ? anchorDN : document.body;
-		if (!realAnchorDN)
-			return;
-
-		// get our root node from the anchor element's well-known property.
-		let rootVN: RootVN = realAnchorDN[RootVN.mimblAnchorPropName];
-		if (!rootVN)
-			return;
-
-		// remove our root node from the anchor element's well-known property
-		delete realAnchorDN[RootVN.mimblAnchorPropName];
-
-		// destruct the root node (asynchronously)
-		rootVN.setContent( null, false);
-		rootVN.scheduleCall( () => rootVN.willUnmount() );
 	}
 
 
@@ -210,10 +120,6 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 
 
 
-	private static mimblAnchorPropName = "__mimblAnchorPropName__";
-
-
-
 	// Displays the content originally passed in the constructor.
 	public restart(): void
 	{
@@ -258,6 +164,98 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 
 	// Set of promises thrown by descendant nodes and not yet fulfilled.
 	private thrownPromises = new Set<Promise<any>>();
+}
+
+
+
+let s_mimblAnchorPropName = "__mimblAnchorPropName__";
+
+
+
+// Renders the given content (usually a result of JSX expression or a component instance)
+// under the given HTML element in a synchronous way.
+export function mountRootSync( content: any, anchorDN: DN): void
+{
+	let realAnchorDN: DN = anchorDN ? anchorDN : document.body;
+
+	// check whether we already have root node remembered in the anchor element's well-known
+	// property
+	let rootVN: RootVN = realAnchorDN[s_mimblAnchorPropName];
+	if (!rootVN)
+	{
+		// create root node and remember it in the anchor element's well-known property
+		rootVN = new RootVN( realAnchorDN);
+		(realAnchorDN as any)[s_mimblAnchorPropName] = rootVN;
+	}
+
+
+	// set content to the root node and trigger synchronous update
+	rootVN.setContent( content, true);
+}
+
+
+
+// Unmounts a root node that was created using mountRootSync.
+export function unmountRootSync( anchorDN: DN): void
+{
+	let realAnchorDN: DN = anchorDN ? anchorDN : document.body;
+	if (!realAnchorDN)
+		return;
+
+	// get our root node from the anchor element's well-known property.
+	let rootVN: RootVN = realAnchorDN[s_mimblAnchorPropName];
+	if (!rootVN)
+		return;
+
+	// remove our root node from the anchor element's well-known property
+	delete realAnchorDN[s_mimblAnchorPropName];
+
+	rootVN.setContent( null, true);
+	rootVN.term();
+}
+
+
+
+// Renders the given content (usually a result of JSX expression or a component instance)
+// under the given HTML element.
+export function mountRoot( content: any, anchorDN: DN): void
+{
+	let realAnchorDN: DN = anchorDN ? anchorDN : document.body;
+
+	// check whether we already have root node remembered in the anchor element's well-known
+	// property
+	let rootVN: RootVN = realAnchorDN[s_mimblAnchorPropName];
+	if (!rootVN)
+	{
+		// create root node and remember it in the anchor element's well-known property
+		rootVN = new RootVN( realAnchorDN);
+		(realAnchorDN as any)[s_mimblAnchorPropName] = rootVN;
+	}
+
+	// set content to the root node, which will trigger update
+	rootVN.setContent( content, false);
+}
+
+
+
+// Unmounts a root node that was created using mountRoot.
+export function unmountRoot( anchorDN: DN): void
+{
+	let realAnchorDN: DN = anchorDN ? anchorDN : document.body;
+	if (!realAnchorDN)
+		return;
+
+	// get our root node from the anchor element's well-known property.
+	let rootVN: RootVN = realAnchorDN[s_mimblAnchorPropName];
+	if (!rootVN)
+		return;
+
+	// remove our root node from the anchor element's well-known property
+	delete realAnchorDN[s_mimblAnchorPropName];
+
+	// destruct the root node (asynchronously)
+	rootVN.setContent( null, false);
+	rootVN.scheduleCall( () => rootVN.willUnmount() );
 }
 
 
