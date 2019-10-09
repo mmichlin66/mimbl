@@ -268,11 +268,10 @@ export class ElmVN extends VNBase implements mim.IElmVN
 			else
 			{
 				// get information about the property and determine its type (regular attribute, event
-				// or custom attribute). Note that getPropertyInfo may return null for most regular
-				// attributes and events; in this case we will check the property value.
+				// or custom attribute). Note that getPropertyInfo may return null only for regular
+				// attributes.
 				propInfo = ElmAttr.getPropertyInfo( propName);
-				propType = propInfo ? propInfo.type : isEventValue( propVal) ? PropType.Event : PropType.Attr;
-
+				propType = propInfo ? propInfo.type : PropType.Attr;
 				if (propType === PropType.Attr)
 				{
 					if (!this.attrs)
@@ -719,15 +718,6 @@ interface CystomAttrRunTimeData
 	// Handler object that knows to deal with the property values
 	handler: mim.ICustomAttributeHandler<any>;
 };
-
-
-
-// Determines whether the given property value is of the type that is used for event handlers.
-function isEventValue( propVal: any): boolean
-{
-	return typeof propVal === "function" ||
-		Array.isArray(propVal) && propVal.length > 0 && typeof propVal[0] === "function";
-}
 
 
 

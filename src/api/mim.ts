@@ -1512,6 +1512,15 @@ export function registerCustomAttribute<T>( attrName: string, handlerClass: ICus
 	ElmAttr.registerProperty( attrName, { type: PropType.CustomAttr, handlerClass });
 }
 
+/**
+ * Registers custom event for the given property name.
+ * @param propName name of the custom event
+ */
+export function registerCustomEvent( eventName: string): void
+{
+	ElmAttr.registerProperty( eventName, { type: PropType.Event });
+}
+
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
