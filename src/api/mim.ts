@@ -793,13 +793,13 @@ export interface IVNode
 	 * ```typescript
 	 *	class ResizeMonitor
 	 *	{
-	 *		private onWindowResize = (e: Event): void => {};
+	 *		private onWindowResize(e: Event): void {};
 	 *
 	 * 		wrapper: (e: Event): void;
 	 * 
 	 * 		public startResizeMonitoring( vn: IVNode)
 	 *		{
-	 *			this.wrapper = vn.wrapCallback( this.onWindowResize);
+	 *			this.wrapper = vn.wrapCallback( this.onWindowResize, this);
 	 *			window.addEventListener( "resize", this.wrapper);
 	 *		}
 	 * 
@@ -1596,17 +1596,17 @@ import {wrapCallbackWithVN} from "../core/Scheduler"
  * given virtual node. The given "that" object will be the value of "this" when the callback is
  * executed. If the original callback throws an exception, it is processed by the Mimbl error
  * handling mechanism so that the exception bubles from this virtual node up the hierarchy until a
- * node/component that knows to handle errors is found.
- * @param vn Virtual node in whose context the callback will be executed. This can be null/undefined;
- *   however, in this case if the exception is caught it will not be handled by the Mimbl error
- *   handling mechanism.
+ * node/component that knows to handle errors is found. Note that the VN can be null/undefined;
+ * however, in this case if the exception is caught it will not be handled by the Mimbl error
+ * handling mechanism.
  * @param callback Callback to be wrapped.
  * @param that Object that will be the value of "this" when the callback is executed.
+ * @param vn Virtual node in whose context the callback will be executed.
  * @returns The wrapper function that should be used instead of the original callback.
  */
-export function wrapCallback<T extends Function>( vn: IVNode, callback: T, that?: object): T
+export function wrapCallback<T extends Function>( callback: T, that?: object, vn?: IVNode): T
 {
-	return wrapCallbackWithVN( vn, callback, that);
+	return wrapCallbackWithVN( callback, that, vn);
 }
 
 

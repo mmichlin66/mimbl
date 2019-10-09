@@ -220,11 +220,11 @@ export class ElmVN extends VNBase implements mim.IElmVN
 				mim.setRef( this.ref, this.elm);
 		}
 
-		// remeber the new value of the key property (even if it is the same)
+		// remeber the new value of the key, updateStartegy and creator property (even if the
+		// values are the same)
 		this.key = newElmVN.key;
-
-		// remeber the new value of the updateStrategy property (even if it is the same)
 		this.updateStrategy = newElmVN.updateStrategy;
+		this.creator = newElmVN.creator;
 
 		this.updateAttrs( newElmVN.attrs);
 		this.updateEvents( newElmVN.events);
@@ -505,7 +505,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 	// method.
 	private createEventWrapper( event: EventRunTimeData): mim.EventFuncType<Event>
 	{
-		return wrapCallbackWithVN( this, event.orgFunc, event.that ? event.that : this.creator);
+		return wrapCallbackWithVN( event.orgFunc, event.that ? event.that : this.creator, this);
 	}
 
 

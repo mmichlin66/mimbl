@@ -66,24 +66,6 @@ export abstract class VNBase implements VN
 	// component if both the component and its parent are updated in the same cycle.
 	public lastUpdateTick: number;
 
-	// // Component that created this node or null if created not by a component (e.g. directly in
-	// // mim.mount).
-	// private _creator: mim.IClassCompVN;
-	// public get creator(): mim.IClassCompVN
-	// {
-	// 	if (this._creator === undefined)
-	// 	{
-	// 		// go up the parent chain
-	// 		let ancestor = this.parent;
-	// 		while( ancestor)
-	// 		{
-	// 			if (ancestor.type === mim.VNType.ClassComp || ancestor.type == mim.VNType.InstanceComp)
-	// 		}
-	// 	}
-
-	// 	return this._creator;
-	// }
-
 
 
 	// Initializes the node by passing the parent node to it. After this, the node knows its
@@ -111,13 +93,6 @@ export abstract class VNBase implements VN
 			this.subscribedServices.forEach( (info, id) => { notifyServiceUnsubscribed( id, this); });
 			this.subscribedServices.clear();
 		}
-
-		// // disconnect the node from its siblings (if any)
-		// if (this.next !== undefined)
-		// 	this.next.prev = undefined;
-
-		// if (this.prev !== undefined)
-		// 	this.prev.next = undefined;
 
 		this.next = undefined;
 		this.prev = undefined;
@@ -149,7 +124,7 @@ export abstract class VNBase implements VN
 	 */
 	public scheduleCallBeforeUpdate( func: mim.ScheduledFuncType, that?: object): void
 	{
-		scheduleFuncCall( this, func, true, that);
+		scheduleFuncCall( func, true, that, this);
 	}
 
 
@@ -162,7 +137,7 @@ export abstract class VNBase implements VN
 	 */
 	public scheduleCallAfterUpdate( func: mim.ScheduledFuncType, that?: object): void
 	{
-		scheduleFuncCall( this, func, false, that);
+		scheduleFuncCall( func, false, that, this);
 	}
 
 
@@ -303,7 +278,7 @@ export abstract class VNBase implements VN
 	 */
 	public wrapCallback<T extends Function>( callback: T, that?: object): T
 	{
-		return wrapCallbackWithVN( this, callback, that);
+		return wrapCallbackWithVN( callback, that, this);
 	}
 
 

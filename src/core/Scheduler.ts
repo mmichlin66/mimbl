@@ -127,10 +127,10 @@ export function requestNodeUpdate( vn: VN): void
 	{
 		let comp = (vn as any as mim.IClassCompVN).comp;
 		if (comp.beforeUpdate && s_schedulerState !== SchedulerState.BeforeUpdate)
-			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, wrapCallbackWithVN( vn, comp.beforeUpdate, comp));
+			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, wrapCallbackWithVN( comp.beforeUpdate, comp, vn));
 
 		if (comp.afterUpdate)
-			s_callsScheduledAfterUpdate.set( comp.afterUpdate, wrapCallbackWithVN( vn, comp.beforeUpdate, comp));
+			s_callsScheduledAfterUpdate.set( comp.afterUpdate, wrapCallbackWithVN( comp.beforeUpdate, comp, vn));
 	}
 
 	// the update is scheduled in the next cycle unless the request is made during a
@@ -143,12 +143,12 @@ export function requestNodeUpdate( vn: VN): void
 
 // Schedules to call the given function either before or after all the scheduled components
 // have been updated.
-export function scheduleFuncCall( vn: mim.IVNode, func: mim.ScheduledFuncType, beforeUpdate: boolean, that: object): void
+export function scheduleFuncCall( func: mim.ScheduledFuncType, beforeUpdate: boolean, that: object, vn: mim.IVNode): void
 {
 	if (!func)
 		return;
 
-	let wrapper = wrapCallbackWithVN( vn, func, that);
+	let wrapper = wrapCallbackWithVN( func, that, vn);
 	if (beforeUpdate)
 	{
 		s_callsScheduledBeforeUpdate.set( func, wrapper);
@@ -181,7 +181,7 @@ export function scheduleFuncCall( vn: mim.IVNode, func: mim.ScheduledFuncType, b
  * @param that Object that will be the value of "this" when the callback is executed.
  * @returns The wrapper function that should be used instead of the original callback.
  */
-export function wrapCallbackWithVN<T extends Function>( vn: mim.IVNode, callback: T, that?: object): T
+export function wrapCallbackWithVN<T extends Function>( callback: T, that?: object, vn?: mim.IVNode): T
 {
 	return CallbackWrapper.bind( vn, that, callback);
 }
@@ -199,7 +199,8 @@ export function wrapCallbackWithVN<T extends Function>( vn: mim.IVNode, callback
  */
 function CallbackWrapper(): any
 {
-	// remember the current VN and set the current VN to be the VN from the "this" value.
+	// remember the current VN and set the current VN to be the VN from the "this" value. Note
+	// that this can be undefined
 	let currentVN = s_currentVN;
 	s_currentVN = this;
 	try
@@ -210,11 +211,7 @@ function CallbackWrapper(): any
 	catch( err)
 	{
 		if (!this)
-		{
-			console.error( "Wrapper called without reference to virtual node caught exception in callback. Error: " + (err as Error).message);
-			console.error( (err as Error).stack);
 			throw err;
-		}
 		else
 		{
 			let errorService = this.findService( "StdErrorHandling") as mim.IErrorHandlingService;
