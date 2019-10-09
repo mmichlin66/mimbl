@@ -441,7 +441,7 @@ export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
 /**
  * Decorator function for defining properties with a set method that calls the updateMe method
  * whenever the property value changes.
- *	```typescript
+ *	```tsx
  *	class Child extends Component
  *	{
  *		@mim.updatable text: string = "Hello!";
@@ -475,7 +475,8 @@ export function updatable( target, name: string)
 				if (this[attrName] !== val)
 				{
 					this[attrName] = val;
-					if (this.vn)
+					let vn: IVNode = this.vn;
+					if (vn && !vn.updateRequested)
 						this.vn.requestUpdate();
 				}
 			},
@@ -494,7 +495,7 @@ export function updatable( target, name: string)
  * function is used.
  *
  * Use it as follows:
- * ```typescript
+ * ```tsx
  *	import * as mim from "mimbl"
  *	.....
  *	render()
@@ -709,6 +710,11 @@ export interface IVNode
 	 */
 	readonly name?: string;
 
+	// Flag indicating that update has been requested but not yet performed. This flag is needed
+	// to prevent trying to add the node to the global map every time the requestUpdate method
+	// is called. 
+	readonly updateRequested: boolean;
+
 
 
 	/** This method is called by the component when it needs to be updated. */
@@ -858,16 +864,16 @@ export interface IManagedCompVN extends IVNode
  */
 export interface IElmVN extends IVNode
 {
-	/** Gets the element name. */
+	/** Gets the DOM element name. */
 	readonly elmName: string;
 
 	/** Gets the flag indicating whether this element is an SVG (as opposed to HTML). */
 	readonly isSvg: boolean;
 
-	/** Gets the element instance. */
+	/** Gets the DOM element object. */
 	readonly elm: Element;
 
-	/** Component that created this element in its render method. */
+	/** Component that created this element in its render method (or undefined). */
 	readonly creator: IComponent;
 }
 
