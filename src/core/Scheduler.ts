@@ -145,26 +145,36 @@ export function requestNodeUpdate( vn: VN): void
 // have been updated.
 export function scheduleFuncCall( func: mim.ScheduledFuncType, beforeUpdate: boolean, that: object, vn: mim.IVNode): void
 {
+	/// #if DEBUG
 	if (!func)
+	{
+		console.error( "Trying to schedule undefined function for update");
 		return;
+	}
+	/// #endif
 
-	let wrapper = wrapCallbackWithVN( func, that, vn);
 	if (beforeUpdate)
 	{
-		s_callsScheduledBeforeUpdate.set( func, wrapper);
+		if (!s_callsScheduledBeforeUpdate.has( func))
+		{
+			s_callsScheduledBeforeUpdate.set( func, wrapCallbackWithVN( func, that, vn));
 
-		// a "before update" function is always scheduled in the next frame even if the
-		// call is made from another "before update" function.
-		requestFrameIfNeeded();
+			// a "before update" function is always scheduled in the next frame even if the
+			// call is made from another "before update" function.
+			requestFrameIfNeeded();
+		}
 	}
 	else
 	{
-		s_callsScheduledAfterUpdate.set( func, wrapper);
+		if (!s_callsScheduledAfterUpdate.has( func))
+		{
+			s_callsScheduledAfterUpdate.set( func, wrapCallbackWithVN( func, that, vn));
 
-		// an "after update" function is scheduled in the next cycle unless the request is made
-		// either from a "before update" function execution or during a node update.
-		if (s_schedulerState !== SchedulerState.BeforeUpdate && s_schedulerState !== SchedulerState.Update)
-			requestFrameIfNeeded();
+			// an "after update" function is scheduled in the next cycle unless the request is made
+			// either from a "before update" function execution or during a node update.
+			if (s_schedulerState !== SchedulerState.BeforeUpdate && s_schedulerState !== SchedulerState.Update)
+				requestFrameIfNeeded();
+		}
 	}
 }
 
