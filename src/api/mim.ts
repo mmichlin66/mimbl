@@ -67,14 +67,14 @@ export interface IComponentClass<TProps = {}, TChildren = any>
 export interface IComponent<TProps = {}, TChildren = any>
 {
 	/** Component properties passed to the constructor */
-	props: CompProps<TProps,TChildren>;
+	props?: CompProps<TProps,TChildren>;
 
 	/**
 	 * Components can define display name for tracing purposes; if they don't the default name
-	 * is the component's class constructor name. Note that this method can be called before
+	 * used is the component's class constructor name. Note that this method can be called before
 	 * the virtual node is attached to the component.
 	 */
-	getDisplayName?(): string;
+	readonly displayName?: string;
 
 	/**
 	 * Sets, gets or clears the virtual node object of the component. This property is set twice:
@@ -85,6 +85,9 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 */
 	vn?: IVNode;
 
+	/** Returns the component's content that will be ultimately placed into the DOM tree. */
+	render(): any;
+
 	/**
 	 * Notifies that the component is about to render its content for the first time. This method
 	 * is called when the virtual node has already been set so the component can request services
@@ -92,10 +95,31 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 */
 	willMount?(): void;
 
-	/** Returns the component's content that will be ultimately placed into the DOM tree. */
-	render(): any;
+	/**
+	 * Notifies that the component's content is going to be removed from the DOM tree. After
+	 * this method returns the component is destroyed.
+	 */
+	willUnmount?(): void;
 
 	/**
+	 * Optional method that is called before any components that are scheduled to be updated in
+	 * a Mimbl tick, are updated. If implemented, this method will be called every time the
+	 * component is scheduled to be updated. This method can read DOM layout information (e.g.
+	 * element measurements) without the risk of causing forced layouts.
+	 */
+	beforeUpdate?(): void;
+
+	/**
+	 * Optional method that is called after al components that are scheduled to be updated in
+	 * a Mimbl tick, are updated. If implemented, this method will be called every time the
+	 * component is scheduled to be updated. This method is called after all modifications to
+	 * DOM resulting from updaing components have been already done.
+	 */
+	afterUpdate?(): void;
+
+	/**
+	 * This method is only used by managed components.
+	 * 
 	 * Informs the component that new properties have been specified. At the time of the call
 	 * this.props refers to the "old" properties. If the component returns true,then its render
 	 * method will be called. At that time,the original props object that was passed into the
@@ -107,12 +131,6 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * @returns True if the component should have its render method called and false otherwise.
 	 */
 	shouldUpdate?( newProps: CompProps<TProps,TChildren>): boolean;
-
-	/**
-	 * Notifies that the component's content is going to be removed from the DOM tree. After
-	 * this method returns the component is destroyed.
-	 */
-	willUnmount?(): void;
 
 	/**
 	 * Handles an exception that occurred during the component's own rendering or rendering of
@@ -170,42 +188,6 @@ export type ScheduledFuncType = () => void;
 
 
 /**
- * The IServiceDefinitions interface serves as a mapping between service names and service types.
- * This interface is intended to be augmented by modules that define and/or use specific services.
- * This allows performing service publishing and subscribing in type-safe manner.
- */
-export interface IServiceDefinitions
-{
-	/** Built-in error handling service. */
-	"StdErrorHandling": IErrorHandlingService;
-
-	/**
-	 * Built-in service for lazy people - can be used for quick prototypes without the need to
-	 * augment the interface.
-	 */
-	"any": any;
-}
-
-
-
-/**
- * The IErrorHandlingService interface represents a service that can be invoked when an error -
- * usually an exception - is encountered but cannot be handled locally. A component that implements
- * this service would normally remember the error and request to update itself,so that in its
- * render method it will present the error to the user.
- *
- * The IErrorHandlingService is implemented by the Root Virtual Node as a last resort for error
- * handling. The Root VN will display a simple UI showing the error and will allow the user to
- * restart - in the hope that the error will not repeat itself.
- */
-export interface IErrorHandlingService
-{
-	reportError( err: any,path: string[]): void;
-}
-
-
-
-/**
  * Base class for components. Components that derive from this class must implement the render
  * method.
  */
@@ -233,16 +215,34 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 			this.vn.requestUpdate();
 	}
 
-	/** This method is called by the component to schedule a function to be invoked on the next
-	 * update cycle either before or after the scheduled components are updated.
+	/**
+	 * Schedules the given function to be called before any components scheduled to be updated in
+	 * the Mimbl tick are updated.
 	 * @param func Function to be called
-	 * @param beforeUpdate Flag indicating whether the function should be called before (true)
-	 * or after (false) the update cycle.
+	 * @param that Object that will be used as "this" value when the function is called. If this
+	 *   parameter is undefined, the component instance will be used (which allows scheduling
+	 *   regular unbound components' methods). This parameter will be ignored if the the function
+	 *   is already bound or is an arrow function.
 	 */
-	protected callMe( func: ScheduledFuncType, beforeUpdate: boolean = false): void
+	protected callMeBeforeUpdate( func: ScheduledFuncType, that?: object): void
 	{
 		if (this.vn)
-			this.vn.scheduleCall( func, beforeUpdate);
+			this.vn.scheduleCallBeforeUpdate( func, that ? that : this);
+	}
+
+	/**
+	 * Schedules the given function to be called after all components scheduled to be updated in
+	 * the Mimbl tick have already been updated.
+	 * @param func Function to be called
+	 * @param that Object that will be used as "this" value when the function is called. If this
+	 *   parameter is undefined, the component instance will be used (which allows scheduling
+	 *   regular unbound components' methods). This parameter will be ignored if the the function
+	 *   is already bound or is an arrow function.
+	 */
+	protected callMeAfterUpdate( func: ScheduledFuncType, that?: object): void
+	{
+		if (this.vn)
+			this.vn.scheduleCallAfterUpdate( func, that ? that : this);
 	}
 }
 
@@ -309,6 +309,42 @@ export class Ref<T>
 		this._r = undefined;
 		this.changedEvent.clear();
 	}
+}
+
+
+
+/**
+ * The IServiceDefinitions interface serves as a mapping between service names and service types.
+ * This interface is intended to be augmented by modules that define and/or use specific services.
+ * This allows performing service publishing and subscribing in type-safe manner.
+ */
+export interface IServiceDefinitions
+{
+	/** Built-in error handling service. */
+	"StdErrorHandling": IErrorHandlingService;
+
+	/**
+	 * Built-in service for lazy people - can be used for quick prototypes without the need to
+	 * augment the interface.
+	 */
+	"any": any;
+}
+
+
+
+/**
+ * The IErrorHandlingService interface represents a service that can be invoked when an error -
+ * usually an exception - is encountered but cannot be handled locally. A component that implements
+ * this service would normally remember the error and request to update itself,so that in its
+ * render method it will present the error to the user.
+ *
+ * The IErrorHandlingService is implemented by the Root Virtual Node as a last resort for error
+ * handling. The Root VN will display a simple UI showing the error and will allow the user to
+ * restart - in the hope that the error will not repeat itself.
+ */
+export interface IErrorHandlingService
+{
+	reportError( err: any,path: string[]): void;
 }
 
 
@@ -622,22 +658,22 @@ export class Waiting extends Component
 /** Defines types of virtual DOM nodes */
 export const enum VNType
 {
-	// Top-level node
+	/** Top-level node */
 	Root,
 
-	// Class-based (state-full) component created via new
+	/** Class-based (state-full) component created via new */
 	IndependentComp,
 
-	// Class-based (state-full) JSX-based component laid out using JSX
+	/** Class-based (state-full) component laid out using JSX */
 	ManagedComp,
 
-	// Stateless component (simple rendering function accepting props)
+	/** Stateless component (simple rendering function accepting props) */
 	FuncComp,
 
-	// DOM element (HTML or SVG) laid out using JSX.
+	/** DOM element (HTML or SVG) laid out using JSX. */
 	Elm,
 
-	// Text node
+	/** Text node */
 	Text,
 }
 
@@ -679,13 +715,20 @@ export interface IVNode
 	requestUpdate(): void;
 
 	/**
-	 * Schedules to call the given function either before or after all the scheduled components
-	 * have been updated.
-	 * @param func Function to be called either before or after the update cycle.
-	 * @param beforeUpdate Flag indicating whether the function should be called before (true)
-	 * or after (false) the update cycle.
+	 * Schedules to call the given function before all the scheduled components have been updated.
+	 * @param func Function to be called.
+	 * @param that Object to be used as the "this" value when the function is called. This parameter
+	 *   is not needed if the function is already bound or it is an arrow function.
 	 */
-	scheduleCall( func: ScheduledFuncType, beforeUpdate: boolean): void;
+	scheduleCallBeforeUpdate( func: ScheduledFuncType, that?: object): void;
+
+	/**
+	 * Schedules to call the given function before all the scheduled components have been updated.
+	 * @param func Function to be called.
+	 * @param that Object to be used as the "this" value when the function is called. This parameter
+	 *   is not needed if the function is already bound or it is an arrow function.
+	 */
+	scheduleCallAfterUpdate( func: ScheduledFuncType, that?: object): void;
 
 
 
@@ -772,7 +815,7 @@ export interface IVNode
 	 * @returns Function that has the same signature as the given callback and that should be used
 	 *     instead of the original callback
 	 */
-	wrapCallback<T>( callback: T, that?: any): T;
+	wrapCallback<T extends Function>( callback: T, that?: object): T;
 }
 
 
@@ -1380,11 +1423,13 @@ import {createNodesFromJSX} from "../core/ContentFuncs"
  * JSX Factory function. In order for this function to be invoked by the TypeScript compiler, the
  * tsconfig.json must have the following option:
  *
+ * ```json
  * "compilerOptions":
  * {
  *     "jsx": "react",
  *     "jsxFactory": "mim.jsx"
  * }
+ * ```
  *
  * The .tsx files must import the mimbl module as mim: import * as mim from "mimbl"
  * @param tag 
@@ -1526,6 +1571,33 @@ export function mergeStyles( ...styles: StylePropType[]): StylePropType
 export function mergeStylesTo( resStyle: StylePropType, ...styles: (StylePropType | string)[] ): void
 {
 	utils.mergeStylesTo( resStyle, ...styles);
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Callback wrapping
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+import {wrapCallbackWithVN} from "../core/Scheduler"
+
+/**
+ * Wraps the given callback and returns a wrapper function which is executed in the context of the
+ * given virtual node. The given "that" object will be the value of "this" when the callback is
+ * executed. If the original callback throws an exception, it is processed by the Mimbl error
+ * handling mechanism so that the exception bubles from this virtual node up the hierarchy until a
+ * node/component that knows to handle errors is found.
+ * @param vn Virtual node in whose context the callback will be executed. This can be null/undefined;
+ *   however, in this case if the exception is caught it will not be handled by the Mimbl error
+ *   handling mechanism.
+ * @param callback Callback to be wrapped.
+ * @param that Object that will be the value of "this" when the callback is executed.
+ * @returns The wrapper function that should be used instead of the original callback.
+ */
+export function wrapCallback<T extends Function>( vn: IVNode, callback: T, that?: object): T
+{
+	return wrapCallbackWithVN( vn, callback, that);
 }
 
 

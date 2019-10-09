@@ -13,7 +13,7 @@ import {ClassCompVN} from "./ClassCompVN"
 // The class InstanceVN is a node that holds an instance of an IComponent-implementing object.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class IndependentCompVN extends ClassCompVN<mim.IComponent> implements mim.IIndependentCompVN
+export class IndependentCompVN extends ClassCompVN implements mim.IIndependentCompVN
 {
 	constructor( comp: mim.IComponent)
 	{
@@ -30,12 +30,9 @@ export class IndependentCompVN extends ClassCompVN<mim.IComponent> implements mi
 	// it can reflect an "id" property of an element (if any).
 	public get name(): string
 	{
-		// components can define the getDisplayName method; if they don't then the default name
+		// components can define the displayName property; if they don't then the default name
 		// is the component's constructor name
-		if (this.comp.getDisplayName)
-			return this.comp.getDisplayName();
-		else
-			return this.comp.constructor.name;
+		return this.comp.displayName ? this.comp.displayName : this.comp.constructor.name;
 	}
 
 

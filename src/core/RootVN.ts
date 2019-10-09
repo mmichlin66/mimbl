@@ -255,7 +255,7 @@ export function unmountRoot( anchorDN: DN): void
 
 	// destruct the root node (asynchronously)
 	rootVN.setContent( null, false);
-	rootVN.scheduleCall( () => rootVN.willUnmount() );
+	rootVN.scheduleCallAfterUpdate( () => rootVN.willUnmount() );
 }
 
 

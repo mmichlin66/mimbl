@@ -1,6 +1,6 @@
 ﻿import * as mim from "../api/mim"
-import {VN, DN, getVNPath} from "./VN"
-import {requestNodeUpdate, scheduleFuncCall} from "./Scheduler"
+import {VN, DN} from "./VN"
+import {requestNodeUpdate, scheduleFuncCall, wrapCallbackWithVN} from "./Scheduler"
 import {notifyServicePublished, notifyServiceUnpublished, notifyServiceSubscribed, notifyServiceUnsubscribed} from "./PubSub"
 
 /// #if USE_STATS
@@ -141,11 +141,28 @@ export abstract class VNBase implements VN
 
 
 
-	// Schedules to call the given function either before or after all the scheduled components
-	// have been updated.
-	public scheduleCall( func: () => void, beforeUpdate: boolean = false): void
+	/**
+	 * Schedules to call the given function before all the scheduled components have been updated.
+	 * @param func Function to be called.
+	 * @param that Object to be used as the "this" value when the function is called. This parameter
+	 *   is not needed if the function is already bound or it is an arrow function.
+	 */
+	public scheduleCallBeforeUpdate( func: mim.ScheduledFuncType, that?: object): void
 	{
-		scheduleFuncCall( func, beforeUpdate);
+		scheduleFuncCall( this, func, true, that);
+	}
+
+
+
+	/**
+	 * Schedules to call the given function before all the scheduled components have been updated.
+	 * @param func Function to be called.
+	 * @param that Object to be used as the "this" value when the function is called. This parameter
+	 *   is not needed if the function is already bound or it is an arrow function.
+	 */
+	public scheduleCallAfterUpdate( func: mim.ScheduledFuncType, that?: object): void
+	{
+		scheduleFuncCall( this, func, false, that);
 	}
 
 
@@ -274,7 +291,7 @@ export abstract class VNBase implements VN
 
 	/**
 	 * Creates a wrapper function with the same signature as the given callback so that if the original
-	 * callback throws an exception, it is processed by the Mimble error handling mechanism so that the
+	 * callback throws an exception, it is processed by the Mimbl error handling mechanism so that the
 	 * exception bubles from this virtual node up the hierarchy until a node/component that knows
 	 * to handle errors is found.
 	 * 
@@ -284,12 +301,9 @@ export abstract class VNBase implements VN
 	 * 
 	 * @param callback 
 	 */
-	public wrapCallback<T>( callback: T, that?: any): T
+	public wrapCallback<T extends Function>( callback: T, that?: object): T
 	{
-		// if (!that && (callback as any).boundable === true)
-		// 	that = undefined;
-
-		return CallbackWrapper.bind( this, that, callback);
+		return wrapCallbackWithVN( this, callback, that);
 	}
 
 
@@ -299,32 +313,6 @@ export abstract class VNBase implements VN
 
 	// Map of service IDs to objects constituting subscriptions made by this node.
 	private subscribedServices: Map<string,VNSubscribedServiceInfo>;
-}
-
-
-
-/**
- * The CallbackWrapper function is used to wrap a callback in order to catch exceptions from the
- * callback and pass it to the "StdErrorHandling" service. The function is bound to two parameters:
- * a virtual node (accessed as `this`) and the original callback (accessed as the first element
- * from the `arguments` array). The rest of parameters in the `arguments` array are passed to the
- * original callback and the value returned by the callback is returned from the wrapper.
- */
-function CallbackWrapper(): any
-{
-	try
-	{
-		let [that, orgCallback, ...rest] = arguments;
-		return that ? orgCallback.apply( that, rest) : orgCallback( ...rest);
-	}
-	catch( err)
-	{
-		let errorService = this.findService( "StdErrorHandling") as mim.IErrorHandlingService;
-		if (errorService)
-			errorService.reportError( err, getVNPath( this));
-		else
-			throw err;
-	}
 }
 
 

@@ -31,6 +31,16 @@ enum SchedulerState
 
 
 
+/**
+ * The ScheduledFuncMap class represents a map of functions scheduled to be executed either before
+ * or after component updates. The keys in this map are the original functions and the values are
+ * the wrapper functions that will be executed in the context of a given virtual node. Both
+ * the keys and the values have the same type: mim.ScheduledFuncType.
+ */
+class ScheduledFuncMap extends Map<mim.ScheduledFuncType,mim.ScheduledFuncType> {}
+
+
+
 // Map of nodes that should be updated on the next UI cycle. We use Map in order to not include
 // the same node more than once - which can happen if the node's requestUpdate method is called
 // more than once during a single run (e.g. during event processing). The value mapped to the
@@ -40,13 +50,15 @@ enum SchedulerState
 //	- anything else - the node will be replaced with this new content
 let s_vnsScheduledForUpdate = new Set<VN>();
 
-// Set of functions that have been scheduled to be called upon a new animation frame before
-// components scheduled for update are updated.
-let s_callsScheduledBeforeUpdate = new Set<mim.ScheduledFuncType>();
+// Map of functions that have been scheduled to be called upon a new animation frame before
+// components scheduled for update are updated. The values in the map are objects that will
+// be used s the "this" value in the callback.
+let s_callsScheduledBeforeUpdate = new ScheduledFuncMap();
 
-// Set of functions that have been scheduled to be called upon a new animation frame after
-// components scheduled for update are updated.
-let s_callsScheduledAfterUpdate = new Set<mim.ScheduledFuncType>();
+// Map of functions that have been scheduled to be called upon a new animation frame after
+// components scheduled for update are updated. The values in the map are objects that will
+// be used s the "this" value in the callback.
+let s_callsScheduledAfterUpdate = new ScheduledFuncMap();
 
 // Handle of the animation frame request (in case it should be canceled).
 let s_scheduledFrameHandle: number = 0;
@@ -106,6 +118,21 @@ export function requestNodeUpdate( vn: VN): void
 	// matter how many times it calls requestUpdate().
 	s_vnsScheduledForUpdate.add( vn);
 
+	// if this is a class-based component and it has beforeUpdate and/or afterUpdate methods
+	// implemented, schedule their executions. Note that the "beforeUpdate" method is not
+	// scheduled if the current scheduler state is BeforeUpdate. This is because the component
+	// wil be updated in the current cycle and there is already no time to execute the "before
+	// update" method.
+	if (vn.type === mim.VNType.IndependentComp || vn.type === mim.VNType.ManagedComp)
+	{
+		let comp = (vn as any as mim.IClassCompVN).comp;
+		if (comp.beforeUpdate && s_schedulerState !== SchedulerState.BeforeUpdate)
+			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, wrapCallbackWithVN( vn, comp.beforeUpdate, comp));
+
+		if (comp.afterUpdate)
+			s_callsScheduledAfterUpdate.set( comp.afterUpdate, wrapCallbackWithVN( vn, comp.beforeUpdate, comp));
+	}
+
 	// the update is scheduled in the next cycle unless the request is made during a
 	// "before update" function execution.
 	if (s_schedulerState !== SchedulerState.BeforeUpdate)
@@ -116,14 +143,15 @@ export function requestNodeUpdate( vn: VN): void
 
 // Schedules to call the given function either before or after all the scheduled components
 // have been updated.
-export function scheduleFuncCall( func: mim.ScheduledFuncType, beforeUpdate: boolean = false): void
+export function scheduleFuncCall( vn: mim.IVNode, func: mim.ScheduledFuncType, beforeUpdate: boolean, that: object): void
 {
 	if (!func)
 		return;
 
+	let wrapper = wrapCallbackWithVN( vn, func, that);
 	if (beforeUpdate)
 	{
-		s_callsScheduledBeforeUpdate.add( func);
+		s_callsScheduledBeforeUpdate.set( func, wrapper);
 
 		// a "before update" function is always scheduled in the next frame even if the
 		// call is made from another "before update" function.
@@ -131,12 +159,75 @@ export function scheduleFuncCall( func: mim.ScheduledFuncType, beforeUpdate: boo
 	}
 	else
 	{
-		s_callsScheduledAfterUpdate.add( func);
+		s_callsScheduledAfterUpdate.set( func, wrapper);
 
 		// an "after update" function is scheduled in the next cycle unless the request is made
 		// either from a "before update" function execution or during a node update.
 		if (s_schedulerState !== SchedulerState.BeforeUpdate && s_schedulerState !== SchedulerState.Update)
 			requestFrameIfNeeded();
+	}
+}
+
+
+
+/**
+ * Wraps the given callback and returns a wrapper function which is executed in the context of the
+ * given virtual node. The given "that" object will be the value of "this" when the callback is
+ * executed. If the original callback throws an exception, it is processed by the Mimbl error
+ * handling mechanism so that the exception bubles from this virtual node up the hierarchy until a
+ * node/component that knows to handle errors is found.
+ * @param vn Virtual node in whose context the callback will be executed.
+ * @param callback Callback to be wrapped.
+ * @param that Object that will be the value of "this" when the callback is executed.
+ * @returns The wrapper function that should be used instead of the original callback.
+ */
+export function wrapCallbackWithVN<T extends Function>( vn: mim.IVNode, callback: T, that?: object): T
+{
+	return CallbackWrapper.bind( vn, that, callback);
+}
+
+
+
+/**
+ * The CallbackWrapper function is used to wrap a callback in order to catch exceptions from the
+ * callback and pass it to the "StdErrorHandling" service. The function is bound to  the virtual
+ * node as "this" and to two parameters: the object that will be the value of "this" when the
+ * original callback is executed and the original callback itself. These two parameters are
+ * accessed as the first and second elements of the `arguments` array). The rest of parameters in
+ * the `arguments` array are passed to the original callback and the value returned by the callback
+ * is returned from the wrapper.
+ */
+function CallbackWrapper(): any
+{
+	// remember the current VN and set the current VN to be the VN from the "this" value.
+	let currentVN = s_currentVN;
+	s_currentVN = this;
+	try
+	{
+		let [that, orgCallback, ...rest] = arguments;
+		return that ? orgCallback.apply( that, rest) : orgCallback( ...rest);
+	}
+	catch( err)
+	{
+		if (!this)
+		{
+			console.error( "Wrapper called without reference to virtual node caught exception in callback. Error: " + (err as Error).message);
+			console.error( (err as Error).stack);
+			throw err;
+		}
+		else
+		{
+			let errorService = this.findService( "StdErrorHandling") as mim.IErrorHandlingService;
+			if (errorService)
+				errorService.reportError( err, getVNPath( this));
+			else
+				throw err;
+		}
+	}
+	finally
+	{
+		// restore the current VN to the remembered value;
+		s_currentVN = currentVN;
 	}
 }
 
@@ -170,8 +261,8 @@ let onScheduledFrame = (): void =>
 	{
 		s_schedulerState = SchedulerState.BeforeUpdate;
 		let callsScheduledBeforeUpdate = s_callsScheduledBeforeUpdate;
-		s_callsScheduledBeforeUpdate = new Set<mim.ScheduledFuncType>();
-		callScheduledFunctions( callsScheduledBeforeUpdate, "before");
+		s_callsScheduledBeforeUpdate = new ScheduledFuncMap();
+		callScheduledFunctions( callsScheduledBeforeUpdate, true);
 	}
 
 	if (s_vnsScheduledForUpdate.size > 0)
@@ -199,8 +290,8 @@ let onScheduledFrame = (): void =>
 	{
 		s_schedulerState = SchedulerState.AfterUpdate;
 		let callsScheduledAfterUpdate = s_callsScheduledAfterUpdate;
-		s_callsScheduledAfterUpdate = new Set<mim.ScheduledFuncType>();
-		callScheduledFunctions( callsScheduledAfterUpdate, "after");
+		s_callsScheduledAfterUpdate = new ScheduledFuncMap();
+		callScheduledFunctions( callsScheduledAfterUpdate, false);
 	}
 
 	s_schedulerState = SchedulerState.Idle;
@@ -243,6 +334,8 @@ function arrangeNodesByDepth( vnsScheduledForUpdate: Set<VN>): VN[][]
 
 	return vnsByDepth;
 }
+
+
 
 // Performs rendering phase for all components scheduled for update and recursively for their
 // sub-nodes where necessary. Returns array of VNDisp structures for each updated node.
@@ -301,17 +394,17 @@ function performCommitPhase( updatedNodeDisps: VNDisp[]): void
 
 
 // Call functions scheduled before or after update cycle.
-function callScheduledFunctions( funcs: Set<()=>void>, beforeOrAfter: string)
+function callScheduledFunctions( funcs: ScheduledFuncMap, beforeUpdate: boolean)
 {
-	funcs.forEach( (func) =>
+	funcs.forEach( (wrapper, func) =>
 	{
 		try
 		{
-			func();
+			wrapper();
 		}
 		catch( err)
 		{
-			console.error( `Exception while invoking function ${beforeOrAfter} updating components\n`, err);
+			console.error( `Exception while invoking function ${beforeUpdate ? "before" : "after"} updating components\n`, err);
 		}
 	});
 }

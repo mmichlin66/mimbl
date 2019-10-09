@@ -13,7 +13,7 @@ import {ClassCompVN} from "./ClassCompVN"
 // Represents a component implementing the IComponent<> interface.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class ManagedCompVN extends ClassCompVN<mim.IComponent> implements mim.IManagedCompVN
+export class ManagedCompVN extends ClassCompVN implements mim.IManagedCompVN
 {
 	// Type of the class-based component.
 	public compClass: mim.IComponentClass;
@@ -70,11 +70,11 @@ export class ManagedCompVN extends ClassCompVN<mim.IComponent> implements mim.IM
 	// it can reflect an "id" property of an element (if any).
 	public get name(): string
 	{
-		// components can define the getDisplayName method; if they don't then the default name
+		// components can define the displayName property; if they don't then the default name
 		// is the component's constructor name plus key if defined. Note that component instance
 		// might not be created yet when this method is called
-		if (this.comp && this.comp.getDisplayName)
-			return this.comp.getDisplayName();
+		if (this.comp && this.comp.displayName)
+			return this.comp.displayName;
 		else
 		{
 			let name = this.compClass.name;

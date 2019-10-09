@@ -13,10 +13,10 @@ import {VNBase} from "./VNBase"
 // in terms of update requests and lifecycle management.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export abstract class ClassCompVN<TComp extends mim.IComponent> extends VNBase implements mim.IClassCompVN
+export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 {
 	// Component instance.
-	public comp: TComp;
+	public comp: mim.IComponent;
 
 
 
