@@ -4,7 +4,7 @@ import {VNBase} from "./VNBase"
 import {ElmAttr, AttrPropInfo, EventPropInfo, CustomAttrPropInfo, PropType, PropInfo} from "../utils/ElmAttr"
 import {SvgElms} from "../utils/SvgElms";
 import {deepCompare} from "../utils/Utils";
-import {s_currentVN, wrapCallbackWithVN} from "./Scheduler"
+import {s_currentVN} from "./Scheduler"
 import {ClassCompVN} from "./ClassCompVN";
 
 /// #if USE_STATS
@@ -505,7 +505,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 	// method.
 	private createEventWrapper( event: EventRunTimeData): mim.EventFuncType<Event>
 	{
-		return wrapCallbackWithVN( event.orgFunc, event.that ? event.that : this.creator, this);
+		return this.wrapCallback( event.orgFunc, event.that ? event.that : this.creator);
 	}
 
 

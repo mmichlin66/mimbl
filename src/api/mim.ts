@@ -66,7 +66,10 @@ export interface IComponentClass<TProps = {}, TChildren = any>
  */
 export interface IComponent<TProps = {}, TChildren = any>
 {
-	/** Component properties passed to the constructor */
+	/**
+	 * Component properties passed to the constructor. For managed components, the properties
+	 * can also be set (changed) when the component's parent is updated.
+	 */
 	props?: CompProps<TProps,TChildren>;
 
 	/**
@@ -188,67 +191,6 @@ export type ScheduledFuncType = () => void;
 
 
 /**
- * Base class for components. Components that derive from this class must implement the render
- * method.
- */
-export abstract class Component<TProps = {}, TChildren = any> implements IComponent<TProps,TChildren>
-{
-	/** Component properties passed to the constructor */
-	public props: CompProps<TProps,TChildren>;
-
-	/** Remembered vn object through which component can request services. */
-	public vn: IVNode;
-
-	constructor( props?: CompProps<TProps,TChildren>)
-	{
-		if (props)
-			this.props = props;
-	}
-
-	/** Returns the component's content that will be ultimately placed into the DOM tree. */
-	public abstract render(): any;
-
-	/** This method is called by the component to request to be updated. */
-	protected updateMe(): void
-	{
-		if (this.vn)
-			this.vn.requestUpdate();
-	}
-
-	/**
-	 * Schedules the given function to be called before any components scheduled to be updated in
-	 * the Mimbl tick are updated.
-	 * @param func Function to be called
-	 * @param that Object that will be used as "this" value when the function is called. If this
-	 *   parameter is undefined, the component instance will be used (which allows scheduling
-	 *   regular unbound components' methods). This parameter will be ignored if the the function
-	 *   is already bound or is an arrow function.
-	 */
-	protected callMeBeforeUpdate( func: ScheduledFuncType, that?: object): void
-	{
-		if (this.vn)
-			this.vn.scheduleCallBeforeUpdate( func, that ? that : this);
-	}
-
-	/**
-	 * Schedules the given function to be called after all components scheduled to be updated in
-	 * the Mimbl tick have already been updated.
-	 * @param func Function to be called
-	 * @param that Object that will be used as "this" value when the function is called. If this
-	 *   parameter is undefined, the component instance will be used (which allows scheduling
-	 *   regular unbound components' methods). This parameter will be ignored if the the function
-	 *   is already bound or is an arrow function.
-	 */
-	protected callMeAfterUpdate( func: ScheduledFuncType, that?: object): void
-	{
-		if (this.vn)
-			this.vn.scheduleCallAfterUpdate( func, that ? that : this);
-	}
-}
-
-
-
-/**
  * Defines event handler that is invoked when reference value changes.
  */
 export type RefFunc<T> = (newRef: T) => void;
@@ -290,10 +232,10 @@ export class Ref<T>
 		this.changedEvent.remove( listener);
 	}
 
-	/** Get accessors to the reference value */
+	/** Get accessor for the reference value */
 	public get r(): T { return this._r; }
 
-	/** Set accessors to the reference value */
+	/** Set accessor for the reference value */
 	public set r( newRef: T)
 	{
 		if (this._r !== newRef)
@@ -344,7 +286,7 @@ export interface IServiceDefinitions
  */
 export interface IErrorHandlingService
 {
-	reportError( err: any,path: string[]): void;
+	reportError( err: any, path: string[]): void;
 }
 
 
@@ -566,96 +508,6 @@ export interface ICustomAttributeHandler<T>
 
 
 
-/**
- * The FuncProxy component wraps a function that produces content. Proxies can wrap instance
- * methods of classes that have access to "this" thus allowing a single class to "host" multiple
- * components that can be updated separately. This is especially useful when there is a hierarchy
- * of derived classes and (virtual) methods that deliver several pieces of content. FuncProxies
- * can wrap these virtual methods (or other methods that call them) so that the content pieces
- * can be updated separately. FuncProxy has a public Update method that should be called to cause
- * the rendering mechanism to invoke the function wrapped by the FuncProxy.
- */
-export class FuncProxy extends Component
-{
-	constructor( func: () => any)
-	{
-		super();
-
-		this.func = func;
-	}
-
-	public update = (): void =>
-	{
-		if (this.vn)
-			this.vn.requestUpdate();
-	};
-
-	public render(): any
-	{
-		return this.func();
-	}
-
-	private func: () => any;
-}
-
-
-
-/**
- * The Waiting component wraps a Promise and replaces its content when the promise is settled.
- * Before the promise is settled, the component displays an optional "in-progress" content
- * specified in the constructor. If the promise is rejected, the component will either display
- * the "error" content obtained by calling a functions specified in the constructor or if such
- * function is not specified show empty content.
- */
-export class Waiting extends Component
-{
-	/**
-	 * Constructs the object
-	 * @param promise Promise object to wait for
-	 * @param progressContent Content to display while waiting for the promise
-	 * @param errorContentFunc Content to display if the promise is rejected
-	 */
-	constructor( promise: Promise<any>, progressContent?: any, errorContentFunc?: (err: any) => any)
-	{
-		super();
-
-		this.content = progressContent;
-
-		this.watchPromise( promise, errorContentFunc);
-	}
-
-	public render(): any
-	{
-		return this.content;
-	}
-
-	private async watchPromise(promise: Promise<any>,errorContentFunc?: (err: any) => any): Promise<any>
-	{
-		try
-		{
-			this.content = await promise;
-		}
-		catch( err)
-		{
-			this.content = null;
-			if (errorContentFunc !== undefined)
-			{
-				try
-				{
-					this.content = errorContentFunc( err);
-				}
-				catch(anotherErr)
-				{
-				}
-			}
-		}
-	}
-
-	private content: any;
-}
-
-
-
 /** Defines types of virtual DOM nodes */
 export const enum VNType
 {
@@ -785,8 +637,8 @@ export interface IVNode
 
 	/**
 	 * Creates a wrapper function with the same signature as the given callback so that if the original
-	 * callback throws an exception, it is processed by the Mimble error handling mechanism so that the
-	 * exception bubles from this virtual node up the hierarchy until a node/component that knows to
+	 * callback throws an exception, it is processed by the Mimbl error handling mechanism so that the
+	 * exception bubbles from this virtual node up the hierarchy until a node/component that knows to
 	 * handle errors is found.
 	 * 
 	 * This function should be called by the code that is not part of any component but still has access
@@ -837,24 +689,24 @@ export interface IClassCompVN extends IVNode
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// The IInstanceVN interface represents a virtual node for a component.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-export interface IIndependentCompVN extends IVNode
-{
-}
-
-
-
 /**
- * The IClassVN interface represents a virtual node for a JSX-based component.
+ * The IManagedCompVN interface represents a virtual node for a JSX-based component.
  */
 export interface IManagedCompVN extends IVNode
 {
 	/** Gets the component class. */
 	readonly compClass: IComponentClass;
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// The IIndependentCompVN interface represents a virtual node for a component.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+export interface IIndependentCompVN extends IVNode
+{
 }
 
 
@@ -912,9 +764,11 @@ export type Slice =
 
 
 /**
- *  Styles
+ *  Type for the `style` element property.
  */
 export type StylePropType = Partial<CSSStyleDeclaration>;
+
+
 
 /**
  * Type of event handler function for DOM events of type T.
@@ -942,12 +796,10 @@ export type EventFuncAndFlagType<T extends Event> = [EventFuncType<T>, boolean];
  * capture (true) or to the bubble (false) phase.
  * @typeparam T DOM event type, e.g. MouseEvent
  */
-export type EventFuncAndThisAndFlagType<T extends Event> = [EventFuncType<T>, any, boolean];
+export type EventFuncAndThisAndFlagType<T extends Event> = [EventFuncType<T>, object, boolean];
 
 /**
- * Union type that can be passed to an Element's event. It is either an event handler function
- * or a tuple consisting of the handler function and the flag indicating whether the event
- * handler should be attached to the capture (true) or to the bubble (false) phase.
+ * Union type that can be passed to an Element's event.
  * @typeparam T DOM event type, e.g. MouseEvent
  */
 export type EventPropType<T extends Event> = EventFuncType<T> | EventFuncAndThisType<T> |
@@ -973,6 +825,9 @@ export interface ICommonProps
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Type that is used to specify color values for different style properties.
+ */
 export type ColorPropType = string;
 export type CrossoriginPropType = "anonymous" | "use-credentials";
 export type FormenctypePropType = "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain";
@@ -1127,7 +982,8 @@ export function isSvg( elm: Element): boolean
  */
 export function isSvgSvg( elm: Element): boolean
 {
-	return (elm as any).ownerSVGElement === null;
+	return elm.tagName === "svg";
+	// return (elm as any).ownerSVGElement === null;
 }
 
 
@@ -1451,58 +1307,6 @@ export function jsx( tag: any, props: any, ...children: any[]): any
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Definitions of mount/unmount functions
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-import * as root from "../core/RootVN"
-
-/**
- * Renders the given content (usually result of JSX expression) under the given HTML element in a
- * synchronous manner.
- * @param content Content to render.
- * @param anchorDN DOM element under which to render the content. If null or undefined, then
- * render under the document.body tag.
- */
-export function mountSync( content: any, anchorDN: Node = null): void
-{
-	root.mountRootSync( content, anchorDN);
-}
-
-// 
-/**
- * Removes the content that was originally generated by the mountSync function.
- * @param anchorDN DOM element under which the content was previously rendered.
- */
-export function unmountSync( anchorDN: Node = null): void
-{
-	root.unmountRootSync( anchorDN);
-}
-
-/**
- * Renders the given content (usually result of JSX expression) under the given HTML element
-// asynchronously.
- * @param content Content to render.
- * @param anchorDN DOM element under which to render the content. If null or undefined,then
- *				render under the document.body tag.
- */
-export function mount( content: any, anchorDN: Node = null): void
-{
-	root.mountRoot( content, anchorDN);
-}
-
-/**
- * Removes the content that was originally generated by the mount function.
- * @param anchorDN DOM element under which the content was previously rendered.
- */
-export function unmount( anchorDN: Node = null): void
-{
-	root.unmountRoot( anchorDN);
-}
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
 // Provide implementation for the registerCustomAttribute exported function.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1613,6 +1417,248 @@ import {wrapCallbackWithVN} from "../core/Scheduler"
 export function wrapCallback<T extends Function>( callback: T, that?: object, vn?: IVNode): T
 {
 	return wrapCallbackWithVN( callback, that, vn);
+}
+
+
+
+/**
+ * Base class for components. Components that derive from this class must implement the render
+ * method.
+ */
+export abstract class Component<TProps = {}, TChildren = any> implements IComponent<TProps,TChildren>
+{
+	/** Component properties passed to the constructor */
+	public props: CompProps<TProps,TChildren>;
+
+	/** Remembered vn object through which component can request services. */
+	public vn: IVNode;
+
+	constructor( props?: CompProps<TProps,TChildren>)
+	{
+		if (props)
+			this.props = props;
+	}
+
+	/** Returns the component's content that will be ultimately placed into the DOM tree. */
+	public abstract render(): any;
+
+	/** This method is called by the component to request to be updated. */
+	protected updateMe(): void
+	{
+		if (this.vn)
+			this.vn.requestUpdate();
+	}
+
+	/**
+	 * Schedules the given function to be called before any components scheduled to be updated in
+	 * the Mimbl tick are updated.
+	 * @param func Function to be called
+	 * @param that Object that will be used as "this" value when the function is called. If this
+	 *   parameter is undefined, the component instance will be used (which allows scheduling
+	 *   regular unbound components' methods). This parameter will be ignored if the the function
+	 *   is already bound or is an arrow function.
+	 */
+	protected callMeBeforeUpdate( func: ScheduledFuncType, that?: object): void
+	{
+		if (this.vn)
+			this.vn.scheduleCallBeforeUpdate( func, that ? that : this);
+	}
+
+	/**
+	 * Schedules the given function to be called after all components scheduled to be updated in
+	 * the Mimbl tick have already been updated.
+	 * @param func Function to be called
+	 * @param that Object that will be used as "this" value when the function is called. If this
+	 *   parameter is undefined, the component instance will be used (which allows scheduling
+	 *   regular unbound components' methods). This parameter will be ignored if the the function
+	 *   is already bound or is an arrow function.
+	 */
+	protected callMeAfterUpdate( func: ScheduledFuncType, that?: object): void
+	{
+		if (this.vn)
+			this.vn.scheduleCallAfterUpdate( func, that ? that : this);
+	}
+
+	/**
+	 * Creates a wrapper function with the same signature as the given callback so that if the original
+	 * callback throws an exception, it is processed by the Mimbl error handling mechanism so that the
+	 * exception bubbles from this component up the hierarchy until a component that knows to
+	 * handle errors is found.
+	 * 
+	 * Use this method before passing callbacks to document and window event handlers as well as
+	 * non-DOM objects that use callbacks, e.g. promises. For example:
+	 * 
+	 * ```typescript
+	 *	class ResizeMonitor
+	 *	{
+	 *		private onWindowResize(e: Event): void {};
+	 *
+	 * 		wrapper: (e: Event): void;
+	 * 
+	 * 		public startResizeMonitoring( vn: IVNode)
+	 *		{
+	 *			this.wrapper = vn.wrapCallback( this.onWindowResize, this);
+	 *			window.addEventListener( "resize", this.wrapper);
+	 *		}
+	 * 
+	 * 		public stopResizeMonitoring()
+	 *		{
+	 *			window.removeEventListener( "resize", this.wrapper);
+	 *			this.wrapper = undefined;
+	 *		}
+	 *	}
+	 * ```
+	 * 
+	 * @param callback Callback to be wrapped
+	 * @returns Function that has the same signature as the given callback and that should be used
+	 *     instead of the original callback
+	 */
+	protected wrapCallback<T extends Function>( callback: T, that?: object): T
+	{
+		return wrapCallbackWithVN( callback, this, this.vn);
+	}
+}
+
+
+
+/**
+ * The FuncProxy component wraps a function that produces content. Proxies can wrap instance
+ * methods of classes that have access to "this" thus allowing a single class to "host" multiple
+ * components that can be updated separately. This is especially useful when there is a hierarchy
+ * of derived classes and (virtual) methods that deliver several pieces of content. FuncProxies
+ * can wrap these virtual methods (or other methods that call them) so that the content pieces
+ * can be updated separately. FuncProxy has a public Update method that should be called to cause
+ * the rendering mechanism to invoke the function wrapped by the FuncProxy.
+ */
+export class FuncProxy extends Component
+{
+	constructor( func: () => any)
+	{
+		super();
+
+		this.func = func;
+	}
+
+	public update = (): void =>
+	{
+		if (this.vn)
+			this.vn.requestUpdate();
+	};
+
+	public render(): any
+	{
+		return this.func();
+	}
+
+	private func: () => any;
+}
+
+
+
+/**
+ * The Waiting component wraps a Promise and replaces its content when the promise is settled.
+ * Before the promise is settled, the component displays an optional "in-progress" content
+ * specified in the constructor. If the promise is rejected, the component will either display
+ * the "error" content obtained by calling a functions specified in the constructor or if such
+ * function is not specified show empty content.
+ */
+export class Waiting extends Component
+{
+	/**
+	 * Constructs the object
+	 * @param promise Promise object to wait for
+	 * @param progressContent Content to display while waiting for the promise
+	 * @param errorContentFunc Content to display if the promise is rejected
+	 */
+	constructor( promise: Promise<any>, progressContent?: any, errorContentFunc?: (err: any) => any)
+	{
+		super();
+
+		this.content = progressContent;
+
+		this.watchPromise( promise, errorContentFunc);
+	}
+
+	public render(): any
+	{
+		return this.content;
+	}
+
+	private async watchPromise( promise: Promise<any>, errorContentFunc?: (err: any) => any): Promise<any>
+	{
+		try
+		{
+			this.content = await promise;
+		}
+		catch( err)
+		{
+			this.content = null;
+			if (errorContentFunc !== undefined)
+			{
+				try
+				{
+					this.content = errorContentFunc( err);
+				}
+				catch(anotherErr)
+				{
+				}
+			}
+		}
+	}
+
+	private content: any;
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Definitions of mount/unmount functions
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+import * as root from "../core/RootVN"
+
+/**
+ * Renders the given content (usually result of JSX expression) under the given HTML element in a
+ * synchronous manner.
+ * @param content Content to render.
+ * @param anchorDN DOM element under which to render the content. If null or undefined, then
+ * render under the document.body tag.
+ */
+export function mountSync( content: any, anchorDN: Node = null): void
+{
+	root.mountRootSync( content, anchorDN);
+}
+
+// 
+/**
+ * Removes the content that was originally generated by the mountSync function.
+ * @param anchorDN DOM element under which the content was previously rendered.
+ */
+export function unmountSync( anchorDN: Node = null): void
+{
+	root.unmountRootSync( anchorDN);
+}
+
+/**
+ * Renders the given content (usually result of JSX expression) under the given HTML element
+// asynchronously.
+ * @param content Content to render.
+ * @param anchorDN DOM element under which to render the content. If null or undefined,then
+ *				render under the document.body tag.
+ */
+export function mount( content: any, anchorDN: Node = null): void
+{
+	root.mountRoot( content, anchorDN);
+}
+
+/**
+ * Removes the content that was originally generated by the mount function.
+ * @param anchorDN DOM element under which the content was previously rendered.
+ */
+export function unmount( anchorDN: Node = null): void
+{
+	root.unmountRoot( anchorDN);
 }
 
 
