@@ -35,8 +35,10 @@ export class FuncProxyVN extends VNBase
 
 		this.type = mim.VNType.FuncProxy;
 		this.func = props.func;
-		this.thisArg = props.thisArg;
+		this.thisArg = props.thisArg || s_currentClassComp;
 		this.args = props.args;
+		this.argsReplaced = false;
+
 		this.key = props.key;
 
 		// if a key was not provided we use the current component as a key. If that is undefined
@@ -48,6 +50,7 @@ export class FuncProxyVN extends VNBase
 	public replaceArgs( args: any[]): void
 	{
 		this.args = args;
+		this.argsReplaced = true;
 	}
 
 
@@ -65,12 +68,11 @@ export class FuncProxyVN extends VNBase
 
 
 	/**
-	 * Flag indicating whether this node (more precisely, nodes of this type) should always
-	 * re-render during update even it is the same physical node instance. This is needed for
-	 * nodes that serve as a proxy to a rendering function and that function must be invoked
-	 * even none of the node parameters have changed.
+	 * Flag indicating whether this node should re-render during update even it is the same
+	 * physical node instance. This is needed for nodes that serve as a proxy to a rendering
+	 * function and that function must be invoked even none of the node parameters have changed.
 	 */
-	public get alwaysRenderOnUpdate(): boolean { return true; };
+	public get renderOnUpdate(): boolean { return this.argsReplaced; };
 
 
 
@@ -100,6 +102,7 @@ export class FuncProxyVN extends VNBase
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
+		this.argsReplaced = false;
 		return this.func.apply( this.thisArg, this.args);
 	}
 
@@ -182,6 +185,7 @@ export class FuncProxyVN extends VNBase
 			return;
 
 		vn.args = args;
+		vn.argsReplaced = true;
 		vn.requestUpdate();
 	}
 
@@ -218,6 +222,10 @@ export class FuncProxyVN extends VNBase
 
 	// Optional arguments to be passed to the function.
 	private args: any[];
+
+	// Flag indicating whether arguments have been replaced. This is needed to determine whether
+	// the node should be re-rendered; that is, the function should be called.
+	private argsReplaced: boolean;
 
 	// Key that links the function and this node. This key is either equals to the key provided
 	// in the properties passed to the constructor or to the current component or to the function

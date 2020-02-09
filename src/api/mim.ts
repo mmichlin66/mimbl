@@ -1561,22 +1561,22 @@ export interface FuncProxyProps
 	 * original arguments. The next time the FuncProxy component is rendered, the `args` property
 	 * will be ignored.
 	 * 
-	 * Note the following sequence of actions that occurs when `updateArgs` is false or missing:
+	 * Note the following sequence of actions that occurs when `replaceArgs` is false or missing:
 	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" />. "A" will be used.
 	 * 1. Parent component calls FuncProxy.update( this.foo, undefined, "B"). "B" will be used.
 	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" />. "B" will still be used.
 	 * 
-	 * If the `updateArgs` property is set to true, then every time the FuncProxy componenet is
+	 * If the `replaceArgs` property is set to true, then every time the FuncProxy componenet is
 	 * rendered, the value of the `args` property replaces whatever arguments there were before.
 	 * 
 	 * Now note the sequence of actions when `updateArgs` is true:
-	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" updateArgs />."A" will
+	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" replaceArgs />."A" will
 	 * be used.
 	 * 1. Parent component calls FuncProxy.update( this.foo, undefined, "B"). "B" will be used.
-	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" updateArgs />. "A" will
+	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" replaceArgs />. "A" will
 	 * be used again.
 	 */
-	updateArgs?: boolean;
+	replaceArgs?: boolean;
 
 	/**
 	 * Value to be used as "this" when invoking the function. If this value is undefined, the

@@ -83,10 +83,10 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
 		{
 			// if the updateArgs property is true, we replace the arguments in the node; otherwise,
 			// we ignore the arguments from the properties.
-			if (funcProxyProps.updateArgs)
+			if (funcProxyProps.replaceArgs)
 				vn.replaceArgs( funcProxyProps.args);
 
-			return vn
+			return vn;
 		}
 	}
 	else if (typeof tag === "function")

@@ -35,12 +35,11 @@ export interface VN extends mim.IVNode
 	key?: any;
 
 	/**
-	 * Flag indicating whether this node (more precisely, nodes of this type) should always
-	 * re-render during update even it is the same physical node instance. This is needed for
-	 * nodes that serve as a proxy to a rendering function and that function must be invoked
-	 * even none of the node parameters have changed.
+	 * Flag indicating whether this node should re-render during update even it is the same
+	 * physical node instance. This is needed for nodes that serve as a proxy to a rendering
+	 * function and that function must be invoked even none of the node parameters have changed.
 	 */
-	alwaysRenderOnUpdate?: boolean;
+	renderOnUpdate?: boolean;
 
 	/** Gets node's parent. This is undefined for the top-level (root) nodes. */
 	parent?: VN;

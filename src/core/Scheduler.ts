@@ -703,7 +703,7 @@ function updateSubNodesVirtual( disp: VNDisp): void
 			newVN = subNodeDisp.newVN;
 			if (subNodeDisp.action === VNDispAction.Update)
 			{
-				if ((oldVN.alwaysRenderOnUpdate || oldVN !== newVN) && oldVN.prepareUpdate)
+				if ((oldVN.renderOnUpdate || oldVN !== newVN) && oldVN.prepareUpdate)
 				{
 					/// #if VERBOSE_NODE
 						console.debug( `VERBOSE: Calling prepareUpdate() on node ${oldVN.name}`);
@@ -792,7 +792,7 @@ function updatePhysicalByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 
 		if (disp.action === VNDispAction.Update)
 		{
-			if (oldVN.alwaysRenderOnUpdate || oldVN !== newVN)
+			if (oldVN.renderOnUpdate || oldVN !== newVN)
 			{
 				if (disp.updateDisp.shouldCommit)
 				{
@@ -886,7 +886,7 @@ function updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 
 			if (group.action === VNDispAction.Update)
 			{
-				if (oldVN.alwaysRenderOnUpdate || oldVN !== newVN)
+				if (oldVN.renderOnUpdate || oldVN !== newVN)
 				{
 					if (disp.updateDisp.shouldCommit)
 					{
