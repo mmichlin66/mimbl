@@ -1,5 +1,6 @@
 ﻿import * as mim from "../api/mim"
 import {VN, VNUpdateDisp} from "./VN"
+import {VNBase} from "./VNBase"
 import {ClassCompVN} from "./ClassCompVN"
 
 /// #if USE_STATS
@@ -87,13 +88,23 @@ export class ManagedCompVN extends ClassCompVN implements mim.IManagedCompVN
 
 
 
+	// Initializes the node by passing the parent node to it. After this, the node knows its
+	// place in the hierarchy and gets access to the root of it - the RootVN object.
+	public init( parent: VNBase, creator: mim.IComponent): void
+	{
+		super.init( parent, creator);
+
+		// create component instance
+		this.comp = new this.compClass( this.props);
+	}
+
+
+
 	// Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
 	// This method is part of the Render phase.
 	public willMount(): void
 	{
-		// create component instance
-		this.comp = new this.compClass( this.props);
 		this.comp.vn = this;
 
 		if (this.comp.willMount)

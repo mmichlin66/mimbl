@@ -88,7 +88,7 @@ export class IndependentCompVN extends ClassCompVN implements mim.IIndependentCo
 
 
 
-	// Notifies the given component that ir will be mounted.
+	// Notifies the given component that it will be mounted.
 	private willMountInstance( comp: mim.IComponent): void
 	{
 		comp.vn = this;

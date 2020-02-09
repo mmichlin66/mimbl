@@ -4,8 +4,6 @@ import {VNBase} from "./VNBase"
 import {ElmAttr, AttrPropInfo, EventPropInfo, CustomAttrPropInfo, PropType, PropInfo} from "../utils/ElmAttr"
 import {SvgElms} from "../utils/SvgElms";
 import {deepCompare} from "../utils/Utils";
-import {s_currentVN} from "./Scheduler"
-import {ClassCompVN} from "./ClassCompVN";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -33,9 +31,6 @@ export class ElmVN extends VNBase implements mim.IElmVN
 	// (anchore) DOM node.
 	public isSvg: boolean;
 
-	// Component that created this element in its render method.
-	public creator: mim.IComponent;
-
 
 
 	constructor( tagName: string, props: any, children: any[])
@@ -46,12 +41,6 @@ export class ElmVN extends VNBase implements mim.IElmVN
 		this.elmName = tagName;
 		this.props = props;
 		this.children = children;
-
-		// the s_currentVN should point to the virtual node behind the class-based component
-		// whose render method created this element node. We remember it and use it later to
-		// bind event listeners.
-		if (s_currentVN && s_currentVN instanceof ClassCompVN)
-			this.creator = s_currentVN.comp;
 
 		if (props)
 		{
@@ -224,7 +213,6 @@ export class ElmVN extends VNBase implements mim.IElmVN
 		// values are the same)
 		this.key = newElmVN.key;
 		this.updateStrategy = newElmVN.updateStrategy;
-		this.creator = newElmVN.creator;
 
 		this.updateAttrs( newElmVN.attrs);
 		this.updateEvents( newElmVN.events);

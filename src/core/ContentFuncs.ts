@@ -6,6 +6,8 @@ import {ManagedCompVN} from "./ManagedCompVN"
 import {FuncVN} from "./FuncVN"
 import {ElmVN} from "./ElmVN"
 import {TextVN} from "./TextVN"
+import {FuncProxyVN} from "./FuncProxyVN"
+import {s_currentClassComp} from "./Scheduler"
 
 
 
@@ -15,16 +17,16 @@ import {TextVN} from "./TextVN"
 // might also be arrays, the process is recursive.
 export function createNodesFromContent( content: any): VN | VN[]
 {
-	if (content === null || content === undefined || content === false || typeof content === "function")
+	if (content === null || content === undefined || content === false)
 		return null;
-	else if (typeof content === "string")
-		return new TextVN( content);
 	else if (content instanceof VNBase)
 		return content;
+	else if (typeof content === "string")
+		return new TextVN( content);
 	else if (typeof content.render === "function")
 	{
-		// if the component (this can only be an Instance component) is already attached to VN, add
-		// this existing VN; otherwise create a new one.
+		// if the component (this can only be an Instance component) is already attached to VN,
+		// return this existing VN; otherwise create a new one.
 		return (content as mim.IComponent).vn
 						? (content as mim.IComponent).vn as VN
 						: new IndependentCompVN( content as mim.IComponent);
@@ -33,6 +35,11 @@ export function createNodesFromContent( content: any): VN | VN[]
 		return createNodesFromArray( content);
 	else if (content instanceof Promise)
 		throw content;
+	else if (typeof content === "function")
+	{
+		let vn = FuncProxyVN.findVN( content)
+		return vn || new FuncProxyVN( { func: content, thisArg: s_currentClassComp});
+	}
 	else
 		return new TextVN( content.toString());
 }
@@ -61,6 +68,27 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
 		return new ElmVN( tag as string, props, children);
 	else if (tag === mim.Fragment)
 		return createNodesFromArray( children);
+	else if (tag === mim.FuncProxy)
+	{
+		if (!props || !props.func)
+			return undefined;
+
+		// check whether we already have a node linked to this function. If yes return it;
+		// otherwise, create a new node.
+		let funcProxyProps = props as mim.FuncProxyProps;
+		let vn = FuncProxyVN.findVN( props.func, funcProxyProps.key);
+		if (!vn)
+			return new FuncProxyVN( props);
+		else
+		{
+			// if the updateArgs property is true, we replace the arguments in the node; otherwise,
+			// we ignore the arguments from the properties.
+			if (funcProxyProps.updateArgs)
+				vn.replaceArgs( funcProxyProps.args);
+
+			return vn
+		}
+	}
 	else if (typeof tag === "function")
 	{
 		// children parameter is always an array. A component can specify that its children are
@@ -108,6 +136,18 @@ function createNodesFromArray( arr: any[]): VN[]
 	}
 
 	return nodes.length > 0 ? nodes : null;
+}
+
+
+
+/**
+ * Returns a reference to the component that is set as current at the time of the call.
+ */
+export function getCurrentComponent(): mim.IComponent
+{
+	// the s_currentVN should point to the virtual node behind the class-based component,
+	// which should be used as "this" when the FuncProxy component calls the function.
+	return s_currentClassComp;
 }
 
 

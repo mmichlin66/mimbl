@@ -22,18 +22,31 @@ export interface VN extends mim.IVNode
 		readonly statsCategory: StatsCategory;
 	/// #endif
 
-	// Level of nesting at which the node resides relative to the root node.
+	/** Level of nesting at which the node resides relative to the root node. */
 	depth?: number;
 
-	// DOM node under which all content of this virtual node is rendered.
+	/** DOM node under which all content of this virtual node is rendered. */
 	anchorDN?: DN;
 
-	// Node's key. The derived classes set it based on their respective content. A key
-	// can be of any type.
+	/**
+	 * Node's key. The derived classes set it based on their respective content. A key can be of
+	 * any type.
+	 */
 	key?: any;
+
+	/**
+	 * Flag indicating whether this node (more precisely, nodes of this type) should always
+	 * re-render during update even it is the same physical node instance. This is needed for
+	 * nodes that serve as a proxy to a rendering function and that function must be invoked
+	 * even none of the node parameters have changed.
+	 */
+	alwaysRenderOnUpdate?: boolean;
 
 	/** Gets node's parent. This is undefined for the top-level (root) nodes. */
 	parent?: VN;
+
+	// Component that created this node as part of its rendering tree.
+	creator?: mim.IComponent;
 
 	// Reference to the next sibling node or undefined for the last sibling.
 	next?: VN;
@@ -72,7 +85,7 @@ export interface VN extends mim.IVNode
 
 	// Initializes the node by passing the parent node to it. After this, the node knows its
 	// place in the hierarchy and gets access to the root of it - the RootVN object.
-	init( parent: VN): void;
+	init( parent: VN, creator: mim.IComponent): void;
 
 	// Cleans up the node object before it is released.
 	term(): void;
@@ -136,7 +149,7 @@ export interface VN extends mim.IVNode
 	supportsErrorHandling?(): boolean;
 
 	// This method is called after an exception was thrown during rendering of the node itself
-	// and/or its sub-nodes. It returns content comprising the children of the node.
+	// and/or its sub-nodes. The render method will be called after this method returns.
 	// This method is part of the Render phase.
 	handleError?( vnErr: any, path: string[]): void;
 }
@@ -146,7 +159,7 @@ export interface VN extends mim.IVNode
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // The VNUpdateDisp type describes whether certain actions should be performed on the node
-// during update. This object is returned from the node's updateFrom method.
+// during update. This object is returned from the node's prepareUpdate method.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export class VNUpdateDisp

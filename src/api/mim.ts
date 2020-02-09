@@ -528,6 +528,9 @@ export const enum VNType
 
 	/** Text node */
 	Text,
+
+	/** Wrapper around a function/method that can be updated independently. */
+	FuncProxy,
 }
 
 
@@ -545,6 +548,9 @@ export interface IVNode
 
 	/** Gets node's parent. This is undefined for the top-level (root) nodes. */
 	readonly parent?: IVNode;
+
+	/** Component that created this node in its render method (or undefined). */
+	readonly creator?: IComponent;
 
 	/** Reference to the next sibling node or undefined for the last sibling. */
 	readonly next?: IVNode;
@@ -724,9 +730,6 @@ export interface IElmVN extends IVNode
 
 	/** Gets the DOM element object. */
 	readonly elm: Element;
-
-	/** Component that created this element in its render method (or undefined). */
-	readonly creator: IComponent;
 }
 
 
@@ -1455,7 +1458,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * @param func Function to be called
 	 * @param that Object that will be used as "this" value when the function is called. If this
 	 *   parameter is undefined, the component instance will be used (which allows scheduling
-	 *   regular unbound components' methods). This parameter will be ignored if the the function
+	 *   regular unbound components' methods). This parameter will be ignored if the function
 	 *   is already bound or is an arrow function.
 	 */
 	protected callMeBeforeUpdate( func: ScheduledFuncType, that?: object): void
@@ -1521,38 +1524,122 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 
 
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// FuncProxy support
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+import {FuncProxyVN} from "../core/FuncProxyVN"
+
+/**
+ * Properties to be used with the FuncProxy component. FuncProxy component cannot have children.
+ */
+export interface FuncProxyProps
+{
+	/** Function that renders content. */
+	func: Function;
+
+	/**
+	 * A key that distinguishes between multiple uses of the same function. If the function is
+	 * used only once within a component, the key is not necessary; however, if the function is
+	 * used multiple times, key is mandatory - otherwise, the behavior is undetermined.
+	 */
+	key?: any;
+
+	/**
+	 * Arguments to be passed to the function. Whenever the FuncProxy component is rendered, this
+	 * parameter is used when calling the wrapped function.
+	 */
+	args?: any[];
+
+	/**
+	 * Flag indicating whether the arguments specified by the `args` property should be passed to
+	 * the function overriding arguments that were specified by the most recent call to the
+	 * FuncProxy.update method. By default the value of this property is false and `args` will be
+	 * used only the first time the function is wrapped by the FuncProxy component. If the
+	 * FuncProxy.update method is called, the argument specified in this call will replace the
+	 * original arguments. The next time the FuncProxy component is rendered, the `args` property
+	 * will be ignored.
+	 * 
+	 * Note the following sequence of actions that occurs when `updateArgs` is false or missing:
+	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" />. "A" will be used.
+	 * 1. Parent component calls FuncProxy.update( this.foo, undefined, "B"). "B" will be used.
+	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" />. "B" will still be used.
+	 * 
+	 * If the `updateArgs` property is set to true, then every time the FuncProxy componenet is
+	 * rendered, the value of the `args` property replaces whatever arguments there were before.
+	 * 
+	 * Now note the sequence of actions when `updateArgs` is true:
+	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" updateArgs />."A" will
+	 * be used.
+	 * 1. Parent component calls FuncProxy.update( this.foo, undefined, "B"). "B" will be used.
+	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" updateArgs />. "A" will
+	 * be used again.
+	 */
+	updateArgs?: boolean;
+
+	/**
+	 * Value to be used as "this" when invoking the function. If this value is undefined, the
+	 * class based component that rendered the FuncProxy component will be used (which is the
+	 * most common case).
+	 */
+	thisArg?: any;
+
+	/** FuncProxy component cannot have children. */
+	children?: void;
+}
+
 /**
  * The FuncProxy component wraps a function that produces content. Proxies can wrap instance
  * methods of classes that have access to "this" thus allowing a single class to "host" multiple
- * components that can be updated separately. This is especially useful when there is a hierarchy
- * of derived classes and (virtual) methods that deliver several pieces of content. FuncProxies
- * can wrap these virtual methods (or other methods that call them) so that the content pieces
- * can be updated separately. FuncProxy has a public Update method that should be called to cause
- * the rendering mechanism to invoke the function wrapped by the FuncProxy.
+ * components that can be updated separately. The FuncProxy component is not intended to be
+ * created by developers; instead it is only used in its JSX form as the following:
+ * 
+ * ```tsx
+ * <FuncProxy func={this.renderSomething} key={...} args={...} thisArg={...} />
+ * ```
+ * 
+ * There is a simpler method of specifying a rendering function in JSX, e.g.:
+ * 
+ * ```tsx
+ * <div>{this.renderSomething}</div>
+ * ```
+ * 
+ * The FuncProxy coponent is needed in the case where one (or more) of the following is true:
+ * - There is a need to pass arguments to the function
+ * - The same function is used multiple times and keys must be used to distinguish between the
+ * invocations.
+ * - The value of "this" inside the function is not the component that does the rendering. That
+ * is, the function is not a method of this component.
+ * 
+ * FuncProxy has a public static Update method that should be called to
+ * cause the rendering mechanism to invoke the function wrapped by the FuncProxy.
  */
-export class FuncProxy extends Component
+export class FuncProxy extends Component<FuncProxyProps>
 {
-	constructor( func: () => any)
-	{
-		super();
+	/**
+	 * Instances of the FuncProxy component are never actually created; istead. the parameters
+	 * passed to it via JSX are used by an internal virtual node that handles function
+	 * invocation.
+	 */
+	private constructor( props: FuncProxyProps) { super(props) }
 
-		this.func = func;
+	/** The render method of the FuncProxy component is never actually called */
+	public render(): any {}
+
+	/**
+	 * Request re-rendering of the content produced by the given function by invoking this
+	 * function. The function must have been previously used in rendering using either
+	 * <FuncProxy func={} /> JSX construct or a simpler constuct
+	 * @param func Function to invoke.
+	 * @param key Value that helps distinguishing between multiple usages of the function.
+	 * @param args Arguments to be passed to the function.
+	 */
+	public static update( func: Function, key?: any, ...args: any[])
+	{
+		FuncProxyVN.update( func, key, args);
 	}
-
-	public update = (): void =>
-	{
-		if (this.vn)
-			this.vn.requestUpdate();
-	};
-
-	public render(): any
-	{
-		return this.func();
-	}
-
-	private func: () => any;
 }
-
 
 
 /**
@@ -1606,7 +1693,7 @@ export class Waiting extends Component
 		}
 	}
 
-	private content: any;
+	@updatable private content: any;
 }
 
 

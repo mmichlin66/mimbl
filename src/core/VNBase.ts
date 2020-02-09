@@ -9,12 +9,6 @@ import {notifyServicePublished, notifyServiceUnpublished, notifyServiceSubscribe
 
 
 
-// Use type DN to refer to DOM's Node class. The DOM nodes that we are dealing with are
-// either of type Element or Text.
-export type DN = Node;
-
-
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // The VNBase class is a base class for all types of virtual nodes.
@@ -36,6 +30,9 @@ export abstract class VNBase implements VN
 
 	// Parent node. This is null for the top-level (root) nodes.
 	public parent: VNBase;
+
+	/** Component that created this node in its render method (or undefined). */
+	public creator: mim.IComponent;
 
 	// Level of nesting at which the node resides relative to the root node.
 	public depth: number;
@@ -70,10 +67,11 @@ export abstract class VNBase implements VN
 
 	// Initializes the node by passing the parent node to it. After this, the node knows its
 	// place in the hierarchy and gets access to the root of it - the RootVN object.
-	public init( parent: VNBase): void
+	public init( parent: VNBase, creator: mim.IComponent): void
 	{
 		this.parent = parent;
 		this.depth = this.parent ? this.parent.depth + 1 : 0;
+		this.creator = creator;
 	}
 
 
@@ -98,6 +96,7 @@ export abstract class VNBase implements VN
 		this.prev = undefined;
 		this.subNodes = undefined;
 		this.keyedSubNodes = undefined;
+		this.creator = undefined;
 		this.depth = undefined;
 		this.parent = undefined;
 	}

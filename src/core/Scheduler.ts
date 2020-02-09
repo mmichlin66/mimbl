@@ -78,6 +78,9 @@ let s_currentTick: number = 0;
 // level node, this value will still point at the node that caused the exception.
 export let s_currentVN: VN = null;
 
+// Class-based coponent whose rendering tree is currently being processed.
+export let s_currentClassComp: mim.IComponent = null;
+
 
 
 // Callback that is called on a new UI cycle when there is a need to update UI components
@@ -213,6 +216,8 @@ function CallbackWrapper(): any
 	// that this can be undefined
 	let currentVN = s_currentVN;
 	s_currentVN = this;
+	let currentClassComp = s_currentClassComp;
+	s_currentClassComp = (s_currentVN as any).comp ? (s_currentVN as any).comp : s_currentVN.creator;
 	try
 	{
 		let [that, orgCallback, ...rest] = arguments;
@@ -235,6 +240,7 @@ function CallbackWrapper(): any
 	{
 		// restore the current VN to the remembered value;
 		s_currentVN = currentVN;
+		s_currentClassComp = s_currentClassComp;
 	}
 }
 
@@ -427,15 +433,15 @@ function callScheduledFunctions( funcs: ScheduledFuncMap, beforeUpdate: boolean)
 // handles it or up to the root node.
 function createVirtual( vn: VN, parent: VN): void
 {
-	vn.init( parent);
-
-	// set essential node parameters.
-	vn.parent = parent;
-	vn.depth = vn.parent ? vn.parent.depth + 1 : 0;
+	vn.init( parent, s_currentClassComp);
 
 	// keep track of the node that is being currently processed.
 	let currentVN = vn;
 	s_currentVN = currentVN;
+
+	let currentClassComp = s_currentClassComp;
+	if ((vn as any).comp)
+		s_currentClassComp = (vn as any).comp;
 
 	if (vn.willMount)
 	{
@@ -493,6 +499,7 @@ function createVirtual( vn: VN, parent: VN): void
 	// node or by one of its sub-nodes, this line is not executed and thus, s_currentVN
 	// will point to our node when the exception is caught.
 	s_currentVN = currentVN;
+	s_currentClassComp = currentClassComp;
 }
 
 
@@ -636,6 +643,10 @@ function updateVirtual( disp: VNDisp): void
 	let currentVN = vn;
 	s_currentVN = currentVN;
 
+	let currentClassComp = s_currentClassComp;
+	if ((vn as any).comp)
+		s_currentClassComp = (vn as any).comp;
+
 	try
 	{
 		updateSubNodesVirtual( disp);
@@ -662,6 +673,7 @@ function updateVirtual( disp: VNDisp): void
 
 	// restore pointer to the currently being processed node after processing its sub-nodes
 	s_currentVN = currentVN;
+	s_currentClassComp = currentClassComp;
 }
 
 
@@ -691,7 +703,7 @@ function updateSubNodesVirtual( disp: VNDisp): void
 			newVN = subNodeDisp.newVN;
 			if (subNodeDisp.action === VNDispAction.Update)
 			{
-				if (oldVN !== newVN && oldVN.prepareUpdate)
+				if ((oldVN.alwaysRenderOnUpdate || oldVN !== newVN) && oldVN.prepareUpdate)
 				{
 					/// #if VERBOSE_NODE
 						console.debug( `VERBOSE: Calling prepareUpdate() on node ${oldVN.name}`);
@@ -780,7 +792,7 @@ function updatePhysicalByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 
 		if (disp.action === VNDispAction.Update)
 		{
-			if (oldVN !== newVN)
+			if (oldVN.alwaysRenderOnUpdate || oldVN !== newVN)
 			{
 				if (disp.updateDisp.shouldCommit)
 				{
@@ -874,7 +886,7 @@ function updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 
 			if (group.action === VNDispAction.Update)
 			{
-				if (oldVN !== newVN)
+				if (oldVN.alwaysRenderOnUpdate || oldVN !== newVN)
 				{
 					if (disp.updateDisp.shouldCommit)
 					{
