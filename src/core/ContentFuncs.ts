@@ -17,12 +17,17 @@ import {s_currentClassComp} from "./Scheduler"
 // might also be arrays, the process is recursive.
 export function createNodesFromContent( content: any): VN | VN[]
 {
-	if (content === null || content === undefined || content === false)
+	if (content == null || content === false)
+	{
+		// the comparison above covers both null and undefined
 		return null;
+	}
 	else if (content instanceof VNBase)
 		return content;
 	else if (typeof content === "string")
-		return new TextVN( content);
+	{
+		return content.length > 0 ? new TextVN( content) : null;
+	}
 	else if (typeof content.render === "function")
 	{
 		// if the component (this can only be an Instance component) is already attached to VN,
@@ -51,12 +56,7 @@ export function createNodesFromContent( content: any): VN | VN[]
 export function createVNChainFromContent( content: any): VN[]
 {
 	let nodes = createNodesFromContent( content);
-	if (!nodes)
-		return null;
-	else if (Array.isArray(nodes))
-		return nodes;
-	else
-		return [nodes];
+	return !nodes ? null : Array.isArray(nodes) ? nodes : [nodes];
 }
 
 

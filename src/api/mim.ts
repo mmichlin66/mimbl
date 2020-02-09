@@ -1424,16 +1424,37 @@ export function wrapCallback<T extends Function>( callback: T, that?: object, vn
 
 
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Base component class.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+import {FuncProxyVN} from "../core/FuncProxyVN"
+
+/**
+ * The ComponentUpdateRequest type defines parameters that can be passed to the component updateMe
+ * method if the goal is not to update the entire component but only one or several rendering
+ * functions.
+ */
+export type ComponentUpdateRequest = Function | { func: Function, key?: any, args?: any }
+
 /**
  * Base class for components. Components that derive from this class must implement the render
  * method.
  */
 export abstract class Component<TProps = {}, TChildren = any> implements IComponent<TProps,TChildren>
 {
-	/** Component properties passed to the constructor */
+	/**
+	 * Component properties passed to the constructor. This is normally used only by managed
+	 * components and is usually undefined for independent coponents.
+	 */
 	public props: CompProps<TProps,TChildren>;
 
-	/** Remembered vn object through which component can request services. */
+	/**
+	 * Remembered virtual node object through which the component can request services. This
+	 * is undefined in the component's costructor but will be defined before the call to the
+	 * (optional) willMount method.
+	 */
 	public vn: IVNode;
 
 	constructor( props?: CompProps<TProps,TChildren>)
@@ -1445,11 +1466,37 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	/** Returns the component's content that will be ultimately placed into the DOM tree. */
 	public abstract render(): any;
 
-	/** This method is called by the component to request to be updated. */
-	protected updateMe(): void
+	/**
+	 * This method is called by the component to request to be updated. If no arguments are
+	 * provided, the entire component is requested to be updated. If argument are provided, they
+	 * indicate what rendering functions should be updated.
+	 * @param updateRequests 
+	 */
+	protected updateMe( ...updateRequests: ComponentUpdateRequest[]): void
 	{
-		if (this.vn)
+		if (!this.vn)
+			return;
+
+		if (updateRequests.length === 0)
+		{
+			// if no arguments arer provided we request to update the entire component.
 			this.vn.requestUpdate();
+		}
+		else
+		{
+			// loop over update request arguments
+			for( let req of updateRequests)
+			{
+				if (typeof req === "function")
+					FuncProxyVN.update( req);
+				else
+				{
+					// if a non-array parameter is passed in req.args, we wrap it in an array
+					FuncProxyVN.update( req.func, req.key,
+						!req.args || Array.isArray(req.args) ? req.args : [req.args]);
+				}
+			}
+		}
 	}
 
 	/**
@@ -1529,8 +1576,6 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 // FuncProxy support
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-import {FuncProxyVN} from "../core/FuncProxyVN"
-
 /**
  * Properties to be used with the FuncProxy component. FuncProxy component cannot have children.
  */
@@ -1561,7 +1606,7 @@ export interface FuncProxyProps
 	 * original arguments. The next time the FuncProxy component is rendered, the `args` property
 	 * will be ignored.
 	 * 
-	 * Note the following sequence of actions that occurs when `replaceArgs` is false or missing:
+	 * Note the following sequence of actions that occurs when `replaceArgs` is false or omitted:
 	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" />. "A" will be used.
 	 * 1. Parent component calls FuncProxy.update( this.foo, undefined, "B"). "B" will be used.
 	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" />. "B" will still be used.
@@ -1569,7 +1614,7 @@ export interface FuncProxyProps
 	 * If the `replaceArgs` property is set to true, then every time the FuncProxy componenet is
 	 * rendered, the value of the `args` property replaces whatever arguments there were before.
 	 * 
-	 * Now note the sequence of actions when `updateArgs` is true:
+	 * Now note the sequence of actions when `replaceArgs` is true:
 	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" replaceArgs />."A" will
 	 * be used.
 	 * 1. Parent component calls FuncProxy.update( this.foo, undefined, "B"). "B" will be used.
