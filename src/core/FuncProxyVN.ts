@@ -41,10 +41,10 @@ export class FuncProxyVN extends VNBase
 
 		this.key = props.key;
 
-		// if a key was not provided we use the current component as a key. If that is undefined
-		// too we use the function itself as a key
-		this.linkKey = props.key || s_currentClassComp || this.func;
-	};
+		// if a key was not provided we use the value of thisArg (which might be the current
+		// component) as a key. If that is undefined too we use the function itself as a key.
+		this.linkKey = props.key || this.thisArg || this.func;
+	}
 
 
 	public replaceArgs( args: any[]): void
