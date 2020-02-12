@@ -1,45 +1,58 @@
-﻿///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// The IEventSlot interface represents an event with custom parameters. Multiple
-// listeners can be added/removed to/from an event.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
+﻿/**
+ * The IEventSlot interface represents an event with custom parameters. Multiple listeners can be
+ * added/removed to/from an event.
+ */
 export interface IEventSlot<TFunc extends Function>
 {
-	// Method that raises the event and calls all the listeners (if any). It has the signature
-	// of the template function so only proper-types parameters can be passed to it.
-	fire: TFunc;
-
-	// Adds the given function as a listener to the event. Note that this cannot be a lambda
-	// function because there will be no way to remove a lambda function listener later.
+	/**
+	 * Adds the given function as a listener to the event. Note that this cannot be a lambda
+	 * function because there will be no way to remove a lambda function listener later.
+	 */
 	add( listener: TFunc): void;
 
-	// Removes the given function as a listener to the event.
+	/** Removes the given function as a listener to the event. */
 	remove( listener: TFunc): void;
+}
 
-	// Removes all listeners to the event.
+
+
+/**
+ * The IEventSlotOwner interface represents an event slot from the point of view of the caller who
+ * created it. The owner can fire events and clear event listeners.
+ */
+export interface IEventSlotOwner<TFunc extends Function> extends IEventSlot<TFunc>
+{
+	/**
+	 * Method that raises the event and calls all the listeners (if any). It has the signature
+	 * of the template function so only proper-types parameters can be passed to it.
+	 */
+	fire: TFunc;
+
+	/** Removes all listeners to the event. */
 	clear(): void;
 }
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// The EventSlot class defines an event with custom parameters as members of classes without the
-// need for the classes to derive from EventTarget and use string names for events. Multiple
-// listeners can be added/removed to/from an event.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-export class EventSlot<TFunc extends Function> implements IEventSlot<TFunc>
+/**
+ * The EventSlot class defines an event with custom parameters as members of classes without the
+ * need for the classes to derive from EventTarget and use string names for events. Multiple
+ * listeners can be added/removed to/from an event.
+ */
+export class EventSlot<TFunc extends Function> implements IEventSlotOwner<TFunc>
 {
-	// Method that raises the event and calls all the listeners (if any). It has the signature
-	// of the template function so only proper-types parameters can be passed to it.
+	/**
+	 * Method that raises the event and calls all the listeners (if any). It has the signature
+	 * of the template function so only proper-types parameters can be passed to it.
+	 */
 	public fire: TFunc = this.realFire as any as TFunc;
 
 
 
-	// Adds the given function as a listener to the event. Note that this should not be a lambda
-	// function because there will be no way to remove a lambda function listener later.
+	/**
+	 * Adds the given function as a listener to the event. Note that this cannot be a lambda
+	 * function because there will be no way to remove a lambda function listener later.
+	 */
 	public add( listener: TFunc): void
 	{
 		if (this.listeners === null)
@@ -50,7 +63,7 @@ export class EventSlot<TFunc extends Function> implements IEventSlot<TFunc>
 
 
 
-	// Removes the given function as a listener to the event.
+	/** Removes the given function as a listener to the event. */
 	public remove( listener: TFunc): void
 	{
 		if (this.listeners !== null)
@@ -63,7 +76,7 @@ export class EventSlot<TFunc extends Function> implements IEventSlot<TFunc>
 
 
 
-	// Removes all listener to the event.
+	/** Removes all listeners to the event. */
 	public clear(): void
 	{
 		this.listeners = null;
@@ -91,51 +104,122 @@ export class EventSlot<TFunc extends Function> implements IEventSlot<TFunc>
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// The EventMultiSlot class allows registering listeners for multiple events. Events are identified
-// using the specified template type, which is usually (but not necessarily) a number- or
-// string-based enumeration or union type.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-export class EventMultiSlot<T>
+// Interface and class for simple events accepting no parameters.
+export interface ISimpleEventSlot extends IEventSlot<()=>void> {}
+export class SimpleEventSlot extends EventSlot<()=>void> {}
+
+
+
+/**
+ * The MultiEventSlot type represents an object that for each property from the template type T
+ * has corresponding property, which is an event slot for a function, whose signature is the same
+ * as of the original property. For example, if we have the following type:
+ * 
+ * ```typescript
+ * type IMyEvents = 
+ * {
+ *     click: () => void;
+ *     change: ( newVal: number) => void;
+ * }
+ * ```
+ * 
+ * then the MultiEventSlot<IMyEvents> type will have the following shape:
+ * 
+ * ```typescript
+ * {
+ *     click: IEventSlot<() => void>;
+ *     change: IEventSlot(newVal: number) => void>;
+ * }
+ * ```
+ * 
+ */
+export type MultiEventSlot<T extends { [K: string]: Function }> =
 {
-	// Adds a new listener to the given event
-	public addListener( event: T, eventFunc: Function): void
-	{
-		if (this.slots === undefined)
-			this.slots = new Map<T,EventSlot<Function>>();
-
-		let slot = this.slots.get( event);
-		if (slot === undefined)
-		{
-			slot = new EventSlot<Function>();
-			this.slots.set( event, slot);
-		}
-
-		slot.add( eventFunc);
-	}
-
-
-
-	// Removes the given listener from the given event
-	public removeListener( event: T, eventFunc: Function): void
-	{
-		if (this.slots !== undefined)
-		{
-			let slot = this.slots.get( event);
-			if (slot !== undefined)
-				slot.remove( eventFunc);
-		}
-	}
-
-	private slots: Map<T,EventSlot<Function>>;
+	readonly [P in keyof T]: IEventSlot<T[P]>;
 }
 
 
 
-// Interface and class for simple events accepting no parameters.
-export interface ISimpleEventSlot extends IEventSlot<()=>void> {}
-export class SimpleEventSlot extends EventSlot<()=>void> {}
+/**
+ * The MultiEventSlotOwner type represents an object that for each property from the template type
+ * T has corresponding property, which is an event slot for a function, whose signature is the same
+ * as of the original property. For example, if we have the following type:
+ * 
+ * ```typescript
+ * type IMyEvents = 
+ * {
+ *     click: () => void;
+ *     change: ( newVal: number) => void;
+ * }
+ * ```
+ * 
+ * then the MultiEventSlotOwner<IMyEvents> type will have the following shape:
+ * 
+ * ```typescript
+ * {
+ *     click: IEventSlotOwner<() => void>;
+ *     change: IEventSlotOwner(newVal: number) => void>;
+ * }
+ * ```
+ * 
+ */
+export type MultiEventSlotOwner<T extends { [K: string]: Function }> =
+{
+	readonly [P in keyof T]: IEventSlotOwner<T[P]>;
+}
+
+
+
+/**
+ * Creates an object that will have event slots for each property of the template type T. The
+ * caller will be the owner of the event slots; that is, it will be able to fire events and
+ * clear all listeners when necessary. This allows the following code:
+ * 
+ * ```typescript
+ * type IMyEvents = 
+ * {
+ *     click: () => void;
+ *     change: ( newVal: number) => void;
+ * }
+ * 
+ * interface IMyClass
+ * {
+ *     events: MultiEventSlot<IMyEvents>;
+ *     doSomething(): void;
+ * }
+ * 
+ * class MyClass implements IMyClass
+ * {
+ *     private _events = createMultiEventSlot<IMyEvents>();
+ *     public get events(): MultiEventSlot<IMyEvents> { return this._events; }
+ * 
+ *     public doSomething(): void { this._events.change.fire(1);}
+ * }
+ * 
+ * let obj: IMyClass = new MyClass();
+ * obj.events.change.add( (n: number) => console.log(n));
+ * obj.doSomething();
+ * ```
+ */
+export function createMultiEventSlot<T extends { [K: string]: Function }>(): MultiEventSlotOwner<T>
+{
+	return new Proxy( {}, new MultiEventSlotHandler());
+}
+
+
+
+/**
+ * Implementation of the proxy handler for the MultiEventSlot object. The handler doesn't use any
+ * target object - it simply creates EventSlot property in itself whenever the get method is
+ * called. The TypeScript's type checking ensures that only proper event slot names can be used.
+ */
+class MultiEventSlotHandler
+{
+	public get( target: any, prop: string, receiver: any): any
+	{
+		return this[prop] ? this[prop] : this[prop] = new EventSlot();
+	}
+}
+
 
 

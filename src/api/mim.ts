@@ -210,7 +210,7 @@ export class Ref<T>
 	private _r: T;
 
 	/** Event that is fired when the referenced value changes */
-	private changedEvent: IEventSlot<RefFunc<T>> = new EventSlot<RefFunc<T>>();
+	private changedEvent = new EventSlot<RefFunc<T>>();
 
 	constructor( listener?: RefFunc<T>, initialReferene?: T)
 	{
