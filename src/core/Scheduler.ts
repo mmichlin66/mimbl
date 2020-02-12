@@ -78,7 +78,7 @@ let s_currentTick: number = 0;
 // level node, this value will still point at the node that caused the exception.
 export let s_currentVN: VN = null;
 
-// Class-based coponent whose rendering tree is currently being processed.
+// Class-based component whose rendering tree is currently being processed.
 export let s_currentClassComp: mim.IComponent = null;
 
 
@@ -90,6 +90,7 @@ export function updateNodeSync( vn: VN): void
 	s_currentTick++;
 
 	/// #if USE_STATS
+		let oldStats = DetailedStats.stats;
 		DetailedStats.stats = new DetailedStats( `Mimbl update cycle ${s_currentTick}: `);
 		DetailedStats.stats.start();
 	/// #endif
@@ -102,7 +103,7 @@ export function updateNodeSync( vn: VN): void
 
 	/// #if USE_STATS
 		DetailedStats.stats.stop( true);
-		DetailedStats.stats = null;
+		DetailedStats.stats = oldStats;
 	/// #endif
 
 	s_schedulerState = SchedulerState.Idle;

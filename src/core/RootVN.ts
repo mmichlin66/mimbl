@@ -27,7 +27,6 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 		this.type = mim.VNType.Root;
 		this.anchorDN = anchorDN;
 		this.depth = 0;
-		// this.willMount();
 	};
 
 

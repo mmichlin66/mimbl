@@ -317,7 +317,7 @@ export function getVNPath( vn: VN): string[]
 	let path = Array<string>( depth);
 	for( let i = 0, nvn: VN = vn; i < depth; i++, nvn = nvn.parent)
 	{
-		path[i] = nvn.name;
+		path[i] = nvn.name + (nvn.creator && nvn.creator.vn ? ` (created by ${nvn.creator.vn.name})` : "");
 	}
 
 	return path;

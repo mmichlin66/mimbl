@@ -103,6 +103,11 @@ export abstract class VNBase implements VN
 
 
 
+	/** Determines whether the node is currently mounted */
+	public get isMounted(): boolean { return !!this.anchorDN; }
+
+
+
 	// Schedules an update for this node.
 	public requestUpdate(): void
 	{

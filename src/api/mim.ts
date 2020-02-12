@@ -531,6 +531,9 @@ export const enum VNType
 
 	/** Wrapper around a function/method that can be updated independently. */
 	FuncProxy,
+
+	/** Node that waits for a promise to be settled and then displays the resolved value as content. */
+	PromiseProxy,
 }
 
 
@@ -1436,7 +1439,7 @@ import {FuncProxyVN} from "../core/FuncProxyVN"
  * method if the goal is not to update the entire component but only one or several rendering
  * functions.
  */
-export type ComponentUpdateRequest = Function | { func: Function, key?: any, args?: any }
+export type ComponentUpdateRequest = Function | { func: Function, key?: any, thisArg?: any, args?: any }
 
 /**
  * Base class for components. Components that derive from this class must implement the render
@@ -1488,11 +1491,11 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 			for( let req of updateRequests)
 			{
 				if (typeof req === "function")
-					FuncProxyVN.update( req);
+					FuncProxyVN.update( req, undefined, this);
 				else
 				{
 					// if a non-array parameter is passed in req.args, we wrap it in an array
-					FuncProxyVN.update( req.func, req.key,
+					FuncProxyVN.update( req.func, req.key, req.thisArg ? req.thisArg : this,
 						!req.args || Array.isArray(req.args) ? req.args : [req.args]);
 				}
 			}
@@ -1576,20 +1579,17 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 // FuncProxy support
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
 /**
  * Properties to be used with the FuncProxy component. FuncProxy component cannot have children.
+ * A key property can be used to distinguish between multiple uses of the same function. If the
+ * function is used only once within a component, the key is not necessary; however, if the
+ * function is used multiple times, key is mandatory - otherwise, the behavior is undetermined.
  */
-export interface FuncProxyProps
+export interface FuncProxyProps extends ICommonProps
 {
 	/** Function that renders content. */
 	func: Function;
-
-	/**
-	 * A key that distinguishes between multiple uses of the same function. If the function is
-	 * used only once within a component, the key is not necessary; however, if the function is
-	 * used multiple times, key is mandatory - otherwise, the behavior is undetermined.
-	 */
-	key?: any;
 
 	/**
 	 * Arguments to be passed to the function. Whenever the FuncProxy component is rendered, this
@@ -1608,7 +1608,7 @@ export interface FuncProxyProps
 	 * 
 	 * Note the following sequence of actions that occurs when `replaceArgs` is false or omitted:
 	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" />. "A" will be used.
-	 * 1. Parent component calls FuncProxy.update( this.foo, undefined, "B"). "B" will be used.
+	 * 1. Parent component calls FuncProxy.update( this.foo, undefined, undefined, "B"). "B" will be used.
 	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" />. "B" will still be used.
 	 * 
 	 * If the `replaceArgs` property is set to true, then every time the FuncProxy componenet is
@@ -1617,7 +1617,7 @@ export interface FuncProxyProps
 	 * Now note the sequence of actions when `replaceArgs` is true:
 	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" replaceArgs />."A" will
 	 * be used.
-	 * 1. Parent component calls FuncProxy.update( this.foo, undefined, "B"). "B" will be used.
+	 * 1. Parent component calls FuncProxy.update( this.foo, undefined, undefined, "B"). "B" will be used.
 	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" replaceArgs />. "A" will
 	 * be used again.
 	 */
@@ -1629,10 +1629,9 @@ export interface FuncProxyProps
 	 * most common case).
 	 */
 	thisArg?: any;
-
-	/** FuncProxy component cannot have children. */
-	children?: void;
 }
+
+
 
 /**
  * The FuncProxy component wraps a function that produces content. Proxies can wrap instance
@@ -1657,13 +1656,13 @@ export interface FuncProxyProps
  * - The value of "this" inside the function is not the component that does the rendering. That
  * is, the function is not a method of this component.
  * 
- * FuncProxy has a public static Update method that should be called to
- * cause the rendering mechanism to invoke the function wrapped by the FuncProxy.
+ * FuncProxy has a public static Update method that can be called to cause the rendering mechanism
+ * to invoke the function wrapped by the FuncProxy.
  */
-export class FuncProxy extends Component<FuncProxyProps>
+export class FuncProxy extends Component<FuncProxyProps,void>
 {
 	/**
-	 * Instances of the FuncProxy component are never actually created; istead. the parameters
+	 * Instances of the FuncProxy component are never actually created; istead, the parameters
 	 * passed to it via JSX are used by an internal virtual node that handles function
 	 * invocation.
 	 */
@@ -1680,65 +1679,52 @@ export class FuncProxy extends Component<FuncProxyProps>
 	 * @param key Value that helps distinguishing between multiple usages of the function.
 	 * @param args Arguments to be passed to the function.
 	 */
-	public static update( func: Function, key?: any, ...args: any[])
+	public static update( func: Function, key?: any, thisArg?: any, ...args: any[])
 	{
-		FuncProxyVN.update( func, key, args);
+		FuncProxyVN.update( func, key, thisArg, args);
 	}
 }
 
 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Support for promises returned as content.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 /**
- * The Waiting component wraps a Promise and replaces its content when the promise is settled.
- * Before the promise is settled, the component displays an optional "in-progress" content
- * specified in the constructor. If the promise is rejected, the component will either display
- * the "error" content obtained by calling a functions specified in the constructor or if such
- * function is not specified show empty content.
+ * Properties to be used with the PromiseProxy component.
  */
-export class Waiting extends Component
+export interface PromiseProxyProps extends ICommonProps
+{
+	/** Promise that will be watch by the waiting node. */
+	promise: Promise<any>;
+
+	/** Function that is called if the promise is rejected. */
+	errorContentFunc?: (err: any) => any;
+}
+
+
+
+/**
+ * The PromiseProxy component wraps a Promise and replaces its content when the promise is settled.
+ * Before the promise is settled, the component displays an optional "in-progress" content
+ * specified as children of the component. If the promise is rejected, the component will either
+ * display the "error" content obtained by calling a functions specified in the properties or, if
+ * such function is not specified, display nothing.
+ */
+export class PromiseProxy extends Component<PromiseProxyProps>
 {
 	/**
-	 * Constructs the object
-	 * @param promise Promise object to wait for
-	 * @param progressContent Content to display while waiting for the promise
-	 * @param errorContentFunc Content to display if the promise is rejected
+	 * Instances of the FuncProxy component are never actually created; istead, the parameters
+	 * passed to it via JSX are used by an internal virtual node that handles function
+	 * invocation.
 	 */
-	constructor( promise: Promise<any>, progressContent?: any, errorContentFunc?: (err: any) => any)
-	{
-		super();
+	private constructor( props: PromiseProxyProps) { super( props); }
 
-		this.content = progressContent;
-
-		this.watchPromise( promise, errorContentFunc);
-	}
-
-	public render(): any
-	{
-		return this.content;
-	}
-
-	private async watchPromise( promise: Promise<any>, errorContentFunc?: (err: any) => any): Promise<any>
-	{
-		try
-		{
-			this.content = await promise;
-		}
-		catch( err)
-		{
-			this.content = null;
-			if (errorContentFunc !== undefined)
-			{
-				try
-				{
-					this.content = errorContentFunc( err);
-				}
-				catch(anotherErr)
-				{
-				}
-			}
-		}
-	}
-
-	@updatable private content: any;
+	/** The render method of the PromiseProxy component is never actually called */
+	public render(): any {}
 }
 
 

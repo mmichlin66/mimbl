@@ -7,6 +7,7 @@ import {FuncVN} from "./FuncVN"
 import {ElmVN} from "./ElmVN"
 import {TextVN} from "./TextVN"
 import {FuncProxyVN} from "./FuncProxyVN"
+import {PromiseProxyVN} from "./PromiseProxyVN"
 import {s_currentClassComp} from "./Scheduler"
 
 
@@ -39,7 +40,9 @@ export function createNodesFromContent( content: any): VN | VN[]
 	else if (Array.isArray( content))
 		return createNodesFromArray( content);
 	else if (content instanceof Promise)
-		throw content;
+	{
+		return new PromiseProxyVN( { promise: content});
+	}
 	else if (typeof content === "function")
 	{
 		let vn = FuncProxyVN.findVN( content)
@@ -88,6 +91,13 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
 
 			return vn;
 		}
+	}
+	else if (tag === mim.PromiseProxy)
+	{
+		if (!props || !props.promise)
+			return undefined;
+
+		return new PromiseProxyVN( props, children);
 	}
 	else if (typeof tag === "function")
 	{

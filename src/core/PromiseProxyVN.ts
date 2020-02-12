@@ -27,31 +27,24 @@ import {s_currentClassComp} from "./Scheduler"
  * The link between the function and the nodes that use this function is kept in a map from the
  * keys to the nodes. The map is stored in a custom property on the function object itself.
  */
-export class FuncProxyVN extends VNBase
+export class PromiseProxyVN extends VNBase
 {
-	constructor( props: mim.FuncProxyProps)
+	constructor( props: mim.PromiseProxyProps, children?: any[])
 	{
 		super();
 
-		this.type = mim.VNType.FuncProxy;
-		this.func = props.func;
-		this.thisArg = props.thisArg || s_currentClassComp;
-		this.args = props.args;
-		this.argsReplaced = false;
+		this.type = mim.VNType.PromiseProxy;
+		this.promise = props.promise;
+		this.errorContentFunc = props.errorContentFunc;
+		this.content = children;
 
 		this.key = props.key;
-
-		// if a key was not provided we use the value of thisArg (which might be the current
-		// component) as a key. If that is undefined too we use the function itself as a key.
-		this.linkKey = props.key || this.thisArg || this.func;
 	}
 
 
-	public replaceArgs( args: any[]): void
-	{
-		this.args = args;
-		this.argsReplaced = true;
-	}
+
+	// Flag indicating whether the promise is settled (successfully or not).
+	public get isSettled(): boolean { return this.promise == null; }
 
 
 
@@ -67,22 +60,12 @@ export class FuncProxyVN extends VNBase
 
 
 
-	/**
-	 * Flag indicating whether this node should re-render during update even it is the same
-	 * physical node instance. This is needed for nodes that serve as a proxy to a rendering
-	 * function and that function must be invoked even none of the node parameters have changed.
-	 */
-	public get renderOnUpdate(): boolean { return this.argsReplaced; };
-
-
-
 	// String representation of the virtual node. This is used mostly for tracing and error
 	// reporting. The name can change during the lifetime of the virtual node; for example,
 	// it can reflect an "id" property of an element (if any).
 	public get name(): string
 	{
-		// node name is the function's name plus key (or id) if specified.
-		let name = this.func.name;
+		let name = "Promise";
 		if (this.key != null)
 			name += "@" + this.key;
 
@@ -94,16 +77,11 @@ export class FuncProxyVN extends VNBase
 	// Generates list of sub-nodes according to the current state
 	public render(): any
 	{
-		/// #if VERBOSE_COMP
-			console.debug( `VERBOSE: Calling function proxy component ${this.name}`);
-		/// #endif
-
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-		this.argsReplaced = false;
-		return this.func.apply( this.thisArg, this.args);
+		return this.content;
 	}
 
 
@@ -113,7 +91,7 @@ export class FuncProxyVN extends VNBase
 	// This method is part of the Render phase.
 	public willMount(): void
 	{
-		this.linkNodeToFunc();
+		this.watchPromise();
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
@@ -127,8 +105,6 @@ export class FuncProxyVN extends VNBase
 	// This method is part of the render phase.
 	public willUnmount(): void
 	{
-		this.unlinkNodeFromFunc();
-
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
 		/// #endif
@@ -140,10 +116,10 @@ export class FuncProxyVN extends VNBase
 	// parameter is guaranteed to point to a VN of the same type as this node.
 	public isUpdatePossible( newVN: VN): boolean
 	{
-		let newFuncProxyVN = newVN as FuncProxyVN;
+		let newPromiseProxyVN = newVN as PromiseProxyVN;
 
-		// update is possible if it is the same function object and the same thisArg property
-		return this.func === newFuncProxyVN.func && this.thisArg === newFuncProxyVN.thisArg;
+		// update is possible if it is the same promise object
+		return this.promise === newPromiseProxyVN.promise;
 	}
 
 
@@ -155,14 +131,12 @@ export class FuncProxyVN extends VNBase
 	// This method is part of the Render phase.
 	public prepareUpdate( newVN: VN): VNUpdateDisp
 	{
-		let newFuncProxyVN = newVN as FuncProxyVN;
+		let newPromiseProxyVN = newVN as PromiseProxyVN;
 
 		// remeber the new value of the key property (even if it is the same)
-		this.key = newFuncProxyVN.key;
-		this.linkKey = newFuncProxyVN.linkKey;
-
-		// take arguments from the new node; the function itself and "thisArg" remain the same.
-		this.args = newFuncProxyVN.args;
+		this.key = newPromiseProxyVN.key;
+		this.content = newPromiseProxyVN.content;
+		this.errorContentFunc = newPromiseProxyVN.errorContentFunc;
 
 		// indicate that it is necessary to update the sub-nodes. The commitUpdate
 		// method should NOT be called.
@@ -171,72 +145,58 @@ export class FuncProxyVN extends VNBase
 
 
 
-	public static findVN( func: Function, key?: any, thisArg?: any): FuncProxyVN
+	/**
+	 * Waits for the promise to settle
+	 */
+	private async watchPromise(): Promise<void>
 	{
-		// if the key is undefined, we use the function object itself
-		let linkKey: any = key || thisArg || s_currentClassComp || func;
-
-		// try to find the key in the map on the function object; if not found, do nothing
-		let mapKeysToNodes: Map<any,FuncProxyVN> = func["__keys-to-nodes"];
-		return mapKeysToNodes && mapKeysToNodes.get( linkKey);
-	}
-
-
-
-	public static update( func: Function, key?: any, thisArg?: any, args?: any[]): void
-	{
-		// find the node
-		let vn = FuncProxyVN.findVN( func, key, thisArg);
-		if (!vn)
-			return;
-
-		vn.args = args;
-		vn.argsReplaced = true;
-		vn.requestUpdate();
-	}
-
-
-
-	private linkNodeToFunc(): void
-	{
-		let func: any = this.func;
-		let mapKeysToNodes: Map<any,FuncProxyVN> = func["__keys-to-nodes"];
-		if (!mapKeysToNodes)
+		try
 		{
-			mapKeysToNodes = new Map<any,FuncProxyVN>();
-			func["__keys-to-nodes"] = mapKeysToNodes;
+			this.content = await this.promise;
+			this.promise = null;
+
+			// if the node is still mounted, request update
+			if (this.isMounted)
+				this.requestUpdate();
 		}
+		catch( err)
+		{
+			this.promise = null;
+			this.content = null;
 
-		mapKeysToNodes.set( this.linkKey, this);
+			// if the node is already unmounted, do nothing
+			if (!this.isMounted)
+				return;
+
+			if (this.errorContentFunc)
+			{
+				try
+				{
+					this.content = this.errorContentFunc( err);
+				}
+				catch( err1)
+				{
+					console.warn( "Unhandled rejected promise:", err1);
+				}
+			}
+			else
+				console.warn( "Unhandled rejected promise:", err);
+
+			this.requestUpdate();
+		}
 	}
 
+	// Promise that this node watches.
+	private promise: Promise<any>;
 
-	private unlinkNodeFromFunc(): void
-	{
-		let func: any = this.func;
-		let mapKeysToNodes: Map<any,FuncProxyVN> = func["__keys-to-nodes"];
-		if (mapKeysToNodes)
-			mapKeysToNodes.delete( this.linkKey);
-	}
-
-
-	// Function to be invoked during the rendering
-	private func: Function;
-
-	// Object to be used as "this" when invoking the function.
-	private thisArg: any;
+	// Content that this node displays. Initially this content is set to props.children. When
+	// the promise is resolved, the content is set to the resolved value. If the promise is
+	// rejected and the errorContentFunc is defined, this function is called and its return
+	// value is used as content.
+	private content?: any;
 
 	// Optional arguments to be passed to the function.
-	private args: any[];
-
-	// Flag indicating whether arguments have been replaced. This is needed to determine whether
-	// the node should be re-rendered; that is, the function should be called.
-	private argsReplaced: boolean;
-
-	// Key that links the function and this node. This key is either equals to the key provided
-	// in the properties passed to the constructor or to the current component or to the function
-	// itself.
-	private linkKey: any;
+	private errorContentFunc?: ( err: any) => any;
 }
 
 
