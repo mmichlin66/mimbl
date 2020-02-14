@@ -8,10 +8,10 @@ export interface IEventSlot<TFunc extends Function>
 	 * Adds the given function as a listener to the event. Note that this cannot be a lambda
 	 * function because there will be no way to remove a lambda function listener later.
 	 */
-	add( listener: TFunc): void;
+	attach( listener: TFunc): void;
 
 	/** Removes the given function as a listener to the event. */
-	remove( listener: TFunc): void;
+	detach( listener: TFunc): void;
 }
 
 
@@ -53,7 +53,7 @@ export class EventSlot<TFunc extends Function> implements IEventSlotOwner<TFunc>
 	 * Adds the given function as a listener to the event. Note that this cannot be a lambda
 	 * function because there will be no way to remove a lambda function listener later.
 	 */
-	public add( listener: TFunc): void
+	public attach( listener: TFunc): void
 	{
 		if (this.listeners === null)
 			this.listeners = new Set<TFunc>();
@@ -64,7 +64,7 @@ export class EventSlot<TFunc extends Function> implements IEventSlotOwner<TFunc>
 
 
 	/** Removes the given function as a listener to the event. */
-	public remove( listener: TFunc): void
+	public detach( listener: TFunc): void
 	{
 		if (this.listeners !== null)
 		{

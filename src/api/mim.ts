@@ -215,7 +215,7 @@ export class Ref<T>
 	constructor( listener?: RefFunc<T>, initialReferene?: T)
 	{
 		if (listener !== undefined)
-			this.changedEvent.add( listener);
+			this.changedEvent.attach( listener);
 
 		this._r = initialReferene;
 	}
@@ -223,13 +223,13 @@ export class Ref<T>
 	/** Adds a callback that will be invoked when the value of the reference changes. */
 	public addListener( listener: RefFunc<T>)
 	{
-		this.changedEvent.add( listener);
+		this.changedEvent.attach( listener);
 	}
 
 	/** Removes a callback that was added with addListener. */
 	public removeListener( listener: RefFunc<T>)
 	{
-		this.changedEvent.remove( listener);
+		this.changedEvent.detach( listener);
 	}
 
 	/** Get accessor for the reference value */
