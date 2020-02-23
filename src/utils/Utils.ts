@@ -191,37 +191,27 @@ export function parseStyleString( s: string): mim.StylePropType
 
 
 
-// Converts names with dashes into names in camelCase, where every character after a dash is
-// capitalized and dashes are removed.
+/**
+ * Converts names with dashes into names in camelCase, where every character after a dash is
+ * capitalized and dashes are removed.
+ */
 export function dashToCamel( dash: string): string
 {
 	if (!dash)
 		return dash;
 
-	let camel: string;
-	let index: number = -1;
-	let nextIndexToCopyFrom: number = 0;
-	while( (index = dash.indexOf( "-", index + 1)) >= 0)
-	{
-		if (camel === undefined)
-			camel = "";
+	return dash.replace( /-([a-zA-Z])/g, (x, $1) => $1.toUpperCase());
+}
 
-		camel += dash.substr( nextIndexToCopyFrom, index - nextIndexToCopyFrom);
-		if (index != dash.length - 1)
-			camel += dash[index + 1].toUpperCase();
 
-		nextIndexToCopyFrom = index + 2;
-	}
 
-	if (camel === undefined)
-		return dash;
-	else
-	{
-		if (nextIndexToCopyFrom < dash.length)
-			camel += dash.substr( nextIndexToCopyFrom);
-
-		return camel;
-	}
+/**
+ * Converts camelCase to dash-case
+ * @param camel
+ */
+export function camelToDash( camel: string): string
+{
+  return camel.replace( /([a-zA-Z])(?=[A-Z])/g, '$1-').toLowerCase();
 }
 
 
