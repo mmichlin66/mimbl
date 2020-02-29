@@ -1,4 +1,5 @@
 ﻿import * as mim from "../api/mim"
+import {Styleset, tsh} from "mimcss"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
@@ -399,16 +400,16 @@ export class ElmAttr
 // key value is from the new style value; for removed items, the key value is undefined.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-function setStyleProp( elm: Element, attrName: string, propVal: any): void
+function setStyleProp( elm: Element, attrName: string, propVal: Styleset): void
 {
 	if (propVal === undefined || propVal === null)
 		elm.removeAttribute( "style");
 	else
 	{
-		const elmStyle: CSSStyleDeclaration = (elm as HTMLElement).style;
-		for( let key in propVal as mim.StylePropType)
+		const elmStyle = (elm as HTMLElement).style;
+		for( let key in propVal)
 		{
-			const keyVal: any = propVal[key];
+			const keyVal = tsh.val( key, propVal[key]);
 			if (elmStyle[key] !== keyVal)
 				elmStyle[key] = keyVal;
 		}
@@ -418,16 +419,16 @@ function setStyleProp( elm: Element, attrName: string, propVal: any): void
 
 
 
-function diffStyleProp( attrName: string, oldPropVal: any, newPropVal: any): any
+function diffStyleProp( attrName: string, oldPropVal: Styleset, newPropVal: Styleset): any
 {
 	if (typeof oldPropVal !== typeof newPropVal)
 		return newPropVal;
 	else
 	{
-		const oldStyle = oldPropVal as mim.StylePropType;
-		const newStyle = newPropVal as mim.StylePropType;
+		const oldStyle = oldPropVal as Styleset;
+		const newStyle = newPropVal as Styleset;
 
-		const updateVal: mim.StylePropType = {};
+		const updateVal: Styleset = {};
 		let changesExist: boolean = false;
 
 		// loop over keys in the old style object and find those that are not in the new one. These
@@ -466,12 +467,12 @@ function diffStyleProp( attrName: string, oldPropVal: any, newPropVal: any): any
 
 
 
-function updateStyleProp( elm: Element, attrName: string, updateVal: any): void
+function updateStyleProp( elm: Element, attrName: string, updateVal: Styleset): void
 {
-	const elmStyle: CSSStyleDeclaration = (elm as HTMLElement).style;
-	for( let key in updateVal as Object)
+	const elmStyle = (elm as HTMLElement).style;
+	for( let key in updateVal)
 	{
-		const keyVal: any = updateVal[key];
+		const keyVal = tsh.val( key, updateVal[key]);
 		if (keyVal === undefined)
 			elmStyle[key] = null;
 			//elmStyle[key] = "initial";
@@ -485,7 +486,7 @@ function updateStyleProp( elm: Element, attrName: string, updateVal: any): void
 
 //// Determines whether the first style is a complete subset of the second one; that is keys
 //// in the first style are all found and have the same values in the second style.
-//function isStyle1SubsetOfStyle2( style1: Object, style2: Object): boolean
+//function isStyle1SubsetOfStyle2( style1: any, style2: any): boolean
 //{
 //	for( let key1 in style1)
 //	{

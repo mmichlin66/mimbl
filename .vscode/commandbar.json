@@ -7,16 +7,16 @@
         {
             "text": "mimbl Dev",
             "color": "white",
-            "commandType": "script",
-            "command": "buildDev",
+            "commandType": "exec",
+            "command": "buildDev.bat",
             "alignment": "left",
             "priority": 1
         },
         {
             "text": "mimbl Prod",
             "color": "yellow",
-            "commandType": "script",
-            "command": "buildProd",
+            "commandType": "exec",
+            "command": "buildProd.bat",
             "alignment": "left",
             "priority": 1
         },

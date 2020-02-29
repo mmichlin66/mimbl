@@ -1,6 +1,6 @@
 {
 	"name": "mimbl",
-	"version": "0.1.12",
+	"version": "0.2.1",
 	"description": "MiM Base Library for Web UI Authoring",
 	"homepage": "https://mmichlin66.github.io/mimbl/mimblAbout.html",
 	"repository": "github:mmichlin66/mimbl",
@@ -26,11 +26,11 @@
 	"devDependencies": {
 		"ifdef-loader": "^2.1.1",
 		"source-map-loader": "^0.2.4",
-		"terser-webpack-plugin": "^2.0.1",
+		"terser-webpack-plugin": "^2.3.5",
 		"ts-loader": "^5.3.3",
-		"typescript": "^3.2.4",
-		"webpack": "^4.39.3",
-		"webpack-cli": "^3.3.8"
+		"typescript": "^3.8.3",
+		"webpack": "^4.41.6",
+		"webpack-cli": "^3.3.11"
 	},
 	"files": [
 		"lib/mimbl.js",
@@ -45,5 +45,8 @@
 		"ProjectOpened": [
 			"install_global_deps"
 		]
+	},
+	"dependencies": {
+		"mimcss": "^0.1.4"
 	}
 }

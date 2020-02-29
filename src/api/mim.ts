@@ -1,4 +1,8 @@
-﻿/**
+﻿import {Styleset} from "mimcss"
+
+
+
+/**
  * Type used to define properties that can be passed to a functional component.
  * 
  * @typeparam TProps Type defining properties that can be passed to the functional component
@@ -762,17 +766,10 @@ export interface ITextVN extends IVNode
 export type Slice =
 {
 	className?: string;
-	style?: StylePropType;
+	style?: Styleset;
 	props?: object
 	content?: any;
 };
-
-
-
-/**
- *  Type for the `style` element property.
- */
-export type StylePropType = Partial<CSSStyleDeclaration>;
 
 
 
@@ -834,7 +831,6 @@ export interface ICommonProps
 /**
  * Type that is used to specify color values for different style properties.
  */
-export type ColorPropType = string;
 export type CrossoriginPropType = "anonymous" | "use-credentials";
 export type FormenctypePropType = "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain";
 export type FormmethodPropType = "get" | "post" | "dialog";
@@ -869,7 +865,7 @@ export interface IElementProps<TRef,TChildren = any> extends ICommonProps
 	id?: string | number;
 	lang?: string;
 	role?: string;
-	style?: StylePropType;
+	style?: Styleset;
 	tabindex?: number;
 
 	// global events
@@ -1383,7 +1379,7 @@ export function mergeClasses( ...classNames: (string | string[])[]): string
  * always returns an object - even if empty
  * @param styles Array of style objects to merge.
  */
-export function mergeStyles( ...styles: StylePropType[]): StylePropType
+export function mergeStyles( ...styles: Styleset[]): Styleset
 {
 	return utils.mergeStyles( ...styles);
 }
@@ -1393,7 +1389,7 @@ export function mergeStyles( ...styles: StylePropType[]): StylePropType
  * @param resStyle Resultant style object
  * @param styles Array of style objects to merge.
  */
-export function mergeStylesTo( resStyle: StylePropType, ...styles: (StylePropType | string)[] ): void
+export function mergeStylesTo( resStyle: Styleset, ...styles: (Styleset | string)[] ): void
 {
 	utils.mergeStylesTo( resStyle, ...styles);
 }

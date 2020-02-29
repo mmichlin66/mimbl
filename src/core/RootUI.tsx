@@ -22,7 +22,7 @@ export class RootErrorUI extends mim.Component
 		return <div id="rootError" style={{display:"flex", flexDirection:"column", alignItems: "start"}}>
 			<div>{this.err.message}</div>
 			<div>{this.pathString}</div>
-			<hr style={{width:"100%"}}/>
+			<hr style={{ width: "100%" }}/>
 			<button click={this.onRestart}>Restart</button>
 		</div>
 	}

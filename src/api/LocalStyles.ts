@@ -1,4 +1,5 @@
 import * as mim from "../api/mim"
+import {Styleset, tsh} from "mimcss"
 import {IEventSlot, EventSlot} from"../utils/EventSlot"
 
 
@@ -84,7 +85,7 @@ export abstract class ComponentWithLocalStyles<TProps = {}, TChildren = any>
 	///////////////////////////////////////////////////////////////////////////////////////////////////
 
 	// Creates style rule.
-	public createStyleRule( name: string, selector?: string, props?: mim.StylePropType): IMCssStyleRule
+	public createStyleRule( name: string, selector?: string, props?: Styleset): IMCssStyleRule
 	{
 		// create dummy style rule
 		let info: RuleInfo = this.createDummyRule( name, "dummy {}");
@@ -268,7 +269,7 @@ export interface IMCssStyleRule
 
 	// Sets several style properties. Both property names and property values can use the
 	// (*) marker, which will be substituted with the unique ID.
-	setProperties( props: mim.StylePropType): void;
+	setProperties( props: Styleset): void;
 
 	// Sets value for a style property. Property name can use the (*) marker, which will be
 	// substituted with the unique ID.
@@ -313,13 +314,16 @@ class MCssStyleRule extends MCssRuleBase<CSSStyleRule> implements IMCssStyleRule
 
 	// Sets several style properties. Both property names and property values can use the
 	// (*) marker, which will be substituted with the unique ID.
-	public setProperties( props: mim.StylePropType): void
+	public setProperties( props: Styleset): void
 	{
 		if (!props)
 			return;
 
 		for( let propName in props)
-			this.cssomRule.style[this.replace( propName)] = this.replace( props[propName]);
+		{
+			let propVal = tsh.val( propName, props[propName]);
+			this.cssomRule.style[this.replace( propName)] = this.replace( propVal);
+		}
 	}
 
 

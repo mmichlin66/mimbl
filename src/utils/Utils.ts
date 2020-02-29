@@ -1,5 +1,5 @@
 import * as mim from "../api/mim"
-
+import {Styleset} from "mimcss"
 
 
 export function deepCompare( o1: any, o2: any): boolean
@@ -137,10 +137,10 @@ export function mergeClasses( ...classNames: (string | string[])[]): string
 
 // Combines arbitrary number of style objects merging later into the earlier ones. This method
 // always returns an object - even if empty
-export function mergeStyles( ...styles: mim.StylePropType[]): mim.StylePropType
+export function mergeStyles( ...styles: Styleset[]): Styleset
 {
 	// create an empty object for accumulating style properties
-	let resStyle: mim.StylePropType = {};
+	let resStyle: Styleset = {};
 	mergeStylesTo( resStyle, ...styles);
 	return resStyle;
 }
@@ -148,7 +148,7 @@ export function mergeStyles( ...styles: mim.StylePropType[]): mim.StylePropType
 
 
 // Combines arbitrary number of style objects merging later into the first one.
-export function mergeStylesTo( resStyle: mim.StylePropType, ...styles: (mim.StylePropType | string)[] ): void
+export function mergeStylesTo( resStyle: Styleset, ...styles: (Styleset | string)[] ): void
 {
 	for( let style of styles)
 	{
@@ -156,8 +156,8 @@ export function mergeStylesTo( resStyle: mim.StylePropType, ...styles: (mim.Styl
 			continue;
 
 		// parse the style if it is specified as a string
-		let styleObj: mim.StylePropType = typeof style === "object"
-				? style as mim.StylePropType
+		let styleObj: Styleset = typeof style === "object"
+				? style as Styleset
 				: parseStyleString( style as string);
 
 		// copy all properties defined in teh current style object to our resultant object			
@@ -169,12 +169,12 @@ export function mergeStylesTo( resStyle: mim.StylePropType, ...styles: (mim.Styl
 
 
 // Parses the given style string into the Style object.
-export function parseStyleString( s: string): mim.StylePropType
+export function parseStyleString( s: string): Styleset
 {
 	if (!s)
 		return {};
 
-	let retStyle: mim.StylePropType = {};
+	let retStyle: Styleset = {};
 
 	let elms: string[] = s.split(";");
 	for( let elm of elms)

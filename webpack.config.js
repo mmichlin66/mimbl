@@ -93,5 +93,6 @@ module.exports =
     // dependencies, which allows browsers to cache those libraries between builds.
     externals:
     {
+        mimcss: { root: 'mimcss', commonjs2: 'mimcss', commonjs: 'mimcss', amd: 'mimcss' },
     }
 };
