@@ -1,11 +1,8 @@
-const TerserPlugin = require('terser-webpack-plugin');
-
 let isProd = process.argv.indexOf('-p') !== -1;
 let mode = isProd ? "production" : "development";
 let devtool = isProd ? "source-map" : "#inline-source-map";
 let outputFilename = isProd ? "mimbl.js" : "mimbl.dev.js";
 let minimize = isProd ? true : false;
-// let minimizer = isProd ? new TerserPlugin() : undefined;
 
 
 // define preprocessor variables for ifdef-loader
@@ -23,16 +20,6 @@ const ifdefLoaderOptions =
 
 
 
-//const DtsBundleWebpack = require('dts-bundle-webpack');
-//const DtsBundleOptions = {
-//    name: "mimbl",
-//    main: "lib/index.d.ts",
-//    out: "mimbl.d.ts",
-//	outputAsModuleFolder: false,
-//	removeSource: true
-//};
-
-
 module.exports =
 {
     entry: "./src/mimblTypes.ts",
@@ -47,14 +34,9 @@ module.exports =
     },
 
     mode: mode,
-    //mode: "production",
-    //mode: "none",
-
-    // optimization: { minimize: minimize, minimizer: [minimizer] },
 
     // Enable sourcemaps for debugging webpack's output.
     devtool: devtool,
-    //devtool: "source-map",
 
     resolve:
     {
@@ -62,10 +44,6 @@ module.exports =
         extensions: [".ts", ".tsx", ".js"]
     },
 
-    //plugins: [
-    //    new DtsBundleWebpack( DtsBundleOptions)
-    //],
-    
     module:
     {
         rules:
