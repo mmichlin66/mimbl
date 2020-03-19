@@ -1,6 +1,6 @@
 {
 	"name": "mimbl",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"description": "MiM Base Library for Web UI Authoring",
 	"homepage": "https://mmichlin66.github.io/mimbl/mimblAbout.html",
 	"repository": "github:mmichlin66/mimbl",
@@ -47,6 +47,6 @@
 		]
 	},
 	"dependencies": {
-		"mimcss": "^0.1.4"
+		"mimcss": "^0.2.2"
 	}
 }
