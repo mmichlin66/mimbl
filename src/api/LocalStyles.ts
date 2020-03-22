@@ -1,6 +1,5 @@
 import * as mim from "../api/mim"
-import {Styleset, tsh} from "mimcss"
-import {IEventSlot, EventSlot} from"../utils/EventSlot"
+import {Styleset, tsh, PureStyleset} from "mimcss"
 
 
 
@@ -321,7 +320,7 @@ class MCssStyleRule extends MCssRuleBase<CSSStyleRule> implements IMCssStyleRule
 
 		for( let propName in props)
 		{
-			let propVal = tsh.val( propName, props[propName]);
+			let propVal = tsh.val( propName as keyof PureStyleset, props[propName]);
 			this.cssomRule.style[this.replace( propName)] = this.replace( propVal);
 		}
 	}
