@@ -1,5 +1,5 @@
 ﻿import * as mim from "../api/mim"
-import {Styleset, tsh, PureStyleset} from "mimcss"
+import {Styleset, sh, IStyleset} from "mimcss"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
@@ -409,7 +409,7 @@ function setStyleProp( elm: Element, attrName: string, propVal: Styleset): void
 		const elmStyle = (elm as HTMLElement).style;
 		for( let key in propVal)
 		{
-			const keyVal = tsh.val( key as keyof PureStyleset, propVal[key]);
+			const keyVal = sh.val( key as keyof IStyleset, propVal[key]);
 			elmStyle[key] = keyVal;
 		}
 	}
@@ -471,7 +471,7 @@ function updateStyleProp( elm: Element, attrName: string, updateVal: Styleset): 
 	const elmStyle = (elm as HTMLElement).style;
 	for( let key in updateVal)
 	{
-		const keyVal = tsh.val( key as keyof PureStyleset, updateVal[key]);
+		const keyVal = sh.val( key as keyof IStyleset, updateVal[key]);
 		if (keyVal === undefined)
 			elmStyle[key] = null;
 			//elmStyle[key] = "initial";

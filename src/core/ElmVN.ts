@@ -238,9 +238,9 @@ export class ElmVN extends VNBase implements mim.IElmVN
 			}
 
 			propVal = this.props[propName];
-			if (propVal == null)
+			if (propVal == null || propVal === false)
 			{
-				// ignore properties with values undefined and null
+				// ignore properties with values undefined, null and false
 				continue;
 			}
 			else if (propName === "ref")
