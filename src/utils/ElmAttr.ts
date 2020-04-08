@@ -470,14 +470,7 @@ function updateStyleProp( elm: Element, attrName: string, updateVal: Styleset): 
 {
 	const elmStyle = (elm as HTMLElement).style;
 	for( let key in updateVal)
-	{
-		const keyVal = sh.val( key as keyof IStyleset, updateVal[key]);
-		if (keyVal === undefined)
-			elmStyle[key] = null;
-			//elmStyle[key] = "initial";
-		else
-			elmStyle[key] = keyVal;
-	}
+		elmStyle[key] = sh.val( key as keyof IStyleset, updateVal[key]);
 }
 
 
