@@ -375,7 +375,7 @@ export interface IHtmlHeadElementProps extends IHtmlElementProps<HTMLHeadElement
 export interface IHtmlHrElementProps extends IHtmlElementProps<HTMLHRElement>
 {
 	align?: string;
-	color?:  mimcss.Color_StyleType;
+	color?:  mimcss.CssColor;
 	noshade?: boolean;
 	size?: number;
 	width?: number;
