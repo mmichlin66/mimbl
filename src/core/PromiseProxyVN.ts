@@ -48,11 +48,10 @@ export class PromiseProxyVN extends VNBase
 
 
 
-/// #if USE_STATS
+	/// #if USE_STATS
 	public get statsCategory(): StatsCategory { return StatsCategory.Comp; }
-/// #endif
-
-
+	/// #endif
+	; // ugly trick to not let the TypeScript compiler to strip the #endif comment
 
 	// Node's key. The derived classes set it based on their respective content. A key
 	// can be of any type.

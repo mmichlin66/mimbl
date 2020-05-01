@@ -2,8 +2,9 @@
 import {Styleset, getStylePropValue, IStyleset} from "mimcss"
 
 /// #if USE_STATS
-	import {DetailedStats, StatsCategory, StatsAction} from "./Stats"
+	import {DetailedStats, StatsCategory, StatsAction} from "./Stats";
 /// #endif
+; // ugly trick to not let the TypeScript compiler to strip the #endif comment
 
 
 
@@ -393,11 +394,11 @@ export class ElmAttr
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Handling of style property. Style property can be specified either as a string or as the
-// CSSStyleDeclaration object. If the old and new style property values are of different types
-// the diff function returns the new style value. If both are of the string type, then the new
-// string value is returned. If both are of the CSSStyleDeclaration type, then an object is
-// returned whose keys correspond to style items that should be changed. For updated items, the
-// key value is from the new style value; for removed items, the key value is undefined.
+// Styleset object from the Mimcss library. If the old and new style property values are of
+// different types the diff function returns the new style value. If both are of the string type,
+// then the new string value is returned. If both are of the CSSStyleDeclaration type, then an
+// object is returned whose keys correspond to style items that should be changed. For updated
+// items, the key value is from the new style value; for removed items, the key value is undefined.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 function setStyleProp( elm: Element, attrName: string, propVal: Styleset): void

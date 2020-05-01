@@ -1,6 +1,6 @@
 {
 	"name": "mimbl",
-	"version": "0.2.6",
+	"version": "0.2.7",
 	"description": "MiM Base Library for Web UI Authoring",
 	"homepage": "https://mmichlin66.github.io/mimbl/mimblAbout.html",
 	"repository": "github:mmichlin66/mimbl",
@@ -8,8 +8,7 @@
 	"module": "./lib/mimbl.js",
 	"types": "./lib/mimblTypes.d.ts",
 	"scripts": {
-		"buildDev": "webpack --display-error-details",
-		"buildProd": "webpack -p --display-error-details"
+		"build": "tsc -b && webpack"
 	},
 	"author": {
 		"name": "Michael Michlin",
@@ -26,8 +25,6 @@
 	"devDependencies": {
 		"ifdef-loader": "^2.1.5",
 		"source-map-loader": "^0.2.4",
-		"terser-webpack-plugin": "^2.3.5",
-		"ts-loader": "^5.3.3",
 		"typescript": "^3.8.3",
 		"webpack": "^4.42.1",
 		"webpack-cli": "^3.3.11"
@@ -39,14 +36,10 @@
 		"lib/api/mim.d.ts",
 		"lib/api/HtmlTypes.d.ts",
 		"lib/api/SvgTypes.d.ts",
-		"lib/api/LocalStyles.d.ts"
+		"lib/api/LocalStyles.d.ts",
+		"lib/utils/EventSlot.d.ts"
 	],
-	"-vs-binding": {
-		"ProjectOpened": [
-			"install_global_deps"
-		]
-	},
 	"dependencies": {
-		"mimcss": "^0.4.3"
+		"mimcss": "^0.5.2"
 	}
 }

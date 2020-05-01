@@ -1,17 +1,22 @@
 {
+	"references": [
+		{ "path": "../mimcss" }
+	],
 	"compilerOptions": {
+		"composite": true,
 		"declaration": true,
-		"outDir": "./lib/",
 		"sourceMap": true,
 		"noImplicitAny": false,
 		"strictNullChecks": false,
+		"experimentalDecorators": true,
+		"preserveConstEnums": false,
 		"module": "commonjs",
 		"target": "ES2017",
 		"lib": [ "ES2017", "dom" ],
-		"experimentalDecorators": true,
+		"rootDir": "src",
+		"outDir": "./lib/",
 		"jsx": "react",
-		"jsxFactory": "mim.jsx",
-		"preserveConstEnums": false
+		"jsxFactory": "mim.jsx"
 	},
 
 	"include": [
