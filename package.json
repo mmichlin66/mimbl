@@ -1,6 +1,6 @@
 {
 	"name": "mimbl",
-	"version": "0.2.9",
+	"version": "0.2.10",
 	"description": "MiM Base Library for Web UI Authoring",
 	"homepage": "https://mmichlin66.github.io/mimbl/mimblAbout.html",
 	"repository": "github:mmichlin66/mimbl",
@@ -25,8 +25,8 @@
 	"devDependencies": {
 		"ifdef-loader": "^2.1.5",
 		"source-map-loader": "^0.2.4",
-		"typescript": "^3.8.3",
-		"webpack": "^4.42.1",
+		"typescript": "^3.9.2",
+		"webpack": "^4.43.0",
 		"webpack-cli": "^3.3.11"
 	},
 	"files": [
@@ -40,6 +40,6 @@
 		"lib/utils/EventSlot.d.ts"
 	],
 	"dependencies": {
-		"mimcss": "^0.5.6"
+		"mimcss": "^0.5.8"
 	}
 }
