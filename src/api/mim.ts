@@ -1,4 +1,4 @@
-﻿import {Styleset} from "mimcss"
+﻿import * as css from "mimcss"
 
 
 
@@ -766,7 +766,7 @@ export interface ITextVN extends IVNode
 export type Slice =
 {
 	className?: string;
-	style?: Styleset;
+	style?: css.Styleset;
 	props?: object
 	content?: any;
 };
@@ -807,6 +807,16 @@ export type EventFuncAndThisAndFlagType<T extends Event> = [EventFuncType<T>, ob
  */
 export type EventPropType<T extends Event> = EventFuncType<T> | EventFuncAndThisType<T> |
 				EventFuncAndFlagType<T> | EventFuncAndThisAndFlagType<T>;
+
+/**
+ * Type for defining the class property of HTML elements
+ */				
+export type ClassPropType = string | css.IClassRule | (string | css.IClassRule)[];
+
+/**
+ * Type for defining the id property of HTML elements
+ */				
+export type IDPropType = string | number | css.IIDRule;
 
 
 
@@ -859,13 +869,13 @@ export interface IElementProps<TRef,TChildren = any> extends ICommonProps
 	children?: TChildren;
 
 	// standard HTML and SVG element properties
-	class?: string
+	class?: ClassPropType;
 	draggable?: boolean;
 	dropzone ?: "copy" | "move" | "link";
-	id?: string | number;
+	id?: string | number | css.IIDRule;
 	lang?: string;
 	role?: string;
-	style?: Styleset;
+	style?: css.Styleset;
 	tabindex?: number;
 
 	// global events
@@ -1379,7 +1389,7 @@ export function mergeClasses( ...classNames: (string | string[])[]): string
  * always returns an object - even if empty
  * @param styles Array of style objects to merge.
  */
-export function mergeStyles( ...styles: Styleset[]): Styleset
+export function mergeStyles( ...styles: css.Styleset[]): css.Styleset
 {
 	return utils.mergeStyles( ...styles);
 }
@@ -1389,7 +1399,7 @@ export function mergeStyles( ...styles: Styleset[]): Styleset
  * @param resStyle Resultant style object
  * @param styles Array of style objects to merge.
  */
-export function mergeStylesTo( resStyle: Styleset, ...styles: (Styleset | string)[] ): void
+export function mergeStylesTo( resStyle: css.Styleset, ...styles: (css.Styleset | string)[] ): void
 {
 	utils.mergeStylesTo( resStyle, ...styles);
 }

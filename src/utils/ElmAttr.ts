@@ -1,5 +1,5 @@
 ﻿import * as mim from "../api/mim"
-import {Styleset, getStylePropValue, ExtendedStyleset} from "mimcss"
+import * as css from "mimcss"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "./Stats";
@@ -109,12 +109,30 @@ export interface CustomAttrPropInfo extends PropInfoBase
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Type combining information about regular attributes or events or custom attributes.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
+/** Type combining information about regular attributes or events or custom attributes. */
 export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
+
+
+
+/**
+ * Helper function that converts the given value to string.
+ *   - null and undefined are converted to an empty string.
+ *   - arrays are converted by calling this function recursively on the elements and separating
+ *     them with spaces.
+ *   - everything else is converted by calling the toString method.
+ */
+
+function valToString( val: any): string
+{
+	if (val == null)
+		return "";
+	else if (typeof val === "string")
+		return val;
+	else if (Array.isArray( val))
+		return val.map( item => valToString(item)).filter( item => !!item).join(" ");
+	else
+		return val.toString();
+}
 
 
 
@@ -258,7 +276,7 @@ export class ElmAttr
 	{
 		// get property info object
 		if (info === undefined)
-			elm.setAttribute( propName, typeof propVal === "string" ? propVal : propVal.toString());
+			elm.setAttribute( propName, valToString( propVal));
 		else
 		{
 			// get actual attribute name to use
@@ -269,7 +287,7 @@ export class ElmAttr
 			if (info.set !== undefined)
 				info.set( elm, attrName, propVal);
 			else
-				elm.setAttribute( attrName, typeof propVal === "string" ? propVal : propVal.toString());
+				elm.setAttribute( attrName, valToString( propVal));
 		}
 
 		/// #if USE_STATS
@@ -293,7 +311,7 @@ export class ElmAttr
 				return false;
 			else
 			{
-				elm.setAttribute( propName, typeof newPropVal === "string" ? newPropVal : newPropVal.toString());
+				elm.setAttribute( propName, valToString( newPropVal));
 
 				/// #if USE_STATS
 					DetailedStats.stats.log( StatsCategory.Attr, StatsAction.Updated);
@@ -337,7 +355,7 @@ export class ElmAttr
 			if (info.set !== undefined)
 				info.set( elm, attrName, updateVal);
 			else
-				elm.setAttribute( attrName, typeof updateVal === "string" ? updateVal : updateVal.toString());
+				elm.setAttribute( attrName, valToString( updateVal));
 		}
 
 		/// #if USE_STATS
@@ -401,94 +419,29 @@ export class ElmAttr
 // items, the key value is from the new style value; for removed items, the key value is undefined.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-function setStyleProp( elm: Element, attrName: string, propVal: Styleset): void
+function setStyleProp( elm: Element, attrName: string, propVal: css.Styleset): void
 {
-	if (propVal === undefined || propVal === null)
-		elm.removeAttribute( "style");
-	else
-	{
-		const elmStyle = (elm as HTMLElement).style;
-		for( let key in propVal)
-		{
-			const keyVal = getStylePropValue( key as keyof ExtendedStyleset, propVal[key]);
-			elmStyle[key] = keyVal;
-		}
-	}
+	css.setElementStyle( elm as HTMLElement, propVal);
 }
 
 
 
 
-function diffStyleProp( attrName: string, oldPropVal: Styleset, newPropVal: Styleset): any
+function diffStyleProp( attrName: string, oldPropVal: css.Styleset, newPropVal: css.Styleset): any
 {
-	if (typeof oldPropVal !== typeof newPropVal)
-		return newPropVal;
-	else
-	{
-		const oldStyle = oldPropVal as Styleset;
-		const newStyle = newPropVal as Styleset;
+	let res = css.diffStylesets( oldPropVal, newPropVal);
 
-		const updateVal: Styleset = {};
-		let changesExist: boolean = false;
-
-		// loop over keys in the old style object and find those that are not in the new one. These
-		// will be removed.
-		for( let key in oldStyle)
-		{
-			const oldVal: any = oldStyle[key];
-			const newVal: any = newStyle[key];
-			if (newVal === undefined)
-			{
-				changesExist = true;
-				updateVal[key] = undefined;
-			}
-			else if (newVal !== oldVal)
-			{
-				changesExist = true;
-				updateVal[key] = newVal;
-			}
-		}
-
-		// loop over keys in the new style object and find those that are not in the old one. These
-		// will be added.
-		for( let key in newStyle)
-		{
-			const oldVal: any = oldStyle[key];
-			if (oldVal === undefined)
-			{
-				changesExist = true;
-				updateVal[key] = newStyle[key];
-			}
-		}
-
-		return changesExist ? updateVal : undefined;
-	}
+	// we have to return undefined because null is considered a valid update value
+	return res == null ? undefined : res;
 }
 
 
 
-function updateStyleProp( elm: Element, attrName: string, updateVal: Styleset): void
+function updateStyleProp( elm: Element, attrName: string, updateVal: css.StringStyleset): void
 {
-	const elmStyle = (elm as HTMLElement).style;
-	for( let key in updateVal)
-		elmStyle[key] = getStylePropValue( key as keyof ExtendedStyleset, updateVal[key]);
+	css.setElementStringStyle( elm as HTMLElement, updateVal);
 }
 
-
-
-
-//// Determines whether the first style is a complete subset of the second one; that is keys
-//// in the first style are all found and have the same values in the second style.
-//function isStyle1SubsetOfStyle2( style1: any, style2: any): boolean
-//{
-//	for( let key1 in style1)
-//	{
-//		if (style1[key1] !== style2[key1])
-//			return false;
-//	}
-
-//	return true;
-//}
 
 
 
