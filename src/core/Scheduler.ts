@@ -147,7 +147,7 @@ export function requestNodeUpdate( vn: VN): void
 
 // Schedules to call the given function either before or after all the scheduled components
 // have been updated.
-export function scheduleFuncCall( func: mim.ScheduledFuncType, beforeUpdate: boolean, that: object, vn: mim.IVNode): void
+export function scheduleFuncCall( func: mim.ScheduledFuncType, beforeUpdate: boolean, that?: object, vn?: mim.IVNode): void
 {
 	/// #if DEBUG
 	if (!func)
@@ -210,15 +210,22 @@ export function wrapCallbackWithVN<T extends Function>( callback: T, that?: obje
  * accessed as the first and second elements of the `arguments` array). The rest of parameters in
  * the `arguments` array are passed to the original callback and the value returned by the callback
  * is returned from the wrapper.
+ * 
+ * Note that "this" can be undefined if the function was scheduled without being in the context of
+ * any virtual node.
  */
 function CallbackWrapper(): any
 {
 	// remember the current VN and set the current VN to be the VN from the "this" value. Note
 	// that this can be undefined
 	let currentVN = s_currentVN;
-	s_currentVN = this;
-	let currentClassComp = s_currentClassComp;
-	s_currentClassComp = (s_currentVN as any).comp ? (s_currentVN as any).comp : s_currentVN.creator;
+    let currentClassComp = s_currentClassComp;
+    if (this)
+    {
+        s_currentVN = this;
+        s_currentClassComp = (s_currentVN as any).comp ? (s_currentVN as any).comp : s_currentVN.creator;
+    }
+
 	try
 	{
 		let [that, orgCallback, ...rest] = arguments;
@@ -239,9 +246,12 @@ function CallbackWrapper(): any
 	}
 	finally
 	{
-		// restore the current VN to the remembered value;
-		s_currentVN = currentVN;
-		s_currentClassComp = s_currentClassComp;
+        if (this)
+        {
+            // restore the current VN to the remembered value;
+            s_currentVN = currentVN;
+            s_currentClassComp = currentClassComp;
+        }
 	}
 }
 

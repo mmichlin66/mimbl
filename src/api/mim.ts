@@ -1787,3 +1787,15 @@ export function unmount( anchorDN: Node = null): void
 
 
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Definitions of mount/unmount functions
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+import {initializeMimblStyleScheduler} from "../core/StyleScheduler"
+
+// set Mimbl style scheduler as the default scheduler for style-related DOM-writing operations.
+export let mimblStyleSchedulerType = initializeMimblStyleScheduler();
+
+
+
