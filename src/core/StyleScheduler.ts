@@ -10,21 +10,21 @@ import {scheduleFuncCall} from "./Scheduler"
 class StyleScheduler implements css.IScheduler
 {
     // Callback to call to write changes to the DOM.
-	private doActivation: () => void;
+	private doDOMUpdate: () => void;
 
     /**
      * Initializes the scheduler object and provides the callback that should be invoked when the
      * scheduler decides to make changes to the DOM.
      */
-    public init( doActivation: () => void)
+    public init( doDOMUpdate: () => void)
     {
-        this.doActivation = doActivation;
+        this.doDOMUpdate = doDOMUpdate;
     }
 
 	/**
 	 * Is invoked when the scheduler needs to schedule its callback or event.
 	 */
-    public scheduleActivation(): void
+    public scheduleDOMUpdate(): void
     {
 		scheduleFuncCall( this.onUpdate, false, this);
     }
@@ -32,7 +32,7 @@ class StyleScheduler implements css.IScheduler
 	/**
 	 * Is invoked when the scheduler needs to cancels its scheduled callback or event.
 	 */
-    public unscheduleActivation(): void
+    public cancelDOMUpdate(): void
     {
     }
 
@@ -42,8 +42,7 @@ class StyleScheduler implements css.IScheduler
 	 */
 	private onUpdate(): void
 	{
-		// this.isCallScheduled = false;
-		this.doActivation();
+		this.doDOMUpdate();
 	}
 }
 

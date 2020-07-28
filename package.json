@@ -1,6 +1,6 @@
 {
 	"name": "mimbl",
-	"version": "0.3.1",
+	"version": "0.3.2",
 	"description": "MiM Base Library for Web UI Authoring",
 	"homepage": "https://mmichlin66.github.io/mimbl/mimblAbout.html",
 	"repository": "github:mmichlin66/mimbl",
@@ -40,6 +40,6 @@
 		"lib/utils/EventSlot.d.ts"
 	],
 	"dependencies": {
-		"mimcss": "^0.6.2"
+		"mimcss": "^0.7.1"
 	}
 }
