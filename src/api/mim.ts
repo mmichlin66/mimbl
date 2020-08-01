@@ -102,7 +102,13 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 */
 	willMount?(): void;
 
-	/**
+    // Notifies the component that it was successfully mounted. This method is called after the
+    // component is rendered for the first time and the content of all its sub-nodes is added to
+    // the DOM tree.
+	// This method is part of the Commit phase.
+    didMount?(): void;
+
+    /**
 	 * Notifies that the component's content is going to be removed from the DOM tree. After
 	 * this method returns the component is destroyed.
 	 */
@@ -811,7 +817,7 @@ export type EventPropType<T extends Event> = EventFuncType<T> | EventFuncAndThis
 /**
  * Type for defining the class property of HTML elements
  */				
-export type ClassPropType = string | css.IClassRule | (string | css.IClassRule)[];
+export type ClassPropType = string | css.IClassRule | css.IClassNameRule | (string | css.IClassRule | css.IClassNameRule)[];
 
 /**
  * Type for defining the id property of HTML elements

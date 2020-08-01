@@ -573,6 +573,12 @@ function createPhysical( vn: VN, anchorDN: DN, beforeDN: DN)
 		for( let svn of vn.subNodes)
 			createPhysical( svn, newAnchorDN, newBeforeDN);
 	}
+
+	/// #if VERBOSE_NODE
+		console.debug( `VERBOSE: Calling didMount() on node ${vn.name}`);
+	/// #endif
+    if (vn.didMount)
+        vn.didMount();
 }
 
 

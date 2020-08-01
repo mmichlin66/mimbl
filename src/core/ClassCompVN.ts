@@ -61,6 +61,15 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 
 
 
+    // Notifies the virtual node that it was successfully mounted. This method is called after the
+    // content of node and all its sub-nodes is added to the DOM tree.
+	// This method is part of the Commit phase.
+    public didMount(): void
+    {
+		if (this.comp.didMount)
+			this.comp.didMount();
+    }
+
 	// Determines whether the node supports handling of errors; that is, exception thrown during
 	// rendering of the node itself and/or its sub-nodes.
 	public supportsErrorHandling(): boolean

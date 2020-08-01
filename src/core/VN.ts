@@ -108,15 +108,25 @@ export interface VN extends mim.IVNode
 	// This method is part of the Render phase.
 	willMount?(): void;
 
+	// Creates and returns DOM node corresponding to this virtual node. This method is implemented
+	// only on nodes that have their own DOM nodes.
+	// This method is part of the Commit phase.
+	mount?(): DN;
+
+    // Notifies the virtual node that it was successfully mounted. This method is called after the
+    // content of node and all its sub-nodes is added to the DOM tree.
+	// This method is part of the Commit phase.
+	didMount?(): void;
+
 	// Clears internal structures of the virtual node. This method is called before the content
 	// of node and all its sub-nodes is removed from the DOM tree.
 	// This method is part of the Commit phase.
 	willUnmount?(): void;
 
-	// Creates and returns DOM node corresponding to this virtual node. This method is implemented
-	// only on nodes that have their own DOM nodes.
-	// This method is part of the Commit phase.
-	mount?(): DN;
+	// Initializes internal stuctures of the virtual node. This method is called right after the
+	// node has been constructed.
+	// This method is part of the Render phase.
+	willMount?(): void;
 
 	// Clears DOM node corresponding to this virtual node. This method is implemented only on nodes
 	// that have their own DOM nodes. This method should only release the internally held reference
