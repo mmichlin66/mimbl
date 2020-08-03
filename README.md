@@ -53,7 +53,7 @@ mim.mount( new HelloWorld("red"));
 ```
 
 For more details please see the following resources:
-- [About](https://mmichlin66.github.io/mimbl/mimblAbout.html)
-- [API Reference](https://mmichlin66.github.io/mimbl/mimblReference.html)
-- [Playground](https://mmichlin66.github.io/mimbl/mimblDemo.html) (work in progress)
+- [About](https://mmichlin66.github.io/mimbl/about.html)
+- [API Reference](https://mmichlin66.github.io/mimbl/reference.html)
+- [Playground](https://mmichlin66.github.io/mimbl/playground.html) (work in progress)
 
