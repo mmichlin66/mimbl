@@ -402,6 +402,7 @@ export interface IHtmlIframeElementProps extends IHtmlElementProps<HTMLIFrameEle
 	referrerpolicy?:  mim.ReferrerPolicyPropType;
 	sandbox?: string;
 	src?: string | "about:blank";
+	srcdoc?: string;
 	width?: number;
 }
 
