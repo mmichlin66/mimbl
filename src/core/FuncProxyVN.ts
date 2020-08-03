@@ -37,7 +37,7 @@ export class FuncProxyVN extends VNBase
 		this.func = props.func;
 		this.thisArg = props.thisArg || s_currentClassComp;
 		this.args = props.args;
-		this.argsReplaced = false;
+        this.renderRequired = false;
 
 		this.key = props.key;
 
@@ -50,7 +50,7 @@ export class FuncProxyVN extends VNBase
 	public replaceArgs( args: any[]): void
 	{
 		this.args = args;
-		this.argsReplaced = true;
+		this.renderRequired = true;
 	}
 
 
@@ -73,11 +73,11 @@ export class FuncProxyVN extends VNBase
 	 * physical node instance. This is needed for nodes that serve as a proxy to a rendering
 	 * function and that function must be invoked even none of the node parameters have changed.
 	 */
-	public get renderOnUpdate(): boolean { return this.argsReplaced; };
+	public get renderOnUpdate(): boolean { return this.renderRequired; };
 
 
 
-	// String representation of the virtual node. This is used mostly for tracing and error
+    // String representation of the virtual node. This is used mostly for tracing and error
 	// reporting. The name can change during the lifetime of the virtual node; for example,
 	// it can reflect an "id" property of an element (if any).
 	public get name(): string
@@ -103,7 +103,6 @@ export class FuncProxyVN extends VNBase
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-		this.argsReplaced = false;
 		return this.func.apply( this.thisArg, this.args);
 	}
 
@@ -166,11 +165,19 @@ export class FuncProxyVN extends VNBase
 		this.args = newFuncProxyVN.args;
 
 		// indicate that it is necessary to update the sub-nodes. The commitUpdate
-		// method should NOT be called.
-		return VNUpdateDisp.NoCommitDoRender;
+		// method should also be called - but only to clear the renderRequired flag.
+		return VNUpdateDisp.DoCommitDoRender;
 	}
 
 
+
+	// Commits updates made to this node to DOM.
+	// This method is part of the Commit phase.
+    public commitUpdate( newVN: VN): void
+    {
+        // we use this method only to clear the renderRequired flag"
+        this.renderRequired = false;
+    }
 
 	public static findVN( func: Function, key?: any, thisArg?: any): FuncProxyVN
 	{
@@ -192,7 +199,7 @@ export class FuncProxyVN extends VNBase
 			return;
 
 		vn.args = args;
-		vn.argsReplaced = true;
+		vn.renderRequired = true;
 		vn.requestUpdate();
 	}
 
@@ -230,9 +237,8 @@ export class FuncProxyVN extends VNBase
 	// Optional arguments to be passed to the function.
 	private args: any[];
 
-	// Flag indicating whether arguments have been replaced. This is needed to determine whether
-	// the node should be re-rendered; that is, the function should be called.
-	private argsReplaced: boolean;
+	// Flag indicating whether the node should be re-rendered; that is, the function should be called.
+	private renderRequired: boolean;
 
 	// Key that links the function and this node. This key is either equals to the key provided
 	// in the properties passed to the constructor or to the current component or to the function
