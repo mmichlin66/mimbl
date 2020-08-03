@@ -31,7 +31,7 @@
 	},
 	"files": [
 		"lib/mimbl.js",
-		"lib/mimbl.js.map",
+		"lib/mimbl.dev.js",
 		"lib/mimblTypes.d.ts",
 		"lib/api/mim.d.ts",
 		"lib/api/HtmlTypes.d.ts",

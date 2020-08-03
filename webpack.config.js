@@ -57,7 +57,7 @@ function config( outFileName, mode, devtool, ifdefLoaderOptions)
 module.exports =
 [
     config( "mimbl.dev.js", "development", "#inline-source-map", dev_ifdefLoaderOptions),
-    config( "mimbl.js", "production", "source-map", prod_ifdefLoaderOptions),
+    config( "mimbl.js", "production", undefined, prod_ifdefLoaderOptions),
 ];
 
 
