@@ -84,6 +84,40 @@ class Trigger<T = any> implements ITrigger<T>
  */
 let symWatcher = Symbol( "symWatcher");
 
+
+
+export interface IWatcher<T extends (...args: any) => any>
+{
+    /**
+     * This is a callable interface, whihc is implement as a function.
+     */
+    (...args: Parameters<T>): ReturnType<T>;
+
+    /**
+     * Indicates that the watcher cannot be used any more. This also detaches from all the
+     * attached triggers.
+     */
+    dispose(): void;
+}
+
+
+
+export interface IWatcher<T extends (...args: any) => any = any>
+{
+    /**
+     * This is a callable interface, whihc is implement as a function.
+     */
+    (...args: Parameters<T>): ReturnType<T>;
+
+    /**
+     * Indicates that the watcher cannot be used any more. This also detaches from all the
+     * attached triggers.
+     */
+    dispose(): void;
+}
+
+
+
 /**
  * Creates a watcher function with the same signature as the given regular function. When the
  * watcher function is invoked it invokes the original function and it notices all trigger objects
@@ -96,7 +130,7 @@ let symWatcher = Symbol( "symWatcher");
  * @param thisResponder Optional value of "this" that will be used to call the responder function.
  * If this value is undefined, the "this" value for the original function will be used.
  */
-export function watch<T extends Function>( func: T, responder: () => void, thisFunc?: any, thisResponder?: any): T
+export function watch<T extends (...args: any) => any>( func: T, responder: () => void, thisFunc?: any, thisResponder?: any): IWatcher<T>
 {
     function watcherFunc(...args: any[]): any
     {
@@ -109,20 +143,16 @@ export function watch<T extends Function>( func: T, responder: () => void, thisF
 
     // keep the watcher object in the function object itself using a symbol.
     watcherFunc[symWatcher] = new Watcher( func, responder, thisFunc, thisResponder);
-    return watcherFunc as any as T;
-}
 
+    // implement the dispose method
+    (watcherFunc as IWatcher).dispose = function()
+    {
+        let watcher = watcherFunc[symWatcher] as Watcher;
+        watcher && watcher.dispose();
+        delete watcherFunc[symWatcher];
+    } 
 
-
-/**
- * Indicates that the watcher function cannot be used any more. This also detaches from all
- * triggers
- */
-export function disposeWatcher<T extends Function>( watcherFunc: T): void
-{
-    let watcher: Watcher = watcherFunc[symWatcher];
-    watcher && watcher.dispose();
-    delete watcherFunc[symWatcher];
+    return watcherFunc as IWatcher<T>;
 }
 
 

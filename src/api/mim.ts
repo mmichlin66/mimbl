@@ -391,6 +391,7 @@ export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
 
 
 /**
+ * @deprecated
  * Decorator function for defining properties with a set method that calls the updateMe method
  * whenever the property value changes.
  *	```tsx
@@ -1795,7 +1796,7 @@ export function unmount( anchorDN: Node = null): void
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Definitions of mount/unmount functions
+// Mimbl-specific style scheduler that coordinates Mimcss DOM writing with Mimbl tick.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 import {initializeMimblStyleScheduler} from "../core/StyleScheduler"

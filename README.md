@@ -26,7 +26,7 @@ The Mimbl library provides a custom JSX factory function called `jsx`. In order 
 }
  ```
 
-The .tsx files must import the Mimbl module as mim:
+The .tsx files must import the Mimbl module as mim. Mimbl uses the Mimcss library for managing CSS styles; therefore, it is also imported here.
 
 ```tsx
 import * as mim from "mimbl"
@@ -53,7 +53,7 @@ mim.mount( new HelloWorld("red"));
 ```
 
 For more details please see the following resources:
-- [About](https://mmichlin66.github.io/mimbl/about.html)
+- [Documentation](https://mmichlin66.github.io/mimbl/introduction.html)
 - [API Reference](https://mmichlin66.github.io/mimbl/reference.html)
 - [Playground](https://mmichlin66.github.io/mimbl/playground.html) (work in progress)
 

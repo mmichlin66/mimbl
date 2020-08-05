@@ -1,6 +1,6 @@
 ﻿import * as mim from "../api/mim"
 import {VNBase} from "./VNBase"
-import {watch, disposeWatcher} from "../utils/TriggerWatcher";
+import {watch, IWatcher} from "../utils/TriggerWatcher";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -57,7 +57,7 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-		return this.watcherFunc();
+		return this.renderWatcher();
 	}
 
 
@@ -68,7 +68,7 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 	public willMount(): void
 	{
         // start watching the function
-        this.watcherFunc = watch( this.comp.render, this.requestUpdate, this.comp, this);
+        this.renderWatcher = watch( this.comp.render, this.requestUpdate, this.comp, this);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
@@ -82,7 +82,7 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 	// This method is part of the render phase.
 	public willUnmount(): void
 	{
-        disposeWatcher( this.watcherFunc);
+        this.renderWatcher.dispose();
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
@@ -124,8 +124,8 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
     // We need to stop watching the old component's render and start watching the new one's.
     protected reestablishWatcher()
     {
-        disposeWatcher( this.watcherFunc);
-        this.watcherFunc = watch( this.comp.render, this.requestUpdate, this.comp, this);
+        this.renderWatcher.dispose();
+        this.renderWatcher = watch( this.comp.render, this.requestUpdate, this.comp, this);
     }
 
 
@@ -133,7 +133,7 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
     // Watcher function wrapping the component's render function. The watcher will notice any
     // trigger objects being read during the original function execution and will request update
     // thus triggerring re-rendering.
-	private watcherFunc: Function;
+	private renderWatcher: IWatcher;
 }
 
 

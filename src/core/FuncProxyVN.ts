@@ -2,11 +2,18 @@
 import {VN, VNUpdateDisp} from "./VN"
 import {VNBase} from "./VNBase"
 import {s_currentClassComp} from "./Scheduler"
-import {watch, disposeWatcher} from "../utils/TriggerWatcher"
+import {watch, IWatcher} from "../utils/TriggerWatcher"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
+
+
+
+/**
+ * A Symbol used to connect between the original function and the VNs created for it.
+ */
+let symKeysToNodes = Symbol( "symKeysToNodes");
 
 
 
@@ -35,7 +42,7 @@ export class FuncProxyVN extends VNBase
 		super();
 
 		this.type = mim.VNType.FuncProxy;
-		this.func = props.func;
+		this.func = props.func as (...args: any) => any;
 		this.thisArg = props.thisArg || s_currentClassComp;
 		this.args = props.args;
         this.renderRequired = false;
@@ -105,7 +112,7 @@ export class FuncProxyVN extends VNBase
 		/// #endif
 
 		// return this.func.apply( this.thisArg, this.args);
-		return this.watcherFunc( this.args);
+		return this.funcWatcher( this.args);
 	}
 
 
@@ -118,7 +125,7 @@ export class FuncProxyVN extends VNBase
 		this.linkNodeToFunc();
         
         // start watching the function
-        this.watcherFunc = watch( this.func, this.updateFromWatcher, this.thisArg, this);
+        this.funcWatcher = watch( this.func, this.updateFromWatcher, this.thisArg, this);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
@@ -132,7 +139,7 @@ export class FuncProxyVN extends VNBase
 	// This method is part of the render phase.
 	public willUnmount(): void
 	{
-        disposeWatcher( this.watcherFunc);
+        this.funcWatcher.dispose();
 		this.unlinkNodeFromFunc();
 
 		/// #if USE_STATS
@@ -225,12 +232,11 @@ export class FuncProxyVN extends VNBase
 
 	private linkNodeToFunc(): void
 	{
-		let func: any = this.func;
-		let mapKeysToNodes: Map<any,FuncProxyVN> = func["__keys-to-nodes"];
+		let mapKeysToNodes: Map<any,FuncProxyVN> = this.func[symKeysToNodes];
 		if (!mapKeysToNodes)
 		{
 			mapKeysToNodes = new Map<any,FuncProxyVN>();
-			func["__keys-to-nodes"] = mapKeysToNodes;
+			this.func[symKeysToNodes] = mapKeysToNodes;
 		}
 
 		mapKeysToNodes.set( this.linkKey, this);
@@ -239,15 +245,14 @@ export class FuncProxyVN extends VNBase
 
 	private unlinkNodeFromFunc(): void
 	{
-		let func: any = this.func;
-		let mapKeysToNodes: Map<any,FuncProxyVN> = func["__keys-to-nodes"];
+		let mapKeysToNodes: Map<any,FuncProxyVN> = this.func[symKeysToNodes];
 		if (mapKeysToNodes)
 			mapKeysToNodes.delete( this.linkKey);
 	}
 
 
 	// Function to be invoked during the rendering
-	private func: Function;
+	private func: (...args: any) => any;
 
 	// Object to be used as "this" when invoking the function.
 	private thisArg: any;
@@ -266,7 +271,7 @@ export class FuncProxyVN extends VNBase
     // Watcher function wrapping the original function. The watcher will notice any trigger objects
     // being read during the original function execution and will request update thus triggerring
     // re-rendering.
-	private watcherFunc: Function;
+	private funcWatcher: IWatcher;
 }
 
 
