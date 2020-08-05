@@ -37,7 +37,8 @@
 		"lib/api/HtmlTypes.d.ts",
 		"lib/api/SvgTypes.d.ts",
 		"lib/api/LocalStyles.d.ts",
-		"lib/utils/EventSlot.d.ts"
+		"lib/utils/EventSlot.d.ts",
+		"lib/utils/TriggerWatcher.d.ts"
 	],
 	"dependencies": {
 		"mimcss": "^0.7.4"

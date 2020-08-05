@@ -1,5 +1,6 @@
 ﻿import * as mim from "../api/mim"
 import {VNBase} from "./VNBase"
+import {watch, disposeWatcher} from "../utils/TriggerWatcher";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -56,7 +57,36 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-		return this.comp.render();
+		return this.watcherFunc();
+	}
+
+
+
+	// Creates internal stuctures of the virtual node so that it is ready to produce children.
+	// This method is called right after the node has been constructed.
+	// This method is part of the Render phase.
+	public willMount(): void
+	{
+        // start watching the function
+        this.watcherFunc = watch( this.comp.render, this.requestUpdate, this.comp, this);
+
+		/// #if USE_STATS
+			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
+		/// #endif
+	}
+
+
+
+	// This method is called before the content of node and all its sub-nodes is removed from the
+	// DOM tree.
+	// This method is part of the render phase.
+	public willUnmount(): void
+	{
+        disposeWatcher( this.watcherFunc);
+
+		/// #if USE_STATS
+			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
+		/// #endif
 	}
 
 
@@ -69,6 +99,8 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 		if (this.comp.didMount)
 			this.comp.didMount();
     }
+
+
 
 	// Determines whether the node supports handling of errors; that is, exception thrown during
 	// rendering of the node itself and/or its sub-nodes.
@@ -85,6 +117,23 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 	{
 		this.comp.handleError( err, path);
 	}
+
+
+
+    // This method is called when the comp property has changed without actually unmounting the VN.
+    // We need to stop watching the old component's render and start watching the new one's.
+    protected reestablishWatcher()
+    {
+        disposeWatcher( this.watcherFunc);
+        this.watcherFunc = watch( this.comp.render, this.requestUpdate, this.comp, this);
+    }
+
+
+
+    // Watcher function wrapping the component's render function. The watcher will notice any
+    // trigger objects being read during the original function execution and will request update
+    // thus triggerring re-rendering.
+	private watcherFunc: Function;
 }
 
 

@@ -1,7 +1,8 @@
 ﻿import * as mim from "../api/mim"
-import {DN, VN, VNUpdateDisp} from "./VN"
+import {VN, VNUpdateDisp} from "./VN"
 import {VNBase} from "./VNBase"
 import {s_currentClassComp} from "./Scheduler"
+import {watch, disposeWatcher} from "../utils/TriggerWatcher"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -42,8 +43,8 @@ export class FuncProxyVN extends VNBase
 		this.key = props.key;
 
 		// if a key was not provided we use the value of thisArg (which might be the current
-		// component) as a key. If that is undefined too we use the function itself as a key.
-		this.linkKey = props.key || this.thisArg || this.func;
+		// component) as a key. If that is undefined either we use the function itself as a key.
+        this.linkKey = props.key || this.thisArg || this.func;
 	}
 
 
@@ -103,7 +104,8 @@ export class FuncProxyVN extends VNBase
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-		return this.func.apply( this.thisArg, this.args);
+		// return this.func.apply( this.thisArg, this.args);
+		return this.watcherFunc( this.args);
 	}
 
 
@@ -114,6 +116,9 @@ export class FuncProxyVN extends VNBase
 	public willMount(): void
 	{
 		this.linkNodeToFunc();
+        
+        // start watching the function
+        this.watcherFunc = watch( this.func, this.updateFromWatcher, this.thisArg, this);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
@@ -127,6 +132,7 @@ export class FuncProxyVN extends VNBase
 	// This method is part of the render phase.
 	public willUnmount(): void
 	{
+        disposeWatcher( this.watcherFunc);
 		this.unlinkNodeFromFunc();
 
 		/// #if USE_STATS
@@ -179,6 +185,8 @@ export class FuncProxyVN extends VNBase
         this.renderRequired = false;
     }
 
+
+
 	public static findVN( func: Function, key?: any, thisArg?: any): FuncProxyVN
 	{
 		// if the key is undefined, we use the function object itself
@@ -201,6 +209,16 @@ export class FuncProxyVN extends VNBase
 		vn.args = args;
 		vn.renderRequired = true;
 		vn.requestUpdate();
+	}
+
+
+
+    // This method is invoked when a value of some trigger object being watched by the function
+    // is changed.
+    private updateFromWatcher(): void
+	{
+		this.renderRequired = true;
+		this.requestUpdate();
 	}
 
 
@@ -244,6 +262,11 @@ export class FuncProxyVN extends VNBase
 	// in the properties passed to the constructor or to the current component or to the function
 	// itself.
 	private linkKey: any;
+
+    // Watcher function wrapping the original function. The watcher will notice any trigger objects
+    // being read during the original function execution and will request update thus triggerring
+    // re-rendering.
+	private watcherFunc: Function;
 }
 
 

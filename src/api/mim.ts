@@ -1805,3 +1805,36 @@ export let mimblStyleSchedulerType = initializeMimblStyleScheduler();
 
 
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Decorators
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+import {createTrigger} from "../utils/TriggerWatcher";
+
+export function trigger( target: any, name: string)
+{
+    let sym = Symbol(name);
+	Object.defineProperty( target, name,
+		{
+			set( val)
+			{
+                let triggerObj = this[sym];
+                if (!triggerObj)
+                    this[sym] = triggerObj = createTrigger(val);
+                else
+                    triggerObj.set( val)
+			},
+            get()
+            {
+                let triggerObj = this[sym];
+                if (!triggerObj)
+                    this[sym] = triggerObj = createTrigger();
+                return triggerObj.get();
+            }
+		}
+	);
+}
+
+
+

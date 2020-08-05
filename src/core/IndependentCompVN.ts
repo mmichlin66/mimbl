@@ -49,6 +49,7 @@ export class IndependentCompVN extends ClassCompVN implements mim.IIndependentCo
 	public willMount(): void
 	{
 		this.willMountInstance( this.comp);
+        super.willMount();
 	}
 
 
@@ -58,6 +59,7 @@ export class IndependentCompVN extends ClassCompVN implements mim.IIndependentCo
 	// This method is part of the render phase.
 	public willUnmount(): void
 	{
+        super.willUnmount();
 		this.willUnmountInstance( this.comp);
 	}
 
@@ -74,13 +76,17 @@ export class IndependentCompVN extends ClassCompVN implements mim.IIndependentCo
 		let newComp = (newVN as IndependentCompVN).comp;
 		let needsUpdating = this.comp !== newComp;
 
-		// if the coponent instance are different, then we need to prepare the new instance for
+		// if the component instances are different, then we need to prepare the new instance for
 		// mounting and the old one for unmounting.
 		if (needsUpdating)
 		{
 			this.willMountInstance( newComp);
 			this.willUnmountInstance( this.comp);
-			this.comp = newComp;
+            this.comp = newComp;
+            
+            // now that we have the new component in our comp property we should reestablish
+            // watching its render method
+            super.reestablishWatcher();
 		}
 
 		return VNUpdateDisp.getStockValue( false, needsUpdating);
