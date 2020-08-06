@@ -2,7 +2,7 @@
 import {VN, VNUpdateDisp} from "./VN"
 import {VNBase} from "./VNBase"
 import {s_currentClassComp} from "./Scheduler"
-import {watch, IWatcher} from "../utils/TriggerWatcher"
+import {createWatcher, IWatcher} from "../utils/TriggerWatcher"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -125,7 +125,7 @@ export class FuncProxyVN extends VNBase
 		this.linkNodeToFunc();
         
         // start watching the function
-        this.funcWatcher = watch( this.func, this.updateFromWatcher, this.thisArg, this);
+        this.funcWatcher = createWatcher( this.func, this.updateFromWatcher, this.thisArg, this);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);

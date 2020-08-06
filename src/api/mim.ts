@@ -391,56 +391,6 @@ export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
 
 
 /**
- * @deprecated
- * Decorator function for defining properties with a set method that calls the updateMe method
- * whenever the property value changes.
- *	```tsx
- *	class Child extends Component
- *	{
- *		@mim.updatable text: string = "Hello!";
- *		render()
- *		{
- *	 		return <div>{text}</div>
- *		}
- *	}
- *
- *	class Parent extends Component
- *	{
- *		child = new Child();
- *		render()
- *		{
- *			return <div click={() => this.child.text += " again"}>{this.child}</div>
- *		}
- *	}
- *	```
- * In the above example, the Child component will be re-rendered when its `text` property changes.
- * 
- * @param target 
- * @param name 
- */
-export function updatable( target, name: string)
-{
-	let attrName = "_m_" + name;
-	Object.defineProperty( target, name,
-		{
-			set( val)
-			{
-				if (this[attrName] !== val)
-				{
-					this[attrName] = val;
-					let vn: IVNode = this.vn;
-					if (vn && !vn.updateRequested)
-						this.vn.requestUpdate();
-				}
-			},
-			get() { return this[attrName]; }
-		}
-	);
-}
-
-
-
-/**
  * An artificial "Fragment" component that is only used as a temporary collection of other items
  * in places where JSX only allows a single item. Our JSX factory function creates a virtual node
  * for each of its children and the function is never actually called. This function is only needed
@@ -1796,7 +1746,7 @@ export function unmount( anchorDN: Node = null): void
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Mimbl-specific style scheduler that coordinates Mimcss DOM writing with Mimbl tick.
+// Mimbl-specific style scheduler that coordinates Mimcss DOM writing with Mimbl
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 import {initializeMimblStyleScheduler} from "../core/StyleScheduler"
@@ -1806,35 +1756,25 @@ export let mimblStyleSchedulerType = initializeMimblStyleScheduler();
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Decorators
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-import {createTrigger} from "../utils/TriggerWatcher";
-
-export function trigger( target: any, name: string)
+/**
+ * @deprecated - use `@trigger`
+ */
+export function updatable( target, name: string)
 {
-    let sym = Symbol(name);
-	Object.defineProperty( target, name,
-		{
-			set( val)
-			{
-                let triggerObj = this[sym];
-                if (!triggerObj)
-                    this[sym] = triggerObj = createTrigger(val);
-                else
-                    triggerObj.set( val)
-			},
-            get()
+	let attrName = "_m_" + name;
+	Object.defineProperty( target, name, {
+        set( val)
+        {
+            if (this[attrName] !== val)
             {
-                let triggerObj = this[sym];
-                if (!triggerObj)
-                    this[sym] = triggerObj = createTrigger();
-                return triggerObj.get();
+                this[attrName] = val;
+                let vn: IVNode = this.vn;
+                if (vn && !vn.updateRequested)
+                    this.vn.requestUpdate();
             }
-		}
-	);
+        },
+        get() { return this[attrName]; }
+    });
 }
 
 

@@ -1,6 +1,6 @@
 ﻿import * as mim from "../api/mim"
 import {VNBase} from "./VNBase"
-import {watch, IWatcher} from "../utils/TriggerWatcher";
+import {createWatcher, IWatcher} from "../utils/TriggerWatcher";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -68,7 +68,7 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 	public willMount(): void
 	{
         // start watching the function
-        this.renderWatcher = watch( this.comp.render, this.requestUpdate, this.comp, this);
+        this.renderWatcher = createWatcher( this.comp.render, this.requestUpdate, this.comp, this);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
@@ -125,7 +125,7 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
     protected reestablishWatcher()
     {
         this.renderWatcher.dispose();
-        this.renderWatcher = watch( this.comp.render, this.requestUpdate, this.comp, this);
+        this.renderWatcher = createWatcher( this.comp.render, this.requestUpdate, this.comp, this);
     }
 
 
