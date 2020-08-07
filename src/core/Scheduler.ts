@@ -1,7 +1,8 @@
 ﻿import * as mim from "../api/mim"
-import {DN, VN, getFirstDN, getLastDN, getImmediateDNs, getNextDNUnderSameAnchorDN, getVNPath} from "./VN"
+import {DN, VN, getFirstDN, getImmediateDNs, getNextDNUnderSameAnchorDN, getVNPath} from "./VN"
 import {createVNChainFromContent} from "./ContentFuncs"
 import {VNDispAction, VNDisp, VNDispGroup} from "./VNDisp"
+import {enterMutationScope, exitMutationScope} from "../utils/TriggerWatcher"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -217,7 +218,7 @@ export function wrapCallbackWithVN<T extends Function>( callback: T, that?: obje
 function CallbackWrapper(): any
 {
 	// remember the current VN and set the current VN to be the VN from the "this" value. Note
-	// that this can be undefined
+	// that this can be undefined if the wrapping was created without the VN context.
 	let currentVN = s_currentVN;
     let currentClassComp = s_currentClassComp;
     if (this)
@@ -228,8 +229,9 @@ function CallbackWrapper(): any
 
 	try
 	{
+        enterMutationScope();
 		let [that, orgCallback, ...rest] = arguments;
-		return that ? orgCallback.apply( that, rest) : orgCallback( ...rest);
+		return orgCallback.apply( that, rest);
 	}
 	catch( err)
 	{
@@ -246,6 +248,7 @@ function CallbackWrapper(): any
 	}
 	finally
 	{
+        exitMutationScope();
         if (this)
         {
             // restore the current VN to the remembered value;

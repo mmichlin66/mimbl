@@ -704,7 +704,7 @@ interface CystomAttrRunTimeData
 	val: any;
 
 	// Handler object that knows to deal with the property values
-	handler: mim.ICustomAttributeHandler<any>;
+	handler: mim.ICustomAttributeHandler;
 };
 
 

@@ -352,11 +352,22 @@ class TriggerWatcherManager
     }
 
     /**
-     * Increments mutation scope reference count. If it reaches zero, notify all deferred watchers.
+     * Decrements mutation scope reference count. If it reaches zero, notifies all deferred watchers.
      */
     public exitMutationScope(): void
     {
-        this.mutationScopesRefCount--;
+        if (this.mutationScopesRefCount === 0)
+            throw Error( "Unpaired call to exitMutationScope");
+
+        if (--this.mutationScopesRefCount === 0)
+        {
+            // since when watchers respond, they can execute their watcher functions and that could
+            // mess with the same set of watchers we are iterating over. Therefore, we make a copy
+            // of this set first.
+            let watchers = Array.from( this.deferredWatchers.keys());
+            this.deferredWatchers.clear();
+            watchers.forEach( watcher => watcher.respond());
+        }
     }
 
     /**
@@ -426,6 +437,22 @@ let g_manager = new TriggerWatcherManager();
 
 
 
+/**
+ * Increments mutation scope reference count
+ */
+export function enterMutationScope(): void
+{
+    g_manager.enterMutationScope();
+}
+
+/**
+ * Decrements mutation scope reference count. If it reaches zero, notifies all deferred watchers.
+ */
+export function exitMutationScope(): void
+{
+    g_manager.exitMutationScope();
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Computed triggers
@@ -443,14 +470,6 @@ let g_manager = new TriggerWatcherManager();
  */
 export interface IComputedTrigger<T = any> extends ITrigger<T>, IDisposer
 {
-    /** Suspend computing new values even if the triggers being watched change their values */
-    suspend(): void;
-
-    /** Resumes computing by invoking the watched function call and returns the current value */
-    resume(): T;
-
-    /** Calls the watched function and returns the current value */
-    call(): T;
 }
 
 
@@ -460,9 +479,9 @@ export interface IComputedTrigger<T = any> extends ITrigger<T>, IDisposer
  * optional initial value.
  * @param v
  */
-export function createComputedTrigger<T = any>( func: NoneTypeFunc<T>, funcThis?: any, v?: T): IComputedTrigger<T>
+export function createComputedTrigger<T = any>( func: NoneTypeFunc<T>, funcThis?: any): IComputedTrigger<T>
 {
-    return new ComputedTrigger( func, funcThis, v);
+    return new ComputedTrigger( func, funcThis);
 }
 
 
@@ -478,57 +497,31 @@ export function createComputedTrigger<T = any>( func: NoneTypeFunc<T>, funcThis?
  */
 class ComputedTrigger<T = any> extends Trigger<T> implements IComputedTrigger<T>
 {
-    constructor( func: NoneTypeFunc<T>, funcThis?: any, v?: T)
+    constructor( func: NoneTypeFunc<T>, funcThis?: any)
     {
-        super(v);
+        super();
 
         this.func = func;
         this.funcThis = funcThis;
-        this.funcWatcher = createWatcher( func, this.responder, funcThis, this);
-        this.set( this.funcWatcher());
+
+        // we don't create the watcher until the get method is called
+        this.isStale = true;
     }
 
-    /** Suspend computing new values even if the triggers being watched change their values */
-    public suspend(): void
+    // Retrieves the current value
+    public get(): T
     {
-        // check whether the object is disposed or already suspended
-        if (!this.func || !this.funcWatcher)
-            return;
+        if (this.isStale)
+        {
+            // we need to create the watcher if this is the first time the get method is called.
+            if (!this.funcWatcher)
+                this.funcWatcher = createWatcher( this.func, this.responder, this.funcThis, this);
 
-        this.funcWatcher.dispose();
-        this.funcWatcher = null;
-    }
+            super.set( this.funcWatcher());
+            this.isStale = false;
+        }
 
-    /** Resumes computing by invoking the watched function call and returns the current value */
-    public resume(): T
-    {
-        // check whether the object is disposed or not suspended
-        if (!this.func || this.funcWatcher)
-            return;
-
-        // establish a watcher and call it
-        this.funcWatcher = createWatcher( this.func, this.responder, this.funcThis, this);
-        let v = this.funcWatcher();
-
-        // set the return value as the current value and return it
-        this.set(v);
-        return v;
-    }
-
-    /** Calls the watched function and returns the current value */
-    public call(): T
-    {
-        // check whether the object is disposed
-        if (!this.func)
-            return;
-
-        // if the object is not suspended, we call the watcher; otherwise we call the function
-        // directly
-        let v = this.funcWatcher ? this.funcWatcher() : this.func.apply( this.funcThis);
-
-        // set the return value as the current value and return it
-        this.set(v);
-        return v;
+        return super.get();
     }
 
     /** Clears internal resources. */
@@ -555,8 +548,10 @@ class ComputedTrigger<T = any> extends Trigger<T> implements IComputedTrigger<T>
      */
     private responder(): void
     {
-        if (this.funcWatcher && this.watchers.size > 0)
-            this.set( this.funcWatcher());
+        if (this.watchers.size > 0)
+            super.set( this.funcWatcher());
+        else
+            this.isStale = true;
     }
 
 
@@ -569,6 +564,14 @@ class ComputedTrigger<T = any> extends Trigger<T> implements IComputedTrigger<T>
 
     // Watcher over our function
     private funcWatcher: IWatcher<NoneTypeFunc<T>>;
+
+    // Flag indicating that the value  kept by the trigger might not reflect the actual computed
+    // value. This flag is true under the following circumstances:
+    // 1. Right after the object has been created. We don't even create the watcher because we
+    //    wait until the get method is called.
+    // 2. When the responder has been invoked, but our trigger didn't have any watcher. Again, we
+    //    will wait until the get method is called.
+    private isStale: boolean;
 }
 
 
@@ -667,14 +670,8 @@ class Mutator<T extends AnyAnyFunc = any>
             this.funcThis = funcThis;
 
         g_manager.enterMutationScope();
-        try
-        {
-            return this.func.apply( this.funcThis, args);
-        }
-        finally
-        {
-            g_manager.exitMutationScope();
-        }
+        try { return this.func.apply( this.funcThis, args); }
+        finally { g_manager.exitMutationScope(); }
     }
 
     /** Clears internal resources. */
@@ -764,12 +761,9 @@ export function computed( target: any, name: string, propDesc: PropertyDescripto
             let orgSet = propDesc.set;
             propDesc.set = function( v: any): void
             {
-                let triggerObj = this[sym] as IComputedTrigger;
-                if (!triggerObj)
-                    this[sym] = triggerObj = createComputedTrigger( orgGet, this);
-
-                orgSet.call( this, v);
-                triggerObj.set( v);
+                g_manager.enterMutationScope();
+                try { orgSet.call( this, v); }
+                finally { g_manager.exitMutationScope(); }
             }
         }
     }
