@@ -49,12 +49,43 @@ export interface ITrigger<T = any>
 
 
 /**
- * Creates a trigger object with the given initial value.
+ * The TriggerDepth enumeration defines possible ways of how triggers deal with container data;
+ * that is, objects, arrays, maps and sets. For triggers with values of non-container types
+ * this enumeration is irrelevant.
+ */
+enum TriggerDepth
+{
+    /**
+     * Only changes in the value itself are handled. Actions of adding, removing and modifying
+     * items in the container are ignored.
+     */
+    Value = 0,
+
+    /**
+     * Changes in the value itself and of the immediate container items are handled. Actions of
+     * adding and removing items in the container cause change to be triggerred; however actions
+     * of modifying items themselfs are ignored. For triggers with values of non-container types
+     * this value is equivalent to Value.
+     */
+    Shallow = 1,
+
+    /**
+     * Changes in the value itself and of items on all levels are handled. Items added to the
+     * container are converted to deep triggers. For triggers with values of non-container types
+     * this value is equivalent to Value.
+     */
+    Deep = 100,
+}
+
+
+
+/**
+ * Creates a trigger object of the given depth with the given initial value.
  * @param v
  */
-export function createTrigger<T = any>( v?: T): ITrigger<T>
+export function createTrigger<T = any>( depth: number, v?: T): ITrigger<T>
 {
-    return new Trigger(v);
+    return new Trigger( depth < 0 ? 0 : depth, v);
 }
 
 
@@ -65,32 +96,49 @@ export function createTrigger<T = any>( v?: T): ITrigger<T>
  */
 class Trigger<T = any> implements ITrigger<T>
 {
-    constructor( v?: T)
+    constructor( depth?: number, v?: T)
     {
-        this.v = v;
+        this.depth = depth;
+        this.v = triggerrize( v, this, depth);
     }
 
     // Retrieves the current value
     public get(): T
     {
-        g_manager.notifyTriggerRead(this)
+        this.notifyRead();
         return this.v;
     }
 
     // Sets a new value
-    public set(v: T): void
+    public set( v: T): void
     {
         // nothing to do if the value is the same
         if (v === this.v)
             return;
 
-        this.v = v;
+        this.v = triggerrize( v, this, this.depth);
 
-        // we only notify the manager if there is at least one watcher attached to our trigger;
-        // the watchers that would connect later will have to read the trigger's value first.
+        this.notifyChanged();
+    }
+
+    // Notifies the manager that the trigger's value has been read
+    public notifyRead(): void
+    {
+        g_manager.notifyTriggerRead(this)
+    }
+
+    // Notifies the manager that the trigger's value has been changed. We only notify the manager
+    // if there is at least one watcher attached to our trigger;
+    public notifyChanged(): void
+    {
         if (this.watchers.size > 0)
             g_manager.notifyTriggerChanged( this);
     }
+
+
+
+    // Number indicating to what level the items of container types should be triggerrized.
+    public depth: number;
 
     // Value being get and set
     private v: T;
@@ -499,7 +547,7 @@ class ComputedTrigger<T = any> extends Trigger<T> implements IComputedTrigger<T>
 {
     constructor( func: NoneTypeFunc<T>, funcThis?: any)
     {
-        super();
+        super( TriggerDepth.Value);
 
         this.func = func;
         this.funcThis = funcThis;
@@ -697,23 +745,350 @@ class Mutator<T extends AnyAnyFunc = any>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
+// Triggerizing containers
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Depending on the given trigger depth and on the value type, either returns the same value if
+ * it is a container (object, array, map or set), returns a proxy to the value that knows to
+ * notify read and change when its methods and properties are invoked.
+ * @param v Value to convert if necessary
+ * @param trigger Trigger that will be notified when read or change events occur in the converted
+ * values
+ * @param depth The depth on the level (starting from the trigger)that called this function.
+ * If this parameter is 0, no conversion occurs and the value is returned as is. When this function
+ * is called from the trigger, this parameter can be undefined: in this case, we will assign the
+ * depth depending on the type of the value. Arrays, maps and sets get depths of Shallow(1),
+ * meaning that operations that add or remove items will trigger events, but modifications to the
+ * items will not. Objects get the depth of Deep (1000), which essentially means that any changes
+ * to the object properties on any level will trigger events.
+ */
+function triggerrize<T = any>( v: T, trigger: Trigger, depth?: number): T
+{
+    if (depth === 0)
+        return v;
+    else if (Array.isArray(v))
+        return new Proxy( v, new ArrayHandler( trigger, (depth ? depth : TriggerDepth.Shallow) - 1)) as any as T;
+    else if (v instanceof Map)
+        return new Proxy( v, new MapHandler( trigger, (depth ? depth : TriggerDepth.Shallow) - 1)) as any as T;
+    else if (v instanceof Set)
+        return new Proxy( v, new SetHandler( trigger, (depth ? depth : TriggerDepth.Shallow) - 1)) as any as T;
+    else if (v.constructor === Object)
+        return new Proxy( v, new ObjectHandler( trigger, (depth ? depth : TriggerDepth.Deep) - 1)) as any as T;
+    else
+        return v;
+}
+
+
+
+/**
+ * Base class for shallow Map/Set handlers. Methods whose names were supplied in the constructor,
+ * notify change; all other methods notify read.
+ * 
+ * For Map and Set in order to be proxied, the methods returned from get() must be
+ * bound to the target. See https://javascript.info/proxy#built-in-objects-internal-slots.
+ */
+class SlotContainerHandler<T extends object> implements ProxyHandler<T>
+{
+    constructor( masterTrigger: Trigger, mutatorMethodNames: Set<PropertyKey>, depth: number)
+    {
+        this.masterTrigger = masterTrigger;
+        this.mutatorMethodNames = mutatorMethodNames;
+        this.depth = depth;
+    }
+
+    // Retrieve container methods and properties. We always notify read and we wrap methods in
+    // functions that when called will notify either read or change depending on whether the
+    // method is a mutator.
+    get( target: T, prop: PropertyKey, receiver: any): any
+    {
+        this.masterTrigger.notifyRead();
+
+        // in this context "this" is the handler; however, when the methods we return are called
+        // the "this" will be the Proxy object. Therefore, we want these methods to capture and
+        // use the handler object.
+        let handler = this;
+
+        // check whether this method is already in our internal map
+        let method = this.wrappedMethods.get( prop);
+        if (!method)
+        {
+            // get the value from the target
+            let propVal = target[prop];
+            if (typeof propVal !== "function")
+                return propVal;
+
+            // bind the original method to the target object
+            let orgBoundMethod = propVal.bind( target);
+
+            if (this.mutatorMethodNames.has(prop))
+            {
+                // for mutator methods we create and return a function that, when called, ivokes the
+                // handler specific functionality, which knows about the structure of the arguments
+                // and will create proxies for the appropriate objects if needed. This functionality
+                // will also indicate whether an actual change occurs so that we can notify about it.
+                method = function(): any {
+                    let ret: [any, boolean] = handler.callOrgMutatorMethod( target, prop, orgBoundMethod, ...arguments);
+                    if (ret[1])
+                        handler.masterTrigger.notifyChanged();
+
+                    return ret[0];
+                    // return orgBoundMethod( ...arguments);
+                };
+            }
+            else
+            {
+                // For non-mutator methods, we notify the read and invoke the original method.
+                method = function(): any {
+                    handler.masterTrigger.notifyRead();
+                    return orgBoundMethod( ...arguments);
+                };
+            }
+
+            this.wrappedMethods.set( prop, method);
+        }
+
+        return method;
+    }
+
+    /**
+     * Method that must be overridden in the derived classes and which is responsible for calling
+     * a muutator method with the given name.
+     * @param name 
+     * @param orgMethod 
+     * @param args Two element tuple where the first element is the return value and the second
+     * element is a flag indicating whether the container has changed.
+     */
+    protected callOrgMutatorMethod( target: any, name: PropertyKey, orgMethod: Function, ...args: any[]): [any, boolean]
+    {
+        return [undefined,false];
+    }
+
+
+
+    // The trigger object which should send notifications to its watchers when reads or changes
+    // occur 
+    protected masterTrigger: Trigger<T>;
+
+    // Set of method names, which mutate the contaier. All other methods only read from it.
+    private mutatorMethodNames: Set<PropertyKey>;
+
+    // Number indicating to what level the items of container types should be triggerrized.
+    public depth: number;
+
+    // This map keeps already wrapped methods so that we don't do binding more than once. 
+    private wrappedMethods = new Map<PropertyKey,Function>();
+}
+
+
+
+/**
+ * Handler for arrays.
+ */
+class ArrayHandler implements ProxyHandler<Array<any>>
+{
+    constructor( private masterTrigger: Trigger, depth: number) {}
+
+    get( target: Array<any>, prop: PropertyKey, receiver: any): any
+    {
+        this.masterTrigger.notifyRead();
+        return Reflect.get( target, prop, receiver);
+    }
+}
+
+
+
+/**
+ * Handler for maps.
+ */
+class MapHandler extends SlotContainerHandler<Map<any,any>>
+{
+    private static mutatorMethodNames = new Set<PropertyKey>(["clear", "delete", "set"]);
+
+    constructor( masterTrigger: Trigger, depth: number)
+    {
+        super( masterTrigger, MapHandler.mutatorMethodNames, depth);
+    }
+
+    /**
+     * Method that must be overridden in the derived classes and which is responsible for calling
+     * a muutator method with the given name.
+     * @param name 
+     * @param orgMethod 
+     * @param args Two element tuple where the first element is the return value and the second
+     * element is a flag indicating whether the container has changed.
+     */
+    protected callOrgMutatorMethod( target: Map<any,any>, name: PropertyKey, orgMethod: Function, ...args: any[]): [any, boolean]
+    {
+        if (name === "clear")
+        {
+            let isChanged = target.size > 0;
+            orgMethod();
+            return [undefined, isChanged];
+        }
+        else if (name === "set")
+            return [orgMethod( args[0], triggerrize( args[1], this.masterTrigger, this.depth)), true];
+        else if (name === "delete")
+        {
+            let deleted = orgMethod( args[0]);
+            return [deleted, deleted];
+        }
+    }
+}
+
+
+
+/**
+ * Handler for sets.
+ */
+class SetHandler extends SlotContainerHandler<Set<any>>
+{
+    private static mutatorMethodNames = new Set<PropertyKey>(["add", "delete", "clear"]);
+
+    constructor( masterTrigger: Trigger, depth: number)
+    {
+        super( masterTrigger, SetHandler.mutatorMethodNames, depth);
+    }
+}
+
+
+
+/**
+ * Handler for on plain objects.
+ */
+class ObjectHandler implements ProxyHandler<any>
+{
+    constructor( private masterTrigger: Trigger, depth: number) {}
+
+    get( target: any, prop: PropertyKey, receiver: any): any
+    {
+        return Reflect.get( target, prop, receiver);
+    }
+}
+
+
+
+/**
+ * Base class for shallow Array and Object handlers.
+ */
+class NonSlotContainerHandler implements ProxyHandler<any>
+{
+    constructor( private masterTrigger: Trigger, private mutatorMethodNames: Set<string>)
+    {
+    }
+
+    get( target: any, prop: PropertyKey, receiver: any): any
+    {
+        this.masterTrigger.notifyRead();
+
+        let val = Reflect.get( target, prop, receiver);
+        if (typeof prop !== "string")
+            return val;
+
+        if (this.mutatorMethodNames.has(prop))
+        {
+
+        }
+        else
+            return val;
+    }
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
 // Decorators
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+export interface ITriggerDecorator
+{
+    /**
+     * The form `@trigger` designates a default trigger decorator, whose depth will be assigned
+     * depending on the value type: Shallow for arrays, maps and sets and Deep for objects.
+     * The form `@trigger(n)` designates a trigger decorator factory with the specified depth.
+     */
+    (targetOrDepth: any, name?: string): any;
+
+    /**
+     * The form `@trigger.value` designates a Value trigger decorator
+     */
+    value(target: any, name: string): void
+
+    /**
+     * The form `@trigger.shallow` designates a Shallow trigger decorator
+     */
+    shallow(target: any, name: string): void
+
+    /**
+     * The form `@trigger.deep` designates a Deep trigger decorator
+     */
+    deep(target: any, name: string): void
+}
+
+
 
 /**
  * Decorator function for defining properties so that changing their value will any watcher
  * objects attached to them to respond.
  */
-export function trigger( target: any, name: string)
+export let trigger: ITriggerDecorator = (function()
 {
-    let sym = Symbol(name);
-	Object.defineProperty( target, name, {
+    let f: any = function()
+    {
+        if (typeof arguments[0] === "number")
+        {
+            // If the first parameter is a number that it is an explicitly specified depth using
+            // decorator factory.
+            return triggerDecoratorHelper.bind( undefined, arguments[0]);
+        }
+        else
+        {
+            // undefined depth means that that the actual depth will be assigned dependig on the
+            // value of the trigger: Shallow for maps, sets and arrays and Deep for objects.
+            return triggerDecoratorHelper( undefined, arguments[0], arguments[1]);
+        }
+
+    }
+
+    f.value = triggerDecoratorHelper.bind( undefined, TriggerDepth.Value);
+    f.shallow = triggerDecoratorHelper.bind( undefined, TriggerDepth.Shallow);
+    f.deep = triggerDecoratorHelper.bind( undefined, TriggerDepth.Deep);
+    return f as ITriggerDecorator;
+})();
+
+
+
+/**
+ * Helper function for defining `@trigger(n)` decorators.
+ */
+function triggerDecoratorFactory( depth: number): Function
+{
+    return triggerDecoratorHelper.bind( undefined, depth);
+}
+
+
+
+/**
+ * Helper function for defining `@trigger` decorators.
+ */
+function triggerDecoratorHelper( depth: number, target: any, name: string): void
+{
+    let sym;
+    /// #if DEBUG
+        sym = Symbol( name + "_trigger");
+    /// #elseif
+        sym = Symbol();
+    /// #endif
+
+    Object.defineProperty( target, name, {
         get()
         {
             let triggerObj = this[sym] as ITrigger;
             if (!triggerObj)
-                this[sym] = triggerObj = createTrigger();
+                this[sym] = triggerObj = createTrigger( depth);
 
             return triggerObj.get();
         },
@@ -721,7 +1096,7 @@ export function trigger( target: any, name: string)
         {
             let triggerObj = this[sym] as ITrigger;
             if (!triggerObj)
-                this[sym] = triggerObj = createTrigger(val);
+                this[sym] = triggerObj = createTrigger( depth, val);
             else
                 triggerObj.set( val)
         },

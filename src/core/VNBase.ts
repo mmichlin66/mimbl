@@ -3,8 +3,13 @@ import {VN, DN} from "./VN"
 import {requestNodeUpdate, scheduleFuncCall, wrapCallbackWithVN} from "./Scheduler"
 import {notifyServicePublished, notifyServiceUnpublished, notifyServiceSubscribed, notifyServiceUnsubscribed} from "./PubSub"
 
+
 /// #if USE_STATS
-	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
+    import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
+/// #endif
+
+/// #if DEBUG
+    let g_nextVNDebugID = 1;
 /// #endif
 
 
@@ -17,7 +22,7 @@ import {notifyServicePublished, notifyServiceUnpublished, notifyServiceSubscribe
 export abstract class VNBase implements VN
 {
 	/// #if USE_STATS
-		public abstract get statsCategory(): StatsCategory;
+        public abstract get statsCategory(): StatsCategory;
 	/// #endif
 
 	// String representation of the virtual node. This is used mostly for tracing and error
@@ -292,6 +297,11 @@ export abstract class VNBase implements VN
 
 	// Map of service IDs to objects constituting subscriptions made by this node.
 	private subscribedServices: Map<string,VNSubscribedServiceInfo>;
+
+    /// #if DEBUG
+    private debugID = g_nextVNDebugID++;
+	/// #endif
+
 }
 
 

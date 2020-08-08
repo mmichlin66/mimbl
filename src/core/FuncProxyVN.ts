@@ -103,6 +103,9 @@ export class FuncProxyVN extends VNBase
 	// Generates list of sub-nodes according to the current state
 	public render(): any
 	{
+        if (!this.funcWatcher)
+            return null;
+
 		/// #if VERBOSE_COMP
 			console.debug( `VERBOSE: Calling function proxy component ${this.name}`);
 		/// #endif
@@ -140,6 +143,7 @@ export class FuncProxyVN extends VNBase
 	public willUnmount(): void
 	{
         this.funcWatcher.dispose();
+        this.funcWatcher = null;
 		this.unlinkNodeFromFunc();
 
 		/// #if USE_STATS

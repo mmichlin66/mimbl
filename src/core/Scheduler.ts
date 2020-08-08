@@ -608,7 +608,11 @@ function preDestroy( vn: VN)
 		catch( err)
 		{
 			console.error( `Node ${vn.name} threw exception '${err.message}' in willUnmount`);
-		}
+        }
+        
+        // indicate that the node was processed in this cycle - this will prevent it from 
+        // rendering again in this cycle.
+        vn.lastUpdateTick = s_currentTick;
 	}
 }
 
