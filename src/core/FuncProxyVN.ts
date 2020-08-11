@@ -33,7 +33,7 @@ let symKeysToNodes = Symbol( "symKeysToNodes");
  * Mimble will issue an error.
  * 
  * The link between the function and the nodes that use this function is kept in a map from the
- * keys to the nodes. The map is stored in a custom property on the function object itself.
+ * keys to the nodes. The map is stored in a symbol on the function object itself.
  */
 export class FuncProxyVN extends VNBase
 {
@@ -79,7 +79,7 @@ export class FuncProxyVN extends VNBase
 	/**
 	 * Flag indicating whether this node should re-render during update even it is the same
 	 * physical node instance. This is needed for nodes that serve as a proxy to a rendering
-	 * function and that function must be invoked even none of the node parameters have changed.
+	 * function and that function must be invoked even if none of the node parameters have changed.
 	 */
 	public get renderOnUpdate(): boolean { return this.renderRequired; };
 
@@ -204,7 +204,7 @@ export class FuncProxyVN extends VNBase
 		let linkKey: any = key || thisArg || s_currentClassComp || func;
 
 		// try to find the key in the map on the function object; if not found, do nothing
-		let mapKeysToNodes: Map<any,FuncProxyVN> = func["__keys-to-nodes"];
+		let mapKeysToNodes: Map<any,FuncProxyVN> = func[symKeysToNodes];
 		return mapKeysToNodes && mapKeysToNodes.get( linkKey);
 	}
 

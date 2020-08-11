@@ -769,16 +769,126 @@ function triggerrize<T = any>( v: T, trigger: Trigger, depth?: number): T
     if (!v || depth === 0)
         return v;
     else if (Array.isArray(v))
-        return new Proxy( v, new ArrayHandler( trigger, (depth ? depth : TriggerDepth.Shallow) - 1)) as any as T;
+        return new Proxy( v, new NonSlotContainerHandler( trigger, (depth ? depth : TriggerDepth.Shallow) - 1)) as any as T;
     else if (v instanceof Map)
         return new Proxy( v, new MapHandler( trigger, (depth ? depth : TriggerDepth.Shallow) - 1)) as any as T;
     else if (v instanceof Set)
         return new Proxy( v, new SetHandler( trigger, (depth ? depth : TriggerDepth.Shallow) - 1)) as any as T;
     else if (v.constructor === Object)
-        return new Proxy( v, new ObjectHandler( trigger, (depth ? depth : TriggerDepth.Deep) - 1)) as any as T;
+        return new Proxy( v, new NonSlotContainerHandler( trigger, (depth ? depth : TriggerDepth.Deep) - 1)) as any as T;
     else
         return v;
 }
+
+
+
+/**
+ * Base class for Array and plain object handlers.
+ */
+class NonSlotContainerHandler implements ProxyHandler<any>
+{
+    constructor( trigger: Trigger, depth: number)
+    {
+        this.trigger = trigger;
+        this.depth = depth;
+    }
+
+    get( target: any, prop: PropertyKey, receiver: any): any
+    {
+        this.trigger.notifyRead();
+        return Reflect.get( target, prop, receiver);
+    }
+
+    set( target: any, prop: PropertyKey, value: any, receiver: any): any
+    {
+        this.trigger.notifyChanged();
+        return Reflect.set( target, prop, triggerrize( value, this.trigger, this.depth), receiver);
+    }
+
+    deleteProperty( target: any, prop: PropertyKey): boolean
+    {
+        this.trigger.notifyChanged();
+        return Reflect.deleteProperty( target, prop);
+    }
+
+    defineProperty( target: any, prop: PropertyKey, attrs: PropertyDescriptor): boolean
+    {
+        this.trigger.notifyChanged();
+        return Reflect.defineProperty( target, prop, attrs);
+    }
+
+    has( target: any, prop: PropertyKey): boolean
+    {
+        this.trigger.notifyRead();
+        return Reflect.has( target, prop);
+    }
+
+    getPrototypeOf( target: any): object | null
+    {
+        this.trigger.notifyRead();
+        return Reflect.getPrototypeOf( target);
+    }
+
+    isExtensible( target: any): boolean
+    {
+        this.trigger.notifyRead();
+        return Reflect.isExtensible( target);
+    }
+
+    getOwnPropertyDescriptor( target: any, p: PropertyKey): PropertyDescriptor | undefined
+    {
+        this.trigger.notifyRead();
+        return Reflect.getOwnPropertyDescriptor( target, p);
+    }
+
+    enumerate( target: any): PropertyKey[]
+    {
+        this.trigger.notifyRead();
+        return Array.from( Reflect.enumerate( target));
+    }
+
+    ownKeys( target: any): PropertyKey[]
+    {
+        this.trigger.notifyRead();
+        return Reflect.ownKeys( target);
+    }
+
+
+    
+    // The trigger object which should send notifications to its watchers when reads or changes
+    // occur 
+    protected trigger: Trigger;
+
+    // Number indicating to what level the items of container types should be triggerrized.
+    protected depth: number;
+}
+
+
+
+// /**
+//  * Handler for arrays.
+//  */
+// class ArrayHandler extends NonSlotContainerHandler
+// {
+//     get( target: Array<any>, prop: PropertyKey, receiver: any): any
+//     {
+//         this.trigger.notifyRead();
+//         return Reflect.get( target, prop, receiver);
+//     }
+// }
+
+
+
+// /**
+//  * Handler for on plain objects.
+//  */
+// class ObjectHandler extends NonSlotContainerHandler
+// {
+//     get( target: any, prop: PropertyKey, receiver: any): any
+//     {
+//         return Reflect.get( target, prop, receiver);
+//     }
+// }
 
 
 
@@ -789,7 +899,7 @@ function triggerrize<T = any>( v: T, trigger: Trigger, depth?: number): T
  * For Map and Set in order to be proxied, the methods returned from get() must be
  * bound to the target. See https://javascript.info/proxy#built-in-objects-internal-slots.
  */
-class SlotContainerHandler<T extends object> implements ProxyHandler<T>
+class SlotContainerHandler implements ProxyHandler<any>
 {
     constructor( trigger: Trigger, mutatorMethodNames: Set<PropertyKey>, depth: number)
     {
@@ -801,7 +911,7 @@ class SlotContainerHandler<T extends object> implements ProxyHandler<T>
     // Retrieve container methods and properties. We always notify read and we wrap methods in
     // functions that when called will notify either read or change depending on whether the
     // method is a mutator.
-    get( target: T, prop: PropertyKey, receiver: any): any
+    get( target: any, prop: PropertyKey, receiver: any): any
     {
         this.trigger.notifyRead();
 
@@ -824,7 +934,7 @@ class SlotContainerHandler<T extends object> implements ProxyHandler<T>
 
             if (this.mutatorMethodNames.has(prop))
             {
-                // for mutator methods we create and return a function that, when called, ivokes the
+                // for mutator methods we create and return a function that, when called, invokes the
                 // handler specific functionality, which knows about the structure of the arguments
                 // and will create proxies for the appropriate objects if needed. This functionality
                 // will also indicate whether an actual change occurs so that we can notify about it.
@@ -869,13 +979,13 @@ class SlotContainerHandler<T extends object> implements ProxyHandler<T>
 
     // The trigger object which should send notifications to its watchers when reads or changes
     // occur 
-    protected trigger: Trigger<T>;
+    protected trigger: Trigger;
+
+    // Number indicating to what level the items of container types should be triggerrized.
+    protected depth: number;
 
     // Set of method names, which mutate the contaier. All other methods only read from it.
     private mutatorMethodNames: Set<PropertyKey>;
-
-    // Number indicating to what level the items of container types should be triggerrized.
-    public depth: number;
 
     // This map keeps already wrapped methods so that we don't do binding more than once. 
     private wrappedMethods = new Map<PropertyKey,Function>();
@@ -884,25 +994,9 @@ class SlotContainerHandler<T extends object> implements ProxyHandler<T>
 
 
 /**
- * Handler for arrays.
- */
-class ArrayHandler implements ProxyHandler<Array<any>>
-{
-    constructor( private trigger: Trigger, depth: number) {}
-
-    get( target: Array<any>, prop: PropertyKey, receiver: any): any
-    {
-        this.trigger.notifyRead();
-        return Reflect.get( target, prop, receiver);
-    }
-}
-
-
-
-/**
  * Handler for maps.
  */
-class MapHandler extends SlotContainerHandler<Map<any,any>>
+class MapHandler extends SlotContainerHandler
 {
     private static mutatorMethodNames = new Set<PropertyKey>(["clear", "delete", "set"]);
 
@@ -941,7 +1035,7 @@ class MapHandler extends SlotContainerHandler<Map<any,any>>
 /**
  * Handler for sets.
  */
-class SetHandler extends SlotContainerHandler<Set<any>>
+class SetHandler extends SlotContainerHandler
 {
     private static mutatorMethodNames = new Set<PropertyKey>(["add", "delete", "clear"]);
 
@@ -972,49 +1066,6 @@ class SetHandler extends SlotContainerHandler<Set<any>>
             let deleted = orgMethod( args[0]);
             return [deleted, deleted];
         }
-    }
-}
-
-
-
-/**
- * Handler for on plain objects.
- */
-class ObjectHandler implements ProxyHandler<any>
-{
-    constructor( private trigger: Trigger, depth: number) {}
-
-    get( target: any, prop: PropertyKey, receiver: any): any
-    {
-        return Reflect.get( target, prop, receiver);
-    }
-}
-
-
-
-/**
- * Base class for shallow Array and Object handlers.
- */
-class NonSlotContainerHandler implements ProxyHandler<any>
-{
-    constructor( private trigger: Trigger, private mutatorMethodNames: Set<string>)
-    {
-    }
-
-    get( target: any, prop: PropertyKey, receiver: any): any
-    {
-        this.trigger.notifyRead();
-
-        let val = Reflect.get( target, prop, receiver);
-        if (typeof prop !== "string")
-            return val;
-
-        if (this.mutatorMethodNames.has(prop))
-        {
-
-        }
-        else
-            return val;
     }
 }
 
