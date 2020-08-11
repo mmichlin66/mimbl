@@ -8,7 +8,8 @@
 	"module": "./lib/mimbl.js",
 	"types": "./lib/mimblTypes.d.ts",
 	"scripts": {
-		"build": "tsc -b && webpack"
+        "build": "tsc -b && webpack",
+        "typedoc": "typedoc"
 	},
 	"author": {
 		"name": "Michael Michlin",
