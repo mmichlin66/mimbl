@@ -1368,7 +1368,7 @@ export function mergeStylesTo( resStyle: css.Styleset, ...styles: (css.Styleset 
 // Callback wrapping
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-import {wrapCallbackWithVN} from "../core/Scheduler"
+import {wrapCallbackWithVN} from "../core/Reconciler"
 
 /**
  * Wraps the given callback and returns a wrapper function which is executed in the context of the

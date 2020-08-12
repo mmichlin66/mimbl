@@ -56,9 +56,6 @@ export interface VN extends mim.IVNode
 	/** List of sub-nodes. */
 	subNodes?: VN[];
 
-	// Map of keyed sub-nodes - defined only if the number of sub-nodes is greater than 1.
-	keyedSubNodes?: Map<any,VN>;
-
 	/**
 	 * Update strategy object that determines different aspects of node behavior
 	 * during updates.

@@ -1,11 +1,11 @@
 ﻿import * as mim from "../api/mim"
 import {VN, DN} from "./VN"
-import {requestNodeUpdate, scheduleFuncCall, wrapCallbackWithVN} from "./Scheduler"
+import {requestNodeUpdate, scheduleFuncCall, wrapCallbackWithVN} from "./Reconciler"
 import {notifyServicePublished, notifyServiceUnpublished, notifyServiceSubscribed, notifyServiceUnsubscribed} from "./PubSub"
 
 
 /// #if USE_STATS
-    import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
+    import {StatsCategory} from "../utils/Stats"
 /// #endif
 
 /// #if DEBUG

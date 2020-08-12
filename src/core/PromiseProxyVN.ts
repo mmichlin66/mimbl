@@ -1,7 +1,6 @@
 ﻿import * as mim from "../api/mim"
-import {DN, VN, VNUpdateDisp} from "./VN"
+import {VN, VNUpdateDisp} from "./VN"
 import {VNBase} from "./VNBase"
-import {s_currentClassComp} from "./Scheduler"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"

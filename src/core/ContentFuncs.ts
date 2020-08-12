@@ -8,7 +8,7 @@ import {ElmVN} from "./ElmVN"
 import {TextVN} from "./TextVN"
 import {FuncProxyVN} from "./FuncProxyVN"
 import {PromiseProxyVN} from "./PromiseProxyVN"
-import {s_currentClassComp} from "./Scheduler"
+import {s_currentClassComp} from "./Reconciler"
 
 
 

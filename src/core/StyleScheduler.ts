@@ -1,5 +1,5 @@
 import * as css from "mimcss"
-import {scheduleFuncCall} from "./Scheduler"
+import {scheduleFuncCall} from "./Reconciler"
 
 
 

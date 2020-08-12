@@ -1,7 +1,7 @@
 ﻿import * as mim from "../api/mim"
 import {VN, VNUpdateDisp} from "./VN"
 import {VNBase} from "./VNBase"
-import {s_currentClassComp} from "./Scheduler"
+import {s_currentClassComp} from "./Reconciler"
 import {createWatcher, IWatcher} from "../utils/TriggerWatcher"
 
 /// #if USE_STATS

@@ -1,7 +1,6 @@
 ﻿import * as mim from "../api/mim"
-import {DN, VN, getFirstDN, getImmediateDNs, getNextDNUnderSameAnchorDN, getVNPath} from "./VN"
+import {DN, VN, getFirstDN, getImmediateDNs, getNextDNUnderSameAnchorDN, getVNPath, VNUpdateDisp, getLastDN} from "./VN"
 import {createVNChainFromContent} from "./ContentFuncs"
-import {VNDispAction, VNDisp, VNDispGroup} from "./VNDisp"
 import {enterMutationScope, exitMutationScope} from "../utils/TriggerWatcher"
 
 /// #if USE_STATS
@@ -84,107 +83,6 @@ export let s_currentClassComp: mim.IComponent = null;
 
 
 
-// Callback that is called on a new UI cycle when there is a need to update UI components
-export function updateNodeSync( vn: VN): void
-{
-	// increment tick number.
-	s_currentTick++;
-
-	/// #if USE_STATS
-		let oldStats = DetailedStats.stats;
-		DetailedStats.stats = new DetailedStats( `Mimbl update cycle ${s_currentTick}: `);
-		DetailedStats.stats.start();
-	/// #endif
-
-	let vns: VN[][] = new Array(1);
-	vns[0] = [vn];
-
-	s_schedulerState = SchedulerState.Update;
-	performCommitPhase( performRenderPhase( vns));
-
-	/// #if USE_STATS
-		DetailedStats.stats.stop( true);
-		DetailedStats.stats = oldStats;
-	/// #endif
-
-	s_schedulerState = SchedulerState.Idle;
-};
-
-
-
-// Schedules an update for the given node.
-export function requestNodeUpdate( vn: VN): void
-{
-	if (!vn.anchorDN)
-		console.warn( `Update requested for virtual node '${getVNPath(vn).join("->")}' that doesn't have anchor DOM node`)
-
-	// add this node to the map of nodes for which either update or replacement or
-	// deletion is scheduled. Note that a node will only be present once in the map no
-	// matter how many times it calls requestUpdate().
-	s_vnsScheduledForUpdate.add( vn);
-
-	// if this is a class-based component and it has beforeUpdate and/or afterUpdate methods
-	// implemented, schedule their executions. Note that the "beforeUpdate" method is not
-	// scheduled if the current scheduler state is BeforeUpdate. This is because the component
-	// wil be updated in the current cycle and there is already no time to execute the "before
-	// update" method.
-	if (vn.type === mim.VNType.IndependentComp || vn.type === mim.VNType.ManagedComp)
-	{
-		let comp = (vn as any as mim.IClassCompVN).comp;
-		if (comp.beforeUpdate && s_schedulerState !== SchedulerState.BeforeUpdate)
-			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, wrapCallbackWithVN( comp.beforeUpdate, comp, vn));
-
-		if (comp.afterUpdate)
-			s_callsScheduledAfterUpdate.set( comp.afterUpdate, wrapCallbackWithVN( comp.beforeUpdate, comp, vn));
-	}
-
-	// the update is scheduled in the next cycle unless the request is made during a
-	// "before update" function execution.
-	if (s_schedulerState !== SchedulerState.BeforeUpdate)
-		requestFrameIfNeeded();
-}
-
-
-
-// Schedules to call the given function either before or after all the scheduled components
-// have been updated.
-export function scheduleFuncCall( func: mim.ScheduledFuncType, beforeUpdate: boolean, that?: object, vn?: mim.IVNode): void
-{
-	/// #if DEBUG
-	if (!func)
-	{
-		console.error( "Trying to schedule undefined function for update");
-		return;
-	}
-	/// #endif
-
-	if (beforeUpdate)
-	{
-		if (!s_callsScheduledBeforeUpdate.has( func))
-		{
-			s_callsScheduledBeforeUpdate.set( func, wrapCallbackWithVN( func, that, vn));
-
-			// a "before update" function is always scheduled in the next frame even if the
-			// call is made from another "before update" function.
-			requestFrameIfNeeded();
-		}
-	}
-	else
-	{
-		if (!s_callsScheduledAfterUpdate.has( func))
-		{
-			s_callsScheduledAfterUpdate.set( func, wrapCallbackWithVN( func, that, vn));
-
-			// an "after update" function is scheduled in the next cycle unless the request is made
-			// either from a "before update" function execution or during a node update.
-			if (s_schedulerState !== SchedulerState.BeforeUpdate && s_schedulerState !== SchedulerState.Update)
-				requestFrameIfNeeded();
-		}
-	}
-}
-
-
-
 /**
  * Wraps the given callback and returns a wrapper function which is executed in the context of the
  * given virtual node. The given "that" object will be the value of "this" when the callback is
@@ -204,16 +102,22 @@ export function wrapCallbackWithVN<T extends Function>( callback: T, that?: obje
 
 
 /**
- * The CallbackWrapper function is used to wrap a callback in order to catch exceptions from the
- * callback and pass it to the "StdErrorHandling" service. The function is bound to  the virtual
- * node as "this" and to two parameters: the object that will be the value of "this" when the
- * original callback is executed and the original callback itself. These two parameters are
- * accessed as the first and second elements of the `arguments` array). The rest of parameters in
- * the `arguments` array are passed to the original callback and the value returned by the callback
- * is returned from the wrapper.
+ * The CallbackWrapper function is used to wrap callbacks in order to have it executed in a Mimbl
+ * context. The function is usually bound to a virtual node as "this" and to two parameters: the
+ * object that will be the value of "this" when the original callback is executed and the original
+ * callback itself. These two parameters are accessed as the first and second elements of the
+ * `arguments` array). The rest of parameters in the `arguments` array are passed to the original
+ * callback and the value returned by the callback is returned from the wrapper. Note that "this"
+ * can be undefined if the function was scheduled without being in the context of any virtual node.
  * 
- * Note that "this" can be undefined if the function was scheduled without being in the context of
- * any virtual node.
+ * The proper Mimbl context establishes the following:
+ * - executes in a mutation scope, so that if any trigger valriable is changed during the execution
+ *   of the callback, watchers will be only notified after the callback has finished its execution.
+ * - If the wrapping has been done in the context of a virtual node (e.g. from a Mimbl component),
+ *   the "current virtual node" and the "current component" are set to the node and component under
+ *   which the callback was wrapped. This allow for proper JSX execution and for using the Mimbl
+ *   error handling mechanism.
+ * 
  */
 function CallbackWrapper(): any
 {
@@ -260,6 +164,127 @@ function CallbackWrapper(): any
 
 
 
+// Callback that is called on a new UI cycle when there is a need to update UI components
+export function updateNodeSync( vn: VN): void
+{
+	// clear the scheduled frame handle so that new update or replacement requests will
+    // schedule a new frame.
+    if (s_scheduledFrameHandle)
+    {
+        cancelAnimationFrame( s_scheduledFrameHandle);
+        s_scheduledFrameHandle = 0;
+    }
+
+    addNodeToScheduler( vn);
+    doMimbleTick();
+
+    // // increment tick number.
+	// s_currentTick++;
+
+	// /// #if USE_STATS
+	// 	let oldStats = DetailedStats.stats;
+	// 	DetailedStats.stats = new DetailedStats( `Mimbl tick ${s_currentTick}: `);
+	// 	DetailedStats.stats.start();
+	// /// #endif
+
+	// let vns: VN[][] = new Array(1);
+	// vns[0] = [vn];
+
+	// s_schedulerState = SchedulerState.Update;
+	// performCommitPhase( performRenderPhase( vns));
+
+	// /// #if USE_STATS
+	// 	DetailedStats.stats.stop( true);
+	// 	DetailedStats.stats = oldStats;
+	// /// #endif
+
+	// s_schedulerState = SchedulerState.Idle;
+};
+
+
+
+// Schedules an update for the given node.
+export function requestNodeUpdate( vn: VN): void
+{
+	if (!vn.anchorDN)
+		console.warn( `Update requested for virtual node '${getVNPath(vn).join("->")}' that doesn't have anchor DOM node`)
+
+    addNodeToScheduler( vn);
+
+	// the update is scheduled in the next tick unless the request is made during a
+	// "before update" function execution.
+	if (s_schedulerState !== SchedulerState.BeforeUpdate)
+		requestFrameIfNeeded();
+}
+
+
+
+// Adds the given node and related information into the internal structures so that it will be
+// updated during the next Mimbl tick.
+function addNodeToScheduler( vn: VN): void
+{
+	// add this node to the map of nodes for which either update or replacement or
+	// deletion is scheduled. Note that a node will only be present once in the map no
+	// matter how many times it calls requestUpdate().
+	s_vnsScheduledForUpdate.add( vn);
+
+	// if this is a class-based component and it has beforeUpdate and/or afterUpdate methods
+	// implemented, schedule their executions. Note that the "beforeUpdate" method is not
+	// scheduled if the current scheduler state is BeforeUpdate. This is because the component
+	// wil be updated in the current cycle and there is already no time to execute the "before
+	// update" method.
+	if (vn.type === mim.VNType.IndependentComp || vn.type === mim.VNType.ManagedComp)
+	{
+		let comp = (vn as any as mim.IClassCompVN).comp;
+		if (comp.beforeUpdate && s_schedulerState !== SchedulerState.BeforeUpdate)
+			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, wrapCallbackWithVN( comp.beforeUpdate, comp, vn));
+
+		if (comp.afterUpdate)
+			s_callsScheduledAfterUpdate.set( comp.afterUpdate, wrapCallbackWithVN( comp.beforeUpdate, comp, vn));
+	}
+}
+
+
+
+// Schedules to call the given function either before or after all the scheduled components
+// have been updated.
+export function scheduleFuncCall( func: mim.ScheduledFuncType, beforeUpdate: boolean, that?: object, vn?: mim.IVNode): void
+{
+	/// #if DEBUG
+	if (!func)
+	{
+		console.error( "Trying to schedule undefined function for update");
+		return;
+	}
+	/// #endif
+
+	if (beforeUpdate)
+	{
+		if (!s_callsScheduledBeforeUpdate.has( func))
+		{
+			s_callsScheduledBeforeUpdate.set( func, wrapCallbackWithVN( func, that, vn));
+
+			// a "before update" function is always scheduled in the next frame even if the
+			// call is made from another "before update" function.
+			requestFrameIfNeeded();
+		}
+	}
+	else
+	{
+		if (!s_callsScheduledAfterUpdate.has( func))
+		{
+			s_callsScheduledAfterUpdate.set( func, wrapCallbackWithVN( func, that, vn));
+
+			// an "after update" function is scheduled in the next cycle unless the request is made
+			// either from a "before update" function execution or during a node update.
+			if (s_schedulerState !== SchedulerState.BeforeUpdate && s_schedulerState !== SchedulerState.Update)
+				requestFrameIfNeeded();
+		}
+	}
+}
+
+
+
 // Determines whether the call to requestAnimationFrame should be made or the frame has already
 // been scheduled.
 function requestFrameIfNeeded(): void
@@ -271,12 +296,20 @@ function requestFrameIfNeeded(): void
 
 
 // Callback that is called on a new UI cycle when there is a need to update UI components
-let onScheduledFrame = (): void =>
+function onScheduledFrame(): void
 {
 	// clear the scheduled frame handle so that new update or replacement requests will
 	// schedule a new frame.
 	s_scheduledFrameHandle = 0;
 
+    doMimbleTick();
+}
+
+
+
+// Reconciler main entrance point
+function doMimbleTick(): void
+{
 	// increment tick number.
 	s_currentTick++;
 
@@ -294,9 +327,13 @@ let onScheduledFrame = (): void =>
 
 	if (s_vnsScheduledForUpdate.size > 0)
 	{
-		/// #if USE_STATS
-			DetailedStats.stats = new DetailedStats( `Mimbl update cycle ${s_currentTick}: `);
-			DetailedStats.stats.start();
+        /// #if USE_STATS
+            let statsAlreadyExisted = DetailedStats.stats != null;
+            if (!statsAlreadyExisted)
+            {
+                DetailedStats.stats = new DetailedStats( `Mimbl tick ${s_currentTick}: `);
+                DetailedStats.stats.start();
+            }
 		/// #endif
 
 		// remember the internal set of nodes and re-create it so that it is ready for new
@@ -306,9 +343,12 @@ let onScheduledFrame = (): void =>
 		s_vnsScheduledForUpdate = new Set<VN>();
 		performCommitPhase( performRenderPhase( arrangeNodesByDepth( vnsScheduledForUpdate)));
 
-		/// #if USE_STATS
-			DetailedStats.stats.stop( true);
-			DetailedStats.stats = null;
+        /// #if USE_STATS
+            if (!statsAlreadyExisted)
+            {
+                DetailedStats.stats.stop( true);
+                DetailedStats.stats = null;
+            }
 		/// #endif
 	}
 
@@ -383,7 +423,7 @@ function performRenderPhase( vnsByDepth: VN[][]): VNDisp[]
 			if (vn.lastUpdateTick === s_currentTick)
 				return;
 
-			disp = new VNDisp( vn, VNDispAction.Unknown, vn);
+			disp = { newVN: vn, action: VNDispAction.Unknown, oldVN: vn};
 			updateVirtual( disp);
 			updatedNodeDisps.push( disp);
 		}
@@ -525,16 +565,10 @@ function createSubNodesVirtual( vn: VN): void
 	vn.subNodes = createVNChainFromContent( vn.render());
 	if (vn.subNodes)
 	{
-		if (vn.subNodes.length > 1)
-			vn.keyedSubNodes = new Map<any,VN>();
-
 		let prevVN: VN;
 		for( let svn of vn.subNodes)
 		{
 			createVirtual( svn, vn);
-
-			if (vn.keyedSubNodes !== undefined && svn.key !== undefined)
-				vn.keyedSubNodes.set( svn.key, svn);
 
 			if (prevVN)
 			{
@@ -707,7 +741,7 @@ function updateVirtual( disp: VNDisp): void
 function updateSubNodesVirtual( disp: VNDisp): void
 {
 	// render the new content and build array of dispositions objects for the sub-nodes.
-	disp.buildSubNodeDispositions();
+	buildSubNodeDispositions( disp);
 
 	// for nodes to be removed, call willUnmount
 	if (disp.subNodesToRemove)
@@ -780,13 +814,12 @@ function updatePhysical( disp: VNDisp): void
 
 	// re-create our current list of sub-nodes - we will populate it while updating them
 	vn.subNodes = disp.subNodeDisps ? new Array<VN>(disp.subNodeDisps.length) : undefined;
-	vn.keyedSubNodes = vn.subNodes !== undefined && vn.subNodes.length > 1 ? new Map<any,VN>() : undefined;
 
 	// perform updates and inserts by either groups or individual nodes.
 	if (disp.subNodeGroups)
 	{
 		updatePhysicalByGroups( vn, disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
-		arrangeGroups( vn, disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
+		arrangeGroups( disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
 	}
 	else if (disp.subNodeDisps)
 	{
@@ -870,9 +903,6 @@ function updatePhysicalByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 				beforeDN = firstDN;
 		}
 
-		if (parentVN.keyedSubNodes !== undefined && svn.key !== undefined)
-			parentVN.keyedSubNodes.set( svn.key, svn);
-
 		svn.next = svn.prev = undefined;
 		if (nextVN)
 		{
@@ -941,9 +971,6 @@ function updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 					beforeDN = firstDN;
 			}
 
-			if (parentVN.keyedSubNodes !== undefined && svn.key !== undefined)
-				parentVN.keyedSubNodes.set( svn.key, svn);
-
 			svn.next = svn.prev = undefined;
 			if (nextVN)
 			{
@@ -968,7 +995,7 @@ function updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 
 
 // Arrange the groups in order as in the new sub-node list, moving them if necessary.
-function arrangeGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
+function arrangeGroups( disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
 {
 	// We go from the last group to the second group in the list because as soon as we moved all
 	// groups except the first one into their right places, the first group will be automatically
@@ -988,9 +1015,9 @@ function arrangeGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], an
 				// if the current group now resides before the previous group, then that means
 				// that we are swapping two groups. In this case we want to move the shorter one.
 				if (group.lastDN.nextSibling === prevGroup.firstDN && group.count > prevGroup.count)
-					moveGroup( parentVN, disps, prevGroup, anchorDN, group.firstDN);
+					moveGroup( disps, prevGroup, anchorDN, group.firstDN);
 				else
-					moveGroup( parentVN, disps, group, anchorDN, beforeDN);
+					moveGroup( disps, group, anchorDN, beforeDN);
 			}
 
 			// the group's first DN becomes the new beforeDN. Note that firstDN cannot be null
@@ -1003,7 +1030,7 @@ function arrangeGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], an
 
 
 // Moves all the nodes in the given group before the given DOM node.
-function moveGroup( parentVN: VN, disps: VNDisp[], group: VNDispGroup, anchorDN: DN, beforeDN: DN): void
+function moveGroup( disps: VNDisp[], group: VNDispGroup, anchorDN: DN, beforeDN: DN): void
 {
 	for( let j = group.first; j <= group.last; j++)
 	{
@@ -1023,6 +1050,366 @@ function moveGroup( parentVN: VN, disps: VNDisp[], group: VNDispGroup, anchorDN:
 		/// #endif
 
 	}
+}
+
+
+
+/**
+ * The VNAction enumeration specifies possible actions to perform for new nodes during
+ * reconciliation process.
+ */
+const enum VNDispAction
+{
+	/**
+	 * Either it is not yet known what to do with the node itself or this is a stem node; that is,
+	 * only the node's children should be updated.
+	 */
+	Unknown = 0,
+
+	/**
+	 * The new node should be inserted. This means that either there was no counterpart old node
+	 * found or the found node cannot be used to update the old one nor can the old node be reused
+	 * by the new one (e.g. they are of different type).
+	 */
+	Insert = 1,
+
+	/**
+	 * The new node should be used to update the old node. This value is also used for InstanceVN
+	 * nodes if the old and the new are the same node.
+	 */
+	Update = 2,
+}
+
+
+
+/**
+ * The VNDispGroup class describes a group of consecutive VNDisp objects correspponding to the
+ * sequence of sub-nodes. The group is described using indices of VNDisp objects in the
+ * subNodeDisp field of the parent VNDisp object.
+ */
+class VNDispGroup
+{
+	/** parent VNDisp to which this group belongs */
+	public parentDisp: VNDisp;
+	
+	/** Action to be performed on the nodes in the group */
+	public action: VNDispAction;
+
+	/** Index of the first VNDisp in the group */
+	public first: number;
+
+	/** Index of the last VNDisp in the group */
+	public last: number;
+
+	/** Number of nodes in the group. */
+	public get count(): number { return this.last - this.first + 1 };
+
+	/** First DOM node in the group - will be known after the nodes are physically updated */
+	public firstDN: DN;
+
+	/** First DOM node in the group - will be known after the nodes are physically updated */
+	public lastDN: DN;
+
+
+
+	constructor( parentDisp: VNDisp, action: VNDispAction, first: number, last?: number)
+	{
+		this.parentDisp = parentDisp;
+		this.action = action;
+		this.first = first;
+		this.last = last;
+	}
+
+
+
+	/**
+	 * Determines first and last DOM nodes for the group. This method is invoked only after the
+	 * nodes were phisically updated/inserted and we can obtain their DOM nodes.
+	 */
+	public determineDNs()
+	{
+		let disp: VNDisp;
+		let vn: VN;
+		for( let i = this.first; i <= this.last; i++)
+		{
+			disp = this.parentDisp.subNodeDisps[i];
+			vn = this.action === VNDispAction.Update ? disp.oldVN : disp.newVN;
+			this.firstDN = getFirstDN( vn);
+			if (this.firstDN)
+				break;
+		}
+
+		for( let i = this.last; i >= this.first; i--)
+		{
+			disp = this.parentDisp.subNodeDisps[i];
+			vn = this.action === VNDispAction.Update ? disp.oldVN : disp.newVN;
+			this.lastDN = getLastDN( vn);
+			if (this.lastDN)
+				break;
+		}
+	}
+}
+
+
+
+/**
+ * If a node has more than this number of sub-nodes, then we build groups. The idea is that
+ * otherwise, the overhead of building groups is not worth it.
+ */
+const NO_GROUP_THRESHOLD = 8;
+
+
+
+/**
+ * The VNDisp class is a recursive structure that describes a disposition for a node and its
+ * sub-nodes during the reconciliation process.
+ */
+type VNDisp = 
+{
+	/** New virtual node to insert or to update an old node */
+	newVN: VN;
+
+	/** Action to be performed on the node */
+	action?: VNDispAction;
+
+	/** Old virtual node to be updated. This is only used for the Update action. */
+	oldVN?: VN;
+
+	/** Disposition flags for the Update action. This is not used for the Insert actions. */
+	updateDisp?: VNUpdateDisp;
+
+	/**
+	 * Array of disposition objects for sub-nodes. This includes nodes to be updated
+	 * and to be inserted.
+	 */
+	subNodeDisps?: VNDisp[];
+
+	/** Array of sub-nodes that should be removed during update of the sub-nodes. */
+	subNodesToRemove?: VN[];
+
+	/** Array of groups of sub-nodes that should be updated or inserted. */
+	subNodeGroups?: VNDispGroup[];
+}
+
+
+/**
+ * Compares old and new chains of sub-nodes and determines what nodes should be created, deleted
+ * or updated. The result is remembered as an array of VNDisp objects for each sub-node and as
+ * array of old sub-nodes that should be deleted. In addition, the new sub-nodes are divided
+ * into groups of consecutive nodes that should be updated and of nodes that should be inserted.
+ * The groups are built in a way so that if a node should be moved, its entire group is moved.
+ */
+function buildSubNodeDispositions( disp: VNDisp): void
+{
+    // render the new content
+    let newChain = createVNChainFromContent( disp.oldVN.render());
+    let newLen = newChain ? newChain.length : 0;
+
+    let oldChain = disp.oldVN.subNodes;
+    let oldLen = oldChain ? oldChain.length : 0;
+
+    // if either old or new or both chains are empty, we do special things
+    if (newLen === 0 && oldLen === 0)
+    {
+        // both chains are empty - do nothing
+        return;
+    }
+    else if (newLen === 0)
+    {
+        // new chain is empty - delete all old nodes
+        disp.subNodesToRemove = oldChain;
+        return;
+    }
+    else if (oldLen === 0)
+    {
+        // old chain is empty - insert all new nodes
+        disp.subNodeDisps = newChain.map( newVN => { return { newVN, action: VNDispAction.Insert} });
+        if (newLen > NO_GROUP_THRESHOLD)
+            disp.subNodeGroups = [new VNDispGroup( disp, VNDispAction.Insert, 0, newLen - 1)];
+
+        return;
+    }
+
+    // determine whether recycling of non-matching old keyed sub-nodes by non-matching new
+    // keyed sub-nodes is allowed. If update strategy is not defined for the node, the
+    // recycling is allowed.
+    let allowKeyedNodeRecycling = true;
+    let updateStrategy = disp.oldVN ? disp.oldVN.updateStrategy : undefined;
+    if (updateStrategy && updateStrategy.allowKeyedNodeRecycling !== undefined)
+        allowKeyedNodeRecycling = updateStrategy.allowKeyedNodeRecycling;
+
+    // process the special case with a single sub-node in both old and new chains just
+    // to avoid creating temporary structures
+    if (newLen === 1 && oldLen === 1)
+    {
+        disp.subNodeDisps = [createSubDispForNodes( disp, newChain[0], oldChain[0], allowKeyedNodeRecycling)];
+        return;
+    }
+
+    // we are here if either old and new chains contain more than one node and we need to
+    // reconcile the chains. First go over the old nodes and build a map of keyed ones and a
+    // list of non-keyed ones. If there are more than one node with the same key, the first one
+    // goes to the map and the rest to the unleyed list.
+    let oldKeyedMap = new Map<any,VN>();
+    let oldUnkeyedList: VN[] = [];
+    let key: any;
+    for( let oldVN of oldChain)
+    {
+        key = oldVN.key;
+        if (key != null && !oldKeyedMap.has( key))
+            oldKeyedMap.set( key, oldVN);
+        else
+            oldUnkeyedList.push( oldVN);
+    }
+
+    // remeber the length of the unkeyed list;
+    let oldUnkeyedListLength = oldUnkeyedList.length;
+
+    // prepare array for VNDisp objects for new nodes
+    disp.subNodeDisps = new Array( newLen);
+    
+    // loop over new nodes
+    let oldUnkeyedListIndex = 0;
+    newChain.forEach( (newVN, index) =>
+    {
+        let oldVN: VN = null;
+
+        // try to look up the old node by the new node's key if exists
+        key = newVN.key;
+        if (key != null)
+        {
+            oldVN = oldKeyedMap.get( key);
+
+            // if we find the old node by the key, remove it from the map; after the
+            // reconciliation, all old nodes remaining in this map will be marked for removal.
+            if (oldVN)
+                oldKeyedMap.delete( key);
+        }
+
+        // if we have old nodes in the unkeyed list use the next one
+        if (!oldVN && oldUnkeyedListIndex != oldUnkeyedListLength)
+            oldVN = oldUnkeyedList[oldUnkeyedListIndex++];
+
+        disp.subNodeDisps[index] = createSubDispForNodes( disp, newVN, oldVN, allowKeyedNodeRecycling);
+    });
+
+    // old nodes remaning in the keyed map and in the unkeyed list will be removed
+    if (oldKeyedMap.size > 0 || oldUnkeyedListIndex < oldUnkeyedListLength)
+    {
+        if (!disp.subNodesToRemove)
+            disp.subNodesToRemove = [];
+
+        oldKeyedMap.forEach( oldVN => disp.subNodesToRemove.push( oldVN));
+        for( let i = oldUnkeyedListIndex; i < oldUnkeyedListLength; i++)
+            disp.subNodesToRemove.push( oldUnkeyedList[i]);
+    }
+
+    if (newLen > NO_GROUP_THRESHOLD)
+        buildSubNodeGroups( disp);
+}
+
+
+
+function createSubDispForNodes( disp: VNDisp, newVN: VN, oldVN?: VN, allowKeyedNodeRecycling?: boolean): VNDisp
+{
+    let subDisp: VNDisp = { newVN };
+    if (!oldVN)
+        subDisp.action = VNDispAction.Insert;
+    else if (oldVN === newVN ||
+        ((allowKeyedNodeRecycling || newVN.key === oldVN.key) && isUpdatePossible( oldVN, newVN)))
+    {
+        // old node can be updated with information from the new node
+        subDisp.action = VNDispAction.Update;
+        subDisp.oldVN = oldVN;
+    }
+    else
+    {
+        // old node cannot be updated, so the new node will be inserted and the old node will
+        // be removed
+        subDisp.action = VNDispAction.Insert;
+        if (!disp.subNodesToRemove)
+            disp.subNodesToRemove = [];
+        disp.subNodesToRemove.push( oldVN);
+    }
+
+    return subDisp;
+}
+
+
+
+/**
+ * From a flat list of new sub-nodes builds groups of consecutive nodes that should be either
+ * updated or inserted.
+ */
+function buildSubNodeGroups( disp: VNDisp): void
+{
+    // we are here only if we have some number of sub-node dispositions
+    let count = disp.subNodeDisps.length;
+
+    /// #if DEBUG
+        // this method is not supposed to be called if the number of sub-nodes is less then
+        // the pre-determined threshold
+        if (count <= NO_GROUP_THRESHOLD || count === 0)
+            return;
+    /// #endif
+
+    // create array of groups and create the first group starting from the first node
+    let group: VNDispGroup = new VNDispGroup( disp, disp.subNodeDisps[0].action, 0);
+    disp.subNodeGroups = [group];
+
+    // loop over sub-nodes and on each iteration decide whether we need to open a new group
+    // or put the current node into the existing group or close the existing group and open
+    // a new one.
+    let action: VNDispAction;
+    let subDisp: VNDisp;
+    for( let i = 1; i < count; i++)
+    {
+        subDisp = disp.subNodeDisps[i];
+        action = subDisp.action;
+        if (action !== group.action)
+        {
+            // close the group with the previous index. Decrement the iterating index so that
+            // the next iteration will open a new group. Note that we cannot be here for a node
+            // that starts a new group because for such node disp.action === groupAction.
+            group.last = i - 1;
+            group = new VNDispGroup( disp, action, i);
+            disp.subNodeGroups.push( group);
+        }
+        else if (action === VNDispAction.Update)
+        {
+            // an "update" node is out-of-order and should close the current group if
+            // its next sibling in the new list is different from the next sibling in the old list.
+            // The last node will close the last group after the loop.
+            if (disp.subNodeDisps[i-1].oldVN !== subDisp.oldVN.prev)
+            {
+                // close the group with the current index.
+                group.last = i - 1;
+                group = new VNDispGroup( disp, action, i);
+                disp.subNodeGroups.push( group);
+            }
+        }
+
+        // all consecutive "insert" nodes belong to the same group so we just wait for the
+        // next node
+    }
+
+    // close the last group
+    if (group !== undefined)
+        group.last = count - 1;
+}
+
+
+
+/**
+ * Determines whether update of the given old node from the given new node is possible. Update
+ * is possible if the types of nodes are the same and either the isUpdatePossible method is not
+ * defined on the old node or it returns true.
+ */
+function isUpdatePossible( oldVN: VN, newVN: VN): boolean
+{
+	return (oldVN.type === newVN.type &&
+			(oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN)));
+
 }
 
 

@@ -1,5 +1,5 @@
 ﻿import * as mim from "../api/mim"
-import {updateNodeSync, requestNodeUpdate} from "./Scheduler"
+import {updateNodeSync, requestNodeUpdate} from "./Reconciler"
 import {DN} from "./VN"
 import {VNBase} from "./VNBase"
 import {RootErrorUI, RootWaitingUI} from "./RootUI"

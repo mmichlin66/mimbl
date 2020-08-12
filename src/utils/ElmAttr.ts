@@ -421,7 +421,7 @@ export class ElmAttr
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 function setStyleProp( elm: Element, attrName: string, propVal: css.Styleset): void
 {
-	css.setElementStyle( elm as HTMLElement, propVal);
+	css.setElementStyle( elm as HTMLElement, propVal, css.SchedulerType.Sync);
 }
 
 
@@ -439,7 +439,7 @@ function diffStyleProp( attrName: string, oldPropVal: css.Styleset, newPropVal: 
 
 function updateStyleProp( elm: Element, attrName: string, updateVal: css.StringStyleset): void
 {
-	css.setElementStringStyle( elm as HTMLElement, updateVal);
+	css.setElementStringStyle( elm as HTMLElement, updateVal, css.SchedulerType.Sync);
 }
 
 
