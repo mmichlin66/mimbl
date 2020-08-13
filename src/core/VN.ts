@@ -152,12 +152,12 @@ export interface VN extends mim.IVNode
 	// rendering of the node itself and/or its sub-nodes. If this method is not implemented the node
 	// doesn't support error handling.
 	// This method is part of the Render phase.
-	supportsErrorHandling?(): boolean;
+	readonly supportsErrorHandling?: boolean;
 
 	// This method is called after an exception was thrown during rendering of the node itself
 	// and/or its sub-nodes. The render method will be called after this method returns.
 	// This method is part of the Render phase.
-	handleError?( vnErr: any, path: string[]): void;
+	handleError?( err: any, path: string[]): void;
 }
 
 

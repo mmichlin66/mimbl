@@ -87,7 +87,7 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 
 	// Determines whether the node supports handling of errors; that is, exception thrown during
 	// rendering of the node itself and/or its sub-nodes.
-	public supportsErrorHandling(): boolean
+	public get supportsErrorHandling(): boolean
 	{
 		return true;
 	}

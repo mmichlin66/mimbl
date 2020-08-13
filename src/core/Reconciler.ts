@@ -124,14 +124,8 @@ function CallbackWrapper(): any
 {
 	// remember the current VN and set the current VN to be the VN from the "this" value. Note
 	// that this can be undefined if the wrapping was created without the VN context.
-	let currentVN = s_currentVN;
-    let currentClassComp = s_currentClassComp;
     let vn: VN = this;
-    if (vn)
-    {
-        s_currentVN = vn;
-        s_currentClassComp = (s_currentVN as any).comp ? (s_currentVN as any).comp : s_currentVN.creator;
-    }
+    let prevVN = trackCurrentVN( vn ? vn : null);
 
 	try
 	{
@@ -150,12 +144,9 @@ function CallbackWrapper(): any
 	finally
 	{
         exitMutationScope();
-        if (vn)
-        {
-            // restore the current VN to the remembered value;
-            s_currentVN = currentVN;
-            s_currentClassComp = currentClassComp;
-        }
+
+        // restore previous current VN
+        trackCurrentVN( prevVN);
 	}
 }
 
@@ -472,7 +463,7 @@ function renderNewNode( vn: VN, parent: VN): void
             // since we have sub-nodes, we need to create nodes for them and render. If our node
             // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
             // either the uncestor node that knows to handle errors or to the Mimbl tick loop.
-            if (!vn.supportsErrorHandling || !vn.supportsErrorHandling())
+            if (!vn.supportsErrorHandling)
             {
                 for( let svn of subNodes)
                     renderNewNode( svn, vn);
@@ -684,7 +675,7 @@ function renderUpdatedNode( disp: VNDisp): void
         // since we have sub-nodes, we need to create nodes for them and render. If our node
         // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
         // either the uncestor node that knows to handle errors or to the Mimbl tick loop.
-        if (!vn.supportsErrorHandling || !vn.supportsErrorHandling())
+        if (!vn.supportsErrorHandling)
             renderUpdatedSubNodes( disp);
         else
         {
@@ -694,20 +685,17 @@ function renderUpdatedNode( disp: VNDisp): void
             }
             catch( err)
             {
-                if (vn.supportsErrorHandling && vn.supportsErrorHandling())
-                {
-                    /// #if VERBOSE_NODE
-                        console.debug( `Calling handleError() on node ${vn.name}. Error`, err);
-                    /// #endif
+                /// #if VERBOSE_NODE
+                    console.debug( `Calling handleError() on node ${vn.name}. Error`, err);
+                /// #endif
 
-                    // let the node handle its own error and re-render; then we render the new
-                    // content but we do it without try/catch this time; otherwise, we may end
-                    // up in an infinite loop
-                    vn.handleError( err, getVNPath( s_currentVN));
-                    subNodes = createVNChainFromContent( vn.render());
-                    buildSubNodeDispositions( disp, subNodes);
-                    renderUpdatedSubNodes( disp);
-                }
+                // let the node handle its own error and re-render; then we render the new
+                // content but we do it without try/catch this time; otherwise, we may end
+                // up in an infinite loop
+                vn.handleError( err, getVNPath( s_currentVN));
+                subNodes = createVNChainFromContent( vn.render());
+                buildSubNodeDispositions( disp, subNodes);
+                renderUpdatedSubNodes( disp);
             }
         }
     }

@@ -137,7 +137,7 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 
 	// Determines whether the node supports handling of errors; that is, exception thrown during
 	// rendering of the node itself and/or its sub-nodes.
-	public supportsErrorHandling(): boolean
+	public get supportsErrorHandling(): boolean
 	{
 		return this.comp.handleError !== undefined;
 	}
