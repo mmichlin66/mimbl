@@ -1,4 +1,4 @@
-﻿import * as css from "mimcss"
+﻿import {Styleset, IClassRule, IClassNameRule, IIDRule} from "mimcss"
 
 
 
@@ -723,7 +723,7 @@ export interface ITextVN extends IVNode
 export type Slice =
 {
 	className?: string;
-	style?: css.Styleset;
+	style?: Styleset;
 	props?: object
 	content?: any;
 };
@@ -768,12 +768,12 @@ export type EventPropType<T extends Event> = EventFuncType<T> | EventFuncAndThis
 /**
  * Type for defining the class property of HTML elements
  */				
-export type ClassPropType = string | css.IClassRule | css.IClassNameRule | (string | css.IClassRule | css.IClassNameRule)[];
+export type ClassPropType = string | IClassRule | IClassNameRule | (string | IClassRule | IClassNameRule)[];
 
 /**
  * Type for defining the id property of HTML elements
  */				
-export type IDPropType = string | number | css.IIDRule;
+export type IDPropType = string | number | IIDRule;
 
 
 
@@ -829,10 +829,10 @@ export interface IElementProps<TRef,TChildren = any> extends ICommonProps
 	class?: ClassPropType;
 	draggable?: boolean;
 	dropzone ?: "copy" | "move" | "link";
-	id?: string | number | css.IIDRule;
+	id?: string | number | IIDRule;
 	lang?: string;
 	role?: string;
-	style?: css.Styleset;
+	style?: Styleset;
 	tabindex?: number;
 
 	// global events
@@ -1346,7 +1346,7 @@ export function mergeClasses( ...classNames: (string | string[])[]): string
  * always returns an object - even if empty
  * @param styles Array of style objects to merge.
  */
-export function mergeStyles( ...styles: css.Styleset[]): css.Styleset
+export function mergeStyles( ...styles: Styleset[]): Styleset
 {
 	return utils.mergeStyles( ...styles);
 }
@@ -1356,7 +1356,7 @@ export function mergeStyles( ...styles: css.Styleset[]): css.Styleset
  * @param resStyle Resultant style object
  * @param styles Array of style objects to merge.
  */
-export function mergeStylesTo( resStyle: css.Styleset, ...styles: (css.Styleset | string)[] ): void
+export function mergeStylesTo( resStyle: Styleset, ...styles: (Styleset | string)[] ): void
 {
 	utils.mergeStylesTo( resStyle, ...styles);
 }

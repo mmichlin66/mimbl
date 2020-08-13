@@ -1,4 +1,4 @@
-import * as css from "mimcss"
+import {IScheduler, registerScheduler, setDefaultSchedulerType} from "mimcss"
 import {scheduleFuncCall} from "./Reconciler"
 
 
@@ -7,7 +7,7 @@ import {scheduleFuncCall} from "./Reconciler"
  * The StyleScheduler class is responsible for scheduling writing style-related informatino to
  * the DOM using the Mimbl scheduling functionality
  */
-class StyleScheduler implements css.IScheduler
+class StyleScheduler implements IScheduler
 {
     // Callback to call to write changes to the DOM.
 	private doDOMUpdate: () => void;
@@ -53,8 +53,8 @@ class StyleScheduler implements css.IScheduler
  */
 export function initializeMimblStyleScheduler(): number
 {
-    let schedulerType = css.registerScheduler( new StyleScheduler());
-    css.setDefaultSchedulerType( schedulerType);
+    let schedulerType = registerScheduler( new StyleScheduler());
+    setDefaultSchedulerType( schedulerType);
     return schedulerType;
 }
 

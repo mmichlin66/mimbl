@@ -1,4 +1,4 @@
-﻿import * as mimcss from "mimcss"
+﻿import { CssColor } from "mimcss"
 import * as mim from "./mim"
 
 
@@ -375,7 +375,7 @@ export interface IHtmlHeadElementProps extends IHtmlElementProps<HTMLHeadElement
 export interface IHtmlHrElementProps extends IHtmlElementProps<HTMLHRElement>
 {
 	align?: string;
-	color?:  mimcss.CssColor;
+	color?:  CssColor;
 	noshade?: boolean;
 	size?: number;
 	width?: number;

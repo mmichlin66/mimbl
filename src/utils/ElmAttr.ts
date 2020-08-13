@@ -1,5 +1,5 @@
 ﻿import * as mim from "../api/mim"
-import * as css from "mimcss"
+import {Styleset, setElementStyle, SchedulerType, diffStylesets, StringStyleset, setElementStringStyle} from "mimcss"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "./Stats";
@@ -419,17 +419,17 @@ export class ElmAttr
 // items, the key value is from the new style value; for removed items, the key value is undefined.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-function setStyleProp( elm: Element, attrName: string, propVal: css.Styleset): void
+function setStyleProp( elm: Element, attrName: string, propVal: Styleset): void
 {
-	css.setElementStyle( elm as HTMLElement, propVal, css.SchedulerType.Sync);
+	setElementStyle( elm as HTMLElement, propVal, SchedulerType.Sync);
 }
 
 
 
 
-function diffStyleProp( attrName: string, oldPropVal: css.Styleset, newPropVal: css.Styleset): any
+function diffStyleProp( attrName: string, oldPropVal: Styleset, newPropVal: Styleset): any
 {
-	let res = css.diffStylesets( oldPropVal, newPropVal);
+	let res = diffStylesets( oldPropVal, newPropVal);
 
 	// we have to return undefined because null is considered a valid update value
 	return res == null ? undefined : res;
@@ -437,9 +437,9 @@ function diffStyleProp( attrName: string, oldPropVal: css.Styleset, newPropVal: 
 
 
 
-function updateStyleProp( elm: Element, attrName: string, updateVal: css.StringStyleset): void
+function updateStyleProp( elm: Element, attrName: string, updateVal: StringStyleset): void
 {
-	css.setElementStringStyle( elm as HTMLElement, updateVal, css.SchedulerType.Sync);
+	setElementStringStyle( elm as HTMLElement, updateVal, SchedulerType.Sync);
 }
 
 
