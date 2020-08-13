@@ -801,8 +801,14 @@ class NonSlotContainerHandler implements ProxyHandler<any>
 
     set( target: any, prop: PropertyKey, value: any, receiver: any): any
     {
-        this.trigger.notifyChanged();
-        return Reflect.set( target, prop, triggerrize( value, this.trigger, this.depth), receiver);
+        let oldValue = Reflect.get( target, prop, receiver);
+        if (oldValue != value)
+        {
+            this.trigger.notifyChanged();
+            return Reflect.set( target, prop, triggerrize( value, this.trigger, this.depth), receiver);
+        }
+        else
+            return true;
     }
 
     deleteProperty( target: any, prop: PropertyKey): boolean

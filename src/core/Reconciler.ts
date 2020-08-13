@@ -1,5 +1,5 @@
 ﻿import * as mim from "../api/mim"
-import {DN, VN, getFirstDN, getImmediateDNs, getNextDNUnderSameAnchorDN, getVNPath, VNUpdateDisp, getLastDN} from "./VN"
+import {DN, VN, VNUpdateDisp,} from "./VN"
 import {createVNChainFromContent} from "./ContentFuncs"
 import {enterMutationScope, exitMutationScope} from "../utils/TriggerWatcher"
 
@@ -52,15 +52,16 @@ export let s_currentClassComp: mim.IComponent = null;
 
 /**
  * Sets the given node as the current and if the node is for the component, set the current
- * component. As we recurse over virtual nodes and sub-nodes, we call this function to have the
- * s_currentVN and s_currentClassComp variables to point to the node and component being currently
- * processed.
+ * component. Returns the virtual node that was previously the current one. As we recurse over
+ * virtual nodes and sub-nodes, we call this function to have the s_currentVN and
+ * s_currentClassComp variables to point to the node and component being currently processed.
  */
-function trackCurrentVN( vn: VN): void
+function trackCurrentVN( vn: VN): VN
 {
+    let prevVN = s_currentVN;
     s_currentVN = vn;
-    if (vn && (vn as any).comp)
-        s_currentClassComp = (vn as any).comp;
+    s_currentClassComp = !vn ? null : (vn as any).comp != null ? (vn as any).comp : vn.creator;
+    return prevVN;
 }
 
 
@@ -157,23 +158,6 @@ function CallbackWrapper(): any
         }
 	}
 }
-
-
-
-// Callback that is called on a new UI cycle when there is a need to update UI components
-export function updateNodeSync( vn: VN): void
-{
-	// clear the scheduled frame handle so that new update or replacement requests will
-    // schedule a new frame.
-    if (s_scheduledFrameHandle)
-    {
-        cancelAnimationFrame( s_scheduledFrameHandle);
-        s_scheduledFrameHandle = 0;
-    }
-
-    addNodeToScheduler( vn);
-    doMimbleTick();
-};
 
 
 
@@ -464,7 +448,7 @@ function renderNewNode( vn: VN, parent: VN): void
 	vn.init( parent, s_currentClassComp);
 
 	// keep track of the node that is being currently processed.
-	trackCurrentVN(vn);
+	let prevVN = trackCurrentVN(vn);
 
     // if willMount function is defined we call it without try/catch. If it throws, the control
     // goes to either the ancestor node that supports error handling or the Mimbl tick loop
@@ -537,11 +521,8 @@ function renderNewNode( vn: VN, parent: VN): void
         vn.subNodes = subNodes;
 	}
 
-	// restore pointer to the currently being processed node after processing its sub-nodes.
-	// If this node doesn't support error handling and an exception is thrown either by this
-	// node or by one of its sub-nodes, this line is not executed and thus, s_currentVN
-	// will point to our node when the exception is caught.
-	trackCurrentVN(vn);
+	// restore pointer to the previous current node.
+	trackCurrentVN( prevVN);
 }
 
 
@@ -549,6 +530,9 @@ function renderNewNode( vn: VN, parent: VN): void
 // Recursively creates DOM nodes for this VN and its sub-nodes.
 function commitNewNode( vn: VN, anchorDN: DN, beforeDN: DN)
 {
+	// keep track of the node that is being currently processed.
+	let prevVN = trackCurrentVN(vn);
+
 	// remember the anchor node
 	vn.anchorDN = anchorDN;
 
@@ -580,6 +564,9 @@ function commitNewNode( vn: VN, anchorDN: DN, beforeDN: DN)
 
     if (vn.didMount)
         vn.didMount();
+
+	// restore pointer to the previous current node.
+	trackCurrentVN( prevVN);
 }
 
 
@@ -601,7 +588,13 @@ function callWillUnmount( vn: VN, recursive: boolean)
 	{
         for( let svn of vn.subNodes)
         {
+            // keep track of the node that is being currently processed.
+            let prevVN = trackCurrentVN(svn);
+
             callWillUnmount( svn, true);
+
+            // restore pointer to the previous current node.
+            trackCurrentVN( prevVN);
 
             // mark the node as unmounted
             vn.term();
@@ -625,6 +618,9 @@ function callWillUnmount( vn: VN, recursive: boolean)
 // Recursively removes DOM nodes corresponding to this VN and its sub-nodes.
 function commitRemovedNode( vn: VN)
 {
+	// keep track of the node that is being currently processed.
+	let prevVN = trackCurrentVN(vn);
+
 	// get the DOM node before we call unmount, because unmount will clear it.
 	let ownDN = vn.ownDN;
 
@@ -659,6 +655,9 @@ function commitRemovedNode( vn: VN)
     // mark the node as unmounted
 	vn.term();
 	vn.anchorDN = undefined;
+
+	// restore pointer to the previous current node.
+	trackCurrentVN( prevVN);
 }
 
 
@@ -672,7 +671,7 @@ function renderUpdatedNode( disp: VNDisp): void
 	let vn = disp.oldVN;
 
 	// keep track of the node that is being currently processed.
-	trackCurrentVN(vn);
+	let prevVN = trackCurrentVN(vn);
 
     // we call the render method without try/catch. If it throws, the control goes to either the
     // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
@@ -718,7 +717,7 @@ function renderUpdatedNode( disp: VNDisp): void
 	vn.lastUpdateTick = s_currentTick;
 
 	// restore pointer to the currently being processed node after processing its sub-nodes
-	trackCurrentVN(vn);
+	trackCurrentVN( prevVN);
 }
 
 
@@ -778,6 +777,9 @@ function commitUpdatedNode( disp: VNDisp): void
 	if (!vn.anchorDN)
 		return;
 
+	// keep track of the node that is being currently processed.
+	let prevVN = trackCurrentVN(vn);
+
 	// determine the anchor node to use when inserting new or moving existing sub-nodes. If
 	// our node has its own DN, it will be the anchor for the sub-nodes; otherwise, our node's
 	// anchor will be the anchor for the sub-nodes too.
@@ -802,6 +804,9 @@ function commitUpdatedNode( disp: VNDisp): void
 	{
 		commitUpdatesByNodes( vn, disp.subNodeDisps, anchorDN, beforeDN);
 	}
+
+	// restore pointer to the currently being processed node after processing its sub-nodes
+	trackCurrentVN( prevVN);
 }
 
 
@@ -1384,6 +1389,138 @@ function isUpdatePossible( oldVN: VN, newVN: VN): boolean
 	return (oldVN.type === newVN.type &&
 			(oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN)));
 
+}
+
+
+
+// Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
+// This method is only called on the mounted nodes.
+function getFirstDN( vn: VN): DN
+{
+	if (vn.ownDN)
+		return vn.ownDN;
+	else if (!vn.subNodes)
+		return null;
+
+	// recursively call this method on the sub-nodes from first to last until a valid node
+	// is returned
+	let dn;
+	for( let svn of vn.subNodes)
+	{
+		dn = getFirstDN( svn);
+		if (dn)
+			return dn;
+	}
+
+	return null;
+}
+
+
+
+// Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
+// This method is only called on the mounted nodes.
+function getLastDN( vn: VN): DN
+{
+	if (vn.ownDN)
+		return vn.ownDN;
+	else if (!vn.subNodes)
+		return null;
+
+	// recursively call this method on the sub-nodes from last to first until a valid node
+	// is returned
+	let dn;
+	for( let i = vn.subNodes.length - 1; i >= 0; i--)
+	{
+		dn = getLastDN( vn.subNodes[i]);
+		if (dn != null)
+			return dn;
+	}
+
+	return null;
+}
+
+
+
+// Returns the list of DOM nodes that are immediate children of this virtual node; that is,
+// are NOT children of sub-nodes that have their own DOM node. Never returns null.
+function getImmediateDNs( vn: VN): DN[]
+{
+	let arr: DN[] = [];
+	collectImmediateDNs( vn, arr);
+	return arr;
+}
+
+
+
+// Collects all DOM nodes that are immediate children of this virtual node (that is,
+// are NOT children of sub-nodes that have their own DOM node) into the given array.
+function collectImmediateDNs( vn: VN, arr: DN[]): void
+{
+	if (vn.ownDN)
+		arr.push( vn.ownDN);
+	else if (vn.subNodes)
+	{
+		// recursively call this method on the sub-nodes from first to last
+		for( let svn of vn.subNodes)
+			collectImmediateDNs( svn, arr);
+	}
+}
+
+
+
+// Finds the first DOM node in the tree of virtual nodes that comes after our node that is a
+// child of our own anchor element. We use it as a node before which to insert/move nodes of
+// our sub-nodes during the reconciliation process. The algorithm first goes to the next
+// siblings of our node and then to the next siblings of our parent node recursively. It stops
+// when we either find a DOM node (then it is returned) or find a different anchor element
+// (then null is returned). This method is called before the reconciliation process for our
+// sub-nodes starts and, therefore, it only traverses mounted nodes.
+function getNextDNUnderSameAnchorDN( vn: VN, anchorDN: DN): DN
+{
+	// check if we have sibling DOM nodes after our last sub-node - that might be elements
+	// not controlled by our component.
+	if (vn.subNodes && vn.subNodes.length > 0)
+	{
+		let dn = getLastDN( vn.subNodes[vn.subNodes.length - 1]);
+		if (dn)
+		{
+			let nextSibling = dn.nextSibling;
+			if (nextSibling !== null)
+				return nextSibling;
+		}
+	}
+
+	// loop over our next siblings
+	for( let nvn = vn.next; nvn !== undefined; nvn = nvn.next)
+	{
+		if (!nvn.anchorDN)
+			return null;
+
+		// note that getLastDN call traverses the hierarchy of nodes. Note also that it
+		// cannot find a node under a different anchor element because the first different
+		// anchor element will be returned as a wanted node.
+		const dn = getLastDN( nvn);
+		if (dn)
+			return dn;
+	}
+
+	// recurse to our parent if exists
+	return vn.parent && vn.parent.anchorDN === anchorDN ? getNextDNUnderSameAnchorDN( vn.parent, anchorDN) : null;
+}
+
+
+
+// Returns array of node names starting with this node and up until the top-level node.
+function getVNPath( vn: VN): string[]
+{
+	let depth = vn.depth;
+	let path = Array<string>( depth);
+	for( let i = 0, nvn: VN = vn; i < depth; i++, nvn = nvn.parent)
+	{
+		path[i] = nvn.name + (nvn.creator && nvn.creator.vn ? ` (created by ${nvn.creator.vn.name})` : "");
+	}
+
+	return path;
 }
 
 

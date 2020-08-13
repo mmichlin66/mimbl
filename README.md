@@ -11,6 +11,8 @@ npm install mimbl
 Mimbl provides all the standard React-style functionality that developers expect from component authoring libraries: declarative laying out of HTML structure, function- and class-based components, references, error boundaries, lazy-loading, etc. In addition to this functionality Mimbl provides the following unique features:
 
 - Components whose lifecycle is controlled by developers and which can be accessed via standard property and method invocation.
+- Build in mechanism for initiating component updates by triggering state changes.
+- Partitioning components into multiple independently updatable areas just by using rendering methods.
 - Custom HTML and SVG attributes defined by developers and supported via handler objects.
 - Service publish/subscribe mechanism.
 - Mimcss library for style definitions.
@@ -37,7 +39,7 @@ class HelloWorld extends mim.Component
 {
     color: css.CssColor;
 
-    constructor( color: string = "black")
+    constructor( color: css.CssColor = "black")
     {
         super();
         this.color = color;
