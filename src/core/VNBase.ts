@@ -54,9 +54,6 @@ export abstract class VNBase implements VN
 	// List of sub-nodes - both keyed and unkeyed - defined only if there are some sub-nodes.
 	public subNodes: VNBase[];
 
-	// Map of keyed sub-nodes - defined only if the number of sub-nodes is greater than 1.
-	public keyedSubNodes: Map<any,VNBase>;
-
 	// Flag indicating that update has been requested but not yet performed. This flag is needed
 	// to prevent trying to add the node to the global map every time the requestUpdate method
 	// is called. 
@@ -100,7 +97,6 @@ export abstract class VNBase implements VN
 		this.next = undefined;
 		this.prev = undefined;
 		this.subNodes = undefined;
-		this.keyedSubNodes = undefined;
 		this.creator = undefined;
 		this.depth = undefined;
 		this.parent = undefined;

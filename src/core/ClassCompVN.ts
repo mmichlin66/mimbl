@@ -67,6 +67,12 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 	// This method is part of the Render phase.
 	public willMount(): void
 	{
+		this.comp.vn = this;
+
+        // don't need try/catch because it will be caught up the chain
+		if (this.comp.willMount)
+			this.comp.willMount();
+
         // start watching the function
         this.renderWatcher = createWatcher( this.comp.render, this.requestUpdate, this.comp, this);
 
@@ -83,6 +89,23 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 	public willUnmount(): void
 	{
         this.renderWatcher.dispose();
+        this.renderWatcher = null;
+
+        if (this.comp.willUnmount)
+        {
+            // need try/catch but only to log
+            try
+            {
+                this.comp.willUnmount();
+            }
+            catch( err)
+            {
+                console.error( `Exception in willUnmount of component '${this.name}'`, err);
+            }
+        }
+
+		this.comp.vn = undefined;
+		this.comp = undefined;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
@@ -96,8 +119,18 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 	// This method is part of the Commit phase.
     public didMount(): void
     {
-		if (this.comp.didMount)
-			this.comp.didMount();
+        if (this.comp.didMount)
+        {
+            // need try/catch but only to log
+            try
+            {
+                this.comp.didMount();
+            }
+            catch( err)
+            {
+                console.error( `Exception in didMount of component '${this.name}'`, err);
+            }
+        }
     }
 
 
@@ -117,16 +150,6 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 	{
 		this.comp.handleError( err, path);
 	}
-
-
-
-    // This method is called when the comp property has changed without actually unmounting the VN.
-    // We need to stop watching the old component's render and start watching the new one's.
-    protected reestablishWatcher()
-    {
-        this.renderWatcher.dispose();
-        this.renderWatcher = createWatcher( this.comp.render, this.requestUpdate, this.comp, this);
-    }
 
 
 

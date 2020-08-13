@@ -105,16 +105,11 @@ export class ManagedCompVN extends ClassCompVN implements mim.IManagedCompVN
 	// This method is part of the Render phase.
 	public willMount(): void
 	{
-		this.comp.vn = this;
+        super.willMount();
 
-		if (this.comp.willMount)
-			this.comp.willMount();
-
-		// set the reference value if specified
+        // set the reference value if specified
 		if (this.ref !== undefined)
 			mim.setRef( this.ref, this.comp);
-
-        super.willMount();
 	}
 
 
@@ -124,8 +119,6 @@ export class ManagedCompVN extends ClassCompVN implements mim.IManagedCompVN
 	// This method is part of the render phase.
 	public willUnmount(): void
 	{
-        super.willUnmount();
-
 		// unset the reference value if specified. We check whether the reference still points
 		// to our component before setting it to undefined. If the same Ref object is used for
 		// more than one components (and/or elements) it can happen that the reference is changed
@@ -133,11 +126,7 @@ export class ManagedCompVN extends ClassCompVN implements mim.IManagedCompVN
 		if (this.ref !== undefined)
 			mim.setRef( this.ref, undefined, this.comp);
 
-		if (this.comp.willUnmount)
-			this.comp.willUnmount();
-
-		this.comp.vn = undefined;
-		this.comp = undefined;
+        super.willUnmount();
 	}
 
 

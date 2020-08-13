@@ -8,39 +8,6 @@ import {enterMutationScope, exitMutationScope} from "../utils/TriggerWatcher"
 /// #endif
 
 
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// State of the scheduler indicating in what phase of the update cycle we currently reside.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-enum SchedulerState
-{
-	// The scheduler is not within the update cycle
-	Idle = 0,
-
-	// The scheduler is executing functions before updating nodes
-	BeforeUpdate,
-
-	// The scheduler is updating nodes
-	Update,
-
-	// The scheduler is executing functions after updating nodes
-	AfterUpdate,
-}
-
-
-
-/**
- * The ScheduledFuncMap class represents a map of functions scheduled to be executed either before
- * or after component updates. The keys in this map are the original functions and the values are
- * the wrapper functions that will be executed in the context of a given virtual node. Both
- * the keys and the values have the same type: mim.ScheduledFuncType.
- */
-class ScheduledFuncMap extends Map<mim.ScheduledFuncType,mim.ScheduledFuncType> {}
-
-
-
 // Map of nodes that should be updated on the next UI cycle. We use Map in order to not include
 // the same node more than once - which can happen if the node's requestUpdate method is called
 // more than once during a single run (e.g. during event processing). The value mapped to the
@@ -51,14 +18,14 @@ class ScheduledFuncMap extends Map<mim.ScheduledFuncType,mim.ScheduledFuncType> 
 let s_vnsScheduledForUpdate = new Set<VN>();
 
 // Map of functions that have been scheduled to be called upon a new animation frame before
-// components scheduled for update are updated. The values in the map are objects that will
-// be used s the "this" value in the callback.
-let s_callsScheduledBeforeUpdate = new ScheduledFuncMap();
+// components scheduled for update are updated. The keys in this map are the original functions and
+// the values are the wrapper functions that will be executed in the context of a given virtual node.
+let s_callsScheduledBeforeUpdate = new Map<mim.ScheduledFuncType,mim.ScheduledFuncType>();
 
 // Map of functions that have been scheduled to be called upon a new animation frame after
-// components scheduled for update are updated. The values in the map are objects that will
-// be used s the "this" value in the callback.
-let s_callsScheduledAfterUpdate = new ScheduledFuncMap();
+// components scheduled for update are updated. The keys in this map are the original functions and
+// the values are the wrapper functions that will be executed in the context of a given virtual node.
+let s_callsScheduledAfterUpdate = new Map<mim.ScheduledFuncType,mim.ScheduledFuncType>();
 
 // Handle of the animation frame request (in case it should be canceled).
 let s_scheduledFrameHandle: number = 0;
@@ -80,6 +47,39 @@ export let s_currentVN: VN = null;
 
 // Class-based component whose rendering tree is currently being processed.
 export let s_currentClassComp: mim.IComponent = null;
+
+
+
+/**
+ * Sets the given node as the current and if the node is for the component, set the current
+ * component. As we recurse over virtual nodes and sub-nodes, we call this function to have the
+ * s_currentVN and s_currentClassComp variables to point to the node and component being currently
+ * processed.
+ */
+function trackCurrentVN( vn: VN): void
+{
+    s_currentVN = vn;
+    if (vn && (vn as any).comp)
+        s_currentClassComp = (vn as any).comp;
+}
+
+
+
+// State of the scheduler indicating in what phase of the update cycle we currently reside.
+const enum SchedulerState
+{
+	// The scheduler is not within the update cycle
+	Idle = 0,
+
+	// The scheduler is executing functions before updating nodes
+	BeforeUpdate,
+
+	// The scheduler is updating nodes
+	Update,
+
+	// The scheduler is executing functions after updating nodes
+	AfterUpdate,
+}
 
 
 
@@ -125,35 +125,31 @@ function CallbackWrapper(): any
 	// that this can be undefined if the wrapping was created without the VN context.
 	let currentVN = s_currentVN;
     let currentClassComp = s_currentClassComp;
-    if (this)
+    let vn: VN = this;
+    if (vn)
     {
-        s_currentVN = this;
+        s_currentVN = vn;
         s_currentClassComp = (s_currentVN as any).comp ? (s_currentVN as any).comp : s_currentVN.creator;
     }
 
 	try
 	{
         enterMutationScope();
-		let [that, orgCallback, ...rest] = arguments;
-		return orgCallback.apply( that, rest);
+		let [thisOrgCallback, orgCallback, ...rest] = arguments;
+		return orgCallback.apply( thisOrgCallback, rest);
 	}
 	catch( err)
 	{
-		if (!this)
-			throw err;
-		else
-		{
-			let errorService = this.findService( "StdErrorHandling") as mim.IErrorHandlingService;
-			if (errorService)
-				errorService.reportError( err, getVNPath( this));
-			else
-				throw err;
-		}
+        let errorService = vn?.getService( "StdErrorHandling");
+        if (errorService)
+            errorService.reportError( err, getVNPath( vn));
+        else
+            throw err;
 	}
 	finally
 	{
         exitMutationScope();
-        if (this)
+        if (vn)
         {
             // restore the current VN to the remembered value;
             s_currentVN = currentVN;
@@ -177,28 +173,6 @@ export function updateNodeSync( vn: VN): void
 
     addNodeToScheduler( vn);
     doMimbleTick();
-
-    // // increment tick number.
-	// s_currentTick++;
-
-	// /// #if USE_STATS
-	// 	let oldStats = DetailedStats.stats;
-	// 	DetailedStats.stats = new DetailedStats( `Mimbl tick ${s_currentTick}: `);
-	// 	DetailedStats.stats.start();
-	// /// #endif
-
-	// let vns: VN[][] = new Array(1);
-	// vns[0] = [vn];
-
-	// s_schedulerState = SchedulerState.Update;
-	// performCommitPhase( performRenderPhase( vns));
-
-	// /// #if USE_STATS
-	// 	DetailedStats.stats.stop( true);
-	// 	DetailedStats.stats = oldStats;
-	// /// #endif
-
-	// s_schedulerState = SchedulerState.Idle;
 };
 
 
@@ -248,7 +222,8 @@ function addNodeToScheduler( vn: VN): void
 
 // Schedules to call the given function either before or after all the scheduled components
 // have been updated.
-export function scheduleFuncCall( func: mim.ScheduledFuncType, beforeUpdate: boolean, that?: object, vn?: mim.IVNode): void
+export function scheduleFuncCall( func: mim.ScheduledFuncType, beforeUpdate: boolean,
+    thisArg?: object, vn?: mim.IVNode): void
 {
 	/// #if DEBUG
 	if (!func)
@@ -262,7 +237,7 @@ export function scheduleFuncCall( func: mim.ScheduledFuncType, beforeUpdate: boo
 	{
 		if (!s_callsScheduledBeforeUpdate.has( func))
 		{
-			s_callsScheduledBeforeUpdate.set( func, wrapCallbackWithVN( func, that, vn));
+			s_callsScheduledBeforeUpdate.set( func, wrapCallbackWithVN( func, thisArg, vn));
 
 			// a "before update" function is always scheduled in the next frame even if the
 			// call is made from another "before update" function.
@@ -273,7 +248,7 @@ export function scheduleFuncCall( func: mim.ScheduledFuncType, beforeUpdate: boo
 	{
 		if (!s_callsScheduledAfterUpdate.has( func))
 		{
-			s_callsScheduledAfterUpdate.set( func, wrapCallbackWithVN( func, that, vn));
+			s_callsScheduledAfterUpdate.set( func, wrapCallbackWithVN( func, thisArg, vn));
 
 			// an "after update" function is scheduled in the next cycle unless the request is made
 			// either from a "before update" function execution or during a node update.
@@ -298,7 +273,7 @@ function requestFrameIfNeeded(): void
 // Callback that is called on a new UI cycle when there is a need to update UI components
 function onScheduledFrame(): void
 {
-	// clear the scheduled frame handle so that new update or replacement requests will
+	// clear the scheduled frame handle so that new update requests will
 	// schedule a new frame.
 	s_scheduledFrameHandle = 0;
 
@@ -316,12 +291,12 @@ function doMimbleTick(): void
 	// call functions scheduled to be invoked before updating components. If this function
 	// calls the requestUpdate method or schedules a function to be invoked after updates,
 	// they will be executed in this cycle. However, if it schedules a function to be invoked
-	// after updates, it will be executed in the next cycle.
+	// before updates, it will be executed in the next cycle.
 	if (s_callsScheduledBeforeUpdate.size > 0)
 	{
 		s_schedulerState = SchedulerState.BeforeUpdate;
 		let callsScheduledBeforeUpdate = s_callsScheduledBeforeUpdate;
-		s_callsScheduledBeforeUpdate = new ScheduledFuncMap();
+		s_callsScheduledBeforeUpdate = new Map<mim.ScheduledFuncType,mim.ScheduledFuncType>();
 		callScheduledFunctions( callsScheduledBeforeUpdate, true);
 	}
 
@@ -357,7 +332,7 @@ function doMimbleTick(): void
 	{
 		s_schedulerState = SchedulerState.AfterUpdate;
 		let callsScheduledAfterUpdate = s_callsScheduledAfterUpdate;
-		s_callsScheduledAfterUpdate = new ScheduledFuncMap();
+		s_callsScheduledAfterUpdate = new Map<mim.ScheduledFuncType,mim.ScheduledFuncType>();
 		callScheduledFunctions( callsScheduledAfterUpdate, false);
 	}
 
@@ -375,16 +350,15 @@ function doMimbleTick(): void
 // array will either be undefined or contain an array of nodes at this depth.
 function arrangeNodesByDepth( vnsScheduledForUpdate: Set<VN>): VN[][]
 {
-	/// #if VERBOSE_NODE
-		let label = `arranging ${vnsScheduledForUpdate.size} nodes by depth`;
-		console.time( label);
-	/// #endif
-
 	// create a sparse array of certain reasonable size. If we have depths greater than this,
 	// the array will grow automatically (although it is less performant it is still acceptable).
-	let vnsByDepth: VN[][] = new Array<VN[]>(100);
+	let vnsByDepth: VN[][] = new Array<VN[]>(32);
 	vnsScheduledForUpdate.forEach( (vn: VN) =>
 	{
+        // it can happen that we encounter already unmounted virtual nodes - ignore them
+        if (!vn.anchorDN)
+            return;
+
 		let arr = vnsByDepth[vn.depth];
 		if (!arr)
 		{
@@ -394,10 +368,6 @@ function arrangeNodesByDepth( vnsScheduledForUpdate: Set<VN>): VN[][]
 
 		arr.push(vn);
 	});
-
-	/// #if VERBOSE_NODE
-		console.timeEnd( label);
-	/// #endif
 
 	return vnsByDepth;
 }
@@ -410,36 +380,42 @@ function performRenderPhase( vnsByDepth: VN[][]): VNDisp[]
 {
 	let updatedNodeDisps: VNDisp[] = [];
 
-	// iteration over the sparse array skips the holes.
-	let disp: VNDisp;
-	vnsByDepth.forEach( (vns: VN[]) => { vns.forEach( (vn: VN) =>
+    let disp: VNDisp;
+    for( let vns of vnsByDepth)
 	{
-		try
-		{
-			// clear the flag that update has been requested for the node
-			vn.updateRequested = false;
-			
-			// if the component was already updated in this cycle, don't update it again
-			if (vn.lastUpdateTick === s_currentTick)
-				return;
+        // vnsByDepth is a sparse array so it can have holes
+        if (!vns)
+            continue;
 
-			disp = { newVN: vn, action: VNDispAction.Unknown, oldVN: vn};
-			updateVirtual( disp);
-			updatedNodeDisps.push( disp);
-		}
-		catch( err)
-		{
-			// find the nearest error handling service. If nobody else, it is implemented
-			// by the RootVN object.
-			let errorService: mim.IErrorHandlingService = vn.getService( "StdErrorHandling", undefined, false);
-			if (errorService)
-				errorService.reportError( err, s_currentVN ? getVNPath( s_currentVN) : null);
-			else
-				throw err;
-		}
+        for( let vn of vns)
+        {
+            try
+            {
+                // clear the flag that update has been requested for the node
+                vn.updateRequested = false;
+                
+                // if the component was already updated in this cycle, don't update it again
+                if (vn.lastUpdateTick === s_currentTick)
+                    continue;
 
-		s_currentVN = null;
-	})});
+                disp = { newVN: vn, action: VNDispAction.Unknown, oldVN: vn};
+                renderUpdatedNode( disp);
+                updatedNodeDisps.push( disp);
+            }
+            catch( err)
+            {
+                // find the nearest error handling service. If nobody else, it is implemented
+                // by the RootVN object.
+                let errorService = vn.getService( "StdErrorHandling", undefined, false);
+                if (errorService)
+                    errorService.reportError( err, s_currentVN ? getVNPath( s_currentVN) : null);
+                else
+                    console.error( "BUG: updateVirtual threw exception but StdErrorHandling service was not found.");
+            }
+
+            trackCurrentVN( null);
+        }
+	}
 
 	return updatedNodeDisps;
 }
@@ -452,16 +428,14 @@ function performRenderPhase( vnsByDepth: VN[][]): VNDisp[]
 function performCommitPhase( updatedNodeDisps: VNDisp[]): void
 {
 	// we don't unticipate any exceptions here because we don't invoke 3rd-party code here.
-	updatedNodeDisps.forEach( (disp: VNDisp) =>
-	{
-		updatePhysical( disp);
-	});
+	for( let disp of updatedNodeDisps)
+		commitUpdatedNode( disp);
 }
 
 
 
 // Call functions scheduled before or after update cycle.
-function callScheduledFunctions( funcs: ScheduledFuncMap, beforeUpdate: boolean)
+function callScheduledFunctions( funcs: Map<mim.ScheduledFuncType,mim.ScheduledFuncType>, beforeUpdate: boolean)
 {
 	funcs.forEach( (wrapper, func) =>
 	{
@@ -485,112 +459,101 @@ function callScheduledFunctions( funcs: ScheduledFuncMap, beforeUpdate: boolean)
 // content returned from the error handling method is rendered; otherwise, the exception
 // is re-thrown. Thus, the exception is propagated up until it is handled by a node that
 // handles it or up to the root node.
-function createVirtual( vn: VN, parent: VN): void
+function renderNewNode( vn: VN, parent: VN): void
 {
 	vn.init( parent, s_currentClassComp);
 
 	// keep track of the node that is being currently processed.
-	let currentVN = vn;
-	s_currentVN = currentVN;
+	trackCurrentVN(vn);
 
-	let currentClassComp = s_currentClassComp;
-	if ((vn as any).comp)
-		s_currentClassComp = (vn as any).comp;
-
-	if (vn.willMount)
+    // if willMount function is defined we call it without try/catch. If it throws, the control
+    // goes to either the ancestor node that supports error handling or the Mimbl tick loop
+    // (which has try/catch).
+    if (vn.willMount)
 	{
 		/// #if VERBOSE_NODE
-			console.debug( `VERBOSE: Calling willMount() on node ${vn.name}`);
+			console.debug( `Calling willMount() on node ${vn.name}`);
 		/// #endif
 
-		try
-		{
-			vn.willMount();
-		}
-		catch( err)
-		{
-			if (vn.supportsErrorHandling && vn.supportsErrorHandling())
-			{
-				/// #if VERBOSE_NODE
-					console.debug( `VERBOSE: Calling handleError() on node ${vn.name}`);
-				/// #endif
-
-				// let the node handle its own error and re-render
-				vn.handleError( err, getVNPath( s_currentVN));
-				vn.willMount();
-			}
-			else
-				throw err;
-		}
+		vn.willMount();
 	}
 
 	// if the node doesn't implement `render`, the node never has any sub-nodes (e.g. text nodes)
 	if (vn.render)
 	{
-		try
-		{
-			createSubNodesVirtual( vn);
-		}
-		catch( err)
-		{
-			if (vn.supportsErrorHandling && vn.supportsErrorHandling())
-			{
-				/// #if VERBOSE_NODE
-					console.debug( `VERBOSE: Calling handleError() on node ${vn.name}`);
-				/// #endif
+        // we call the render method without try/catch
+        let subNodes = createVNChainFromContent( vn.render());
+        if (subNodes)
+        {
+            // since we have sub-nodes, we need to create nodes for them and render. If our node
+            // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
+            // either the uncestor node that knows to handle errors or to the Mimbl tick loop.
+            if (!vn.supportsErrorHandling || !vn.supportsErrorHandling())
+            {
+                for( let svn of subNodes)
+                    renderNewNode( svn, vn);
+            }
+            else
+            {
+                try
+                {
+                    for( let svn of subNodes)
+                        renderNewNode( svn, vn);
+                }
+                catch( err)
+                {
+                    /// #if VERBOSE_NODE
+                        console.debug( `Calling handleError() on node ${vn.name}. Error:`, err);
+                    /// #endif
 
-				// let the node handle its own error and re-render
-				vn.handleError( err, getVNPath( s_currentVN));
-				createSubNodesVirtual( vn);
-			}
-			else
-				throw err;
-		}
+                    // let the node handle the error and re-render; then we render the new
+                    // content but we do it without try/catch this time; otherwise, we may end
+                    // up in an infinite loop
+                    vn.handleError( err, getVNPath( s_currentVN));
+                    subNodes = createVNChainFromContent( vn.render());
+                    if (vn.subNodes)
+                    {
+                        for( let svn of subNodes)
+                            renderNewNode( svn, vn);
+                    }
+                }
+            }
+
+            // interlink the sub-nodes with next and prev properties
+            let prevVN: VN;
+            for( let svn of subNodes)
+            {
+                if (prevVN)
+                {
+                    prevVN.next = svn;
+                    svn.prev = prevVN;
+                }
+
+                prevVN = svn;
+            }
+        }
+
+        // remember the sub-nodes
+        vn.subNodes = subNodes;
 	}
 
 	// restore pointer to the currently being processed node after processing its sub-nodes.
 	// If this node doesn't support error handling and an exception is thrown either by this
 	// node or by one of its sub-nodes, this line is not executed and thus, s_currentVN
 	// will point to our node when the exception is caught.
-	s_currentVN = currentVN;
-	s_currentClassComp = currentClassComp;
-}
-
-
-
-// Performs creation and initial rendering on the sub-nodes of our node.
-function createSubNodesVirtual( vn: VN): void
-{
-	// this method is only invoked if the node has the render function
-	vn.subNodes = createVNChainFromContent( vn.render());
-	if (vn.subNodes)
-	{
-		let prevVN: VN;
-		for( let svn of vn.subNodes)
-		{
-			createVirtual( svn, vn);
-
-			if (prevVN)
-			{
-				prevVN.next = svn;
-				svn.prev = prevVN;
-			}
-
-			prevVN = svn;
-		}
-	}
+	trackCurrentVN(vn);
 }
 
 
 
 // Recursively creates DOM nodes for this VN and its sub-nodes.
-function createPhysical( vn: VN, anchorDN: DN, beforeDN: DN)
+function commitNewNode( vn: VN, anchorDN: DN, beforeDN: DN)
 {
 	// remember the anchor node
 	vn.anchorDN = anchorDN;
 
 	/// #if VERBOSE_NODE
-		console.debug( `VERBOSE: Calling mount() on node ${vn.name}`);
+		console.debug( `Calling mount() on node ${vn.name}`);
 	/// #endif
 	let ownDN = vn.mount ? vn.mount() : undefined;
 
@@ -608,78 +571,93 @@ function createPhysical( vn: VN, anchorDN: DN, beforeDN: DN)
 
 		// mount all sub-nodes
 		for( let svn of vn.subNodes)
-			createPhysical( svn, newAnchorDN, newBeforeDN);
+			commitNewNode( svn, newAnchorDN, newBeforeDN);
 	}
 
 	/// #if VERBOSE_NODE
-		console.debug( `VERBOSE: Calling didMount() on node ${vn.name}`);
+		console.debug( `Calling didMount() on node ${vn.name}`);
 	/// #endif
+
     if (vn.didMount)
         vn.didMount();
 }
 
 
 
-// Recursively calls willUnmount on this VN and its sub-nodes.
-function preDestroy( vn: VN)
+// Calls willUnmount on this VN and, if requested, recursively on its sub-nodes. This function is
+// called for every node being destructed. It is called non-recursively on the virtual nodes that
+// have their own DOM node. On such nodes, the unmount method will be called and the node will be
+// properly marked as unmounted. For virtual nodes that don't have their own DOM node, this
+// function is called recursively. the unmount method will not be called for these nodes;
+// therefore, we need to mark them as unmounted here.
+function callWillUnmount( vn: VN, recursive: boolean)
 {
-	if (vn.subNodes)
+    // indicate that the node was processed in this cycle - this will prevent it from 
+    // rendering again in this cycle.
+    vn.lastUpdateTick = s_currentTick;
+
+    // first notify sub-nodes if recursive
+    if (recursive && vn.subNodes)
 	{
-		for( let svn of vn.subNodes)
-			preDestroy( svn);
+        for( let svn of vn.subNodes)
+        {
+            callWillUnmount( svn, true);
+
+            // mark the node as unmounted
+            vn.term();
+            vn.anchorDN = undefined;
+        }
 	}
 
+    // notify our node
 	if (vn.willUnmount)
 	{
 		/// #if VERBOSE_NODE
-			console.debug( `VERBOSE: Calling willUnmount() on node ${vn.name}`);
+			console.debug( `Calling willUnmount() on node ${vn.name}`);
 		/// #endif
 
-		try
-		{
-			vn.willUnmount();
-		}
-		catch( err)
-		{
-			console.error( `Node ${vn.name} threw exception '${err.message}' in willUnmount`);
-        }
-        
-        // indicate that the node was processed in this cycle - this will prevent it from 
-        // rendering again in this cycle.
-        vn.lastUpdateTick = s_currentTick;
+		vn.willUnmount();
 	}
 }
 
 
 
 // Recursively removes DOM nodes corresponding to this VN and its sub-nodes.
-function destroyPhysical( vn: VN)
+function commitRemovedNode( vn: VN)
 {
 	// get the DOM node before we call unmount, because unmount will clear it.
 	let ownDN = vn.ownDN;
 
-	if (vn.unmount)
-	{
-		/// #if VERBOSE_NODE
-			console.debug( `VERBOSE: Calling unmount() on node ${vn.name}`);
-		/// #endif
-		vn.unmount();
-	}
+	// If the virtual node has its own DOM node, we will remove it from the DOM tree. In this case,
+    // we don't need to recursively unmount sub-nodes because they are removed with the parent;
+    // however, we need to call their willUnmount methods. If the node doesn't have its own DOM
+    // node, we need to call willUnmount only on the node itself because later we will recurse
+    // into its sub-nodes.
+    callWillUnmount( vn, ownDN != null);
 
-	// If the virtual node has its own DOM node, we remove it from the DOM tree. In this case,
-	// we don't need to recurse into sub-nodes, because they are removed with the parent.
-	if (ownDN)
-		(ownDN as any as ChildNode).remove();
-	else if (vn.subNodes)
+    // call unmount on our node - regardless whether it has its own DN or not
+    if (vn.unmount)
+    {
+        /// #if VERBOSE_NODE
+            console.debug( `Calling unmount() on node ${vn.name}`);
+        /// #endif
+        vn.unmount();
+    }
+
+    // If the virtual node has its own DOM node, remove it from the DOM tree; otherwise, recurse
+    // into the sub-nodes.
+    if (ownDN)
+        (ownDN as any as ChildNode).remove();
+    else if (vn.subNodes)
 	{
 		// loop over sub-nodes from last to first because this way the DOM element removal is
 		// easier.
 		for( let i = vn.subNodes.length - 1; i >=0; i--)
-			destroyPhysical( vn.subNodes[i]);
+			commitRemovedNode( vn.subNodes[i]);
 	}
 
+    // mark the node as unmounted
 	vn.term();
-
 	vn.anchorDN = undefined;
 }
 
@@ -687,69 +665,68 @@ function destroyPhysical( vn: VN)
 
 // Recursively renders this node and updates its sub-nodes if necessary. This method is
 // invoked when a node is being updated either as a result of updateMe invocation or because
-// the parent node was updated. If an exception is thrown during the execution of this method
-// (which can be only from components' shouldUpdate or render methods), the component is asked
-// to handle the error. If the component handles the error, the component is asked to render
-// again; otherwise, the exception is re-thrown. Thus, the exception is propagated up until it
-// is handled by a node that handles it or up to the root node.
-function updateVirtual( disp: VNDisp): void
+// the parent node was updated.
+function renderUpdatedNode( disp: VNDisp): void
 {
 	// let vn = disp.action === VNDispAction.Insert ? disp.newVN : disp.oldVN;
 	let vn = disp.oldVN;
 
 	// keep track of the node that is being currently processed.
-	let currentVN = vn;
-	s_currentVN = currentVN;
+	trackCurrentVN(vn);
 
-	let currentClassComp = s_currentClassComp;
-	if ((vn as any).comp)
-		s_currentClassComp = (vn as any).comp;
+    // we call the render method without try/catch. If it throws, the control goes to either the
+    // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
+    let subNodes = createVNChainFromContent( vn.render());
 
-	try
-	{
-		updateSubNodesVirtual( disp);
-	}
-	catch( err)
-	{
-		if (vn.supportsErrorHandling && vn.supportsErrorHandling())
-		{
-			/// #if VERBOSE_NODE
-				console.debug( `VERBOSE: Calling handleError() on node ${vn.name}`);
-			/// #endif
+	// build array of dispositions objects for the sub-nodes.
+	buildSubNodeDispositions( disp, subNodes);
+	if (subNodes)
+    {
+        // since we have sub-nodes, we need to create nodes for them and render. If our node
+        // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
+        // either the uncestor node that knows to handle errors or to the Mimbl tick loop.
+        if (!vn.supportsErrorHandling || !vn.supportsErrorHandling())
+            renderUpdatedSubNodes( disp);
+        else
+        {
+            try
+            {
+                renderUpdatedSubNodes( disp);
+            }
+            catch( err)
+            {
+                if (vn.supportsErrorHandling && vn.supportsErrorHandling())
+                {
+                    /// #if VERBOSE_NODE
+                        console.debug( `Calling handleError() on node ${vn.name}. Error`, err);
+                    /// #endif
 
-			// let the node handle its own error and re-render
-			vn.handleError( err, getVNPath( s_currentVN));
-			updateSubNodesVirtual( disp);
-		}
-		else
-			throw err;
-	}
+                    // let the node handle its own error and re-render; then we render the new
+                    // content but we do it without try/catch this time; otherwise, we may end
+                    // up in an infinite loop
+                    vn.handleError( err, getVNPath( s_currentVN));
+                    subNodes = createVNChainFromContent( vn.render());
+                    buildSubNodeDispositions( disp, subNodes);
+                    renderUpdatedSubNodes( disp);
+                }
+            }
+        }
+    }
 
 	// indicate that the node was updated in this cycle - this will prevent it from 
 	// rendering again in this cycle.
 	vn.lastUpdateTick = s_currentTick;
 
 	// restore pointer to the currently being processed node after processing its sub-nodes
-	s_currentVN = currentVN;
-	s_currentClassComp = currentClassComp;
+	trackCurrentVN(vn);
 }
 
 
 
 // Performs rendering phase of the update on the sub-nodes of the node, which is passed as
 // the oldVN member of the VNDisp structure.
-function updateSubNodesVirtual( disp: VNDisp): void
+function renderUpdatedSubNodes( disp: VNDisp): void
 {
-	// render the new content and build array of dispositions objects for the sub-nodes.
-	buildSubNodeDispositions( disp);
-
-	// for nodes to be removed, call willUnmount
-	if (disp.subNodesToRemove)
-	{
-		for( let svn of disp.subNodesToRemove)
-			preDestroy( svn);
-	}
-
 	// perform rendering for sub-nodes that should be inserted, replaced or updated
 	if (disp.subNodeDisps)
 	{
@@ -764,15 +741,15 @@ function updateSubNodesVirtual( disp: VNDisp): void
 				if ((oldVN.renderOnUpdate || oldVN !== newVN) && oldVN.prepareUpdate)
 				{
 					/// #if VERBOSE_NODE
-						console.debug( `VERBOSE: Calling prepareUpdate() on node ${oldVN.name}`);
+						console.debug( `Calling prepareUpdate() on node ${oldVN.name}`);
 					/// #endif
 					subNodeDisp.updateDisp = oldVN.prepareUpdate( newVN);
 					if (subNodeDisp.updateDisp.shouldRender)
-						updateVirtual( subNodeDisp);
+						renderUpdatedNode( subNodeDisp);
 				}
 			}
 			else if (subNodeDisp.action === VNDispAction.Insert)
-				createVirtual( newVN, parentVN);
+				renderNewNode( newVN, parentVN);
 		}
 	}
 }
@@ -780,7 +757,7 @@ function updateSubNodesVirtual( disp: VNDisp): void
 
 
 // Recursively performs DOM updates corresponding to this VN and its sub-nodes.
-function updatePhysical( disp: VNDisp): void
+function commitUpdatedNode( disp: VNDisp): void
 {
 	// remove from DOM the old nodes designated to be removed (that is, those for which there
 	// was no counterpart new node that would either update or replace it). We need to remove
@@ -789,7 +766,7 @@ function updatePhysical( disp: VNDisp): void
 	if (disp.subNodesToRemove)
 	{
 		for( let svn of disp.subNodesToRemove)
-			destroyPhysical( svn);
+			commitRemovedNode( svn);
 	}
 
 	// get the node whose children are being updated. This is always the oldVN member of
@@ -818,19 +795,19 @@ function updatePhysical( disp: VNDisp): void
 	// perform updates and inserts by either groups or individual nodes.
 	if (disp.subNodeGroups)
 	{
-		updatePhysicalByGroups( vn, disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
+		commitUpdatesByGroups( vn, disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
 		arrangeGroups( disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
 	}
 	else if (disp.subNodeDisps)
 	{
-		updatePhysicalByNodes( vn, disp.subNodeDisps, anchorDN, beforeDN);
+		commitUpdatesByNodes( vn, disp.subNodeDisps, anchorDN, beforeDN);
 	}
 }
 
 
 
 // Performs updates and inserts by individual nodes.
-function updatePhysicalByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, beforeDN: DN): void
+function commitUpdatesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, beforeDN: DN): void
 {
 	// perform DOM operations according to sub-node disposition. We need to decide for each
 	// node what node to use to insert or move it before. We go from the end of the list of
@@ -854,7 +831,7 @@ function updatePhysicalByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 				if (disp.updateDisp.shouldCommit)
 				{
 					/// #if VERBOSE_NODE
-						console.debug( `VERBOSE: Calling commitUpdate() on node ${oldVN.name}`);
+						console.debug( `Calling commitUpdate() on node ${oldVN.name}`);
 					/// #endif
 
 					oldVN.commitUpdate( newVN);
@@ -862,7 +839,7 @@ function updatePhysicalByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 
 				// update the sub-nodes if necessary
 				if (disp.updateDisp.shouldRender)
-					updatePhysical( disp);
+					commitUpdatedNode( disp);
 			}
 
 			// determine whether all the nodes under this VN should be moved.
@@ -894,7 +871,7 @@ function updatePhysicalByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 		{
 			// since we already destroyed old nodes designated to be replaced, the code is
 			// identical for Replace and Insert actions
-			createPhysical( newVN, anchorDN, beforeDN);
+			commitNewNode( newVN, anchorDN, beforeDN);
 
 			// if the new node defines a DOM node, it becomes the DOM node before which
 			// next components should be inserted/moved
@@ -918,7 +895,7 @@ function updatePhysicalByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 
 // Performs updates and inserts by groups. We go from the end of the list of update groups
 // and on each iteration we decide the value of the "beforeDN".
-function updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
+function commitUpdatesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
 {
 	let currSubNodeIndex = disps.length - 1;
 	let nextVN: VN, svn: VN, disp: VNDisp, newVN: VN, oldVN: VN, firstDN: DN;
@@ -945,7 +922,7 @@ function updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 					if (disp.updateDisp.shouldCommit)
 					{
 						/// #if VERBOSE_NODE
-							console.debug( `VERBOSE: Calling commitUpdate() on node ${oldVN.name}`);
+							console.debug( `Calling commitUpdate() on node ${oldVN.name}`);
 						/// #endif
 
 						oldVN.commitUpdate( newVN);
@@ -953,7 +930,7 @@ function updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 
 					// update the sub-nodes if necessary
 					if (disp.updateDisp.shouldRender)
-						updatePhysical( disp);
+						commitUpdatedNode( disp);
 				}
 
 				firstDN = getFirstDN( oldVN);
@@ -962,7 +939,7 @@ function updatePhysicalByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 			}
 			else if (group.action === VNDispAction.Insert)
 			{
-				createPhysical( newVN, anchorDN, beforeDN);
+				commitNewNode( newVN, anchorDN, beforeDN);
 
 				// if the new node defines a DOM node, it becomes the DOM node before which
 				// next components should be inserted/moved
@@ -1199,12 +1176,9 @@ type VNDisp =
  * into groups of consecutive nodes that should be updated and of nodes that should be inserted.
  * The groups are built in a way so that if a node should be moved, its entire group is moved.
  */
-function buildSubNodeDispositions( disp: VNDisp): void
+function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
 {
-    // render the new content
-    let newChain = createVNChainFromContent( disp.oldVN.render());
     let newLen = newChain ? newChain.length : 0;
-
     let oldChain = disp.oldVN.subNodes;
     let oldLen = oldChain ? oldChain.length : 0;
 

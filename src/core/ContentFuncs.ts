@@ -59,7 +59,7 @@ export function createNodesFromContent( content: any): VN | VN[]
 export function createVNChainFromContent( content: any): VN[]
 {
 	let nodes = createNodesFromContent( content);
-	return !nodes ? null : Array.isArray(nodes) ? nodes : [nodes];
+	return !nodes ? null : Array.isArray(nodes) ? (nodes.length === 0 ? null : nodes) : [nodes];
 }
 
 

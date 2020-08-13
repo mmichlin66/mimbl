@@ -98,15 +98,15 @@ export class PromiseProxyVN extends VNBase
 
 
 
-	// This method is called before the content of node and all its sub-nodes is removed from the
-	// DOM tree.
-	// This method is part of the render phase.
-	public willUnmount(): void
-	{
-		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
-		/// #endif
-	}
+    /// #if USE_STATS
+        // This method is called before the content of node and all its sub-nodes is removed from the
+        // DOM tree.
+        // This method is part of the render phase.
+        public willUnmount(): void
+        {
+                DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
+        }
+    /// #endif
 
 
 
