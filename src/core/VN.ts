@@ -1,7 +1,7 @@
 ﻿import * as mim from "../api/mim"
 
 /// #if USE_STATS
-	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
+	import {StatsCategory} from "../utils/Stats"
 /// #endif
 
 

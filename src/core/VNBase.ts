@@ -281,9 +281,9 @@ export abstract class VNBase implements VN
 	 * 
 	 * @param callback 
 	 */
-	public wrapCallback<T extends Function>( callback: T, that?: object): T
+	public wrapCallback<T extends Function>( callback: T, thisCallback?: object): T
 	{
-		return wrapCallbackWithVN( callback, that, this);
+		return wrapCallbackWithVN( callback, thisCallback, this);
 	}
 
 

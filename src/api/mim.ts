@@ -1245,37 +1245,6 @@ export namespace JSX
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Definition of mim.jsx function - JSX Factory
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-import {createNodesFromJSX} from "../core/ContentFuncs"
-
-/**
- * JSX Factory function. In order for this function to be invoked by the TypeScript compiler, the
- * tsconfig.json must have the following option:
- *
- * ```json
- * "compilerOptions":
- * {
- *     "jsx": "react",
- *     "jsxFactory": "mim.jsx"
- * }
- * ```
- *
- * The .tsx files must import the mimbl module as mim: import * as mim from "mimbl"
- * @param tag 
- * @param props 
- * @param children 
- */
-export function jsx( tag: any, props: any, ...children: any[]): any
-{
-	return createNodesFromJSX( tag, props, children);
-}
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
 // Provide implementation for the registerCustomAttribute exported function.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1368,7 +1337,7 @@ export function mergeStylesTo( resStyle: Styleset, ...styles: (Styleset | string
 // Callback wrapping
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-import {wrapCallbackWithVN} from "../core/Reconciler"
+import {wrapCallbackWithVN, createNodesFromJSX} from "../core/Reconciler"
 
 /**
  * Wraps the given callback and returns a wrapper function which is executed in the context of the
@@ -1379,13 +1348,37 @@ import {wrapCallbackWithVN} from "../core/Reconciler"
  * however, in this case if the exception is caught it will not be handled by the Mimbl error
  * handling mechanism.
  * @param callback Callback to be wrapped.
- * @param that Object that will be the value of "this" when the callback is executed.
+ * @param thisCallback Object that will be the value of "this" when the callback is executed.
  * @param vn Virtual node in whose context the callback will be executed.
  * @returns The wrapper function that should be used instead of the original callback.
  */
-export function wrapCallback<T extends Function>( callback: T, that?: object, vn?: IVNode): T
+export function wrapCallback<T extends Function>( callback: T, thisCallback?: object, vn?: IVNode): T
 {
-	return wrapCallbackWithVN( callback, that, vn);
+	return wrapCallbackWithVN( callback, thisCallback, vn);
+}
+
+
+
+/**
+ * JSX Factory function. In order for this function to be invoked by the TypeScript compiler, the
+ * tsconfig.json must have the following option:
+ *
+ * ```json
+ * "compilerOptions":
+ * {
+ *     "jsx": "react",
+ *     "jsxFactory": "mim.jsx"
+ * }
+ * ```
+ *
+ * The .tsx files must import the mimbl module as mim: import * as mim from "mimbl"
+ * @param tag 
+ * @param props 
+ * @param children 
+ */
+export function jsx( tag: any, props: any, ...children: any[]): any
+{
+	return createNodesFromJSX( tag, props, children);
 }
 
 
@@ -1529,9 +1522,9 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * @returns Function that has the same signature as the given callback and that should be used
 	 *     instead of the original callback
 	 */
-	protected wrapCallback<T extends Function>( callback: T, that?: object): T
+	protected wrapCallback<T extends Function>( callback: T, thisCallback?: object): T
 	{
-		return wrapCallbackWithVN( callback, this, this.vn);
+		return wrapCallbackWithVN( callback, thisCallback, this.vn);
 	}
 }
 
