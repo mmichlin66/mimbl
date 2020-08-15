@@ -1,7 +1,5 @@
-﻿import * as mim from "../api/mim"
-import {VN, VNUpdateDisp} from "./VN"
-import {VNBase} from "./VNBase"
-import {ClassCompVN} from "./ClassCompVN"
+﻿import {IManagedCompVN, IComponentClass, VNType, IComponent, setRef, RefPropType} from "../api/mim"
+import {ClassCompVN, VNBase, VN, VNUpdateDisp} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -14,18 +12,18 @@ import {ClassCompVN} from "./ClassCompVN"
 // Represents a component implementing the IComponent<> interface.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class ManagedCompVN extends ClassCompVN implements mim.IManagedCompVN
+export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 {
 	// Type of the class-based component.
-	public compClass: mim.IComponentClass;
+	public compClass: IComponentClass;
 
 
 
-	constructor( compClass: mim.IComponentClass, props: any, children: any[])
+	constructor( compClass: IComponentClass, props: any, children: any[])
 	{
 		super();
 
-		this.type = mim.VNType.ManagedComp;
+		this.type = VNType.ManagedComp;
 		this.compClass = compClass;
 
 		// copy properties to our own object excluding framework-handled key and ref
@@ -90,7 +88,7 @@ export class ManagedCompVN extends ClassCompVN implements mim.IManagedCompVN
 
 	// Initializes the node by passing the parent node to it. After this, the node knows its
 	// place in the hierarchy and gets access to the root of it - the RootVN object.
-	public init( parent: VNBase, creator: mim.IComponent): void
+	public init( parent: VNBase, creator: IComponent): void
 	{
 		super.init( parent, creator);
 
@@ -109,7 +107,7 @@ export class ManagedCompVN extends ClassCompVN implements mim.IManagedCompVN
 
         // set the reference value if specified
 		if (this.ref !== undefined)
-			mim.setRef( this.ref, this.comp);
+			setRef( this.ref, this.comp);
 	}
 
 
@@ -124,7 +122,7 @@ export class ManagedCompVN extends ClassCompVN implements mim.IManagedCompVN
 		// more than one components (and/or elements) it can happen that the reference is changed
 		// before our component is unmounted.
 		if (this.ref !== undefined)
-			mim.setRef( this.ref, undefined, this.comp);
+			setRef( this.ref, undefined, this.comp);
 
         super.willUnmount();
 	}
@@ -162,12 +160,12 @@ export class ManagedCompVN extends ClassCompVN implements mim.IManagedCompVN
 			// if reference is now specified, set it now; note that we already determined that
 			// the reference object is different.
 			if (this.ref !== undefined)
-				mim.setRef( this.ref, this.comp);
+				setRef( this.ref, this.comp);
 		}
 		else if (newClassVN.ref === undefined)
 		{
 			// we know that our reference is defined, so unset it
-			mim.setRef( this.ref, undefined, this.comp);
+			setRef( this.ref, undefined, this.comp);
 		}
 
 		// remeber the new value of the key property (even if it is the same)
@@ -197,7 +195,7 @@ export class ManagedCompVN extends ClassCompVN implements mim.IManagedCompVN
 	// Reference to the component that is specified as a "ref" property. Reference object is
 	// set when analyzing properties in the constructor and during update. Reference value is
 	// set during mount and unset during unmount.
-	private ref: mim.RefPropType<any>;
+	private ref: RefPropType<any>;
 }
 
 

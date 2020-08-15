@@ -1,12 +1,12 @@
 {
 	"name": "mimbl",
-	"version": "0.4.2",
+	"version": "0.4.3",
 	"description": "MiM Base Library for Web UI Authoring",
 	"homepage": "https://mmichlin66.github.io/mimbl/about.html",
 	"repository": "github:mmichlin66/mimbl",
 	"main": "./lib/mimbl.js",
 	"module": "./lib/mimbl.js",
-	"types": "./lib/mimblTypes.d.ts",
+	"types": "./lib/index.d.ts",
 	"scripts": {
         "build": "tsc -b && webpack",
         "typedoc": "typedoc"
@@ -33,12 +33,13 @@
 	"files": [
 		"lib/mimbl.js",
 		"lib/mimbl.dev.js",
-		"lib/mimblTypes.d.ts",
-		"lib/api/mim.d.ts",
+		"lib/index.d.ts",
+		"lib/utils/EventSlot.d.ts",
+		"lib/utils/TriggerWatcher.d.ts",
+		"lib/api/UtilAPI.d.ts",
 		"lib/api/HtmlTypes.d.ts",
 		"lib/api/SvgTypes.d.ts",
-		"lib/utils/EventSlot.d.ts",
-		"lib/utils/TriggerWatcher.d.ts"
+		"lib/api/mim.d.ts"
 	],
 	"dependencies": {
 		"mimcss": "^0.7.5"

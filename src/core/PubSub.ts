@@ -1,12 +1,11 @@
-﻿import * as mim from "../api/mim"
-import {VNBase} from "./VNBase"
+﻿import {VNBase} from "../internal"
 
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Information kept by Root virtual node about service export functionations and subscriptions. The same
-// service can be published and subscribed to by multiple nodes.
+// Information kept by Root virtual node about service export publications and subscriptions. The
+// same service can be published and subscribed to by multiple nodes.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 class ServiceInfo

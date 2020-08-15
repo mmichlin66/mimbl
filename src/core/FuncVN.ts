@@ -1,6 +1,5 @@
-﻿import * as mim from "../api/mim"
-import {DN, VN, VNUpdateDisp} from "./VN"
-import {VNBase} from "./VNBase"
+﻿import {Fragment, FuncCompType, VNType} from "../api/mim"
+import { VNBase, VN, VNUpdateDisp } from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -16,16 +15,16 @@ export class FuncVN extends VNBase
 	/** Determines whether this node corresponds to a fragment placeholder. */
 	public static isVNaFragment( vn: VN): boolean
 	{
-		return (vn as FuncVN).func === mim.Fragment;
+		return (vn as FuncVN).func === Fragment;
 	}
 
 
 
-	constructor( func: mim.FuncCompType, props: any, children: any[])
+	constructor( func: FuncCompType, props: any, children: any[])
 	{
 		super();
 
-		this.type = mim.VNType.FuncComp;
+		this.type = VNType.FuncComp;
 		this.func = func;
 
 		// copy properties to our own object excluding framework-handled key
@@ -153,7 +152,7 @@ export class FuncVN extends VNBase
 
 
 	// Function for a stateless component. The function is invoked during the rendering process.
-	private func: mim.FuncCompType;
+	private func: FuncCompType;
 
 	// Properties that were passed to the component, function or element.
 	private props: any;

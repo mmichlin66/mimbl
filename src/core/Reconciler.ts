@@ -1,14 +1,11 @@
-﻿import * as mim from "../api/mim"
-import {DN, VN, VNUpdateDisp,} from "./VN"
-import {enterMutationScope, exitMutationScope} from "../utils/TriggerWatcher"
-import { VNBase } from "./VNBase"
-import { TextVN } from "./TextVN"
-import { IndependentCompVN } from "./IndependentCompVN"
-import { PromiseProxyVN } from "./PromiseProxyVN"
-import { FuncProxyVN } from "./FuncProxyVN"
-import { ElmVN } from "./ElmVN"
-import { ManagedCompVN } from "./ManagedCompVN"
-import { FuncVN } from "./FuncVN"
+﻿import {
+    ScheduledFuncType, IComponent, IVNode, VNType, IClassCompVN, Fragment, FuncProxy,
+    FuncProxyProps, PromiseProxy, IComponentClass, FuncCompType
+} from "../api/mim"
+import {
+    VN, DN, VNUpdateDisp, VNBase, TextVN, IndependentCompVN, PromiseProxyVN,
+    FuncProxyVN, ElmVN, ManagedCompVN, FuncVN, enterMutationScope, exitMutationScope
+} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -27,12 +24,12 @@ let s_vnsScheduledForUpdate = new Set<VN>();
 // Map of functions that have been scheduled to be called upon a new animation frame before
 // components scheduled for update are updated. The keys in this map are the original functions and
 // the values are the wrapper functions that will be executed in the context of a given virtual node.
-let s_callsScheduledBeforeUpdate = new Map<mim.ScheduledFuncType,mim.ScheduledFuncType>();
+let s_callsScheduledBeforeUpdate = new Map<ScheduledFuncType,ScheduledFuncType>();
 
 // Map of functions that have been scheduled to be called upon a new animation frame after
 // components scheduled for update are updated. The keys in this map are the original functions and
 // the values are the wrapper functions that will be executed in the context of a given virtual node.
-let s_callsScheduledAfterUpdate = new Map<mim.ScheduledFuncType,mim.ScheduledFuncType>();
+let s_callsScheduledAfterUpdate = new Map<ScheduledFuncType,ScheduledFuncType>();
 
 // Handle of the animation frame request (in case it should be canceled).
 let s_scheduledFrameHandle: number = 0;
@@ -53,7 +50,7 @@ let s_currentTick: number = 0;
 export let s_currentVN: VN = null;
 
 // Class-based component whose rendering tree is currently being processed.
-export let s_currentClassComp: mim.IComponent = null;
+export let s_currentClassComp: IComponent = null;
 
 
 
@@ -102,9 +99,14 @@ const enum SchedulerState
  * @param vn Virtual node in whose context the callback will be executed.
  * @returns The wrapper function that should be used instead of the original callback.
  */
-export function wrapCallbackWithVN<T extends Function>( callback: T, thisCallback?: object, vn?: mim.IVNode): T
+export function wrapCallbackWithVN<T extends Function>( callback: T, thisCallback?: object, vn?: IVNode): T
 {
-	return CallbackWrapper.bind( vn, thisCallback, callback);
+    // if "this" for the callback was not passed but vn was, check whether the vn is a component;
+    // if yes, use it as "this"; otherwise, use vn's creator component.
+    if (!thisCallback && vn)
+        thisCallback = (vn as any).comp != null ? (vn as any).comp : vn.creator;
+
+    return CallbackWrapper.bind( vn, thisCallback, callback);
 }
 
 
@@ -189,9 +191,9 @@ function addNodeToScheduler( vn: VN): void
 	// scheduled if the current scheduler state is BeforeUpdate. This is because the component
 	// wil be updated in the current cycle and there is already no time to execute the "before
 	// update" method.
-	if (vn.type === mim.VNType.IndependentComp || vn.type === mim.VNType.ManagedComp)
+	if (vn.type === VNType.IndependentComp || vn.type === VNType.ManagedComp)
 	{
-		let comp = (vn as any as mim.IClassCompVN).comp;
+		let comp = (vn as any as IClassCompVN).comp;
 		if (comp.beforeUpdate && s_schedulerState !== SchedulerState.BeforeUpdate)
 			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, wrapCallbackWithVN( comp.beforeUpdate, comp, vn));
 
@@ -204,8 +206,8 @@ function addNodeToScheduler( vn: VN): void
 
 // Schedules to call the given function either before or after all the scheduled components
 // have been updated.
-export function scheduleFuncCall( func: mim.ScheduledFuncType, beforeUpdate: boolean,
-    thisArg?: object, vn?: mim.IVNode): void
+export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean,
+    thisArg?: object, vn?: IVNode): void
 {
 	/// #if DEBUG
 	if (!func)
@@ -278,7 +280,7 @@ function doMimbleTick(): void
 	{
 		s_schedulerState = SchedulerState.BeforeUpdate;
 		let callsScheduledBeforeUpdate = s_callsScheduledBeforeUpdate;
-		s_callsScheduledBeforeUpdate = new Map<mim.ScheduledFuncType,mim.ScheduledFuncType>();
+		s_callsScheduledBeforeUpdate = new Map<ScheduledFuncType,ScheduledFuncType>();
 		callScheduledFunctions( callsScheduledBeforeUpdate, true);
 	}
 
@@ -314,7 +316,7 @@ function doMimbleTick(): void
 	{
 		s_schedulerState = SchedulerState.AfterUpdate;
 		let callsScheduledAfterUpdate = s_callsScheduledAfterUpdate;
-		s_callsScheduledAfterUpdate = new Map<mim.ScheduledFuncType,mim.ScheduledFuncType>();
+		s_callsScheduledAfterUpdate = new Map<ScheduledFuncType,ScheduledFuncType>();
 		callScheduledFunctions( callsScheduledAfterUpdate, false);
 	}
 
@@ -417,7 +419,7 @@ function performCommitPhase( updatedNodeDisps: VNDisp[]): void
 
 
 // Call functions scheduled before or after update cycle.
-function callScheduledFunctions( funcs: Map<mim.ScheduledFuncType,mim.ScheduledFuncType>, beforeUpdate: boolean)
+function callScheduledFunctions( funcs: Map<ScheduledFuncType,ScheduledFuncType>, beforeUpdate: boolean)
 {
 	funcs.forEach( (wrapper, func) =>
 	{
@@ -1541,9 +1543,9 @@ function createNodesFromContent( content: any): VN | VN[]
 	{
 		// if the component (this can only be an Instance component) is already attached to VN,
 		// return this existing VN; otherwise create a new one.
-		return (content as mim.IComponent).vn
-						? (content as mim.IComponent).vn as VN
-						: new IndependentCompVN( content as mim.IComponent);
+		return (content as IComponent).vn
+						? (content as IComponent).vn as VN
+						: new IndependentCompVN( content as IComponent);
 	}
 	else if (Array.isArray( content))
 		return createNodesFromArray( content);
@@ -1603,16 +1605,16 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
 {
 	if (typeof tag === "string")
 		return new ElmVN( tag as string, props, children);
-	else if (tag === mim.Fragment)
+	else if (tag === Fragment)
 		return createNodesFromArray( children);
-	else if (tag === mim.FuncProxy)
+	else if (tag === FuncProxy)
 	{
 		if (!props || !props.func)
 			return undefined;
 
 		// check whether we already have a node linked to this function. If yes return it;
 		// otherwise, create a new node.
-		let funcProxyProps = props as mim.FuncProxyProps;
+		let funcProxyProps = props as FuncProxyProps;
 		let vn = FuncProxyVN.findVN( props.func, funcProxyProps.key);
 		if (!vn)
 			return new FuncProxyVN( props);
@@ -1626,7 +1628,7 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
 			return vn;
 		}
 	}
-	else if (tag === mim.PromiseProxy)
+	else if (tag === PromiseProxy)
 	{
 		if (!props || !props.promise)
 			return undefined;
@@ -1636,7 +1638,7 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
 	else if (typeof tag === "function")
 	{
 		// children parameter is always an array. A component can specify that its children are
-		// an array of a certain type, e.g. class A extends mim.Component<{},T[]>. In this case
+		// an array of a certain type, e.g. class A extends Component<{},T[]>. In this case
 		// there are two ways to specify children in JSX that would be accepted by the TypeScript
 		// compiler:
 		//	1) <A>{t1}{t2}</A>. In this case, children will be [t1, t2] (as expected by A).
@@ -1645,9 +1647,9 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
 		// The realChildren variable accommodates both cases.
 		let realChildren = children.length === 1 && Array.isArray( children[0]) ? children[0] : children;
 		if (typeof tag.prototype.render === "function")
-			return new ManagedCompVN( tag as mim.IComponentClass, props, realChildren);
+			return new ManagedCompVN( tag as IComponentClass, props, realChildren);
 		else
-			return new FuncVN( tag as mim.FuncCompType, props, realChildren);
+			return new FuncVN( tag as FuncCompType, props, realChildren);
 	}
 
 	/// #if DEBUG

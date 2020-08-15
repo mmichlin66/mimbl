@@ -1,6 +1,6 @@
-﻿import * as mim from "../api/mim"
-import {VNBase} from "./VNBase"
-import {createWatcher, IWatcher} from "../utils/TriggerWatcher";
+﻿import {IClassCompVN, IComponent, UpdateStrategy} from "../api/mim"
+import {createWatcher, IWatcher} from "../utils/TriggerWatcher"
+import {VNBase} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -14,10 +14,10 @@ import {createWatcher, IWatcher} from "../utils/TriggerWatcher";
 // in terms of update requests and lifecycle management.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
+export abstract class ClassCompVN extends VNBase implements IClassCompVN
 {
 	// Component instance.
-	public comp: mim.IComponent;
+	public comp: IComponent;
 
 
 
@@ -31,7 +31,7 @@ export abstract class ClassCompVN extends VNBase implements mim.IClassCompVN
 	 * Retrieves update strategy object that determines different aspects of node behavior
 	 * during updates.
 	 */
-	public get updateStrategy(): mim.UpdateStrategy
+	public get updateStrategy(): UpdateStrategy
 	{
 		return this.comp.getUpdateStrategy ? this.comp.getUpdateStrategy() : undefined;
 	}

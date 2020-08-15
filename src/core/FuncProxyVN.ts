@@ -1,8 +1,5 @@
-﻿import * as mim from "../api/mim"
-import {VN, VNUpdateDisp} from "./VN"
-import {VNBase} from "./VNBase"
-import {s_currentClassComp} from "./Reconciler"
-import {createWatcher, IWatcher} from "../utils/TriggerWatcher"
+﻿import {FuncProxyProps, VNType} from "../api/mim"
+import {VNBase, s_currentClassComp, createWatcher, VN, VNUpdateDisp, IWatcher} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -37,21 +34,20 @@ let symKeysToNodes = Symbol( "symKeysToNodes");
  */
 export class FuncProxyVN extends VNBase
 {
-	constructor( props: mim.FuncProxyProps)
+	constructor( props: FuncProxyProps)
 	{
 		super();
 
-		this.type = mim.VNType.FuncProxy;
-		this.func = props.func as (...args: any) => any;
-		this.thisArg = props.thisArg || s_currentClassComp;
-		this.args = props.args;
-        this.renderRequired = false;
+        this.type = VNType.FuncProxy;
 
+        // remember data from the props. Note that if thisArg is undefined it will be changed
+        // to the node's creator component upon mounting
+		this.func = props.func as (...args: any) => any;
+		this.thisArg = props.thisArg;
+		this.args = props.args;
 		this.key = props.key;
 
-		// if a key was not provided we use the value of thisArg (which might be the current
-		// component) as a key. If that is undefined either we use the function itself as a key.
-        this.linkKey = props.key || this.thisArg || this.func;
+        this.renderRequired = false;
 	}
 
 
@@ -125,6 +121,13 @@ export class FuncProxyVN extends VNBase
 	// This method is part of the Render phase.
 	public willMount(): void
 	{
+        if (this.thisArg === undefined)
+            this.thisArg = this.creator;
+
+		// if a key was not provided we use the value of thisArg (which might be the current
+		// component) as a key. If thisArg is undefined either we use the function itself as a key.
+        this.linkKey = this.key || this.thisArg || this.func;
+
 		this.linkNodeToFunc();
         
         // start watching the function

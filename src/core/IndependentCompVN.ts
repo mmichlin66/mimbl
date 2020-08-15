@@ -1,6 +1,5 @@
-﻿import * as mim from "../api/mim"
-import {VN, VNUpdateDisp} from "./VN"
-import {ClassCompVN} from "./ClassCompVN"
+﻿import {IIndependentCompVN, IComponent, VNType} from "../api/mim"
+import {VN, VNUpdateDisp, ClassCompVN} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -13,13 +12,13 @@ import {ClassCompVN} from "./ClassCompVN"
 // The class InstanceVN is a node that holds an instance of an IComponent-implementing object.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class IndependentCompVN extends ClassCompVN implements mim.IIndependentCompVN
+export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 {
-	constructor( comp: mim.IComponent)
+	constructor( comp: IComponent)
 	{
 		super();
 
-		this.type = mim.VNType.IndependentComp;
+		this.type = VNType.IndependentComp;
 		this.comp = comp;
 	};
 

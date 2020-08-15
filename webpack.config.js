@@ -21,7 +21,7 @@ const prod_ifdefLoaderOptions =
 function config( outFileName, mode, devtool, ifdefLoaderOptions)
 {
     return {
-        entry: "./lib/mimblTypes.js",
+        entry: "./lib/index.js",
 
         output:
         {

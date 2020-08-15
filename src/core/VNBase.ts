@@ -1,7 +1,9 @@
-﻿import * as mim from "../api/mim"
-import {VN, DN} from "./VN"
-import {requestNodeUpdate, scheduleFuncCall, wrapCallbackWithVN} from "./Reconciler"
-import {notifyServicePublished, notifyServiceUnpublished, notifyServiceSubscribed, notifyServiceUnsubscribed} from "./PubSub"
+﻿import {
+    VNType, IComponent, ScheduledFuncType, RefPropType, setRef} from "../api/mim";
+import {
+    VN, DN, notifyServiceUnpublished, notifyServiceUnsubscribed, requestNodeUpdate,
+    scheduleFuncCall, notifyServicePublished, notifyServiceSubscribed, wrapCallbackWithVN
+} from "../internal";
 
 
 /// #if USE_STATS
@@ -31,13 +33,13 @@ export abstract class VNBase implements VN
 	public abstract get name(): string;
 
 	// Node's type.
-	public type: mim.VNType;
+	public type: VNType;
 
 	// Parent node. This is null for the top-level (root) nodes.
 	public parent: VNBase;
 
 	/** Component that created this node in its render method (or undefined). */
-	public creator: mim.IComponent;
+	public creator: IComponent;
 
 	// Level of nesting at which the node resides relative to the root node.
 	public depth: number;
@@ -69,7 +71,7 @@ export abstract class VNBase implements VN
 
 	// Initializes the node by passing the parent node to it. After this, the node knows its
 	// place in the hierarchy and gets access to the root of it - the RootVN object.
-	public init( parent: VNBase, creator: mim.IComponent): void
+	public init( parent: VNBase, creator: IComponent): void
 	{
 		this.parent = parent;
 		this.depth = this.parent ? this.parent.depth + 1 : 0;
@@ -90,7 +92,7 @@ export abstract class VNBase implements VN
 
 		if (this.subscribedServices !== undefined)
 		{
-			this.subscribedServices.forEach( (info, id) => { notifyServiceUnsubscribed( id, this); });
+			this.subscribedServices.forEach( (info, id) => notifyServiceUnsubscribed( id, this));
 			this.subscribedServices.clear();
 		}
 
@@ -127,7 +129,7 @@ export abstract class VNBase implements VN
 	 * @param that Object to be used as the "this" value when the function is called. This parameter
 	 *   is not needed if the function is already bound or it is an arrow function.
 	 */
-	public scheduleCallBeforeUpdate( func: mim.ScheduledFuncType, that?: object): void
+	public scheduleCallBeforeUpdate( func: ScheduledFuncType, that?: object): void
 	{
 		scheduleFuncCall( func, true, that, this);
 	}
@@ -140,7 +142,7 @@ export abstract class VNBase implements VN
 	 * @param that Object to be used as the "this" value when the function is called. This parameter
 	 *   is not needed if the function is already bound or it is an arrow function.
 	 */
-	public scheduleCallAfterUpdate( func: mim.ScheduledFuncType, that?: object): void
+	public scheduleCallAfterUpdate( func: ScheduledFuncType, that?: object): void
 	{
 		scheduleFuncCall( func, false, that, this);
 	}
@@ -184,7 +186,7 @@ export abstract class VNBase implements VN
 	// the Ref object will be set to the defaultValue (if specified) or will remain undefined.
 	// Whenever the value of the service that is registered by a closest ancestor node is
 	// changed, the Ref object will receive the new value.
-	public subscribeService( id: string, ref: mim.RefPropType, defaultService?: any, useSelf?: boolean): void
+	public subscribeService( id: string, ref: RefPropType, defaultService?: any, useSelf?: boolean): void
 	{
 		if (this.subscribedServices === undefined)
 			this.subscribedServices = new Map<string,VNSubscribedServiceInfo>();
@@ -196,7 +198,7 @@ export abstract class VNBase implements VN
 
 		this.subscribedServices.set( id, info);
 		notifyServiceSubscribed( id, this);
-		mim.setRef( ref, this.getService( id, defaultService));
+		setRef( ref, this.getService( id, defaultService));
 }
 
 
@@ -212,7 +214,7 @@ export abstract class VNBase implements VN
 		if (info === undefined)
 			return;
 
-		mim.setRef( info.ref, undefined);
+        setRef( info.ref, undefined);
 		this.subscribedServices.delete( id);
 		notifyServiceUnsubscribed( id, this);
 
@@ -264,7 +266,7 @@ export abstract class VNBase implements VN
 		if (info === undefined)
 			return;
 
-		mim.setRef( info.ref, this.getService( id, info.defaultService));
+		setRef( info.ref, this.getService( id, info.defaultService));
 	}
 
 
@@ -277,7 +279,7 @@ export abstract class VNBase implements VN
 	 * 
 	 * This function should be called by the code that is not part of any component but still has access
 	 * to the IVNode object; for example, custom attribute handlers. Components that derive from the
-	 * mim.Component class should use the wrapCallback method of the mim.Component class.
+	 * Component class should use the wrapCallback method of the Component class.
 	 * 
 	 * @param callback 
 	 */
@@ -310,7 +312,7 @@ export abstract class VNBase implements VN
 class VNSubscribedServiceInfo
 {
 	// Reference that will be filled in with the service value
-	ref: mim.RefPropType<any>;
+	ref: RefPropType<any>;
 
 	// Default value of the service that is used if none of the ancestor nodes publishes the
 	// service

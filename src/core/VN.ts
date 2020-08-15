@@ -1,4 +1,4 @@
-﻿import * as mim from "../api/mim"
+﻿import {IVNode, IComponent, UpdateStrategy} from "../api/mim"
 
 /// #if USE_STATS
 	import {StatsCategory} from "../utils/Stats"
@@ -16,7 +16,7 @@ export type DN = Node;
  * The VN interface defines properties and methods that are optionally implemented by all
  * types of virtual nodes.
  */
-export interface VN extends mim.IVNode
+export interface VN extends IVNode
 {
 	/// #if USE_STATS
 		readonly statsCategory: StatsCategory;
@@ -45,7 +45,7 @@ export interface VN extends mim.IVNode
 	parent?: VN;
 
 	// Component that created this node as part of its rendering tree.
-	creator?: mim.IComponent;
+	creator?: IComponent;
 
 	// Reference to the next sibling node or undefined for the last sibling.
 	next?: VN;
@@ -60,7 +60,7 @@ export interface VN extends mim.IVNode
 	 * Update strategy object that determines different aspects of node behavior
 	 * during updates.
 	 */
-	updateStrategy?: mim.UpdateStrategy;
+	updateStrategy?: UpdateStrategy;
 
 	// Returns DOM node corresponding to the virtual node itself (if any) and not to any of its
 	// sub-nodes.
@@ -81,7 +81,7 @@ export interface VN extends mim.IVNode
 
 	// Initializes the node by passing the parent node to it. After this, the node knows its
 	// place in the hierarchy and gets access to the root of it - the RootVN object.
-	init( parent: VN, creator: mim.IComponent): void;
+	init( parent: VN, creator: IComponent): void;
 
 	// Cleans up the node object before it is released.
 	term(): void;

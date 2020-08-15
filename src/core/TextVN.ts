@@ -1,6 +1,5 @@
-﻿import * as mim from "../api/mim"
-import {DN, VN, VNUpdateDisp} from "./VN"
-import {VNBase} from "./VNBase"
+﻿import {ITextVN, VNType} from "../api/mim"
+import {VNBase, DN, VN, VNUpdateDisp} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -11,7 +10,7 @@ import {VNBase} from "./VNBase"
 /**
  * Represents a text node.
  */
-export class TextVN extends VNBase implements mim.ITextVN
+export class TextVN extends VNBase implements ITextVN
 {
 	// Text for a simple text node.
 	public text: string;
@@ -24,7 +23,7 @@ export class TextVN extends VNBase implements mim.ITextVN
 	constructor( text: string)
 	{
 		super();
-		this.type = mim.VNType.Text;
+		this.type = VNType.Text;
 		this.text = text;
 	};
 

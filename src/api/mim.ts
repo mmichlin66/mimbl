@@ -1,4 +1,6 @@
 ﻿import {Styleset, IClassRule, IClassNameRule, IIDRule} from "mimcss"
+import {createNodesFromJSX, wrapCallbackWithVN} from "../core/Reconciler";
+import {PropType, ElmAttr, EventSlot, mountRoot, unmountRoot, FuncProxyVN} from "../internal";
 
 
 
@@ -168,567 +170,11 @@ export interface IComponent<TProps = {}, TChildren = any>
 
 
 
-/**
- * The UpdateStrategy object specifies different aspects of update behavior of components and
- * elements.
- */
-export type UpdateStrategy = 
-{
-	/**
-	 * Flag determining whether non-matching new keyed sub-nodes are allowed to recycle non-
-	 * matching old keyed sub-nodes. Here "non-matching" means those new or old nodes for which
-	 * no old or new sub-nodes respectively were found. If this flag is false, then non-matching
-	 * old sub-nodes will be removed and non-matching new sub-nodes will be inserted. If this
-	 * flag is true, then non-matching old sub-nodes will be updated by the non-matching new
-	 * sub-nodes - provided that the types of sub-nodes are the same.
-	 * 
-	 * If keyed sub-nodes recycling is allowed it can speed up an update process because
-	 * less DOM nodes get removed and inserted, which is more expensive than updating. However,
-	 * this can have some adverse effects under cirtain circumstances if certain data is bound
-	 * to the particular instances of DOM nodes.
-	 * 
-	 * The flag's default value is true.
-	 */
-	allowKeyedNodeRecycling?: boolean;
-};
-
-
-/**
- * Type of functions scheduled to be called either before or after the update cycle.
- */
-export type ScheduledFuncType = () => void;
-
-
-
-/**
- * Defines event handler that is invoked when reference value changes.
- */
-export type RefFunc<T> = (newRef: T) => void;
-
-
-
-import {IEventSlot, EventSlot} from "../utils/EventSlot"
-
-
-
-/**
- * Reference class to use whenever a reference to an object is needed - for example, with JSX `ref`
- * attributes and services.
- */
-export class Ref<T>
-{
-	private _r: T;
-
-	/** Event that is fired when the referenced value changes */
-	private changedEvent = new EventSlot<RefFunc<T>>();
-
-	constructor( listener?: RefFunc<T>, initialReferene?: T)
-	{
-		if (listener !== undefined)
-			this.changedEvent.attach( listener);
-
-		this._r = initialReferene;
-	}
-
-	/** Adds a callback that will be invoked when the value of the reference changes. */
-	public addListener( listener: RefFunc<T>)
-	{
-		this.changedEvent.attach( listener);
-	}
-
-	/** Removes a callback that was added with addListener. */
-	public removeListener( listener: RefFunc<T>)
-	{
-		this.changedEvent.detach( listener);
-	}
-
-	/** Get accessor for the reference value */
-	public get r(): T { return this._r; }
-
-	/** Set accessor for the reference value */
-	public set r( newRef: T)
-	{
-		if (this._r !== newRef)
-		{
-			this._r = newRef;
-			this.changedEvent.fire( newRef);
-		}
-	}
-
-	/** Clears the reference value and also clears all all registered listeners */
-	public clear(): void
-	{
-		this._r = undefined;
-		this.changedEvent.clear();
-	}
-}
-
-
-
-/**
- * The IServiceDefinitions interface serves as a mapping between service names and service types.
- * This interface is intended to be augmented by modules that define and/or use specific services.
- * This allows performing service publishing and subscribing in type-safe manner.
- */
-export interface IServiceDefinitions
-{
-	/** Built-in error handling service. */
-	"StdErrorHandling": IErrorHandlingService;
-
-	/**
-	 * Built-in service for lazy people - can be used for quick prototypes without the need to
-	 * augment the interface.
-	 */
-	"any": any;
-}
-
-
-
-/**
- * The IErrorHandlingService interface represents a service that can be invoked when an error -
- * usually an exception - is encountered but cannot be handled locally. A component that implements
- * this service would normally remember the error and request to update itself,so that in its
- * render method it will present the error to the user.
- *
- * The IErrorHandlingService is implemented by the Root Virtual Node as a last resort for error
- * handling. The Root VN will display a simple UI showing the error and will allow the user to
- * restart - in the hope that the error will not repeat itself.
- */
-export interface IErrorHandlingService
-{
-	reportError( err: any, path: string[]): void;
-}
-
-
-
-// ///////////////////////////////////////////////////////////////////////////////////////////////////
-// //
-// // Decorator function for creating reference properties without the need to manually create
-// // Ref<> instances. This allows for the following code pattern:
-// //
-// //	class A extends Component
-// //	{
-// //		@ref myDiv: HTMLDivElement;
-// //		render() { return <div ref={myDiv}>Hello</div>; }
-// //	}
-// //
-// // In the above example, the myDiv property will be automatically created when first accessed. The
-// // actual object will be a Proxy to Ref<> of the given type (HTMLDivElement in this case).
-// //
-// ///////////////////////////////////////////////////////////////////////////////////////////////////
-// export function ref( target, name)
-// {
-// 	function refGet( obj, key)
-// 	{
-// 		if (key === "r")
-// 			return obj.r;
-// 		else
-// 			return obj.r[key];
-// 	}
-
-// 	function refSet( obj, key, val, receiver): boolean
-// 	{
-// 		if (key === "r")
-// 			obj.r = val;
-// 		else
-// 			obj.r[key] = val;
-
-// 		return true;
-// 	}
-
-// 	function ensureProxy( thisObj: any, attrName: string): any
-// 	{
-// 		let proxy = thisObj[attrName];
-// 		if (!proxy)
-// 		{
-// 			proxy = new Proxy( new Ref<any>(), { get: refGet, set: refSet });
-// 			thisObj[attrName] = proxy;
-// 		}
-// 		return proxy;
-// 	}
-
-// 	let attrName = "_ref_" + name;
-// 	Object.defineProperty( target, name,
-// 		{
-// 			set( val) { ensureProxy( this, attrName).r = val; },
-// 			get() { return ensureProxy( this, attrName); }
-// 		}
-// 	);
-// }
-
-
-
-/**
- * Type of ref property that can be passed to JSX elements and components. This can be either the
- * [[Ref]] class or [[RefFunc]] function.
- */
-export type RefPropType<T = any> = Ref<T> | RefFunc<T>;
-
-
-
-/**
- * Helper function to set the value of the reference that takes care of the different types of
- * references. The optional `onlyIf` parameter may specify a value so that only if the reference
- * currently has the same value it will be replaced. This might be needed to not clear a
- * reference if it already points to a different object.
- * @param ref [[Ref]] object to which the new value will be set
- * @param val Reference value to set to the Ref object
- * @param onlyIf An optional value to which to compare the current (old) value of the reference.
- * The new value will be set only if the old value equals the `onlyIf` value.
- */
-export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
-{
-	if (typeof ref === "object")
-	{
-		let refObj = ref as Ref<T>;
-		if (onlyIf === undefined || refObj.r === onlyIf)
-			refObj.r = val;
-	}
-	else if (typeof ref === "function")
-		(ref as RefFunc<T>)(val);
-}
-
-
-
-/**
- * An artificial "Fragment" component that is only used as a temporary collection of other items
- * in places where JSX only allows a single item. Our JSX factory function creates a virtual node
- * for each of its children and the function is never actually called. This function is only needed
- * because currently TypeScript doesn't allow the `<>` fragment notation if a custom JSX factory
- * function is used.
- *
- * Use it as follows:
- * ```tsx
- *	import * as mim from "mimbl"
- *	.....
- *	render()
- *	{
- *		return <mim.Fragment>
- *			<div1/>
- *			<div2/>
- *			<div3/>
- *		</mim.Fragment>
- *	}
-  ```
-
- * @param props 
- */
-export function Fragment( props: CompProps<{}>): any {}
-
-
-
-/** 
- * The ICustomAttributeHandlerClass interface represents a class of handlers of custom attributes
- * that can be applied to intrinsic (HTML or SVG) elements. The requirements on such classes are:
- * 1. Implement a constructor accepting IElmVN, attribute value and attribute name (this allows
- *   the same handler to serve different attributes).
- * 2. Implement the ICustomAttributeHandler interface
- */
-export interface ICustomAttributeHandlerClass<T>
-{
-	/**
-	 * Constructs a new custom attribute handler that will act on the given element and provides
-	 * the initial value of the attribute. Attribute name is also provided in case the handler
-	 * supports different attributes. By the time this constructor is called, the DOM element had
-	 * already been created and standard attributes and event listeners had been applied.
-	 * @param elmVN Virtual node for this element. The handler can retrieve the DOM element from
-	 *   this interface and also use other methods (e.g. subscribe to services).
-	 * @param attrVal Initial value of the custom attribute
-	 * @param attrName Name of the custom attribute
-	 */
-	new( elmVN: IElmVN, attrVal: T, attrName?: string): ICustomAttributeHandler<T>;
-}
-
-
-
-/**
- * The ICustomAttributeHandler interface represents an ability to handle custom properties that can
- * be applied to intrinsic (HTML or SVG) elements.
- */
-export interface ICustomAttributeHandler<T = any>
-{
-	/**
-	 * Updates an existing custom attribute with the new value.
-	 * @param newPropVal New value of the custom attribute.
-	 * @returns True if changes were made and false otherwise.
-	 */
-	update( newPropVal: T): boolean;
-
-	/**
-	 * Terminates the functioning of the custom attribute handler. This method is invoked either
-	 * when a new rendering of the element doesn't have the attribute anymore or if the element
-	 * is removed. Although this method is optional, most handlers will need to implement it to
-	 * properly cleanup any resources (e.g. event handlers) to avoid leaks.
-	 * @param isRemoval True if the element is being removed and false if the element is being
-	 *   updated and the attribute is no longer provided. If the handler adds any event
-	 *   listeners to the element, then it has to remove them on update but doen't have to do it
-	 *   on element removal.
-	 */
-	terminate?( isRemoval: boolean): void;
-}
-
-
-
-/** Defines types of virtual DOM nodes */
-export const enum VNType
-{
-	/** Top-level node */
-	Root,
-
-	/** Class-based (state-full) component created via new */
-	IndependentComp,
-
-	/** Class-based (state-full) component laid out using JSX */
-	ManagedComp,
-
-	/** Stateless component (simple rendering function accepting props) */
-	FuncComp,
-
-	/** DOM element (HTML or SVG) laid out using JSX. */
-	Elm,
-
-	/** Text node */
-	Text,
-
-	/** Wrapper around a function/method that can be updated independently. */
-	FuncProxy,
-
-	/** Node that waits for a promise to be settled and then displays the resolved value as content. */
-	PromiseProxy,
-}
-
-
-
-/**
- * The IVNode interface represents a virtual node. Through this interface, callers can perform
- * most common actions that are available on every type of virtual node. Each type of virtual node
- * also implements a more specific interface through which the specific capabilities of the node
- * type are available.
- */
-export interface IVNode
-{
-	/** Gets node type. */
-	readonly type: VNType;
-
-	/** Gets node's parent. This is undefined for the top-level (root) nodes. */
-	readonly parent?: IVNode;
-
-	/** Component that created this node in its render method (or undefined). */
-	readonly creator?: IComponent;
-
-	/** Reference to the next sibling node or undefined for the last sibling. */
-	readonly next?: IVNode;
-
-	/** Reference to the previous sibling node or undefined for the first sibling. */
-	readonly prev?: IVNode;
-
-	/** List of sub-nodes. */
-	readonly subNodes?: IVNode[];
-
-	/**
-	 * Gets node's display name. This is used mostly for tracing and error reporting. The name
-	 * can change during the lifetime of the virtual node; for example, it can reflect an "id"
-	 * property of an element.
-	 */
-	readonly name?: string;
-
-	// Flag indicating that update has been requested but not yet performed. This flag is needed
-	// to prevent trying to add the node to the global map every time the requestUpdate method
-	// is called. 
-	readonly updateRequested: boolean;
-
-
-
-	/** This method is called by the component when it needs to be updated. */
-	requestUpdate(): void;
-
-	/**
-	 * Schedules to call the given function before all the scheduled components have been updated.
-	 * @param func Function to be called.
-	 * @param that Object to be used as the "this" value when the function is called. This parameter
-	 *   is not needed if the function is already bound or it is an arrow function.
-	 */
-	scheduleCallBeforeUpdate( func: ScheduledFuncType, that?: object): void;
-
-	/**
-	 * Schedules to call the given function before all the scheduled components have been updated.
-	 * @param func Function to be called.
-	 * @param that Object to be used as the "this" value when the function is called. This parameter
-	 *   is not needed if the function is already bound or it is an arrow function.
-	 */
-	scheduleCallAfterUpdate( func: ScheduledFuncType, that?: object): void;
-
-
-
-	/**
-	 * Registers an object of any type as a service with the given ID that will be available for
-	 * consumption by descendant components.
-	 */
-	publishService<K extends keyof IServiceDefinitions>( id: K, service: IServiceDefinitions[K]): void;
-
-	/** Unregisters a service with the given ID. */
-	unpublishService<K extends keyof IServiceDefinitions>( id: K): void;
-
-	/**
-	 * Subscribes to a service with the given ID. If the service with the given ID is registered
-	 * by this or one of the ancestor components, the passed Ref object will reference it;
-	 * otherwise, the Ref object will be set to the defaultValue (if specified) or will remain
-	 * undefined. Whenever the value of the service that is registered by this or a closest
-	 * ancestor component is changed,the Ref object will receive the new value.
-	 * The useSelf optional parameter determines whether the component can subscribe to the
-	 * service published by itself. The default is false.
-	 * @param id 
-	 * @param ref 
-	 * @param defaultService 
-	 * @param useSelf 
-	 */
-	subscribeService<K extends keyof IServiceDefinitions>( id: K, ref: RefPropType<IServiceDefinitions[K]>,
-					defaultService?: IServiceDefinitions[K], useSelf?: boolean): void;
-
-	/**
-	 * Unsubscribes from a service with the given ID. The Ref object that was used to subscribe
-	 * will be set to undefined.
-	 * @param id 
-	 */
-	unsubscribeService<K extends keyof IServiceDefinitions>( id: K): void;
-
-	/**
-	 * Retrieves the value for a service with the given ID registered by a closest ancestor
-	 * component or the default value if none of the ancestor components registered a service with
-	 * this ID. This method doesn't establish a subscription and only reflects the current state.
-	 * @param id 
-	 * @param defaultService 
-	 * @param useSelf 
-	 */
-	getService<K extends keyof IServiceDefinitions>( id: K, defaultService?: IServiceDefinitions[K],
-					useSelf?: boolean): IServiceDefinitions[K];
-
-
-
-	/**
-	 * Creates a wrapper function with the same signature as the given callback so that if the original
-	 * callback throws an exception, it is processed by the Mimbl error handling mechanism so that the
-	 * exception bubbles from this virtual node up the hierarchy until a node/component that knows to
-	 * handle errors is found.
-	 * 
-	 * This function should be called by the code that is not part of any component but still has access
-	 * to the IVNode object; for example, custom attribute handlers. Components that derive from the
-	 * mim.Component class should use the wrapCallback method of the mim.Component class.
-	 * 
-	 * Use this method before passing callbacks to document and window event handlers as well as
-	 * non-DOM objects that use callbacks, e.g. promises. For example:
-	 * 
-	 * ```typescript
-	 *	class ResizeMonitor
-	 *	{
-	 *		private onWindowResize(e: Event): void {};
-	 *
-	 * 		wrapper: (e: Event): void;
-	 * 
-	 * 		public startResizeMonitoring( vn: IVNode)
-	 *		{
-	 *			this.wrapper = vn.wrapCallback( this.onWindowResize, this);
-	 *			window.addEventListener( "resize", this.wrapper);
-	 *		}
-	 * 
-	 * 		public stopResizeMonitoring()
-	 *		{
-	 *			window.removeEventListener( "resize", this.wrapper);
-	 *			this.wrapper = undefined;
-	 *		}
-	 *	}
-	 * ```
-	 * 
-	 * @param callback Callback to be wrapped
-	 * @returns Function that has the same signature as the given callback and that should be used
-	 *     instead of the original callback
-	 */
-	wrapCallback<T extends Function>( callback: T, that?: object): T;
-}
-
-
-
-/**
- * The IClassCompVN interface represents a virtual node for a JSX-based component.
- */
-export interface IClassCompVN extends IVNode
-{
-	/** Gets the component instance. */
-	readonly comp: IComponent;
-}
-
-
-
-/**
- * The IManagedCompVN interface represents a virtual node for a JSX-based component.
- */
-export interface IManagedCompVN extends IVNode
-{
-	/** Gets the component class. */
-	readonly compClass: IComponentClass;
-}
-
-
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// The IIndependentCompVN interface represents a virtual node for a component.
+// Definitions of property types used by HTML and SVG elements.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export interface IIndependentCompVN extends IVNode
-{
-}
-
-
-
-/**
- *  The IElmVN interface represents a virtual node for a DOM element.
- */
-export interface IElmVN extends IVNode
-{
-	/** Gets the DOM element name. */
-	readonly elmName: string;
-
-	/** Gets the flag indicating whether this element is an SVG (as opposed to HTML). */
-	readonly isSvg: boolean;
-
-	/** Gets the DOM element object. */
-	readonly elm: Element;
-}
-
-
-
-/**
- * The ITextVN interface represents a virtual node for a text DOM node.
- */
-export interface ITextVN extends IVNode
-{
-	/** Text of the node. */
-	text: string;
-
-	/** Text DOM node. */
-	textNode: Text;
-}
-
-
-
-/**
- * The Slice type defines an object structure describing
- * parameters for rendering an element. They include: Class, Style, Properties, Content. This
- * structure is intended to be passed either in the constructor or via the protected methods of
- * derived classes, so that they can control parameters of elements rendered by the upper classes.
- * The main purpose of this structure is to combine parameters defining an element into a single
- * object to minimize the number of properties callers of classes should deal with.
- */
-export type Slice =
-{
-	className?: string;
-	style?: Styleset;
-	props?: object
-	content?: any;
-};
-
-
 
 /**
  * Type of event handler function for DOM events of type T.
@@ -778,6 +224,41 @@ export type IDPropType = string | number | IIDRule;
 
 
 /**
+ * The UpdateStrategy object specifies different aspects of update behavior of components and
+ * elements.
+ */
+export type UpdateStrategy = 
+{
+	/**
+	 * Flag determining whether non-matching new keyed sub-nodes are allowed to recycle non-
+	 * matching old keyed sub-nodes. Here "non-matching" means those new or old nodes for which
+	 * no old or new sub-nodes respectively were found. If this flag is false, then non-matching
+	 * old sub-nodes will be removed and non-matching new sub-nodes will be inserted. If this
+	 * flag is true, then non-matching old sub-nodes will be updated by the non-matching new
+	 * sub-nodes - provided that the types of sub-nodes are the same.
+	 * 
+	 * If keyed sub-nodes recycling is allowed it can speed up an update process because
+	 * less DOM nodes get removed and inserted, which is more expensive than updating. However,
+	 * this can have some adverse effects under cirtain circumstances if certain data is bound
+	 * to the particular instances of DOM nodes.
+	 * 
+	 * The flag's default value is true.
+	 */
+	allowKeyedNodeRecycling?: boolean;
+};
+
+
+
+export type CrossoriginPropType = "anonymous" | "use-credentials";
+export type FormenctypePropType = "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain";
+export type FormmethodPropType = "get" | "post" | "dialog";
+export type FormtargetPropType = string | "_self" | "_blank" | "_parent"| "_top";
+export type ReferrerPolicyPropType = "no-referrer" | "no-referrer-when-downgrade" | "origin" |
+		"origin-when-cross-origin" | "unsafe-url";
+
+
+
+/**
  * The ICommonProps interface defines standard properties that can be used on all JSX elements -
  * intrinsic (HTML and SVG) as well as functional and class-based components.
  */
@@ -788,22 +269,6 @@ export interface ICommonProps
 }
 
 
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Definitions of property types used by HTML and SVG elements.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-/**
- * Type that is used to specify color values for different style properties.
- */
-export type CrossoriginPropType = "anonymous" | "use-credentials";
-export type FormenctypePropType = "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain";
-export type FormmethodPropType = "get" | "post" | "dialog";
-export type FormtargetPropType = string | "_self" | "_blank" | "_parent"| "_top";
-export type ReferrerPolicyPropType = "no-referrer" | "no-referrer-when-downgrade" | "origin" |
-		"origin-when-cross-origin" | "unsafe-url";
 
 /**
  * The IElementProps interface defines standard properties (attributes and event listeners)
@@ -929,44 +394,13 @@ export interface IElementProps<TRef,TChildren = any> extends ICommonProps
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Utility functions for determining whether an element is an SVG.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-/**
- * Determines whether the given element is one of the elements from the SVG spec; that is, <svg>
- * or any other from SVG.
- * @param elm Element to test
- */
-export function isSvg( elm: Element): boolean
-{
-	return "ownerSVGElement" in (elm as any);
-}
-
-
-
-/**
- * Determines whether the given element is the <svg> element.
- * @param elm  Element to test
- */
-export function isSvgSvg( elm: Element): boolean
-{
-	return elm.tagName === "svg";
-	// return (elm as any).ownerSVGElement === null;
-}
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
 // JSX namespace defining how TypeScript performs type checks on JSX elements,components
 // properties and children.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
 import * as html from "./HtmlTypes";
 import * as svg from "./SvgTypes";
-
-
 
 /**
  * Namespace defining interfaces used by TypeScript to type-check JSX expressions.
@@ -1243,12 +677,466 @@ export namespace JSX
 
 
 
+/**
+ * JSX Factory function. In order for this function to be invoked by the TypeScript compiler, the
+ * tsconfig.json must have the following option:
+ *
+ * ```json
+ * "compilerOptions":
+ * {
+ *     "jsx": "react",
+ *     "jsxFactory": "jsx"
+ * }
+ * ```
+ *
+ * The .tsx files must import the mimbl module as mim: import * as mim from "mimbl"
+ * @param tag 
+ * @param props 
+ * @param children 
+ */
+export function jsx( tag: any, props: any, ...children: any[]): any
+{
+	return createNodesFromJSX( tag, props, children);
+}
+
+
+
+/**
+ * The IServiceDefinitions interface serves as a mapping between service names and service types.
+ * This interface is intended to be augmented by modules that define and/or use specific services.
+ * This allows performing service publishing and subscribing in type-safe manner.
+ */
+export interface IServiceDefinitions
+{
+	/** Built-in error handling service. */
+	"StdErrorHandling": IErrorHandlingService;
+
+	/**
+	 * Built-in service for lazy people - can be used for quick prototypes without the need to
+	 * augment the interface.
+	 */
+	"any": any;
+}
+
+
+
+/**
+ * The IErrorHandlingService interface represents a service that can be invoked when an error -
+ * usually an exception - is encountered but cannot be handled locally. A component that implements
+ * this service would normally remember the error and request to update itself,so that in its
+ * render method it will present the error to the user.
+ *
+ * The IErrorHandlingService is implemented by the Root Virtual Node as a last resort for error
+ * handling. The Root VN will display a simple UI showing the error and will allow the user to
+ * restart - in the hope that the error will not repeat itself.
+ */
+export interface IErrorHandlingService
+{
+	reportError( err: any, path: string[]): void;
+}
+
+
+
+/**
+ * Type of functions scheduled to be called either before or after the update cycle.
+ */
+export type ScheduledFuncType = () => void;
+
+
+
+/**
+ * Defines event handler that is invoked when reference value changes.
+ */
+export type RefFunc<T> = (newRef: T) => void;
+
+
+
+/**
+ * Reference class to use whenever a reference to an object is needed - for example, with JSX `ref`
+ * attributes and services.
+ */
+export class Ref<T>
+{
+	private _r: T;
+
+	/** Event that is fired when the referenced value changes */
+	private changedEvent = new EventSlot<RefFunc<T>>();
+
+	constructor( listener?: RefFunc<T>, initialReferene?: T)
+	{
+		if (listener !== undefined)
+			this.changedEvent.attach( listener);
+
+		this._r = initialReferene;
+	}
+
+	/** Adds a callback that will be invoked when the value of the reference changes. */
+	public addListener( listener: RefFunc<T>)
+	{
+		this.changedEvent.attach( listener);
+	}
+
+	/** Removes a callback that was added with addListener. */
+	public removeListener( listener: RefFunc<T>)
+	{
+		this.changedEvent.detach( listener);
+	}
+
+	/** Get accessor for the reference value */
+	public get r(): T { return this._r; }
+
+	/** Set accessor for the reference value */
+	public set r( newRef: T)
+	{
+		if (this._r !== newRef)
+		{
+			this._r = newRef;
+			this.changedEvent.fire( newRef);
+		}
+	}
+
+	/** Clears the reference value and also clears all all registered listeners */
+	public clear(): void
+	{
+		this._r = undefined;
+		this.changedEvent.clear();
+	}
+}
+
+
+
+/**
+ * Type of ref property that can be passed to JSX elements and components. This can be either the
+ * [[Ref]] class or [[RefFunc]] function.
+ */
+export type RefPropType<T = any> = Ref<T> | RefFunc<T>;
+
+
+
+/**
+ * Helper function to set the value of the reference that takes care of the different types of
+ * references. The optional `onlyIf` parameter may specify a value so that only if the reference
+ * currently has the same value it will be replaced. This might be needed to not clear a
+ * reference if it already points to a different object.
+ * @param ref [[Ref]] object to which the new value will be set
+ * @param val Reference value to set to the Ref object
+ * @param onlyIf An optional value to which to compare the current (old) value of the reference.
+ * The new value will be set only if the old value equals the `onlyIf` value.
+ */
+export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
+{
+	if (typeof ref === "object")
+	{
+		let refObj = ref as Ref<T>;
+		if (onlyIf === undefined || refObj.r === onlyIf)
+			refObj.r = val;
+	}
+	else if (typeof ref === "function")
+		(ref as RefFunc<T>)(val);
+}
+
+
+
+/** Defines types of virtual DOM nodes */
+export const enum VNType
+{
+	/** Top-level node */
+	Root,
+
+	/** Class-based (state-full) component created via new */
+	IndependentComp,
+
+	/** Class-based (state-full) component laid out using JSX */
+	ManagedComp,
+
+	/** Stateless component (simple rendering function accepting props) */
+	FuncComp,
+
+	/** DOM element (HTML or SVG) laid out using JSX. */
+	Elm,
+
+	/** Text node */
+	Text,
+
+	/** Wrapper around a function/method that can be updated independently. */
+	FuncProxy,
+
+	/** Node that waits for a promise to be settled and then displays the resolved value as content. */
+	PromiseProxy,
+}
+
+
+
+/**
+ * The IVNode interface represents a virtual node. Through this interface, callers can perform
+ * most common actions that are available on every type of virtual node. Each type of virtual node
+ * also implements a more specific interface through which the specific capabilities of the node
+ * type are available.
+ */
+export interface IVNode
+{
+	/** Gets node type. */
+	readonly type: VNType;
+
+	/** Gets node's parent. This is undefined for the top-level (root) nodes. */
+	readonly parent?: IVNode;
+
+	/** Component that created this node in its render method (or undefined). */
+	readonly creator?: IComponent;
+
+	/** Reference to the next sibling node or undefined for the last sibling. */
+	readonly next?: IVNode;
+
+	/** Reference to the previous sibling node or undefined for the first sibling. */
+	readonly prev?: IVNode;
+
+	/** List of sub-nodes. */
+	readonly subNodes?: IVNode[];
+
+	/**
+	 * Gets node's display name. This is used mostly for tracing and error reporting. The name
+	 * can change during the lifetime of the virtual node; for example, it can reflect an "id"
+	 * property of an element.
+	 */
+	readonly name?: string;
+
+	// Flag indicating that update has been requested but not yet performed. This flag is needed
+	// to prevent trying to add the node to the global map every time the requestUpdate method
+	// is called. 
+	readonly updateRequested: boolean;
+
+
+
+	/** This method is called by the component when it needs to be updated. */
+	requestUpdate(): void;
+
+	/**
+	 * Schedules to call the given function before all the scheduled components have been updated.
+	 * @param func Function to be called.
+	 * @param that Object to be used as the "this" value when the function is called. This parameter
+	 *   is not needed if the function is already bound or it is an arrow function.
+	 */
+	scheduleCallBeforeUpdate( func: ScheduledFuncType, that?: object): void;
+
+	/**
+	 * Schedules to call the given function before all the scheduled components have been updated.
+	 * @param func Function to be called.
+	 * @param that Object to be used as the "this" value when the function is called. This parameter
+	 *   is not needed if the function is already bound or it is an arrow function.
+	 */
+	scheduleCallAfterUpdate( func: ScheduledFuncType, that?: object): void;
+
+
+
+	/**
+	 * Registers an object of any type as a service with the given ID that will be available for
+	 * consumption by descendant components.
+	 */
+	publishService<K extends keyof IServiceDefinitions>( id: K, service: IServiceDefinitions[K]): void;
+
+	/** Unregisters a service with the given ID. */
+	unpublishService<K extends keyof IServiceDefinitions>( id: K): void;
+
+	/**
+	 * Subscribes to a service with the given ID. If the service with the given ID is registered
+	 * by this or one of the ancestor components, the passed Ref object will reference it;
+	 * otherwise, the Ref object will be set to the defaultValue (if specified) or will remain
+	 * undefined. Whenever the value of the service that is registered by this or a closest
+	 * ancestor component is changed,the Ref object will receive the new value.
+	 * The useSelf optional parameter determines whether the component can subscribe to the
+	 * service published by itself. The default is false.
+	 * @param id 
+	 * @param ref 
+	 * @param defaultService 
+	 * @param useSelf 
+	 */
+	subscribeService<K extends keyof IServiceDefinitions>( id: K, ref: RefPropType<IServiceDefinitions[K]>,
+					defaultService?: IServiceDefinitions[K], useSelf?: boolean): void;
+
+	/**
+	 * Unsubscribes from a service with the given ID. The Ref object that was used to subscribe
+	 * will be set to undefined.
+	 * @param id 
+	 */
+	unsubscribeService<K extends keyof IServiceDefinitions>( id: K): void;
+
+	/**
+	 * Retrieves the value for a service with the given ID registered by a closest ancestor
+	 * component or the default value if none of the ancestor components registered a service with
+	 * this ID. This method doesn't establish a subscription and only reflects the current state.
+	 * @param id 
+	 * @param defaultService 
+	 * @param useSelf 
+	 */
+	getService<K extends keyof IServiceDefinitions>( id: K, defaultService?: IServiceDefinitions[K],
+					useSelf?: boolean): IServiceDefinitions[K];
+
+
+
+	/**
+	 * Creates a wrapper function with the same signature as the given callback so that if the original
+	 * callback throws an exception, it is processed by the Mimbl error handling mechanism so that the
+	 * exception bubbles from this virtual node up the hierarchy until a node/component that knows to
+	 * handle errors is found.
+	 * 
+	 * This function should be called by the code that is not part of any component but still has access
+	 * to the IVNode object; for example, custom attribute handlers. Components that derive from the
+	 * Component class should use the wrapCallback method of the Component class.
+	 * 
+	 * Use this method before passing callbacks to document and window event handlers as well as
+	 * non-DOM objects that use callbacks, e.g. promises. For example:
+	 * 
+	 * ```typescript
+	 *	class ResizeMonitor
+	 *	{
+	 *		private onWindowResize(e: Event): void {};
+	 *
+	 * 		wrapper: (e: Event): void;
+	 * 
+	 * 		public startResizeMonitoring( vn: IVNode)
+	 *		{
+	 *			this.wrapper = vn.wrapCallback( this.onWindowResize, this);
+	 *			window.addEventListener( "resize", this.wrapper);
+	 *		}
+	 * 
+	 * 		public stopResizeMonitoring()
+	 *		{
+	 *			window.removeEventListener( "resize", this.wrapper);
+	 *			this.wrapper = undefined;
+	 *		}
+	 *	}
+	 * ```
+	 * 
+	 * @param callback Callback to be wrapped
+	 * @returns Function that has the same signature as the given callback and that should be used
+	 *     instead of the original callback
+	 */
+	wrapCallback<T extends Function>( callback: T, that?: object): T;
+}
+
+
+
+/**
+ * The IClassCompVN interface represents a virtual node for a JSX-based component.
+ */
+export interface IClassCompVN extends IVNode
+{
+	/** Gets the component instance. */
+	readonly comp: IComponent;
+}
+
+
+
+/**
+ * The IManagedCompVN interface represents a virtual node for a JSX-based component.
+ */
+export interface IManagedCompVN extends IVNode
+{
+	/** Gets the component class. */
+	readonly compClass: IComponentClass;
+}
+
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Provide implementation for the registerCustomAttribute exported function.
+// The IIndependentCompVN interface represents a virtual node for a component.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-import {ElmAttr, PropType} from "../utils/ElmAttr";
+export interface IIndependentCompVN extends IVNode
+{
+}
+
+
+
+/**
+ *  The IElmVN interface represents a virtual node for a DOM element.
+ */
+export interface IElmVN extends IVNode
+{
+	/** Gets the DOM element name. */
+	readonly elmName: string;
+
+	/** Gets the flag indicating whether this element is an SVG (as opposed to HTML). */
+	readonly isSvg: boolean;
+
+	/** Gets the DOM element object. */
+	readonly elm: Element;
+}
+
+
+
+/**
+ * The ITextVN interface represents a virtual node for a text DOM node.
+ */
+export interface ITextVN extends IVNode
+{
+	/** Text of the node. */
+	text: string;
+
+	/** Text DOM node. */
+	textNode: Text;
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// CCustom attributes
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/** 
+ * The ICustomAttributeHandlerClass interface represents a class of handlers of custom attributes
+ * that can be applied to intrinsic (HTML or SVG) elements. The requirements on such classes are:
+ * 1. Implement a constructor accepting IElmVN, attribute value and attribute name (this allows
+ *   the same handler to serve different attributes).
+ * 2. Implement the ICustomAttributeHandler interface
+ */
+export interface ICustomAttributeHandlerClass<T>
+{
+	/**
+	 * Constructs a new custom attribute handler that will act on the given element and provides
+	 * the initial value of the attribute. Attribute name is also provided in case the handler
+	 * supports different attributes. By the time this constructor is called, the DOM element had
+	 * already been created and standard attributes and event listeners had been applied.
+	 * @param elmVN Virtual node for this element. The handler can retrieve the DOM element from
+	 *   this interface and also use other methods (e.g. subscribe to services).
+	 * @param attrVal Initial value of the custom attribute
+	 * @param attrName Name of the custom attribute
+	 */
+	new( elmVN: IElmVN, attrVal: T, attrName?: string): ICustomAttributeHandler<T>;
+}
+
+
+
+/**
+ * The ICustomAttributeHandler interface represents an ability to handle custom properties that can
+ * be applied to intrinsic (HTML or SVG) elements.
+ */
+export interface ICustomAttributeHandler<T = any>
+{
+	/**
+	 * Updates an existing custom attribute with the new value.
+	 * @param newPropVal New value of the custom attribute.
+	 * @returns True if changes were made and false otherwise.
+	 */
+	update( newPropVal: T): boolean;
+
+	/**
+	 * Terminates the functioning of the custom attribute handler. This method is invoked either
+	 * when a new rendering of the element doesn't have the attribute anymore or if the element
+	 * is removed. Although this method is optional, most handlers will need to implement it to
+	 * properly cleanup any resources (e.g. event handlers) to avoid leaks.
+	 * @param isRemoval True if the element is being removed and false if the element is being
+	 *   updated and the attribute is no longer provided. If the handler adds any event
+	 *   listeners to the element, then it has to remove them on update but doen't have to do it
+	 *   on element removal.
+	 */
+	terminate?( isRemoval: boolean): void;
+}
+
+
 
 /**
  * Registers custom attribute handler class for the given property name.
@@ -1273,122 +1161,9 @@ export function registerCustomEvent( eventName: string): void
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Provide implementation of utility functions.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-import * as utils from "../utils/Utils";
-
-/**
- * Combines arbitrary number of Slice objects merging classes, styles, properties and content
- * @param slices Array of Slice objects to merge.
- * @returns Resultant Slice object.
- */
-export function mergeSlices( ...slices: Slice[]): Slice
-{
-	return utils.mergeSlices( ...slices);
-}
-
-/**
- * Combines arbitrary number of Slice objects merging classes, styles, properties and content
- * into the given resultant slice.
- * @param resSlice Resultant Slice object.
- * @param slices Array of Slice objects to merge.
- */
-export function mergeSlicesTo( resSlice: Slice, ...slices: Slice[]): void
-{
-	utils.mergeSlicesTo( resSlice, ...slices);
-}
-
-/**
- * Combines arbitrary number of class properties merging later into the earlier ones. This method
- * returns a string or undefined - if all classNames were undefined.
- * @param classNames Array of strings or string arrays with class names
- * @returns Resultant class string.
- */
-export function mergeClasses( ...classNames: (string | string[])[]): string
-{
-	return utils.mergeClasses( ...classNames);
-}
-
-/**
- * Combines arbitrary number of style objects merging later into the earlier ones. This method
- * always returns an object - even if empty
- * @param styles Array of style objects to merge.
- */
-export function mergeStyles( ...styles: Styleset[]): Styleset
-{
-	return utils.mergeStyles( ...styles);
-}
-
-/**
- * Combines arbitrary number of style objects merging later into the first one.
- * @param resStyle Resultant style object
- * @param styles Array of style objects to merge.
- */
-export function mergeStylesTo( resStyle: Styleset, ...styles: (Styleset | string)[] ): void
-{
-	utils.mergeStylesTo( resStyle, ...styles);
-}
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Callback wrapping
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-import {wrapCallbackWithVN, createNodesFromJSX} from "../core/Reconciler"
-
-/**
- * Wraps the given callback and returns a wrapper function which is executed in the context of the
- * given virtual node. The given "that" object will be the value of "this" when the callback is
- * executed. If the original callback throws an exception, it is processed by the Mimbl error
- * handling mechanism so that the exception bubles from this virtual node up the hierarchy until a
- * node/component that knows to handle errors is found. Note that the VN can be null/undefined;
- * however, in this case if the exception is caught it will not be handled by the Mimbl error
- * handling mechanism.
- * @param callback Callback to be wrapped.
- * @param thisCallback Object that will be the value of "this" when the callback is executed.
- * @param vn Virtual node in whose context the callback will be executed.
- * @returns The wrapper function that should be used instead of the original callback.
- */
-export function wrapCallback<T extends Function>( callback: T, thisCallback?: object, vn?: IVNode): T
-{
-	return wrapCallbackWithVN( callback, thisCallback, vn);
-}
-
-
-
-/**
- * JSX Factory function. In order for this function to be invoked by the TypeScript compiler, the
- * tsconfig.json must have the following option:
- *
- * ```json
- * "compilerOptions":
- * {
- *     "jsx": "react",
- *     "jsxFactory": "mim.jsx"
- * }
- * ```
- *
- * The .tsx files must import the mimbl module as mim: import * as mim from "mimbl"
- * @param tag 
- * @param props 
- * @param children 
- */
-export function jsx( tag: any, props: any, ...children: any[]): any
-{
-	return createNodesFromJSX( tag, props, children);
-}
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
 // Base component class.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-import {FuncProxyVN} from "../core/FuncProxyVN"
 
 /**
  * The ComponentUpdateRequest type defines parameters that can be passed to the component updateMe
@@ -1447,7 +1222,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 			for( let req of updateRequests)
 			{
 				if (typeof req === "function")
-					FuncProxyVN.update( req, undefined, this);
+                    FuncProxyVN.update( req, undefined, this);
 				else
 				{
 					// if a non-array parameter is passed in req.args, we wrap it in an array
@@ -1532,9 +1307,36 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// FuncProxy support
+// Built in components
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * An artificial "Fragment" component that is only used as a temporary collection of other items
+ * in places where JSX only allows a single item. Our JSX factory function creates a virtual node
+ * for each of its children and the function is never actually called. This function is only needed
+ * because currently TypeScript doesn't allow the `<>` fragment notation if a custom JSX factory
+ * function is used.
+ *
+ * Use it as follows:
+ * ```tsx
+ *	import * as mim from "mimbl"
+ *	.....
+ *	render()
+ *	{
+ *		return <Fragment>
+ *			<div1/>
+ *			<div2/>
+ *			<div3/>
+ *		</Fragment>
+ *	}
+  ```
+
+ * @param props 
+ */
+export function Fragment( props: CompProps<{}>): any {}
+
+
 
 /**
  * Properties to be used with the FuncProxy component. FuncProxy component cannot have children.
@@ -1690,7 +1492,6 @@ export class PromiseProxy extends Component<PromiseProxyProps>
 // Definitions of mount/unmount functions
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-import * as root from "../core/RootVN"
 
 /**
  * Renders the given content (usually result of JSX expression) under the given HTML element
@@ -1701,7 +1502,7 @@ import * as root from "../core/RootVN"
  */
 export function mount( content: any, anchorDN: Node = null): void
 {
-	root.mountRoot( content, anchorDN);
+	mountRoot( content, anchorDN);
 }
 
 /**
@@ -1710,20 +1511,8 @@ export function mount( content: any, anchorDN: Node = null): void
  */
 export function unmount( anchorDN: Node = null): void
 {
-	root.unmountRoot( anchorDN);
+	unmountRoot( anchorDN);
 }
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Mimbl-specific style scheduler that coordinates Mimcss DOM writing with Mimbl
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-import {initializeMimblStyleScheduler} from "../core/StyleScheduler"
-
-// set Mimbl style scheduler as the default scheduler for style-related DOM-writing operations.
-export let mimblStyleSchedulerType = initializeMimblStyleScheduler();
 
 
 

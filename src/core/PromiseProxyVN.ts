@@ -1,6 +1,5 @@
-﻿import * as mim from "../api/mim"
-import {VN, VNUpdateDisp} from "./VN"
-import {VNBase} from "./VNBase"
+﻿import {PromiseProxyProps, VNType} from "../api/mim"
+import {VNBase, VN, VNUpdateDisp} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -28,11 +27,11 @@ import {VNBase} from "./VNBase"
  */
 export class PromiseProxyVN extends VNBase
 {
-	constructor( props: mim.PromiseProxyProps, children?: any[])
+	constructor( props: PromiseProxyProps, children?: any[])
 	{
 		super();
 
-		this.type = mim.VNType.PromiseProxy;
+		this.type = VNType.PromiseProxy;
 		this.promise = props.promise;
 		this.errorContentFunc = props.errorContentFunc;
 		this.content = children;

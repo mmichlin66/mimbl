@@ -1,8 +1,5 @@
-﻿import * as mim from "../api/mim"
-import {requestNodeUpdate} from "./Reconciler"
-import {DN} from "./VN"
-import {VNBase} from "./VNBase"
-import {RootErrorUI, RootWaitingUI} from "./RootUI"
+﻿import {IErrorHandlingService, VNType} from "../api/mim"
+import {VNBase, DN, requestNodeUpdate} from "../internal"
 
 /// #if USE_STATS
 	import {StatsCategory} from "../utils/Stats"
@@ -18,13 +15,13 @@ import {RootErrorUI, RootWaitingUI} from "./RootUI"
 // RootVN also manages service publishers and subscribers.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class RootVN extends VNBase implements mim.IErrorHandlingService
+export class RootVN extends VNBase implements IErrorHandlingService
 {
 	public constructor( anchorDN: DN)
 	{
 		super();
 		
-		this.type = mim.VNType.Root;
+		this.type = VNType.Root;
 		this.anchorDN = anchorDN;
 		this.depth = 0;
 	};
@@ -55,12 +52,7 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 	// sub-nodes, null should be returned.
 	public render(): any
 	{
-		if (this.errorUI)
-			return this.errorUI;
-		else if (this.waitingUI)
-			return this.waitingUI;
-		else
-			return this.content;
+		return this.error || this.waiting ? null : this.content;
 	}
 
 
@@ -104,12 +96,11 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 			this.thrownPromises.add( promise);
 			promise.then( () => { this.onPromiseFulfilled( promise); });
 			promise.catch( () => { this.onPromiseFulfilled( promise); });
-			if (!this.waitingUI)
-				this.waitingUI = new RootWaitingUI();
+			this.waiting = true;
 		}
 		else
 		{
-			this.errorUI = new RootErrorUI( this, err, path);
+			this.error = true;
 		}
 	}
 
@@ -119,7 +110,7 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 	public restart(): void
 	{
 		// clear the error and request to be updated
-		this.errorUI = undefined;
+		this.error = false;
 		requestNodeUpdate( this);
 	}
 
@@ -141,7 +132,7 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 		this.thrownPromises.delete( promise);
 		if (this.thrownPromises.size === 0)
 		{
-			this.waitingUI = null;
+			this.waiting = false;
 			requestNodeUpdate( this);
 		}
 	}
@@ -151,11 +142,11 @@ export class RootVN extends VNBase implements mim.IErrorHandlingService
 	// Content rendered under this root node.
 	private content: any;
 
-	// Component instance that is rendered when an exception was caught from descendand nodes.
-	private errorUI: RootErrorUI;
+	// Flag indicating that an exception was caught from descendand nodes.
+	private error: boolean = false;
 
-	// Component instance that is rendered when an exception was caught from descendand nodes.
-	private waitingUI: RootWaitingUI;
+	// Flag indicating that a promise thrown as exception was caught from descendand nodes.
+	private waiting: boolean = false;
 
 	// Set of promises thrown by descendant nodes and not yet fulfilled.
 	private thrownPromises = new Set<Promise<any>>();

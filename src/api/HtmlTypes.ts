@@ -1,5 +1,8 @@
-﻿import { CssColor } from "mimcss"
-import * as mim from "./mim"
+﻿import {CssColor} from "mimcss"
+import {
+    IElementProps, EventPropType, ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType,
+    FormenctypePropType, FormmethodPropType
+} from "./mim";
 
 
 
@@ -26,7 +29,7 @@ export type InputTypePropType = "button" | "checkbox" | "color" | "date" | "date
 // that can be used on all HTML elements. This interface is needed for JSX type checking.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export interface IHtmlElementProps<TRef = HTMLElement> extends mim.IElementProps<TRef>
+export interface IHtmlElementProps<TRef = HTMLElement> extends IElementProps<TRef>
 {
 	// standard attributes
 	accesskey?: string;
@@ -47,14 +50,14 @@ export interface IHtmlElementProps<TRef = HTMLElement> extends mim.IElementProps
 	translate?: boolean | "yes" | "no";
 
 	// events
-	drag?: mim.EventPropType<DragEvent>;
-	dragend?: mim.EventPropType<DragEvent>;
-	dragenter?: mim.EventPropType<DragEvent>;
-	//dragexit?: mim.EventPropType<Event>;
-	dragleave?: mim.EventPropType<DragEvent>;
-	dragover?: mim.EventPropType<DragEvent>;
-	dragstart?: mim.EventPropType<DragEvent>;
-	drop?: mim.EventPropType<DragEvent>;
+	drag?: EventPropType<DragEvent>;
+	dragend?: EventPropType<DragEvent>;
+	dragenter?: EventPropType<DragEvent>;
+	//dragexit?: EventPropType<Event>;
+	dragleave?: EventPropType<DragEvent>;
+	dragover?: EventPropType<DragEvent>;
+	dragstart?: EventPropType<DragEvent>;
+	drop?: EventPropType<DragEvent>;
 }
 
 
@@ -66,9 +69,9 @@ export interface IHtmlAElementProps extends IHtmlElementProps<HTMLAnchorElement>
 	href?: string;
 	hreflang?: string;
 	ping?: string;
-	referrerpolicy?: mim.ReferrerPolicyPropType;
+	referrerpolicy?: ReferrerPolicyPropType;
 	rel?: string;
-	target?:  mim.FormtargetPropType;
+	target?: FormtargetPropType;
 	type?: string;
 }
 
@@ -90,10 +93,10 @@ export interface IHtmlAreaElementProps extends IHtmlElementProps<HTMLAreaElement
 	href?: string;
 	hreflang?: string;
 	ping?: string;
-	referrerpolicy?:  mim.ReferrerPolicyPropType;
+	referrerpolicy?: ReferrerPolicyPropType;
 	rel?: string;
 	shape?: "rect" | "circle" | "poly" | "default";
-	target?:  mim.FormtargetPropType;
+	target?: FormtargetPropType;
 }
 
 
@@ -103,7 +106,7 @@ export interface IHtmlAudioElementProps extends IHtmlElementProps<HTMLAudioEleme
 {
 	autoplay?: boolean;
 	controls?: boolean;
-	crossorigin?: mim.CrossoriginPropType;
+	crossorigin?: CrossoriginPropType;
 	loop?: boolean;
 	muted?: boolean;
 	preload?: "none" | "metadata" | "auto" | "";
@@ -116,7 +119,7 @@ export interface IHtmlAudioElementProps extends IHtmlElementProps<HTMLAudioEleme
 export interface IHtmlBaseElementProps extends IHtmlElementProps<HTMLBaseElement>
 {
 	href?: string;
-	target?:  mim.FormtargetPropType;
+	target?: FormtargetPropType;
 }
 
 
@@ -150,10 +153,10 @@ export interface IHtmlButtonElementProps extends IHtmlElementProps<HTMLButtonEle
 	disabled?: boolean;
 	form?: string;
 	formaction?: string;
-	formenctype?:  mim.FormenctypePropType;
-	formmethod?:  mim.FormmethodPropType;
+	formenctype?:  FormenctypePropType;
+	formmethod?: FormmethodPropType;
 	formnovalidate?: boolean;
-	formtarget?:  mim.FormtargetPropType;
+	formtarget?: FormtargetPropType;
 	name?: string;
 	type?: InputTypePropType;
 	value?: string;
@@ -228,7 +231,7 @@ export interface IHtmlDelElementProps extends IHtmlElementProps<HTMLModElement>
 export interface IHtmlDetailsElementProps extends IHtmlElementProps<HTMLDetailsElement>
 {
 	open?: boolean;
-	toggle?: mim.EventPropType<Event>;
+	toggle?: EventPropType<Event>;
 }
 
 
@@ -313,11 +316,11 @@ export interface IHtmlFormElementProps extends IHtmlElementProps<HTMLFormElement
 	action?: string;
 	autocapitalize?: AutocapitalizePropType;
 	autocomplete?: boolean;
-	enctype?:  mim.FormenctypePropType;
-	method?:  mim.FormmethodPropType;
+	enctype?: FormenctypePropType;
+	method?: FormmethodPropType;
 	name?: string;
 	novalidate?: boolean;
-	target?: string |  mim.FormtargetPropType;
+	target?: string | FormtargetPropType;
 }
 
 
@@ -399,7 +402,7 @@ export interface IHtmlIframeElementProps extends IHtmlElementProps<HTMLIFrameEle
 	height?: number;
 	importance?: ImportancePropType;
 	name?: string;
-	referrerpolicy?:  mim.ReferrerPolicyPropType;
+	referrerpolicy?: ReferrerPolicyPropType;
 	sandbox?: string;
 	src?: string | "about:blank";
 	srcdoc?: string;
@@ -412,13 +415,13 @@ export interface IHtmlIframeElementProps extends IHtmlElementProps<HTMLIFrameEle
 export interface IHtmlImgElementProps extends IHtmlElementProps<HTMLImageElement>
 {
 	alt?: string;
-	crossorigin?: mim.CrossoriginPropType;
+	crossorigin?: CrossoriginPropType;
 	decoding?: "auto" | "sync" | "async";
 	height?: number;
 	importance?: ImportancePropType;
 	intrinsicsize?: boolean;
 	ismap?: boolean;
-	referrerpolicy?:  mim.ReferrerPolicyPropType;
+	referrerpolicy?: ReferrerPolicyPropType;
 	sizes?: string;
 	src?: string;
 	srcset?: string;
@@ -462,10 +465,10 @@ export interface IHtmlInputElementProps extends IHtmlElementProps<HTMLInputEleme
 
 	// submit and image
 	formaction?: string;
-	formenctype?:  mim.FormenctypePropType;
-	formmethod?:  mim.FormmethodPropType;
+	formenctype?: FormenctypePropType;
+	formmethod?: FormmethodPropType;
 	formnovalidate?: boolean;
-	formtarget?: string |  mim.FormtargetPropType;
+	formtarget?: string | FormtargetPropType;
 
 	// image
 	alt?: string;
@@ -534,13 +537,13 @@ export interface IHtmlLiElementProps extends IHtmlElementProps<HTMLLIElement>
 export interface IHtmlLinkElementProps extends IHtmlElementProps<HTMLLinkElement>
 {
 	as?: string;
-	crossorigin?: mim.CrossoriginPropType;
+	crossorigin?: CrossoriginPropType;
 	href?: string;
 	hrefLang?: string;
 	importance?: ImportancePropType;
 	integrity?: string;
 	media?: string;
-	referrerpolicy?:  mim.ReferrerPolicyPropType;
+	referrerpolicy?: ReferrerPolicyPropType;
 	rel?: string;
 	sizes?: string;
 	type?: string;
@@ -702,7 +705,7 @@ export interface IHtmlQElementProps extends IHtmlElementProps<HTMLQuoteElement>
 export interface IHtmlScriptElementProps extends IHtmlElementProps<HTMLScriptElement>
 {
 	async?: boolean;
-	crossorigin?: mim.CrossoriginPropType;
+	crossorigin?: CrossoriginPropType;
 	defer?: boolean;
 	integrity?: string;
 	nomodule?: boolean;
@@ -893,7 +896,7 @@ export interface IHtmlVideoElementProps extends IHtmlElementProps<HTMLVideoEleme
 	autoplay?: boolean;
 	buffered?: boolean;
 	controls?: boolean;
-	crossorigin?: mim.CrossoriginPropType;
+	crossorigin?: CrossoriginPropType;
 	height?: number;
 	loop?: boolean;
 	muted?: boolean;

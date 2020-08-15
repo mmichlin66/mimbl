@@ -1,8 +1,10 @@
-﻿import * as mim from "../api/mim"
-import {DN, VN, VNUpdateDisp} from "./VN"
-import {VNBase} from "./VNBase"
-import {ElmAttr, AttrPropInfo, EventPropInfo, CustomAttrPropInfo, PropType, PropInfo} from "../utils/ElmAttr"
-import {deepCompare} from "../utils/Utils";
+﻿import {
+    IElmVN, VNType, setRef, EventFuncType, UpdateStrategy, RefPropType, ICustomAttributeHandler
+} from "../api/mim"
+import {
+    VNBase, DN, VN, VNUpdateDisp, s_deepCompare, PropInfo, PropType,
+    ElmAttr, CustomAttrPropInfo, AttrPropInfo,
+    EventPropInfo} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -15,7 +17,7 @@ import {deepCompare} from "../utils/Utils";
 // Represents a DOM element created using JSX.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class ElmVN extends VNBase implements mim.IElmVN
+export class ElmVN extends VNBase implements IElmVN
 {
 	// Tag name of an Element.
 	public elmName: string;
@@ -36,7 +38,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 	{
 		super();
 
-		this.type = mim.VNType.Elm;
+		this.type = VNType.Elm;
 		this.elmName = tagName;
 		this.props = props;
 		this.children = children;
@@ -112,7 +114,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 
 		// set the value of the reference (if specified)
 		if (this.ref !== undefined)
-			mim.setRef( this.ref, this.elm);
+            setRef( this.ref, this.elm);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Added);
@@ -132,7 +134,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 		// more than one element (and/or components) it can happen that the reference is changed
 		// before our element is unmounted.
 		if (this.ref !== undefined)
-			mim.setRef( this.ref, undefined, this.elm);
+			setRef( this.ref, undefined, this.elm);
 
 		/// #if REMOVE_EVENT_LISTENERS
 			// remove listeners. Since modern browsers don't leak when listeners are not
@@ -175,7 +177,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 	public prepareUpdate( newVN: VN): VNUpdateDisp
 	{
 		// commitUpdate method should be called if new props are different from the current ones
-		let shouldCommit = !deepCompare( this.props, (newVN as ElmVN).props);
+		let shouldCommit = !s_deepCompare( this.props, (newVN as ElmVN).props);
 
 		// render method should be called if either old or new node has children
 		let shouldRender = this.children && this.children.length > 0 ||
@@ -205,7 +207,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 			// if reference is now specified, set it now; note that we already determined that
 			// the reference object is different.
 			if (this.ref !== undefined)
-				mim.setRef( this.ref, this.elm);
+				setRef( this.ref, this.elm);
 		}
 
 		// remeber the new value of the key, updateStartegy and creator property (even if the
@@ -490,7 +492,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 	// with "this" set to either the "event.that" object or, if the latter is undefined, to the
 	// "creator" object, which is the class-based component that created the element i its render
 	// method.
-	private createEventWrapper( event: EventRunTimeData): mim.EventFuncType<Event>
+	private createEventWrapper( event: EventRunTimeData): EventFuncType<Event>
 	{
 		return this.wrapCallback( event.orgFunc, event.that ? event.that : this.creator);
 	}
@@ -629,7 +631,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 	public key: any;
 
 	// Optional UpdateStrategy object defining different aspects of node behavior during updates.
-	public updateStrategy: mim.UpdateStrategy;
+	public updateStrategy: UpdateStrategy;
 
 	// Properties that were passed to the element.
 	private props: any;
@@ -640,7 +642,7 @@ export class ElmVN extends VNBase implements mim.IElmVN
 	// Reference to the component that is specified as a "ref" property. Reference object is
 	// set when analyzing properties in the constructor and during update. Reference value is
 	// set during mount and unset during unmount. The ref property can be changed on update.
-	private ref: mim.RefPropType<any>;
+	private ref: RefPropType<any>;
 
 	// Object that serves as a map between attribute names and their current values.
 	private attrs: { [name: string]: AttrRunTimeData };
@@ -675,7 +677,7 @@ interface EventRunTimeData
 	info: EventPropInfo;
 
 	// Original event callback passed as the value of the event property in JSX
-	orgFunc: mim.EventFuncType<any>;
+	orgFunc: EventFuncType<any>;
 
 	// Object that will be referenced by "this" within the invoked function
 	that?: any;
@@ -688,7 +690,7 @@ interface EventRunTimeData
 	// handling service. The wrapper is marked optional because it is created only if a new
 	// event listener is added; that is, if during update, the event listener function is the
 	// same, there is no need to create new wrapper because the old one will be used.
-	wrapper?:  mim.EventFuncType<Event>;
+	wrapper?:  EventFuncType<Event>;
 };
 
 
@@ -703,7 +705,7 @@ interface CystomAttrRunTimeData
 	val: any;
 
 	// Handler object that knows to deal with the property values
-	handler: mim.ICustomAttributeHandler;
+	handler: ICustomAttributeHandler;
 };
 
 
@@ -713,18 +715,18 @@ interface CystomAttrRunTimeData
 function getPropAsEventRunTimeData( info: EventPropInfo, propVal: any): EventRunTimeData
 {
 	if (typeof propVal === "function")
-		return { info, orgFunc: propVal as mim.EventFuncType<any> };
+		return { info, orgFunc: propVal as EventFuncType<any> };
 	else if (Array.isArray(propVal))
 	{
 		if (propVal.length === 2)
 		{
 			if (typeof propVal[1] === "boolean")
-				return { info, orgFunc: propVal[0] as mim.EventFuncType<any>, useCapture: propVal[1] as boolean };
+				return { info, orgFunc: propVal[0] as EventFuncType<any>, useCapture: propVal[1] as boolean };
 			else
-				return { info, orgFunc: propVal[0] as mim.EventFuncType<any>, that: propVal[1] };
+				return { info, orgFunc: propVal[0] as EventFuncType<any>, that: propVal[1] };
 		}
 		else if (propVal.length === 3)
-			return { info, orgFunc: propVal[0] as mim.EventFuncType<any>, that: propVal[1], useCapture: propVal[2] as boolean };
+			return { info, orgFunc: propVal[0] as EventFuncType<any>, that: propVal[1], useCapture: propVal[2] as boolean };
 	}
 
 	// for all other type combinations the property is not treated as an event handler

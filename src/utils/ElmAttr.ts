@@ -1,5 +1,5 @@
-﻿import * as mim from "../api/mim"
-import {Styleset, setElementStyle, SchedulerType, diffStylesets, StringStyleset, setElementStringStyle} from "mimcss"
+﻿import {Styleset, setElementStyle, SchedulerType, diffStylesets, StringStyleset, setElementStringStyle} from "mimcss"
+import {ICustomAttributeHandlerClass} from "../api/mim"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "./Stats";
@@ -104,7 +104,7 @@ export interface EventPropInfo extends PropInfoBase
 export interface CustomAttrPropInfo extends PropInfoBase
 {
 	// Class object that creates custom attribute handlers.
-	handlerClass: mim.ICustomAttributeHandlerClass<any>;
+	handlerClass: ICustomAttributeHandlerClass<any>;
 }
 
 

@@ -1,4 +1,4 @@
-﻿import * as mim from "./mim"
+﻿import {IElementProps, ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType} from "./mim";
 
 
 
@@ -8,7 +8,7 @@
 // that can be used on all SVG elements.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export interface ISvgElementProps extends mim.IElementProps<SVGElement>
+export interface ISvgElementProps extends IElementProps<SVGElement>
 {
 }
 
@@ -197,9 +197,9 @@ export interface ISvgAElementProps extends ISvgConditionalProcessingProps,ISvgPr
 	href?: string;
 	hreflang?: string;
 	ping?: string;
-	referrerpolicy?:  mim.ReferrerPolicyPropType;
+	referrerpolicy?: ReferrerPolicyPropType;
 	rel?: string;
-	target?:  mim.FormtargetPropType;
+	target?: FormtargetPropType;
 	type?: string;
 }
 
@@ -686,7 +686,7 @@ export interface ISvgRectElementProps extends ISvgConditionalProcessingProps,ISv
 export interface ISvgScriptElementProps extends ISvgElementProps
 {
 	async?: boolean;
-	crossorigin?:  mim.CrossoriginPropType;
+	crossorigin?: CrossoriginPropType;
 	defer?: boolean;
 	integrity?: string;
 	nomodule?: boolean;
