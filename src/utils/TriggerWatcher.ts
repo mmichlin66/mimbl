@@ -799,7 +799,7 @@ class NonSlotContainerHandler implements ProxyHandler<any>
         return Reflect.get( target, prop, receiver);
     }
 
-    set( target: any, prop: PropertyKey, value: any, receiver: any): any
+    set( target: any, prop: PropertyKey, value: any, receiver: any): boolean
     {
         let oldValue = Reflect.get( target, prop, receiver);
         if (oldValue != value)
@@ -841,10 +841,10 @@ class NonSlotContainerHandler implements ProxyHandler<any>
         return Reflect.isExtensible( target);
     }
 
-    getOwnPropertyDescriptor( target: any, p: PropertyKey): PropertyDescriptor | undefined
+    getOwnPropertyDescriptor( target: any, prop: PropertyKey): PropertyDescriptor | undefined
     {
         this.trigger.notifyRead();
-        return Reflect.getOwnPropertyDescriptor( target, p);
+        return Reflect.getOwnPropertyDescriptor( target, prop);
     }
 
     enumerate( target: any): PropertyKey[]

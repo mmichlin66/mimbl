@@ -12,6 +12,9 @@ export interface IEventSlot<TFunc extends Function>
 
 	/** Removes the given function as a listener to the event. */
 	detach( listener: TFunc): void;
+
+	/** Returns the number of currently attached listeners. */
+	readonly count: number;
 }
 
 
@@ -76,6 +79,11 @@ export class EventSlot<TFunc extends Function> implements IEventSlotOwner<TFunc>
 
 
 
+	/** Returns the number of currently attached listeners. */
+    public get count(): number { return this.listeners.size; }
+    
+
+    
 	/** Removes all listeners to the event. */
 	public clear(): void
 	{

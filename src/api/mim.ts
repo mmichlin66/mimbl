@@ -747,18 +747,19 @@ export type ScheduledFuncType = () => void;
 /**
  * Defines event handler that is invoked when reference value changes.
  */
-export type RefFunc<T> = (newRef: T) => void;
+export type RefFunc<T = any> = (newRef: T) => void;
 
 
+
+// Symbol used to keep the referenced object inside the Ref class instance.
+let symRef = Symbol("symRef");
 
 /**
  * Reference class to use whenever a reference to an object is needed - for example, with JSX `ref`
  * attributes and services.
  */
-export class Ref<T>
+export class Ref<T = any>
 {
-	private _r: T;
-
 	/** Event that is fired when the referenced value changes */
 	private changedEvent = new EventSlot<RefFunc<T>>();
 
@@ -767,7 +768,7 @@ export class Ref<T>
 		if (listener !== undefined)
 			this.changedEvent.attach( listener);
 
-		this._r = initialReferene;
+		this[symRef] = initialReferene;
 	}
 
 	/** Adds a callback that will be invoked when the value of the reference changes. */
@@ -783,24 +784,133 @@ export class Ref<T>
 	}
 
 	/** Get accessor for the reference value */
-	public get r(): T { return this._r; }
+	public get r(): T { return this[symRef]; }
 
 	/** Set accessor for the reference value */
 	public set r( newRef: T)
 	{
-		if (this._r !== newRef)
+		if (this[symRef] !== newRef)
 		{
-			this._r = newRef;
+			this[symRef] = newRef;
 			this.changedEvent.fire( newRef);
 		}
 	}
+}
 
-	/** Clears the reference value and also clears all all registered listeners */
-	public clear(): void
-	{
-		this._r = undefined;
-		this.changedEvent.clear();
-	}
+
+
+/**
+ * Decorator function for creating reference properties without the need to manually create Ref<>
+ * instances. This allows for the following code pattern:
+ * 
+ * ```typescript
+ * class A extends Component
+ * {
+ *     @ref myDiv: HTMLDivElement;
+ *     render() { return <div ref={myDiv}>Hello</div>; }
+ * }
+ * ```
+ * 
+ * In the above example, the myDiv property will be set to pint to the HTML div element.
+ */
+export function ref( target: any, name: string)
+{
+	let handler = new RefProxyHandler();
+	handler.proxy = new Proxy( {}, handler);
+	Object.defineProperty( target, name,
+		{
+            set( v: any)
+            {
+                handler.obj = v;
+            },
+            get()
+            {
+                return handler.proxy;
+            }
+		}
+	);
+}
+
+// Determines whether the given property name/symbol belongs to the Ref object or. This is invoked
+// as part of the proxy handler where access to such properties will be reflected from the Ref
+// object while all others will be reflected from the remembered referenced object.
+function chooseObjectToReflect( prop: PropertyKey, ref: Ref, obj: any): any
+{
+    return prop === "r" || prop === symRef || prop == "changedEvent" ? ref : obj;
+}
+
+/**
+ * The RefProxyHandler is a proxy handler for the Ref objects created when reference is defined
+ * using the @ref decorator. Only the "r" property are reflected from the target object (the Ref);
+ * everything else is reflected from the remembered referenced object.
+ */
+class RefProxyHandler implements ProxyHandler<any>
+{
+    // Keeps the proxy object for which this is the handler
+    public proxy: any;
+
+    // Keeps the referenced object or undefined
+    public obj: any;
+
+    public get( target: any, prop: PropertyKey, receiver: any): any
+    {
+        return prop === "r" ? this.obj : this.obj[prop];
+        // Reflect.get doesn't work but regular property get does
+        // return prop === "r" ? this.obj : Reflect.get( this.obj, prop, receiver);
+    }
+
+    public set( target: any, prop: PropertyKey, value: any, receiver: any): boolean
+    {
+        if (prop === "r")
+            this.obj = value;
+        else
+            this.obj[prop] = value;
+
+        return true;
+        // Reflect.set doesn't work but regular property set does
+        // return Reflect.set( this.obj, prop, value, receiver);
+    }
+
+    public deleteProperty( target: any, prop: PropertyKey): boolean
+    {
+        return Reflect.deleteProperty( this.obj, prop);
+    }
+
+    public defineProperty( target: any, prop: PropertyKey, attrs: PropertyDescriptor): boolean
+    {
+        return Reflect.defineProperty( this.obj, prop, attrs);
+    }
+
+    public has( target: any, prop: PropertyKey): boolean
+    {
+        return Reflect.has( this.obj, prop);
+    }
+
+    public getPrototypeOf( target: any): object | null
+    {
+        return Reflect.getPrototypeOf( this.obj);
+    }
+
+    public isExtensible( target: any): boolean
+    {
+        return Reflect.isExtensible( this.obj);
+    }
+
+    public getOwnPropertyDescriptor( target: any, prop: PropertyKey): PropertyDescriptor | undefined
+    {
+        return Reflect.getOwnPropertyDescriptor( this.obj, prop);
+    }
+
+    public enumerate( target: any): PropertyKey[]
+    {
+        return Array.from( Reflect.enumerate( this.enumerate));
+    }
+
+    public ownKeys( target: any): PropertyKey[]
+    {
+        return Reflect.ownKeys( this.obj);
+    }
+
 }
 
 
@@ -809,7 +919,7 @@ export class Ref<T>
  * Type of ref property that can be passed to JSX elements and components. This can be either the
  * [[Ref]] class or [[RefFunc]] function.
  */
-export type RefPropType<T = any> = Ref<T> | RefFunc<T>;
+export type RefPropType<T = any> = T | Ref<T> | RefFunc<T>;
 
 
 
@@ -827,12 +937,11 @@ export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
 {
 	if (typeof ref === "object")
 	{
-		let refObj = ref as Ref<T>;
-		if (onlyIf === undefined || refObj.r === onlyIf)
-			refObj.r = val;
+		if (onlyIf === undefined || (ref as Ref).r === onlyIf)
+			(ref as Ref).r = val;
 	}
 	else if (typeof ref === "function")
-		(ref as RefFunc<T>)(val);
+		(ref as RefFunc)(val);
 }
 
 
@@ -1356,6 +1465,13 @@ export interface FuncProxyProps extends ICommonProps
 	args?: any[];
 
 	/**
+	 * Value to be used as "this" when invoking the function. If this value is undefined, the
+	 * class based component that rendered the FuncProxy component will be used (which is the
+	 * most common case).
+	 */
+	thisArg?: any;
+
+	/**
 	 * Flag indicating whether the arguments specified by the `args` property should be passed to
 	 * the function overriding arguments that were specified by the most recent call to the
 	 * FuncProxy.update method. By default the value of this property is false and `args` will be
@@ -1380,13 +1496,6 @@ export interface FuncProxyProps extends ICommonProps
 	 * be used again.
 	 */
 	replaceArgs?: boolean;
-
-	/**
-	 * Value to be used as "this" when invoking the function. If this value is undefined, the
-	 * class based component that rendered the FuncProxy component will be used (which is the
-	 * most common case).
-	 */
-	thisArg?: any;
 }
 
 
@@ -1407,7 +1516,7 @@ export interface FuncProxyProps extends ICommonProps
  * <div>{this.renderSomething}</div>
  * ```
  * 
- * The FuncProxy coponent is needed in the case where one (or more) of the following is true:
+ * The FuncProxy component is needed in the case where one (or more) of the following is true:
  * - There is a need to pass arguments to the function
  * - The same function is used multiple times and keys must be used to distinguish between the
  * invocations.
