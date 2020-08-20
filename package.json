@@ -39,7 +39,8 @@
 		"lib/api/UtilAPI.d.ts",
 		"lib/api/HtmlTypes.d.ts",
 		"lib/api/SvgTypes.d.ts",
-		"lib/api/mim.d.ts"
+		"lib/api/mim.d.ts",
+		"lib/comp/Popup.d.ts"
 	],
 	"dependencies": {
 		"mimcss": "^0.7.6"

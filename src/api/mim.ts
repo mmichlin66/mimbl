@@ -1,4 +1,4 @@
-﻿import {Styleset, IClassRule, IClassNameRule, IIDRule} from "mimcss"
+﻿import {Styleset, IClassRule, IClassNameRule, IIDRule, ClassPropType} from "mimcss"
 import {createNodesFromJSX, wrapCallbackWithVN} from "../core/Reconciler";
 import {PropType, ElmAttr, EventSlot, mountRoot, unmountRoot, FuncProxyVN} from "../internal";
 
@@ -210,11 +210,6 @@ export type EventFuncAndThisAndFlagType<T extends Event> = [EventFuncType<T>, ob
  */
 export type EventPropType<T extends Event> = EventFuncType<T> | EventFuncAndThisType<T> |
 				EventFuncAndFlagType<T> | EventFuncAndThisAndFlagType<T>;
-
-/**
- * Type for defining the class property of HTML elements
- */				
-export type ClassPropType = string | IClassRule | IClassNameRule | (string | IClassRule | IClassNameRule)[];
 
 /**
  * Type for defining the id property of HTML elements

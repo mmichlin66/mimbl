@@ -2,13 +2,13 @@
 	"mode": "modules",
     "readme": "none",
     "name": "Mimbl Reference",
-    "entryPoint": "index",
 	"excludeExternals": true,
 	"excludeNotExported": true,
     "excludePrivate": true,
     "ignoreCompilerErrors": true,
 	"out": "./reference",
 	"inputFiles": [
-        "src/api/mim.ts"
+        "src/api/mim.ts",
+        "src/comp/Popups.tsx"
 	]
 }

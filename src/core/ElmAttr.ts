@@ -2,7 +2,7 @@
 import {ICustomAttributeHandlerClass} from "../api/mim"
 
 /// #if USE_STATS
-	import {DetailedStats, StatsCategory, StatsAction} from "./Stats";
+	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats";
 /// #endif
 ; // ugly trick to not let the TypeScript compiler to strip the #endif comment
 
