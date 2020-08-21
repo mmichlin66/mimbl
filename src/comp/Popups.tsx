@@ -1,3 +1,13 @@
+/**
+ * This module contains definitions of [[Popup]], [[Dialog]] and [[MsgBox]] components.
+ * 
+ * The [[Popup]] component is a base component that displays a popup usig the `<dialog>` HTML
+ * element. The [[Dialog]] component derives from [[Popup]] and divides the popup area into
+ * secontions for caption, body and button bar. Dialogs support moving around by clicking on the
+ * caption area. The [[MsgBox]] component derives from [[Dialog]] and displays a message
+ * optionally accompannied with an icon and a pre-defined set of buttons.
+ */
+
 import * as mim from "../api/mim"
 import * as css from "mimcss"
 import {PromiseEx, createPromiseEx} from "../api/UtilAPI";
@@ -5,16 +15,37 @@ import {trigger} from "../internal";
 
 
 
+/** Using module augmentation technique to extend the IServiceDefinition interface */
 declare module "../api/mim"
 {
+    /**
+     * Extending the IServiceDefinition interface with services used by the [[Popup]] and
+     * [[Dialog]] components.
+     */
     interface IServiceDefinitions
     {
+        /**
+         * The "popup" service gives components used in the content of the [[Popup]] component
+         * access to the [[IPopup]] interface, through which they can close the popup.
+         */
         popup: IPopup;
+
+        /**
+         * The "dialog" service gives components used in the caption or the body of the [[Dialog]]
+         * component access to the [[IDialog]] interface, through which they can add buttons
+         * and otherwise manipulate the dialog.
+         */
         dialog: IDialog;
     }
 }
 
 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Popup
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
  * The IPopup interface represents a popup from the point of view of the content. This interface
@@ -69,20 +100,20 @@ export class DefaultPopupStyles extends css.StyleDefinition implements IPopupSty
 /**
  * The IPopupOptions interface represents the options that cofigure the behavior of the Popup
  * object. They are passed in the constructor to the [[Popup]] class
+ * @typeParam TStyles Type for the styles property. Options for derived components will have to
+ * derive from the IPopupOptions interface and to implement the [[IPopupStyles]] interface for
+ * the styles property.
  */
-export interface IPopupOptions<T extends IPopupStyles = IPopupStyles>
+export interface IPopupOptions<TStyles extends IPopupStyles = IPopupStyles>
 {
     /**
-     * Defines what styles to use for the <dialog> element and optionally for the ::backdrop
+     * Defines what styles to use for the `<dialog>` element and optionally for the ::backdrop
      * pseudo element. The value can be either a style definition class implementing the
      * [[IPopupStyles]] interface or an instance of such class. The popup activates the styles
-     * when it opens and deactivates them when it closes. The default value is undefined.
-     * 
-     * If this property is not defined, the popup will use styles last set using the
-     * [[pushPopupStyles]] function. If this function has never been called before, the popup
-     * will use default styles.
+     * when it opens and deactivates them when it closes. If this property is not defined, the
+     * popup will use the default styles. The default value is undefined.
      */
-    readonly styles?: T | css.IStyleDefinitionClass<T>;
+    readonly styles?: TStyles | css.IStyleDefinitionClass<TStyles>;
 
     /**
      * Defines what CSS class to use for the `<dialog>` element. If this property is defined,
@@ -94,6 +125,9 @@ export interface IPopupOptions<T extends IPopupStyles = IPopupStyles>
      * Value that is returned when the user closes the popup by pressing the Escape key. If this
      * property is undefined, the popup cannot be closed with the Escape key. The default value is
      * undefined.
+     * 
+     * For modal popups, this property also controls whether the user can dismiss the popup by
+     * clicking on the backdrop - that is, the area outside of the popup itslef.
      */
     readonly escapeReturnValue?: any;
 
@@ -132,15 +166,22 @@ export interface IPopupOptions<T extends IPopupStyles = IPopupStyles>
  * 
  * The content of the popup can be replaced while it is being displayed using the setContent()
  * method.
+ * 
+ * @typeParam TStyles Type of the style definition class used to specify CSS styles for the
+ * component. Must implement the IPopupStyles interface.
+ * @typeParam TOptions Type of the object used to specify options for the component. Must
+ * implement the IPopupOptions interface.
  */
-export class Popup<T extends IPopupStyles = IPopupStyles> extends mim.Component implements IPopup
+export class Popup<TStyles extends IPopupStyles = IPopupStyles,
+            TOptions extends IPopupOptions<TStyles> = IPopupOptions<TStyles>>
+            extends mim.Component implements IPopup
 {
     /**
      * Popup is constructed by specifying the initial content it should display and the options
      * @param content 
      * @param options 
      */
-    public constructor( content?: any, options?: IPopupOptions)
+    public constructor( content?: any, options?: TOptions)
     {
         super();
         this.content = content;
@@ -178,6 +219,11 @@ export class Popup<T extends IPopupStyles = IPopupStyles> extends mim.Component 
         this.create();
         this.dlg.showModal();
 
+        // if the escapeReturnValue is defined in the options, start listening to the click events
+        // to detect clicks outside the popup because they will act as Escape too.
+        if (this.options?.escapeReturnValue != null)
+            this.dlg.addEventListener( "click", this.onDetectClickOutside);
+
         this.modalPromise = createPromiseEx();
         return this.modalPromise;
     }
@@ -193,16 +239,19 @@ export class Popup<T extends IPopupStyles = IPopupStyles> extends mim.Component 
         if (!this.isOpen)
             return;
 
+		if (this.modalPromise)
+		{
+            if (this.options?.escapeReturnValue != null)
+                this.dlg.removeEventListener( "click", this.onDetectClickOutside);
+
+			this.modalPromise.resolve( returnValue);
+			this.modalPromise = undefined;
+		}
+
         this.dlg.close();
         this.destroy();
 
         this._returnValue = returnValue;
-	
-		if (this.modalPromise)
-		{
-			this.modalPromise.resolve( returnValue);
-			this.modalPromise = undefined;
-		}
     }
 
     /**
@@ -283,8 +332,8 @@ export class Popup<T extends IPopupStyles = IPopupStyles> extends mim.Component 
 		this.dlg.style.top = rect.top + "px";
 		this.dlg.style.left = rect.left + "px";
 
-		window.addEventListener( "mousemove", this.onMove);
-        window.addEventListener( "mouseup", this.onStopMove);
+		window.addEventListener( "pointermove", this.onPointerMove);
+        window.addEventListener( "pointerup", this.onPointerUp);
     }
 
 	/**
@@ -293,11 +342,8 @@ export class Popup<T extends IPopupStyles = IPopupStyles> extends mim.Component 
      */
     public stopMove()
 	{
-        if (!this.dlg)
-            return;
-
-		window.removeEventListener( "mousemove", this.onMove);
-        window.removeEventListener( "mouseup", this.onStopMove);
+		window.removeEventListener( "pointermove", this.onPointerMove);
+        window.removeEventListener( "pointerup", this.onPointerUp);
         
         this.movePointOffsetX = this.movePointOffsetY = 0;
 	};
@@ -309,6 +355,9 @@ export class Popup<T extends IPopupStyles = IPopupStyles> extends mim.Component 
      */
 	public moveTo( newX: number, newY: number)
 	{
+        if (!this.dlg)
+            return;
+
         this.move( newX, newY);
         this.dlg.style.margin = "0";
 	};
@@ -329,7 +378,20 @@ export class Popup<T extends IPopupStyles = IPopupStyles> extends mim.Component 
 	public willUnmount(): void
 	{
         this.vn.unpublishService( "popup");
-	};
+
+        // deactivate styles
+        css.deactivate( this.defaultStyles);
+        this.defaultStyles = null;
+        if (this.optionalStyles)
+        {
+            css.deactivate( this.optionalStyles);
+            this.optionalStyles = null;
+        }
+
+        // clean up
+        this.dlg = null;
+        this.anchorElement = null;
+    };
 
     /**
      * The render method simply returns the current content but it can be overridden by derived classes
@@ -349,9 +411,9 @@ export class Popup<T extends IPopupStyles = IPopupStyles> extends mim.Component 
 
         // activate our default styles and if styles are specified in the options, then activate
         // them too.
-        this.defaultStyles = css.activate( this.getDefaultStyles()) as T;
+        this.defaultStyles = css.activate( this.getDefaultStyles()) as TStyles;
         if (this.options && this.options.styles)
-            this.optionalStyles = css.activate( this.options.styles) as T;
+            this.optionalStyles = css.activate( this.options.styles) as TStyles;
 
         // create dialog element and add it to the DOM
         this.dlg = document.createElement( "dialog");
@@ -390,19 +452,8 @@ export class Popup<T extends IPopupStyles = IPopupStyles> extends mim.Component 
         // unmount the content
         mim.unmount( this.dlg);
 
-        // deactivate styles
-        css.activate( this.defaultStyles);
-        this.defaultStyles = null;
-        if (this.optionalStyles)
-        {
-            css.deactivate( this.optionalStyles);
-            this.optionalStyles = null;
-        }
-
         // remove the dialog element
         this.dlg.remove();
-        this.dlg = null;
-        this.anchorElement = null;
     }
 
 	/**
@@ -444,13 +495,41 @@ export class Popup<T extends IPopupStyles = IPopupStyles> extends mim.Component 
         }
 	};
 
-	private onMove = (e: MouseEvent) =>
+    // Detects whether a click occurred outside of the popup area. This handler is invoked only for
+    // modal popups and only if the escapeReturnValue is defined in the options.
+    private onDetectClickOutside = (e: MouseEvent) =>
+    {
+        // clicking on the backdrop of the modal popup has the target property of the event
+        // pointing to the `<dialog>` element itself. If it is not this element, then the click
+        // was on some element within the popup.
+        if (e.target !== this.dlg)
+            return;
+
+        // just in case the click happend on the `<dialog>` element itself but within the bounds
+        // of the popup (e.g. if popup is styleed with paddings), check that coordinates are
+        // outside of the popup area.
+        let rc = this.dlg.getBoundingClientRect();
+        if (e.clientX < rc.left || e.clientX > rc.right || e.clientY < rc.top || e.clientY > rc.bottom)
+            this.close( this.options?.escapeReturnValue);
+    }
+
+	private onPointerMove = (e: PointerEvent) =>
 	{
+        e.preventDefault();
+
+        // we only move on the primary button
+        if (!this.dlg || !e.isPrimary)
+        {
+            this.stopMove();
+            return;
+        }
+
 		this.move( e.clientX - this.movePointOffsetX, e.clientY - this.movePointOffsetY);
 	};
 
-	private onStopMove = (e: MouseEvent) =>
+	private onPointerUp = (e: PointerEvent) =>
 	{
+        e.preventDefault();
         this.stopMove();
 	};
 
@@ -459,9 +538,9 @@ export class Popup<T extends IPopupStyles = IPopupStyles> extends mim.Component 
     /**
      * Returns the default style definition instance or class
      */
-	protected getDefaultStyles(): T | css.IStyleDefinitionClass<T>
+	protected getDefaultStyles(): TStyles | css.IStyleDefinitionClass<TStyles>
 	{
-        return DefaultPopupStyles as css.IStyleDefinitionClass<T>;
+        return DefaultPopupStyles as css.IStyleDefinitionClass<TStyles>;
 	};
 
     /**
@@ -481,13 +560,13 @@ export class Popup<T extends IPopupStyles = IPopupStyles> extends mim.Component 
     protected content: any;
 
     // Options
-    protected options: IPopupOptions;
+    protected options: TOptions;
 
     // Activated default styles
-    protected defaultStyles: T;
+    protected defaultStyles: TStyles;
 
     // Activated optional styles
-    protected optionalStyles: T;
+    protected optionalStyles: TStyles;
 
     // Anchor element under which to create the dialog element
     private anchorElement: HTMLElement;
@@ -512,6 +591,12 @@ export class Popup<T extends IPopupStyles = IPopupStyles> extends mim.Component 
 }
 
 
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
  * The IDialogButton interface describes a single button in the dialog's button bar.
@@ -560,6 +645,11 @@ export interface IDialog extends IPopup
      * Adds a button to the button bar 
      */
     addButton( btn: IDialogButton): void;
+
+    /**
+     * Returns the number of buttons in the button bar 
+     */
+    readonly buttonCount: number;
 }
 
 
@@ -588,7 +678,7 @@ export interface IDialogStyles extends IPopupStyles
 export class DefaultDialogStyles extends DefaultPopupStyles implements IDialogStyles
 {
     dialogCaption = css.$class({
-        backgroundColor: "blue",
+        backgroundColor: "dodgerblue",
         color: "white",
         // boxShadow: { x: 0, y: 4, blur: 2, color: "blue" },
         padding: 0.3,
@@ -599,7 +689,7 @@ export class DefaultDialogStyles extends DefaultPopupStyles implements IDialogSt
     })
 
     dialogButtonBar = css.$class({
-        backgroundColor: "lightgrey",
+        // backgroundColor: "lightgrey",
         padding: [0.7, 1.01],
         display: "flex",
         justifyContent: "flex-end",
@@ -607,9 +697,9 @@ export class DefaultDialogStyles extends DefaultPopupStyles implements IDialogSt
     })
 
     dialogButton = css.$class({
-        padding: 0.4,
+        padding: 0.3,
         marginInlineStart: 1.01,
-        minWidth: 6.5
+        minWidth: 5.5
     })
 }
 
@@ -619,7 +709,7 @@ export class DefaultDialogStyles extends DefaultPopupStyles implements IDialogSt
  * The IDialogOptions interface represents the options that cofigure the behavior of the Dialog
  * object. They are passed in the constructor to the [[Dialog]] class
  */
-export interface IDialogOptions extends IPopupOptions<IDialogStyles>
+export interface IDialogOptions<TStyles extends IDialogStyles = IDialogStyles> extends IPopupOptions<TStyles>
 {
     /**
      * Defines what CSS class to use for the caption section.
@@ -646,11 +736,13 @@ export interface IDialogOptions extends IPopupOptions<IDialogStyles>
 
 /**
  * The Dialog class is a popup that divides the popup area into three sections: caption, body and
- * button bar. 
+ * button bar. The caption area can be used to move the dialog around.
  */
-export class Dialog<T extends IDialogStyles = IDialogStyles> extends Popup<T> implements IDialog
+export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
+            TOptions extends IDialogOptions<TStyles> = IDialogOptions<TStyles>>
+            extends Popup<TStyles,TOptions> implements IDialog
 {
-    constructor( bodyContent?: any, captionContent?: any, options?: any, ...buttons: IDialogButton[])
+    constructor( bodyContent?: any, captionContent?: any, options?: TOptions, ...buttons: IDialogButton[])
     {
         // we reuse the Popup's content property for dialog's body
         super( bodyContent, options);
@@ -670,21 +762,26 @@ export class Dialog<T extends IDialogStyles = IDialogStyles> extends Popup<T> im
     {
         this.buttons.set( btn.id, new DialogButtonInfo( btn));
     }
+ 
+    /**
+     * Returns the number of buttons in the button bar 
+     */
+    public get buttonCount(): number { return this.buttons.size; }
 
 
 
     /**
      * Returns the default style definition instance or class
      */
-	protected getDefaultStyles(): T | css.IStyleDefinitionClass<T>
+	protected getDefaultStyles(): TStyles | css.IStyleDefinitionClass<TStyles>
 	{
-        return DefaultDialogStyles as css.IStyleDefinitionClass<T>;
+        return DefaultDialogStyles as css.IStyleDefinitionClass<TStyles>;
 	};
 
 
 
     /**
-     * If deribed classes override this method, they must call super.willMount()
+     * If derived classes override this method, they must call super.willMount()
      */
     public willMount(): void
 	{
@@ -704,7 +801,7 @@ export class Dialog<T extends IDialogStyles = IDialogStyles> extends Popup<T> im
 	};
 
     /**
-     * If deribed classes override this method, they must call super.willUnmount()
+     * If derived classes override this method, they must call super.willUnmount()
      */
 	public willUnmount(): void
 	{
@@ -723,8 +820,8 @@ export class Dialog<T extends IDialogStyles = IDialogStyles> extends Popup<T> im
 
     public renderCaption(): void
     {
-        return <div class={this.captionClassName}
-            mousedown={this.onCaptionMouseDown}>
+        // have to specify touch-action "none" - otherwise, pointer events are canceled by the browser
+        return <div class={this.captionClassName} pointerdown={this.onCaptionPointerDown} style={{touchAction: "none"}}>
             {this.captionContent}
         </div>
     }
@@ -749,8 +846,13 @@ export class Dialog<T extends IDialogStyles = IDialogStyles> extends Popup<T> im
 
 
 
-    private onCaptionMouseDown( e: MouseEvent): void
+    private onCaptionPointerDown( e: PointerEvent): void
     {
+        // initiate move only on primary button down
+        if (!e.isPrimary)
+            return;
+
+        e.preventDefault();
         this.startMove( e.clientX, e.clientY);
     }
 
@@ -763,9 +865,6 @@ export class Dialog<T extends IDialogStyles = IDialogStyles> extends Popup<T> im
     }
 
 
-
-    // Options
-    protected options: IDialogOptions;
 
     // Map of button IDs to button information objects
     @trigger
@@ -815,10 +914,16 @@ class DialogButtonInfo
 
 
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Message box
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 /**
- * The DialogButton enumeration defines constants to indicate standard buttons used in dialogs.
+ * The MsgBoxButton enumeration defines constants to indicate standard buttons used in dialogs.
  */
-export const enum DialogButton
+export const enum MsgBoxButton
 {
 	None = 0x0,
 	OK = 0x1,
@@ -834,25 +939,25 @@ export const enum DialogButton
  * The MsgBoxButton enumeration specifies values of predefined buttons and button combinations for
  * message boxes.
  */
-export const enum MsgBoxButtons
+export const enum MsgBoxButtonBar
 {
 	/** Message box will display no buttons */
-	None = DialogButton.None,
+	None = MsgBoxButton.None,
 
 	/** Message box will have a single Close button */
-	Close = DialogButton.Close,
+	Close = MsgBoxButton.Close,
 
 	/** Message box will have a single OK button */
-	OK = DialogButton.OK,
+	OK = MsgBoxButton.OK,
 
 	/** Message box will have OK and Cancel buttons */
-	OkCancel = DialogButton.OK + DialogButton.Cancel,
+	OkCancel = MsgBoxButton.OK + MsgBoxButton.Cancel,
 
 	/** Message box will have Yes and No buttons */
-	YesNo = DialogButton.Yes + DialogButton.No,
+	YesNo = MsgBoxButton.Yes + MsgBoxButton.No,
 
 	/** Message box will have Yes, No and Cancel buttons */
-	YesNoCancel = DialogButton.Yes + DialogButton.No + DialogButton.Cancel,
+	YesNoCancel = MsgBoxButton.Yes + MsgBoxButton.No + MsgBoxButton.Cancel,
 }
 
 
@@ -881,14 +986,13 @@ export class MsgBoxStyles extends DefaultDialogStyles
     container = css.$class({
         display: "flex",
         flexDirection: "row",
-        alignItems: "stretch",
+        alignItems: "flex-start",
     })
 
     icon = css.$class({
         padding: "0.5rem",
         fontSize: "3em",
         fontWeight: 900,
-        // marginInlineEnd: "1em",
     })
 
     text = css.$class({
@@ -908,8 +1012,9 @@ export class MsgBoxStyles extends DefaultDialogStyles
  */
 export class MsgBox extends Dialog<MsgBoxStyles>
 {
-	public static showModal( message: string, title?: string, buttons: MsgBoxButtons = MsgBoxButtons.OK,
-					icon: MsgBoxIcon = MsgBoxIcon.None): Promise<DialogButton>
+    public static showModal( message: string, title?: string,
+                    buttons: MsgBoxButtonBar = MsgBoxButtonBar.OK,
+					icon: MsgBoxIcon = MsgBoxIcon.None): Promise<MsgBoxButton>
 	{
 		let msgBox: MsgBox = new MsgBox( message, title, buttons, icon);
 		return msgBox.showModal();
@@ -917,7 +1022,7 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 
 
 
-	constructor( message: string, title?: string, buttons: MsgBoxButtons = MsgBoxButtons.OK,
+	constructor( message: string, title?: string, buttons: MsgBoxButtonBar = MsgBoxButtonBar.OK,
 					icon: MsgBoxIcon = MsgBoxIcon.None)
 	{
 		super( message, title, { styles: MsgBoxStyles });
@@ -943,33 +1048,59 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 
 
 
-	// Adds buttons according to the parameter specified in the constructor.
-	private createButtons( buttons: MsgBoxButtons): void
+    /**
+     * Returns the default style definition instance or class
+     */
+	protected getDefaultStyles(): MsgBoxStyles | css.IStyleDefinitionClass<MsgBoxStyles>
+	{
+        return MsgBoxStyles;
+	};
+
+
+
+    /**
+     * Returns the value that should be used as a return value when closing the popup after the
+     * user pressed the Esc key. If undefined is returned, the popup doesn't close
+     */
+	protected getReturnValueForEscapeKey(): any
+	{
+        // this implementation returns the value from the options if defined; otherwise, it
+        // returns MsgBoxButton.Close if no buttons are defined; otherwise, it returns undefined,
+        // which means the message box will not close.
+        return this.options?.escapeReturnValue != null
+            ? this.options.escapeReturnValue
+            : this.buttonCount === 0 ? MsgBoxButton.Close : undefined;
+	};
+
+
+
+    // Adds buttons according to the parameter specified in the constructor.
+	private createButtons( buttons: MsgBoxButtonBar): void
 	{
 		switch( buttons)
 		{
-			case MsgBoxButtons.Close:
-				this.createButton( "Close", DialogButton.Close);
+			case MsgBoxButtonBar.Close:
+				this.createButton( "Close", MsgBoxButton.Close);
 				break;
 
-			case MsgBoxButtons.OK:
-				this.createButton( "OK", DialogButton.OK);
+			case MsgBoxButtonBar.OK:
+				this.createButton( "OK", MsgBoxButton.OK);
 				break;
 
-			case MsgBoxButtons.OkCancel:
-				this.createButton( "OK", DialogButton.OK);
-				this.createButton( "Cancel", DialogButton.Cancel);
+			case MsgBoxButtonBar.OkCancel:
+				this.createButton( "OK", MsgBoxButton.OK);
+				this.createButton( "Cancel", MsgBoxButton.Cancel);
 				break;
 
-			case MsgBoxButtons.YesNo:
-				this.createButton( "Yes", DialogButton.Yes);
-				this.createButton( "No", DialogButton.No);
+			case MsgBoxButtonBar.YesNo:
+				this.createButton( "Yes", MsgBoxButton.Yes);
+				this.createButton( "No", MsgBoxButton.No);
 				break;
 
-			case MsgBoxButtons.YesNoCancel:
-				this.createButton( "Yes", DialogButton.Yes);
-				this.createButton( "No", DialogButton.No);
-				this.createButton( "Cancel", DialogButton.Cancel);
+			case MsgBoxButtonBar.YesNoCancel:
+				this.createButton( "Yes", MsgBoxButton.Yes);
+				this.createButton( "No", MsgBoxButton.No);
+				this.createButton( "Cancel", MsgBoxButton.Cancel);
 				break;
 		}
 	}
@@ -982,9 +1113,9 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 		switch( this.icon)
 		{
 			case MsgBoxIcon.Info: return { char: "I", color: "blue" };
+			case MsgBoxIcon.Question: return { char: "?", color: "green" };
 			case MsgBoxIcon.Warning: return { char: "!", color: "orange" };
 			case MsgBoxIcon.Error: return { char: "X", color: "red" };
-			case MsgBoxIcon.Question: return { char: "?", color: "green" };
 
 			default: return {};
 		}
@@ -992,7 +1123,7 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 
 
 
-	private createButton( text: string, key: DialogButton): void
+	private createButton( text: string, key: MsgBoxButton): void
 	{
 		this.addButton( {
             id: key,
@@ -1006,6 +1137,102 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 	// Icon
 	private icon: MsgBoxIcon;
 
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Progress box
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+/**
+ * Default styles that will be used by the Popup if styles are not specified using options.
+ */
+export class ProgressBoxStyles extends DefaultDialogStyles
+{
+    container = css.$class({
+        width: "30rem",
+        height: "5rem",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "space-around"
+    })
+
+    progress = css.$class({
+        width: "20rem",
+        height: "1rem",
+        margin: "1rem"
+    })
+
+    text = css.$class({
+        textAlign: "center",
+    })
+
+    constructor( parent?: css.StyleDefinition)
+    {
+        super(parent);
+        this.dialogButtonBar.setProp( "justifyContent", "center")
+    }
+}
+
+
+
+/**
+ * The ProgressBox class is a dialog that displays a progress indicator, a text and an optional
+ * Cancel button.
+ */
+export class ProgressBox extends Dialog<ProgressBoxStyles>
+{
+    public static async showUntil( promise: Promise<any>, content: string, title?: string): Promise<any>
+	{
+        let progressBox = new ProgressBox( content, title);
+        progressBox.showModal();
+        try
+        {
+            return await promise;
+        }
+        finally
+        {
+            progressBox.close();
+        }
+	}
+
+
+
+	constructor( content: string, title?: string, cancelReturnValue?: any)
+	{
+		super( content, title, { styles: ProgressBoxStyles });
+
+        if (cancelReturnValue != null)
+            this.addButton({ id: 1, content: "Cancel", returnValue: cancelReturnValue });
+	}
+
+
+
+	public renderBody(): any
+	{
+		return <div class={this.optionalStyles.container}>
+            <progress class={this.optionalStyles.progress} />
+            <div class={this.optionalStyles.text}>
+                {this.content}
+            </div>
+        </div>;
+	}
+
+
+
+    /**
+     * Returns the default style definition instance or class
+     */
+	protected getDefaultStyles(): ProgressBoxStyles | css.IStyleDefinitionClass<ProgressBoxStyles>
+	{
+        return ProgressBoxStyles;
+	};
 }
 
 

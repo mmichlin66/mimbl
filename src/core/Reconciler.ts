@@ -394,7 +394,7 @@ function performRenderPhase( vnsByDepth: VN[][]): VNDisp[]
                 if (errorService)
                     errorService.reportError( err, s_currentVN ? getVNPath( s_currentVN) : null);
                 else
-                    console.error( "BUG: updateVirtual threw exception but StdErrorHandling service was not found.");
+                    console.error( "BUG: updateVirtual threw exception but StdErrorHandling service was not found.", err);
             }
 
             trackCurrentVN( null);

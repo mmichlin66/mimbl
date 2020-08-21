@@ -171,7 +171,8 @@ export function mountRoot( content: any, anchorDN: DN): void
 	{
 		// create root node and remember it in the anchor element's well-known property
 		rootVN = new RootVN( realAnchorDN);
-		(realAnchorDN as any)[symRootMountPoint] = rootVN;
+        (realAnchorDN as any)[symRootMountPoint] = rootVN;
+        rootVN.willMount();
 	}
 
 	// set content to the root node, which will trigger update
