@@ -100,6 +100,7 @@ export class RootVN extends VNBase implements IErrorHandlingService
 		}
 		else
 		{
+            console.error( `Unhandled error in component\n${path.join("\n")}\n`, err);
 			this.error = true;
 		}
 	}

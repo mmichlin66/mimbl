@@ -806,7 +806,7 @@ export class Ref<T = any>
  * }
  * ```
  * 
- * In the above example, the myDiv property will be set to pint to the HTML div element.
+ * In the above example, the myDiv property will be set to point to the HTML div element.
  */
 export function ref( target: any, name: string)
 {
@@ -826,18 +826,10 @@ export function ref( target: any, name: string)
 	);
 }
 
-// Determines whether the given property name/symbol belongs to the Ref object or. This is invoked
-// as part of the proxy handler where access to such properties will be reflected from the Ref
-// object while all others will be reflected from the remembered referenced object.
-function chooseObjectToReflect( prop: PropertyKey, ref: Ref, obj: any): any
-{
-    return prop === "r" || prop === symRef || prop == "changedEvent" ? ref : obj;
-}
-
 /**
- * The RefProxyHandler is a proxy handler for the Ref objects created when reference is defined
- * using the @ref decorator. Only the "r" property are reflected from the target object (the Ref);
- * everything else is reflected from the remembered referenced object.
+ * The RefProxyHandler is a proxy handler for the objects created when reference is defined using
+ * the @ref decorator. Only the "r" property has special handling (because it is used by the
+ * setRef function); everything else is reflected from the remembered referenced object.
  */
 class RefProxyHandler implements ProxyHandler<any>
 {

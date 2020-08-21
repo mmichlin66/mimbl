@@ -1,6 +1,6 @@
 /**
  * This module contains definitions of [[Popup]], [[Dialog]] and [[MsgBox]] components.
- * 
+ *
  * The [[Popup]] component is a base component that displays a popup usig the `<dialog>` HTML
  * element. The [[Dialog]] component derives from [[Popup]] and divides the popup area into
  * secontions for caption, body and button bar. Dialogs support moving around by clicking on the
@@ -12,6 +12,7 @@ import * as mim from "../api/mim"
 import * as css from "mimcss"
 import {PromiseEx, createPromiseEx} from "../api/UtilAPI";
 import {trigger} from "../internal";
+import { MultiEventSlot, createMultiEventSlot } from "../utils/EventSlot";
 
 
 
@@ -57,7 +58,7 @@ export interface IPopup
      * Closes the popup and passes a value to be used as a return value. For the modal popups,
      * this value will be the resolved value of the promise returned by the showModal() method.
      * For modeless popups, this value will be available as the returnValue property.
-     * @param returnValue 
+     * @param returnValue
      */
     close( returnValue?: any): void;
 }
@@ -72,7 +73,10 @@ export interface IPopup
  */
 export interface IPopupStyles extends css.StyleDefinition
 {
-    readonly dialog?: css.IClassRule | css.IClassNameRule;
+    /**
+     * Defines what CSS class to use for the `<dialog>` element.
+     */
+    readonly dialog?: css.ClassPropType;
 }
 
 
@@ -125,7 +129,7 @@ export interface IPopupOptions<TStyles extends IPopupStyles = IPopupStyles>
      * Value that is returned when the user closes the popup by pressing the Escape key. If this
      * property is undefined, the popup cannot be closed with the Escape key. The default value is
      * undefined.
-     * 
+     *
      * For modal popups, this property also controls whether the user can dismiss the popup by
      * clicking on the backdrop - that is, the area outside of the popup itslef.
      */
@@ -153,20 +157,40 @@ export interface IPopupOptions<TStyles extends IPopupStyles = IPopupStyles>
 
 
 /**
+ * The IPopupEvents interface represents events that the Popup component can fire
+ */
+export interface IPopupEvents
+{
+    /**
+     * The open event is fired when the popup opens.
+     * @param isModal Flag indicating whether the popup opens as modal or modeless
+     */
+	open( isModal: boolean): void;
+
+    /**
+     * The close event is fired when the popup closes.
+     * @param retVal Value passed to the close() method.
+     */
+    close( retVal: any): void;
+}
+
+
+
+/**
  * The Popup class allows displaying modal and modeless popups. This is the base class for
  * dialogs and message boxes. After the Popup instance is created it can be shown either as modal
  * or modeless popup. Both types of the popup can be closed using the close() method. In order for
  * the popup to be closed "from inside" - that is, by the component, which is used as the popup
  * content - the popup object should be passed to this component.
- * 
+ *
  * The Popup class itself doesn't provide any means for the user to start moving it around;
  * however, it allows initiating the move action using the startMove() method. Once this method
  * is called, the Popup will start monitoring mouse (pointer) activity and move the dialog
  * accordingly.
- * 
+ *
  * The content of the popup can be replaced while it is being displayed using the setContent()
  * method.
- * 
+ *
  * @typeParam TStyles Type of the style definition class used to specify CSS styles for the
  * component. Must implement the IPopupStyles interface.
  * @typeParam TOptions Type of the object used to specify options for the component. Must
@@ -178,8 +202,8 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
 {
     /**
      * Popup is constructed by specifying the initial content it should display and the options
-     * @param content 
-     * @param options 
+     * @param content
+     * @param options
      */
     public constructor( content?: any, options?: TOptions)
     {
@@ -201,13 +225,14 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
 
         this.create();
         this.dlg.show();
+
+        this.onOpen( false);
     }
 
     /**
      * Displays the popup as a modeless dialog and returns a promise that is resolved when the
      * popup is closed. The resolved value of the promise is the value passed to the close()
-     * method.  The method will throw an exception if the popup is already open as a modeless
-     * popup.
+     * method. The method will return a rejected promise if the popup is already open.
      */
     public showModal(): Promise<any>
     {
@@ -225,6 +250,7 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
             this.dlg.addEventListener( "click", this.onDetectClickOutside);
 
         this.modalPromise = createPromiseEx();
+
         return this.modalPromise;
     }
 
@@ -232,7 +258,7 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
      * Closes the popup and passes a value to be used as a return value. For the modal popups,
      * this value will be the resolved value of the promise returned by the showModal() method.
      * For modeless popups, this value will be available as the returnValue property.
-     * @param retVal 
+     * @param retVal
      */
     public close( returnValue?: any): void
     {
@@ -252,60 +278,47 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
         this.destroy();
 
         this._returnValue = returnValue;
+
+        this.onClose( returnValue);
     }
+
+    /** Events that can be fired by the Popup component */
+    public get events(): MultiEventSlot<IPopupEvents> { return this._events; }
 
     /**
      * Determines whether the popup is currently open.
      */
-    public get isOpen(): boolean
-    {
-        return this.dlg != null;
-    }
+    public get isOpen(): boolean { return this.dlg != null; }
 
 	/**
      * Determines whether the dialog is currently open as modeless.
      */
-	public isModeless(): boolean
-	{
-		return this.isOpen && !this.modalPromise;
-	}
+	public isModeless(): boolean { return this.isOpen && !this.modalPromise; }
 
 	/**
      * Determines whether the dialog is currently open as modal.
      */
-	public isModal(): boolean
-	{
-		return this.isOpen && this.modalPromise != null;
-	}
+	public isModal(): boolean { return this.isOpen && this.modalPromise != null; }
 
     /**
      * Returns the value set by the close() method. If the popup is open, the value is undefined.
      */
-    public get returnValue(): any
-    {
-        return this._returnValue;
-    }
-
-    /**
-     * Replaces the current content of the popup with the given one.
-     * @param content 
-     */
-    public setContent( content: any): void
-    {
-        this.content = content;
-    }
+    public get returnValue(): any { return this._returnValue; }
 
     /**
      * Gets or sets the flag determining whether the popup is currently visible or hidden.
      */
-    public get isVisible(): boolean
-    {
-        return this._isVisible;
-    }
+    public get isVisible(): boolean { return this._isVisible; }
 
-    public set isVisible( v: boolean)
+    public set isVisible( v: boolean) { this._isVisible = v; }
+
+    /**
+     * Replaces the current content of the popup with the given one.
+     * @param content
+     */
+    public setContent( content: any): void
     {
-        this._isVisible = v;
+        this.content = content;
     }
 
 	/**
@@ -344,7 +357,7 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
 	{
 		window.removeEventListener( "pointermove", this.onPointerMove);
         window.removeEventListener( "pointerup", this.onPointerUp);
-        
+
         this.movePointOffsetX = this.movePointOffsetY = 0;
 	};
 
@@ -365,7 +378,7 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
 
 
     /**
-     * If deribed classes override this method, they must call super.willMount()
+     * If derived classes override this method, they must call super.willMount()
      */
     public willMount(): void
 	{
@@ -373,7 +386,7 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
 	};
 
     /**
-     * If deribed classes override this method, they must call super.willUnmount()
+     * If derived classes override this method, they must call super.willUnmount()
      */
 	public willUnmount(): void
 	{
@@ -553,6 +566,26 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
         return this.options?.escapeReturnValue;
 	};
 
+    /**
+     * This method is called when the popup opens. If derived classes override it they
+     * must call super.onOpen().
+     */
+	protected onOpen( isModal: boolean): void
+	{
+        // notify any listeners
+        this._events.open.fire( isModal);
+    };
+
+    /**
+     * This method is called when the popup is being closed. If derived classes override it they
+     * must call super.onClose().
+     */
+	protected onClose( retVal: any): void
+	{
+        // notify any listeners
+        this._events.close.fire( retVal);
+    };
+
 
 
     // Content to display
@@ -582,6 +615,9 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
 
     // Value passed to the close method.
     private _returnValue: any;
+
+    // Events that can be fired by the Popup objects.
+    private _events = createMultiEventSlot<IPopupEvents>();
 
 	// Offsets of the point where the move started from the dialog top-left corner. We use them
 	// to calculate the dialog top-left position based on the mouse coordinates while move is
@@ -642,12 +678,12 @@ export interface IDialogButton
 export interface IDialog extends IPopup
 {
     /**
-     * Adds a button to the button bar 
+     * Adds a button to the button bar
      */
     addButton( btn: IDialogButton): void;
 
     /**
-     * Returns the number of buttons in the button bar 
+     * Returns the number of buttons in the button bar
      */
     readonly buttonCount: number;
 }
@@ -663,53 +699,6 @@ export interface IDialog extends IPopup
  * - dialogButton
  */
 export interface IDialogStyles extends IPopupStyles
-{
-    readonly dialogCaption?: css.IClassRule | css.IClassNameRule;
-    readonly dialogBody?: css.IClassRule | css.IClassNameRule;
-    readonly dialogButtonBar?: css.IClassRule | css.IClassNameRule;
-    readonly dialogButton?: css.IClassRule | css.IClassNameRule;
-}
-
-
-
-/**
- * Default styles that will be used by the Popup if styles are not specified using options.
- */
-export class DefaultDialogStyles extends DefaultPopupStyles implements IDialogStyles
-{
-    dialogCaption = css.$class({
-        backgroundColor: "dodgerblue",
-        color: "white",
-        // boxShadow: { x: 0, y: 4, blur: 2, color: "blue" },
-        padding: 0.3,
-    })
-
-    dialogBody = css.$class({
-        padding: 0.5,
-    })
-
-    dialogButtonBar = css.$class({
-        // backgroundColor: "lightgrey",
-        padding: [0.7, 1.01],
-        display: "flex",
-        justifyContent: "flex-end",
-        alignItems: "center",
-    })
-
-    dialogButton = css.$class({
-        padding: 0.3,
-        marginInlineStart: 1.01,
-        minWidth: 5.5
-    })
-}
-
-
-
-/**
- * The IDialogOptions interface represents the options that cofigure the behavior of the Dialog
- * object. They are passed in the constructor to the [[Dialog]] class
- */
-export interface IDialogOptions<TStyles extends IDialogStyles = IDialogStyles> extends IPopupOptions<TStyles>
 {
     /**
      * Defines what CSS class to use for the caption section.
@@ -730,6 +719,77 @@ export interface IDialogOptions<TStyles extends IDialogStyles = IDialogStyles> e
      * Defines what CSS class to use for the buttons.
      */
     readonly dialogButton?: css.ClassPropType;
+}
+
+
+
+/**
+ * Default styles that will be used by the Popup if styles are not specified using options.
+ */
+export class DefaultDialogStyles extends DefaultPopupStyles implements IDialogStyles
+{
+    dialogCaption = css.$class({
+        backgroundColor: "dodgerblue",
+        color: "white",
+        boxShadow: { x: 0, y: 2, blur: 2, color: "lightgrey" },
+        padding: 0.4,
+    })
+
+    dialogBody = css.$class({
+        padding: 0.7,
+    })
+
+    dialogButtonBar = css.$class({
+        // backgroundColor: "lightgrey",
+        padding: [0.7, 1.01],
+        display: "flex",
+        justifyContent: "flex-end",
+        alignItems: "center",
+    })
+
+    dialogButton = css.$class({
+        padding: 0.3,
+        marginInlineStart: 1.01,
+        minWidth: 5.5,
+        border: "none",
+        backgroundColor: 0xf2f2f2,
+		":hover": {
+			backgroundColor: 0xe2e2e2,
+		},
+		":focus": {
+            backgroundColor: 0xe2e2e2,
+            outline: [1, "solid", 0xa2a2a2],
+		}
+    })
+}
+
+
+
+/**
+ * The IDialogOptions interface represents the options that cofigure the behavior of the Dialog
+ * object. They are passed in the constructor to the [[Dialog]] class
+ */
+export interface IDialogOptions<TStyles extends IDialogStyles = IDialogStyles> extends IPopupOptions<TStyles>
+{
+    /**
+     * Defines what CSS class to use for the caption section.
+     */
+    readonly dialogCaptionStyleClass?: css.ClassPropType;
+
+    /**
+     * Defines what CSS class to use for the body section.
+     */
+    readonly dialogBodyStyleClass?: css.ClassPropType;
+
+    /**
+     * Defines what CSS class to use for the button bar section.
+     */
+    readonly dialogButtonBarStyleClass?: css.ClassPropType;
+
+    /**
+     * Defines what CSS class to use for the buttons.
+     */
+    readonly dialogButtonStyleClass?: css.ClassPropType;
 }
 
 
@@ -756,15 +816,15 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
 
 
     /**
-     * Adds a button to the button bar 
+     * Adds a button to the button bar
      */
     public addButton( btn: IDialogButton): void
     {
         this.buttons.set( btn.id, new DialogButtonInfo( btn));
     }
- 
+
     /**
-     * Returns the number of buttons in the button bar 
+     * Returns the number of buttons in the button bar
      */
     public get buttonCount(): number { return this.buttons.size; }
 
@@ -788,13 +848,13 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
         super.willMount();
 
         // obtain class names for our elements
-        this.captionClassName = css.chooseClass( this.options?.dialogCaption,
+        this.captionClassName = css.chooseClass( this.options?.dialogCaptionStyleClass,
             this.optionalStyles?.dialogCaption, this.defaultStyles.dialogCaption);
-        this.bodyClassName = css.chooseClass( this.options?.dialogBody,
+        this.bodyClassName = css.chooseClass( this.options?.dialogBodyStyleClass,
             this.optionalStyles?.dialogBody, this.defaultStyles.dialogBody);
-        this.buttonBarClassName = css.chooseClass( this.options?.dialogButtonBar,
+        this.buttonBarClassName = css.chooseClass( this.options?.dialogButtonBarStyleClass,
             this.optionalStyles?.dialogButtonBar, this.defaultStyles.dialogButtonBar);
-        this.buttonClassName = css.chooseClass( this.options?.dialogButton,
+        this.buttonClassName = css.chooseClass( this.options?.dialogButtonStyleClass,
             this.optionalStyles?.dialogButton, this.defaultStyles.dialogButton);
 
         this.vn.publishService( "dialog", this);
@@ -909,7 +969,7 @@ class DialogButtonInfo
     /**
      * Flag indicating whether the button is currently disabled.
      */
-    readonly disabled?: boolean;
+    disabled: boolean;
 }
 
 
@@ -1012,6 +1072,16 @@ export class MsgBoxStyles extends DefaultDialogStyles
  */
 export class MsgBox extends Dialog<MsgBoxStyles>
 {
+    /**
+     * Displays modal message box with the given parameters and returns a promise, which is
+     * resolved when the user clicks on one of the buttons. The identifier of the button is used
+     * as the promise's value.
+     * @param message Content to be used in the message box's body.
+     * @param title Content to display in the message box's caption.
+     * @param buttons Identifier of a button ot button combination to be displayed.
+     * @param icon Optional identifier of the icon to be displayed.
+     * @returns Promise that is resolved with the identifier of the button clicked by the user.
+     */
     public static showModal( message: string, title?: string,
                     buttons: MsgBoxButtonBar = MsgBoxButtonBar.OK,
 					icon: MsgBoxIcon = MsgBoxIcon.None): Promise<MsgBoxButton>
@@ -1022,7 +1092,7 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 
 
 
-	constructor( message: string, title?: string, buttons: MsgBoxButtonBar = MsgBoxButtonBar.OK,
+	constructor( message: any, title?: string, buttons: MsgBoxButtonBar = MsgBoxButtonBar.OK,
 					icon: MsgBoxIcon = MsgBoxIcon.None)
 	{
 		super( message, title, { styles: MsgBoxStyles });
@@ -1035,7 +1105,10 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 
 	public renderBody(): any
 	{
-		let { char, color } = this.getIconClassAndColor();
+        let { char, color } = this.getIconClassAndColor();
+
+        // we are using this.optionalStyles because we explicitly pass our styles in the options
+        // parameter of the Dialog constructor.
 		return <div class={this.optionalStyles.container}>
             {char &&
                 <span class={this.optionalStyles.icon} style={{color}}>{char}</span>
@@ -1055,8 +1128,6 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 	{
         return MsgBoxStyles;
 	};
-
-
 
     /**
      * Returns the value that should be used as a return value when closing the popup after the
@@ -1105,8 +1176,6 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 		}
 	}
 
-
-
 	// Returns symbol and color for displaying the icon.
 	private getIconClassAndColor(): { char?: string, color?: css.CssColor }
 	{
@@ -1121,15 +1190,9 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 		}
 	}
 
-
-
 	private createButton( text: string, key: MsgBoxButton): void
 	{
-		this.addButton( {
-            id: key,
-            content: text,
-            returnValue: key
-        });
+		this.addButton({ id: key, content: text, returnValue: key });
 	}
 
 
@@ -1188,23 +1251,36 @@ export class ProgressBoxStyles extends DefaultDialogStyles
  */
 export class ProgressBox extends Dialog<ProgressBoxStyles>
 {
-    public static async showUntil( promise: Promise<any>, content: string, title?: string): Promise<any>
+    /**
+     * Displays the modal progress box with the given content and title, which is displayed until
+     * the given promise is settled. The delayMilliseconds parameter controls whether the progress
+     * box is displayed immediately or is delayed. If the input promise is settled before the
+     * delay expires, the progress box is not displayed at all.
+     * @param promise Promise to monitor - the progress box is displayed until this promis is settled.
+     * @param content Content to be used in the progress box's body.
+     * @param title Content to display in the progress box's caption.
+     * @param delayMilliseconds Delay in milliseconds until which the progress box isn't displayed.
+     * The default value is 750ms. To display the progress box immediately, set it to 0.
+     * @returns Promise which is resolved ot rejected with the same value as the input promise.
+     */
+    public static async showUntil( promise: Promise<any>, content: any, title?: string,
+        delayMilliseconds: number = 750): Promise<any>
 	{
-        let progressBox = new ProgressBox( content, title);
-        progressBox.showModal();
+        let progress = new ProgressBox( content, title);
+        progress.showModalWithDelay( delayMilliseconds);
         try
         {
             return await promise;
         }
         finally
         {
-            progressBox.close();
+            progress.close();
         }
 	}
 
 
 
-	constructor( content: string, title?: string, cancelReturnValue?: any)
+	constructor( content?: string, title?: string, cancelReturnValue?: any)
 	{
 		super( content, title, { styles: ProgressBoxStyles });
 
@@ -1214,8 +1290,50 @@ export class ProgressBox extends Dialog<ProgressBoxStyles>
 
 
 
+    /**
+     * Initiates displaying a progress box but doesn't really create it until the given timeout
+     * expires. If the [[close]] method is called before the timeout expires, the popup isn't
+     * created at all. This can be useful if you want the progress to reflect multiple operations
+     * but don't show it if the operations finish quickly enough, for example:
+     *
+     * ```typescript
+     * let progress = new Progress();
+     * progress.showModalWithDelay( 1000);
+     * progress.setContent( "First operation is in progress...")
+     * performFirstOperation();
+     * progress.setContent( "Second operation is in progress...")
+     * performSecondOperation();
+     * progress.close();
+     * ```
+     */
+    public showModalWithDelay( delayMilliseconds: number): void
+    {
+        this.delayHandle = setTimeout( () => this.showNow(), delayMilliseconds);
+    }
+
+    /**
+     * Closes the popup and passes a value to be used as a return value. For the modal popups,
+     * this value will be the resolved value of the promise returned by the showModal() method.
+     * For modeless popups, this value will be available as the returnValue property.
+     * @param retVal
+     */
+    public close( retVal?: any): void
+    {
+        if (this.delayHandle > 0)
+        {
+            clearTimeout( this.delayHandle);
+            this.delayHandle = 0;
+        }
+
+        super.close( retVal);
+    }
+
+
+
 	public renderBody(): any
 	{
+        // we are using this.optionalStyles because we explicitly pass our styles in the options
+        // parameter of the Dialog constructor.
 		return <div class={this.optionalStyles.container}>
             <progress class={this.optionalStyles.progress} />
             <div class={this.optionalStyles.text}>
@@ -1233,6 +1351,19 @@ export class ProgressBox extends Dialog<ProgressBoxStyles>
 	{
         return ProgressBoxStyles;
 	};
+
+
+
+    private showNow()
+    {
+        this.delayHandle = 0;
+        this.showModal();
+    }
+
+
+
+    // Handle of the setTimeout call when openeing the popup with delay.
+    private delayHandle = 0;
 }
 
 
