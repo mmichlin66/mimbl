@@ -127,8 +127,8 @@ export interface IPopupOptions<TStyles extends IPopupStyles = IPopupStyles>
 
     /**
      * Value that is returned when the user closes the popup by pressing the Escape key. If this
-     * property is undefined, the popup cannot be closed with the Escape key. The default value is
-     * undefined.
+     * property is undefined, the popup cannot be closed with the Escape key. Note that null is
+     * valid value that can be used to close a popup. The default value is undefined.
      *
      * For modal popups, this property also controls whether the user can dismiss the popup by
      * clicking on the backdrop - that is, the area outside of the popup itslef.
@@ -246,7 +246,8 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
 
         // if the escapeReturnValue is defined in the options, start listening to the click events
         // to detect clicks outside the popup because they will act as Escape too.
-        if (this.options?.escapeReturnValue != null)
+        let escapeRetVal = this.getReturnValueForEscapeKey();
+        if (escapeRetVal !== undefined)
             this.dlg.addEventListener( "click", this.onDetectClickOutside);
 
         this.modalPromise = createPromiseEx();
@@ -267,7 +268,8 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
 
 		if (this.modalPromise)
 		{
-            if (this.options?.escapeReturnValue != null)
+            let escapeRetVal = this.getReturnValueForEscapeKey();
+            if (escapeRetVal !== undefined)
                 this.dlg.removeEventListener( "click", this.onDetectClickOutside);
 
 			this.modalPromise.resolve( returnValue);
@@ -503,7 +505,7 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
             // we ignore the Escape key if the escapeReturnValue option is undefined; otherwise,
             // we close the dialog with its value
             let retVal = this.getReturnValueForEscapeKey();
-            if (retVal != null)
+            if (retVal !== undefined)
                 this.close( retVal);
         }
 	};
@@ -814,6 +816,14 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
     }
 
 
+
+    /**
+     * Adds a button to the button bar
+     */
+    public setCaption( captionContent: any): void
+    {
+        this.captionContent = captionContent;
+    }
 
     /**
      * Adds a button to the button bar
