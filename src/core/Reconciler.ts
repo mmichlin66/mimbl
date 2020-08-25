@@ -1,9 +1,9 @@
 ﻿import {
-    ScheduledFuncType, IComponent, IVNode, VNType, IClassCompVN, Fragment, FuncProxy,
+    ScheduledFuncType, IComponent, IVNode, Fragment, FuncProxy,
     FuncProxyProps, PromiseProxy, IComponentClass, FuncCompType
 } from "../api/mim"
 import {
-    VN, DN, VNUpdateDisp, VNBase, TextVN, IndependentCompVN, PromiseProxyVN,
+    VN, DN, VNUpdateDisp, VNBase, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN,
     FuncProxyVN, ElmVN, ManagedCompVN, FuncVN, enterMutationScope, exitMutationScope
 } from "../internal"
 
@@ -119,7 +119,7 @@ export function wrapCallbackWithVN<T extends Function>( callback: T, thisCallbac
  * `arguments` array). The rest of parameters in the `arguments` array are passed to the original
  * callback and the value returned by the callback is returned from the wrapper. Note that "this"
  * can be undefined if the function was scheduled without being in the context of any virtual node.
- * 
+ *
  * The proper Mimbl context establishes the following:
  * - executes in a mutation scope, so that if any trigger valriable is changed during the execution
  *   of the callback, watchers will be only notified after the callback has finished its execution.
@@ -127,7 +127,7 @@ export function wrapCallbackWithVN<T extends Function>( callback: T, thisCallbac
  *   the "current virtual node" and the "current component" are set to the node and component under
  *   which the callback was wrapped. This allow for proper JSX execution and for using the Mimbl
  *   error handling mechanism.
- * 
+ *
  */
 function CallbackWrapper(): any
 {
@@ -191,9 +191,9 @@ function addNodeToScheduler( vn: VN): void
 	// scheduled if the current scheduler state is BeforeUpdate. This is because the component
 	// wil be updated in the current cycle and there is already no time to execute the "before
 	// update" method.
-	if (vn.type === VNType.IndependentComp || vn.type === VNType.ManagedComp)
+	if (vn instanceof ClassCompVN)
 	{
-		let comp = (vn as any as IClassCompVN).comp;
+		let comp = vn.comp;
 		if (comp.beforeUpdate && s_schedulerState !== SchedulerState.BeforeUpdate)
 			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, wrapCallbackWithVN( comp.beforeUpdate, comp, vn));
 
@@ -377,7 +377,7 @@ function performRenderPhase( vnsByDepth: VN[][]): VNDisp[]
             {
                 // clear the flag that update has been requested for the node
                 vn.updateRequested = false;
-                
+
                 // if the component was already updated in this cycle, don't update it again
                 if (vn.lastUpdateTick === s_currentTick)
                     continue;
@@ -579,7 +579,7 @@ function commitNewNode( vn: VN, anchorDN: DN, beforeDN: DN)
 // therefore, we need to mark them as unmounted here.
 function callWillUnmount( vn: VN, recursive: boolean)
 {
-    // indicate that the node was processed in this cycle - this will prevent it from 
+    // indicate that the node was processed in this cycle - this will prevent it from
     // rendering again in this cycle.
     vn.lastUpdateTick = s_currentTick;
 
@@ -709,7 +709,7 @@ function renderUpdatedNode( disp: VNDisp): void
         }
     }
 
-	// indicate that the node was updated in this cycle - this will prevent it from 
+	// indicate that the node was updated in this cycle - this will prevent it from
 	// rendering again in this cycle.
 	vn.lastUpdateTick = s_currentTick;
 
@@ -1070,7 +1070,7 @@ class VNDispGroup
 {
 	/** parent VNDisp to which this group belongs */
 	public parentDisp: VNDisp;
-	
+
 	/** Action to be performed on the nodes in the group */
 	public action: VNDispAction;
 
@@ -1143,7 +1143,7 @@ const NO_GROUP_THRESHOLD = 8;
  * The VNDisp class is a recursive structure that describes a disposition for a node and its
  * sub-nodes during the reconciliation process.
  */
-type VNDisp = 
+type VNDisp =
 {
 	/** New virtual node to insert or to update an old node */
 	newVN: VN;
@@ -1243,7 +1243,7 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
 
     // prepare array for VNDisp objects for new nodes
     disp.subNodeDisps = new Array( newLen);
-    
+
     // loop over new nodes
     let oldUnkeyedListIndex = 0;
     newChain.forEach( (newVN, index) =>
@@ -1383,9 +1383,8 @@ function buildSubNodeGroups( disp: VNDisp): void
  */
 function isUpdatePossible( oldVN: VN, newVN: VN): boolean
 {
-	return (oldVN.type === newVN.type &&
+	return (oldVN.constructor === newVN.constructor &&
 			(oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN)));
-
 }
 
 

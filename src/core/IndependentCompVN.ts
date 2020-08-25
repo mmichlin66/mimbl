@@ -1,4 +1,4 @@
-﻿import {IIndependentCompVN, IComponent, VNType} from "../api/mim"
+﻿import {IIndependentCompVN, IComponent} from "../api/mim"
 import {VN, VNUpdateDisp, ClassCompVN} from "../internal"
 
 /// #if USE_STATS
@@ -18,7 +18,6 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 	{
 		super();
 
-		this.type = VNType.IndependentComp;
 		this.comp = comp;
 	};
 

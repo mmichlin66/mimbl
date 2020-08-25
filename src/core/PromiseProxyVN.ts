@@ -1,4 +1,4 @@
-﻿import {PromiseProxyProps, VNType} from "../api/mim"
+﻿import {PromiseProxyProps} from "../api/mim"
 import {VNBase, VN, VNUpdateDisp} from "../internal"
 
 /// #if USE_STATS
@@ -13,7 +13,7 @@ import {VNBase, VN, VNUpdateDisp} from "../internal"
  * arguments to pass to it. This allows re-rendering only the part of the parent component as
  * though the method were a full blown independent component. Updating the nodes is accomplished
  * using the FuncProxy static update method accepting the function to be updated.
- * 
+ *
  * The same function can be used multiple times within the parent component's render() method -
  * especially (but not necessarily) if it is called with different parameters. To distinguish
  * between multiple nodes when updating (using FuncProxy.update), a unique key must be assigned.
@@ -21,7 +21,7 @@ import {VNBase, VN, VNUpdateDisp} from "../internal"
  * node is unmounted. The key is optional if the function is used only once in the parent's
  * render method. If the function is used more than once and keys are not provided or are the same
  * Mimble will issue an error.
- * 
+ *
  * The link between the function and the nodes that use this function is kept in a map from the
  * keys to the nodes. The map is stored in a custom property on the function object itself.
  */
@@ -31,7 +31,6 @@ export class PromiseProxyVN extends VNBase
 	{
 		super();
 
-		this.type = VNType.PromiseProxy;
 		this.promise = props.promise;
 		this.errorContentFunc = props.errorContentFunc;
 		this.content = children;

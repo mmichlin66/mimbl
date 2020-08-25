@@ -1,5 +1,4 @@
-﻿import {
-    VNType, IComponent, ScheduledFuncType, RefPropType, setRef} from "../api/mim";
+﻿import {IComponent, ScheduledFuncType, RefPropType, setRef} from "../api/mim";
 import {
     VN, DN, notifyServiceUnpublished, notifyServiceUnsubscribed, requestNodeUpdate,
     scheduleFuncCall, notifyServicePublished, notifyServiceSubscribed, wrapCallbackWithVN
@@ -32,9 +31,6 @@ export abstract class VNBase implements VN
 	// it can reflect an "id" property of an element (if any).
 	public abstract get name(): string;
 
-	// Node's type.
-	public type: VNType;
-
 	// Parent node. This is null for the top-level (root) nodes.
 	public parent: VNBase;
 
@@ -58,7 +54,7 @@ export abstract class VNBase implements VN
 
 	// Flag indicating that update has been requested but not yet performed. This flag is needed
 	// to prevent trying to add the node to the global map every time the requestUpdate method
-	// is called. 
+	// is called.
 	public updateRequested: boolean;
 
 	// "Tick number" during which the node was last updated. If this node's tick number equals
@@ -276,12 +272,12 @@ export abstract class VNBase implements VN
 	 * callback throws an exception, it is processed by the Mimbl error handling mechanism so that the
 	 * exception bubles from this virtual node up the hierarchy until a node/component that knows
 	 * to handle errors is found.
-	 * 
+	 *
 	 * This function should be called by the code that is not part of any component but still has access
 	 * to the IVNode object; for example, custom attribute handlers. Components that derive from the
 	 * Component class should use the wrapCallback method of the Component class.
-	 * 
-	 * @param callback 
+	 *
+	 * @param callback
 	 */
 	public wrapCallback<T extends Function>( callback: T, thisCallback?: object): T
 	{

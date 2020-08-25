@@ -1,4 +1,4 @@
-﻿import {IManagedCompVN, IComponentClass, VNType, IComponent, setRef, RefPropType} from "../api/mim"
+﻿import {IManagedCompVN, IComponentClass, IComponent, setRef, RefPropType} from "../api/mim"
 import {ClassCompVN, VNBase, VN, VNUpdateDisp} from "../internal"
 
 /// #if USE_STATS
@@ -23,7 +23,6 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 	{
 		super();
 
-		this.type = VNType.ManagedComp;
 		this.compClass = compClass;
 
 		// copy properties to our own object excluding framework-handled key and ref

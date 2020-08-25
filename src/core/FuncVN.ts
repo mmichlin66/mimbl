@@ -1,4 +1,4 @@
-﻿import {Fragment, FuncCompType, VNType} from "../api/mim"
+﻿import {Fragment, FuncCompType} from "../api/mim"
 import { VNBase, VN, VNUpdateDisp } from "../internal"
 
 /// #if USE_STATS
@@ -24,7 +24,6 @@ export class FuncVN extends VNBase
 	{
 		super();
 
-		this.type = VNType.FuncComp;
 		this.func = func;
 
 		// copy properties to our own object excluding framework-handled key

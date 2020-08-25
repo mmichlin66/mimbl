@@ -1,4 +1,4 @@
-﻿import {IErrorHandlingService, VNType} from "../api/mim"
+﻿import {IErrorHandlingService} from "../api/mim"
 import {VNBase, DN, requestNodeUpdate} from "../internal"
 
 /// #if USE_STATS
@@ -20,8 +20,7 @@ export class RootVN extends VNBase implements IErrorHandlingService
 	public constructor( anchorDN: DN)
 	{
 		super();
-		
-		this.type = VNType.Root;
+
 		this.anchorDN = anchorDN;
 		this.depth = 0;
 	};

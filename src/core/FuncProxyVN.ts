@@ -1,4 +1,4 @@
-﻿import {FuncProxyProps, VNType} from "../api/mim"
+﻿import {FuncProxyProps} from "../api/mim"
 import {VNBase, s_currentClassComp, createWatcher, VN, VNUpdateDisp, IWatcher} from "../internal"
 
 /// #if USE_STATS
@@ -20,7 +20,7 @@ let symKeysToNodes = Symbol( "symKeysToNodes");
  * arguments to pass to it. This allows re-rendering only the part of the parent component as
  * though the method were a full blown independent component. Updating the nodes is accomplished
  * using the FuncProxy static update method accepting the function to be updated.
- * 
+ *
  * The same function can be used multiple times within the parent component's render() method -
  * especially (but not necessarily) if it is called with different parameters. To distinguish
  * between multiple nodes when updating (using FuncProxy.update), a unique key must be assigned.
@@ -28,7 +28,7 @@ let symKeysToNodes = Symbol( "symKeysToNodes");
  * node is unmounted. The key is optional if the function is used only once in the parent's
  * render method. If the function is used more than once and keys are not provided or are the same
  * Mimble will issue an error.
- * 
+ *
  * The link between the function and the nodes that use this function is kept in a map from the
  * keys to the nodes. The map is stored in a symbol on the function object itself.
  */
@@ -37,8 +37,6 @@ export class FuncProxyVN extends VNBase
 	constructor( props: FuncProxyProps)
 	{
 		super();
-
-        this.type = VNType.FuncProxy;
 
         // remember data from the props. Note that if thisArg is undefined it will be changed
         // to the node's creator component upon mounting
@@ -129,7 +127,7 @@ export class FuncProxyVN extends VNBase
         this.linkKey = this.key || this.thisArg || this.func;
 
 		this.linkNodeToFunc();
-        
+
         // start watching the function
         this.funcWatcher = createWatcher( this.func, this.updateFromWatcher, this.thisArg, this);
 

@@ -13,6 +13,7 @@ import * as css from "mimcss"
 import {PromiseEx, createPromiseEx} from "../api/UtilAPI";
 import {trigger} from "../internal";
 import { MultiEventSlot, createMultiEventSlot } from "../utils/EventSlot";
+import { computed } from "../utils/TriggerWatcher";
 
 
 
@@ -244,9 +245,13 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
         this.create();
         this.dlg.showModal();
 
-        // if the escapeReturnValue is defined in the options, start listening to the click events
-        // to detect clicks outside the popup because they will act as Escape too.
-        let escapeRetVal = this.getReturnValueForEscapeKey();
+        // must establish listener on window because otherwise, the Escape key is processed by
+        // the system (closing the popup) never arriving at the dialog
+        window.addEventListener( "keydown", this.onKeyDown);
+
+        // if the escapeReturnValue is defined in the options, start listening to the keyboard and
+        // click events to detect clicks outside the popup because they will act as Escape too.
+        let escapeRetVal = this.options?.escapeReturnValue;
         if (escapeRetVal !== undefined)
             this.dlg.addEventListener( "click", this.onDetectClickOutside);
 
@@ -268,9 +273,13 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
 
 		if (this.modalPromise)
 		{
-            let escapeRetVal = this.getReturnValueForEscapeKey();
+            // if escapeReturnValue was defined in options, we need to remove the click handler
+            // that we created in showModal
+            let escapeRetVal = this.options?.escapeReturnValue;
             if (escapeRetVal !== undefined)
                 this.dlg.removeEventListener( "click", this.onDetectClickOutside);
+
+            window.removeEventListener( "keydown", this.onKeyDown);
 
 			this.modalPromise.resolve( returnValue);
 			this.modalPromise = undefined;
@@ -453,17 +462,11 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
 
         // mount the component
         mim.mount( this, this.dlg)
-
-        // establish listener for keyboard events
-        window.addEventListener( "keydown", this.onKeyDown);
     }
 
     // Destroys the dialog element
     private destroy(): void
     {
-        // remove listener for keyboard events
-		window.removeEventListener( "keydown", this.onKeyDown);
-
         // unmount the content
         mim.unmount( this.dlg);
 
@@ -498,13 +501,13 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
     // Handles keydown event to prevent closing the dialog by Esc key.
 	private onKeyDown = (e: KeyboardEvent): void =>
 	{
-        if (e.keyCode === 27) // Esc
+        if (e.key === "Escape")
         {
             e.preventDefault();
 
             // we ignore the Escape key if the escapeReturnValue option is undefined; otherwise,
             // we close the dialog with its value
-            let retVal = this.getReturnValueForEscapeKey();
+            let retVal = this.options?.escapeReturnValue;
             if (retVal !== undefined)
                 this.close( retVal);
         }
@@ -556,16 +559,6 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
 	protected getDefaultStyles(): TStyles | css.IStyleDefinitionClass<TStyles>
 	{
         return DefaultPopupStyles as css.IStyleDefinitionClass<TStyles>;
-	};
-
-    /**
-     * Returns the value that should be used as a return value when closing the popup after the
-     * user pressed the Esc key. If undefined is returned, the popup doesn't close
-     */
-	protected getReturnValueForEscapeKey(): any
-	{
-        // this implementation simply returns the value from the options.
-        return this.options?.escapeReturnValue;
 	};
 
     /**
@@ -669,6 +662,11 @@ export interface IDialogButton
      * is, the button is enabled.
      */
     readonly disabled?: boolean;
+
+    /**
+     * Keyboard key or code associated with the button.
+     */
+    readonly keycode?: string;
 }
 
 
@@ -792,6 +790,11 @@ export interface IDialogOptions<TStyles extends IDialogStyles = IDialogStyles> e
      * Defines what CSS class to use for the buttons.
      */
     readonly dialogButtonStyleClass?: css.ClassPropType;
+
+    /**
+     * Identifier of the default button, which will have focus when the dialog appears.
+     */
+    readonly defaultButton?: any;
 }
 
 
@@ -830,7 +833,10 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
      */
     public addButton( btn: IDialogButton): void
     {
-        this.buttons.set( btn.id, new DialogButtonInfo( btn));
+        let info = new DialogButtonInfo( btn, this.nextButtonTabIndex++);
+        this.buttons.set( btn.id, info);
+        if (btn.keycode)
+            this.buttonKeys.set( btn.keycode, info)
     }
 
     /**
@@ -868,7 +874,20 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
             this.optionalStyles?.dialogButton, this.defaultStyles.dialogButton);
 
         this.vn.publishService( "dialog", this);
-	};
+	}
+
+    /**
+     * If derived classes override this method, they must call super.didMount()
+     */
+	public didMount(): void
+	{
+        if (this.options?.defaultButton != null)
+        {
+            let info = this.buttons.get( this.options?.defaultButton);
+            if (info)
+                info.elm.focus();
+        }
+	}
 
     /**
      * If derived classes override this method, they must call super.willUnmount()
@@ -877,11 +896,11 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
 	{
         this.vn.unpublishService( "dialog");
         super.willUnmount();
-	};
+	}
 
     public render(): void
     {
-        return <div>
+        return <div keydown={this.onButtonKeyDown}>
             {this.renderCaption}
             {this.renderBody}
             {this.renderButtons}
@@ -907,7 +926,7 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
     {
         return <div class={this.buttonBarClassName}>
             {Array.from( this.buttons.values()).map( info =>
-                <button id={info.btn.id} class={this.buttonClassName} click={() => this.onButtonClicked(info)}>
+                <button id={info.btn.id} ref={info.elm} class={this.buttonClassName} click={() => this.onButtonClicked(info)}>
                     {info.btn.content}
                 </button>
             )}
@@ -934,6 +953,20 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
             this.close( info.btn.returnValue);
     }
 
+    private onButtonKeyDown( e: KeyboardEvent): void
+    {
+        // check whether any button is associated with either the key or the code
+        let info = this.buttonKeys.get( e.key);
+        if (!info)
+            info = this.buttonKeys.get( e.code);
+
+        if (info)
+        {
+            e.preventDefault();
+            this.onButtonClicked( info);
+        }
+    }
+
 
 
     // Map of button IDs to button information objects
@@ -943,6 +976,12 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
     // Map of button IDs to button information objects
     @trigger(3)
     private buttons = new Map<any, DialogButtonInfo>();
+
+    // Map of keyboard key or code values to the button objects associated with them
+    private buttonKeys = new Map<string, DialogButtonInfo>();
+
+    // Tab index value to use for the next button to be added
+    private nextButtonTabIndex = 1001;
 
     // Class name to use for the caption
     private captionClassName: string;
@@ -965,20 +1004,23 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
  */
 class DialogButtonInfo
 {
-    constructor( btn: IDialogButton)
+    constructor( btn: IDialogButton, tabIndex: number)
     {
         this.btn = btn;
         this.disabled = btn.disabled;
+        this.tabIndex = tabIndex;
     }
 
-    /**
-     * Input information about the button.
-     */
+    /** Input information about the button. */
     btn: IDialogButton;
 
-    /**
-     * Flag indicating whether the button is currently disabled.
-     */
+    /** Refernce to the button element. */
+    @mim.ref elm: HTMLButtonElement;
+
+    /** Tab index to use for the button the button. */
+    tabIndex: number;
+
+    /** Flag indicating whether the button is currently disabled. */
     disabled: boolean;
 }
 
@@ -1056,7 +1098,7 @@ export class MsgBoxStyles extends DefaultDialogStyles
     container = css.$class({
         display: "flex",
         flexDirection: "row",
-        alignItems: "flex-start",
+        alignItems: "center",
     })
 
     icon = css.$class({
@@ -1072,6 +1114,7 @@ export class MsgBoxStyles extends DefaultDialogStyles
         minHeight: "2em",
         maxHeight: "20em",
         overflow: "auto",
+        verticalAlign: "middle",
     })
 }
 
@@ -1094,18 +1137,24 @@ export class MsgBox extends Dialog<MsgBoxStyles>
      */
     public static showModal( message: string, title?: string,
                     buttons: MsgBoxButtonBar = MsgBoxButtonBar.OK,
-					icon: MsgBoxIcon = MsgBoxIcon.None): Promise<MsgBoxButton>
+                    icon: MsgBoxIcon = MsgBoxIcon.None,
+                    defaultButton?: MsgBoxButton): Promise<MsgBoxButton>
 	{
-		let msgBox: MsgBox = new MsgBox( message, title, buttons, icon);
+		let msgBox: MsgBox = new MsgBox( message, title, buttons, icon, defaultButton);
 		return msgBox.showModal();
 	}
 
 
 
 	constructor( message: any, title?: string, buttons: MsgBoxButtonBar = MsgBoxButtonBar.OK,
-					icon: MsgBoxIcon = MsgBoxIcon.None)
+					icon: MsgBoxIcon = MsgBoxIcon.None, defaultButton?: MsgBoxButton)
 	{
-		super( message, title, { styles: MsgBoxStyles });
+        super( message, title, {
+            styles: MsgBoxStyles,
+            escapeReturnValue: buttons === MsgBoxButtonBar.None ? MsgBoxButton.Close : undefined,
+            defaultButton
+        });
+
 		this.icon = icon;
 
 		this.createButtons( buttons);
@@ -1120,12 +1169,8 @@ export class MsgBox extends Dialog<MsgBoxStyles>
         // we are using this.optionalStyles because we explicitly pass our styles in the options
         // parameter of the Dialog constructor.
 		return <div class={this.optionalStyles.container}>
-            {char &&
-                <span class={this.optionalStyles.icon} style={{color}}>{char}</span>
-            }
-            <div class={this.optionalStyles.text}>
-                {this.content}
-            </div>
+            {char && <span class={this.optionalStyles.icon} style={{color}}>{char}</span>}
+            <span class={this.optionalStyles.text}>{this.content}</span>
         </div>;
 	}
 
@@ -1137,20 +1182,6 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 	protected getDefaultStyles(): MsgBoxStyles | css.IStyleDefinitionClass<MsgBoxStyles>
 	{
         return MsgBoxStyles;
-	};
-
-    /**
-     * Returns the value that should be used as a return value when closing the popup after the
-     * user pressed the Esc key. If undefined is returned, the popup doesn't close
-     */
-	protected getReturnValueForEscapeKey(): any
-	{
-        // this implementation returns the value from the options if defined; otherwise, it
-        // returns MsgBoxButton.Close if no buttons are defined; otherwise, it returns undefined,
-        // which means the message box will not close.
-        return this.options?.escapeReturnValue != null
-            ? this.options.escapeReturnValue
-            : this.buttonCount === 0 ? MsgBoxButton.Close : undefined;
 	};
 
 
@@ -1170,7 +1201,7 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 
 			case MsgBoxButtonBar.OkCancel:
 				this.createButton( "OK", MsgBoxButton.OK);
-				this.createButton( "Cancel", MsgBoxButton.Cancel);
+				this.createButton( "Cancel", MsgBoxButton.Cancel, "Escape");
 				break;
 
 			case MsgBoxButtonBar.YesNo:
@@ -1181,7 +1212,7 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 			case MsgBoxButtonBar.YesNoCancel:
 				this.createButton( "Yes", MsgBoxButton.Yes);
 				this.createButton( "No", MsgBoxButton.No);
-				this.createButton( "Cancel", MsgBoxButton.Cancel);
+				this.createButton( "Cancel", MsgBoxButton.Cancel, "Escape");
 				break;
 		}
 	}
@@ -1191,18 +1222,18 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 	{
 		switch( this.icon)
 		{
-			case MsgBoxIcon.Info: return { char: "I", color: "blue" };
+			case MsgBoxIcon.Info: return { char: "i", color: "blue" };
 			case MsgBoxIcon.Question: return { char: "?", color: "green" };
 			case MsgBoxIcon.Warning: return { char: "!", color: "orange" };
-			case MsgBoxIcon.Error: return { char: "X", color: "red" };
+			case MsgBoxIcon.Error: return { char: "x", color: "red" };
 
 			default: return {};
 		}
 	}
 
-	private createButton( text: string, key: MsgBoxButton): void
+	private createButton( text: string, id: MsgBoxButton, keycode?: string): void
 	{
-		this.addButton({ id: key, content: text, returnValue: key });
+		this.addButton({ id, content: text, returnValue: id, keycode });
 	}
 
 

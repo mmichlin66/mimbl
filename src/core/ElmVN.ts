@@ -1,5 +1,5 @@
 ﻿import {
-    IElmVN, VNType, setRef, EventFuncType, UpdateStrategy, RefPropType, ICustomAttributeHandler
+    IElmVN, setRef, EventFuncType, UpdateStrategy, RefPropType, ICustomAttributeHandler
 } from "../api/mim"
 import {
     VNBase, DN, VN, VNUpdateDisp, s_deepCompare, PropInfo, PropType,
@@ -38,7 +38,6 @@ export class ElmVN extends VNBase implements IElmVN
 	{
 		super();
 
-		this.type = VNType.Elm;
 		this.elmName = tagName;
 		this.props = props;
 		this.children = children;
@@ -590,7 +589,7 @@ export class ElmVN extends VNBase implements IElmVN
 					{
 						console.error( `Error updating handler for custom attribute '${name}': ${err.message}`);
 					}
-					
+
 					newCustomAttr.handler = oldCustomAttr.handler;
 				}
 			}

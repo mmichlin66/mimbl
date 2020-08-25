@@ -1,43 +1,16 @@
-﻿import {Styleset, IClassRule, IClassNameRule, IIDRule, ClassPropType} from "mimcss"
+﻿import {Styleset, IIDRule, ClassPropType} from "mimcss"
 import {createNodesFromJSX, wrapCallbackWithVN} from "../core/Reconciler";
 import {PropType, ElmAttr, EventSlot, mountRoot, unmountRoot, FuncProxyVN} from "../internal";
 
 
 
 /**
- * Type used to define properties that can be passed to a functional component.
- * 
- * @typeparam TProps Type defining properties that can be passed to the functional component
- *		with these properties. Default type is an empty object (no properties).
- * @typeparam TChildren Type defining components, elements or other objects that can be used
- *		as children for the functional component with these properties. Default is `any`.
- */
-export type FuncProps<TProps = {}, TChildren = any> = Readonly<TProps> &
-	{
-		readonly children?: TChildren;
-	};
-
-
-
-/**
- * Type of functions representing functional components.
- * 
- * @typeparam TProps Type defining properties that can be passed to this functional component.
- *		Default type is an empty object (no properties).
- * @typeparam TChildren Type defining components, elements or other objects that can be used
- *		as children for this functional component. Default is `any`.
- */
-export type FuncCompType<TProps = {}, TChildren = any> = (props: FuncProps<TProps,TChildren>) => any;
-
-
-
-/**
  * Type used to define properties that can be passed to a class-based component.
- * 
- * @typeparam TProps Type defining properties that can be passed to the class-based component
- *		with these properties. Default type is an empty object (no properties).
- * @typeparam TChildren Type defining components, elements or other objects that can be used
- *		as children for the class-based component with these properties. Default is `any`.
+ *
+ * @typeparam TProps Type defining properties that can be passed to the functional or class-based
+ * component with these properties. Default type is an empty object (no properties).
+ * @typeparam TChildren Type defining components, elements or other objects that can be used as
+ * children for the component with these properties. Default is `any`.
  */
 export type CompProps<TProps = {}, TChildren = any> = Readonly<TProps> &
 	{
@@ -47,8 +20,20 @@ export type CompProps<TProps = {}, TChildren = any> = Readonly<TProps> &
 
 
 /**
+ * Type of functions representing functional components.
+ *
+ * @typeparam TProps Type defining properties that can be passed to this functional component.
+ *		Default type is an empty object (no properties).
+ * @typeparam TChildren Type defining components, elements or other objects that can be used
+ *		as children for this functional component. Default is `any`.
+ */
+export type FuncCompType<TProps = {}, TChildren = any> = (props: CompProps<TProps,TChildren>) => any;
+
+
+
+/**
  * Interface that defines constructor signature for components.
- * 
+ *
  * @typeparam TProps Type defining properties that can be passed to the class-based component
  *		of this type. Default type is an empty object (no properties).
  * @typeparam TChildren Type defining components, elements or other objects that can be used
@@ -64,7 +49,7 @@ export interface IComponentClass<TProps = {}, TChildren = any>
 
 /**
  * Interface that must be implemented by all components.
- * 
+ *
  * @typeparam TProps Type defining properties that can be passed to this class-based component.
  *		Default type is an empty object (no properties).
  * @typeparam TChildren Type defining components, elements or other objects that can be used
@@ -74,7 +59,7 @@ export interface IComponent<TProps = {}, TChildren = any>
 {
 	/**
 	 * Component properties passed to the constructor. For managed components, the properties
-	 * can also be set (changed) when the component's parent is updated.
+	 * are updated when the component's parent is updated.
 	 */
 	props?: CompProps<TProps,TChildren>;
 
@@ -104,10 +89,12 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 */
 	willMount?(): void;
 
-    // Notifies the component that it was successfully mounted. This method is called after the
-    // component is rendered for the first time and the content of all its sub-nodes is added to
-    // the DOM tree.
-	// This method is part of the Commit phase.
+    /**
+     * Notifies the component that it was successfully mounted. This method is called after the
+     * component is rendered for the first time and the content of all its sub-nodes is added to
+     * the DOM tree.
+     * This method is part of the Commit phase.
+     */
     didMount?(): void;
 
     /**
@@ -121,22 +108,24 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * a Mimbl tick, are updated. If implemented, this method will be called every time the
 	 * component is scheduled to be updated. This method can read DOM layout information (e.g.
 	 * element measurements) without the risk of causing forced layouts.
+	 * This method is invoked before the Render phase.
 	 */
 	beforeUpdate?(): void;
 
 	/**
-	 * Optional method that is called after al components that are scheduled to be updated in
+	 * Optional method that is called after all components that are scheduled to be updated in
 	 * a Mimbl tick, are updated. If implemented, this method will be called every time the
 	 * component is scheduled to be updated. This method is called after all modifications to
 	 * DOM resulting from updaing components have been already done.
+	 * This method is invoked after the Commit phase.
 	 */
 	afterUpdate?(): void;
 
 	/**
 	 * This method is only used by managed components.
-	 * 
+	 *
 	 * Informs the component that new properties have been specified. At the time of the call
-	 * this.props refers to the "old" properties. If the component returns true,then its render
+	 * this.props refers to the "old" properties. If the component returns true, then its render
 	 * method will be called. At that time,the original props object that was passed into the
 	 * component's constructor will have these new properties. If the component doesn't implement
 	 * the shouldUpdate method it is as though true is returned. If the component returns
@@ -148,11 +137,10 @@ export interface IComponent<TProps = {}, TChildren = any>
 	shouldUpdate?( newProps: CompProps<TProps,TChildren>): boolean;
 
 	/**
-	 * Handles an exception that occurred during the component's own rendering or rendering of
-	 * one of its descendants. If this method is not implemented or if it throws an error, the
-	 * error will be propagated up the chain of components until it reaches a component that
-	 * handles it. If none of the components can handle the error, the entire tree will be
-	 * unmounted.
+	 * Handles an exception that occurred during the rendering of one of the component's children.
+     * If this method is not implemented or if it throws an error, the error will be propagated up
+     * the chain of components until it reaches a component that handles it. If none of the
+     * components can handle the error, the entire tree will be unmounted.
 	 * @param err An exception that was thrown during the component's own rendering or rendering
 	 * of one of its descendants.
 	 * @param path An array of names of components and elements from the mounted root to the
@@ -167,6 +155,32 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 */
 	getUpdateStrategy?(): UpdateStrategy;
 }
+
+
+
+/**
+ * The UpdateStrategy object specifies different aspects of update behavior of components and
+ * elements.
+ */
+export type UpdateStrategy =
+{
+	/**
+	 * Flag determining whether non-matching new keyed sub-nodes are allowed to recycle non-
+	 * matching old keyed sub-nodes. Here "non-matching" means those new or old nodes with keys
+     * for which no old or new sub-nodes with the same key were found. If this flag is false, then
+     * non-matching old sub-nodes will be removed and non-matching new sub-nodes will be inserted.
+     * If this flag is true, then non-matching old sub-nodes will be updated by the non-matching
+     * new sub-nodes - provided that the types of sub-nodes are the same.
+	 *
+	 * If keyed sub-nodes recycling is allowed it can speed up an update process because
+	 * less DOM nodes get removed and inserted, which is more expensive than updating. However,
+	 * this can have some adverse effects under cirtain circumstances if certain data is bound
+	 * to the particular instances of DOM nodes.
+	 *
+	 * The flag's default value is true.
+	 */
+	allowKeyedNodeRecycling?: boolean;
+};
 
 
 
@@ -213,34 +227,8 @@ export type EventPropType<T extends Event> = EventFuncType<T> | EventFuncAndThis
 
 /**
  * Type for defining the id property of HTML elements
- */				
-export type IDPropType = string | number | IIDRule;
-
-
-
-/**
- * The UpdateStrategy object specifies different aspects of update behavior of components and
- * elements.
  */
-export type UpdateStrategy = 
-{
-	/**
-	 * Flag determining whether non-matching new keyed sub-nodes are allowed to recycle non-
-	 * matching old keyed sub-nodes. Here "non-matching" means those new or old nodes for which
-	 * no old or new sub-nodes respectively were found. If this flag is false, then non-matching
-	 * old sub-nodes will be removed and non-matching new sub-nodes will be inserted. If this
-	 * flag is true, then non-matching old sub-nodes will be updated by the non-matching new
-	 * sub-nodes - provided that the types of sub-nodes are the same.
-	 * 
-	 * If keyed sub-nodes recycling is allowed it can speed up an update process because
-	 * less DOM nodes get removed and inserted, which is more expensive than updating. However,
-	 * this can have some adverse effects under cirtain circumstances if certain data is bound
-	 * to the particular instances of DOM nodes.
-	 * 
-	 * The flag's default value is true.
-	 */
-	allowKeyedNodeRecycling?: boolean;
-};
+export type IDPropType = string | number | IIDRule;
 
 
 
@@ -411,7 +399,7 @@ export namespace JSX
 	export interface ElementAttributesProperty { props: {} }
 
 	export interface ElementChildrenAttribute { children: any }
-	
+
 	export interface IntrinsicElements
 	{
 		// HTML elements
@@ -685,9 +673,9 @@ export namespace JSX
  * ```
  *
  * The .tsx files must import the mimbl module as mim: import * as mim from "mimbl"
- * @param tag 
- * @param props 
- * @param children 
+ * @param tag
+ * @param props
+ * @param children
  */
 export function jsx( tag: any, props: any, ...children: any[]): any
 {
@@ -797,7 +785,7 @@ export class Ref<T = any>
 /**
  * Decorator function for creating reference properties without the need to manually create Ref<>
  * instances. This allows for the following code pattern:
- * 
+ *
  * ```typescript
  * class A extends Component
  * {
@@ -805,22 +793,35 @@ export class Ref<T = any>
  *     render() { return <div ref={myDiv}>Hello</div>; }
  * }
  * ```
- * 
+ *
  * In the above example, the myDiv property will be set to point to the HTML div element.
  */
 export function ref( target: any, name: string)
 {
-	let handler = new RefProxyHandler();
-	handler.proxy = new Proxy( {}, handler);
+    let sym = Symbol( name + "_ref");
+    function ensureHandler( obj: any): RefProxyHandler
+    {
+        let handler = obj[sym];
+        if (!handler)
+        {
+            handler = new RefProxyHandler();
+            handler.proxy = new Proxy( {}, handler);
+            obj[sym] = handler;
+        }
+
+        return handler;
+    }
+
 	Object.defineProperty( target, name,
 		{
             set( v: any)
             {
-                handler.obj = v;
+                ensureHandler(this).obj = v;
             },
+
             get()
             {
-                return handler.proxy;
+                return ensureHandler(this).proxy;
             }
 		}
 	);
@@ -841,9 +842,11 @@ class RefProxyHandler implements ProxyHandler<any>
 
     public get( target: any, prop: PropertyKey, receiver: any): any
     {
-        return prop === "r" ? this.obj : this.obj[prop];
-        // Reflect.get doesn't work but regular property get does
-        // return prop === "r" ? this.obj : Reflect.get( this.obj, prop, receiver);
+        if (prop === "r")
+            return this.obj;
+
+        let propVal = this.obj[prop];
+        return typeof propVal === "function" ? propVal.bind( this.obj) : propVal;
     }
 
     public set( target: any, prop: PropertyKey, value: any, receiver: any): boolean
@@ -933,36 +936,6 @@ export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
 
 
 
-/** Defines types of virtual DOM nodes */
-export const enum VNType
-{
-	/** Top-level node */
-	Root,
-
-	/** Class-based (state-full) component created via new */
-	IndependentComp,
-
-	/** Class-based (state-full) component laid out using JSX */
-	ManagedComp,
-
-	/** Stateless component (simple rendering function accepting props) */
-	FuncComp,
-
-	/** DOM element (HTML or SVG) laid out using JSX. */
-	Elm,
-
-	/** Text node */
-	Text,
-
-	/** Wrapper around a function/method that can be updated independently. */
-	FuncProxy,
-
-	/** Node that waits for a promise to be settled and then displays the resolved value as content. */
-	PromiseProxy,
-}
-
-
-
 /**
  * The IVNode interface represents a virtual node. Through this interface, callers can perform
  * most common actions that are available on every type of virtual node. Each type of virtual node
@@ -971,9 +944,6 @@ export const enum VNType
  */
 export interface IVNode
 {
-	/** Gets node type. */
-	readonly type: VNType;
-
 	/** Gets node's parent. This is undefined for the top-level (root) nodes. */
 	readonly parent?: IVNode;
 
@@ -998,7 +968,7 @@ export interface IVNode
 
 	// Flag indicating that update has been requested but not yet performed. This flag is needed
 	// to prevent trying to add the node to the global map every time the requestUpdate method
-	// is called. 
+	// is called.
 	readonly updateRequested: boolean;
 
 
@@ -1041,10 +1011,10 @@ export interface IVNode
 	 * ancestor component is changed,the Ref object will receive the new value.
 	 * The useSelf optional parameter determines whether the component can subscribe to the
 	 * service published by itself. The default is false.
-	 * @param id 
-	 * @param ref 
-	 * @param defaultService 
-	 * @param useSelf 
+	 * @param id
+	 * @param ref
+	 * @param defaultService
+	 * @param useSelf
 	 */
 	subscribeService<K extends keyof IServiceDefinitions>( id: K, ref: RefPropType<IServiceDefinitions[K]>,
 					defaultService?: IServiceDefinitions[K], useSelf?: boolean): void;
@@ -1052,7 +1022,7 @@ export interface IVNode
 	/**
 	 * Unsubscribes from a service with the given ID. The Ref object that was used to subscribe
 	 * will be set to undefined.
-	 * @param id 
+	 * @param id
 	 */
 	unsubscribeService<K extends keyof IServiceDefinitions>( id: K): void;
 
@@ -1060,9 +1030,9 @@ export interface IVNode
 	 * Retrieves the value for a service with the given ID registered by a closest ancestor
 	 * component or the default value if none of the ancestor components registered a service with
 	 * this ID. This method doesn't establish a subscription and only reflects the current state.
-	 * @param id 
-	 * @param defaultService 
-	 * @param useSelf 
+	 * @param id
+	 * @param defaultService
+	 * @param useSelf
 	 */
 	getService<K extends keyof IServiceDefinitions>( id: K, defaultService?: IServiceDefinitions[K],
 					useSelf?: boolean): IServiceDefinitions[K];
@@ -1074,27 +1044,27 @@ export interface IVNode
 	 * callback throws an exception, it is processed by the Mimbl error handling mechanism so that the
 	 * exception bubbles from this virtual node up the hierarchy until a node/component that knows to
 	 * handle errors is found.
-	 * 
+	 *
 	 * This function should be called by the code that is not part of any component but still has access
 	 * to the IVNode object; for example, custom attribute handlers. Components that derive from the
 	 * Component class should use the wrapCallback method of the Component class.
-	 * 
+	 *
 	 * Use this method before passing callbacks to document and window event handlers as well as
 	 * non-DOM objects that use callbacks, e.g. promises. For example:
-	 * 
+	 *
 	 * ```typescript
 	 *	class ResizeMonitor
 	 *	{
 	 *		private onWindowResize(e: Event): void {};
 	 *
 	 * 		wrapper: (e: Event): void;
-	 * 
+	 *
 	 * 		public startResizeMonitoring( vn: IVNode)
 	 *		{
 	 *			this.wrapper = vn.wrapCallback( this.onWindowResize, this);
 	 *			window.addEventListener( "resize", this.wrapper);
 	 *		}
-	 * 
+	 *
 	 * 		public stopResizeMonitoring()
 	 *		{
 	 *			window.removeEventListener( "resize", this.wrapper);
@@ -1102,7 +1072,7 @@ export interface IVNode
 	 *		}
 	 *	}
 	 * ```
-	 * 
+	 *
 	 * @param callback Callback to be wrapped
 	 * @returns Function that has the same signature as the given callback and that should be used
 	 *     instead of the original callback
@@ -1134,12 +1104,10 @@ export interface IManagedCompVN extends IVNode
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// The IIndependentCompVN interface represents a virtual node for a component.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-export interface IIndependentCompVN extends IVNode
+/**
+ * The IIndependentCompVN interface represents a virtual node for an independent component.
+ */
+export interface IIndependentCompVN extends IClassCompVN
 {
 }
 
@@ -1178,11 +1146,11 @@ export interface ITextVN extends IVNode
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// CCustom attributes
+// Custom attributes
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-/** 
+/**
  * The ICustomAttributeHandlerClass interface represents a class of handlers of custom attributes
  * that can be applied to intrinsic (HTML or SVG) elements. The requirements on such classes are:
  * 1. Implement a constructor accepting IElmVN, attribute value and attribute name (this allows
@@ -1268,6 +1236,8 @@ export function registerCustomEvent( eventName: string): void
  */
 export type ComponentUpdateRequest = Function | { func: Function, key?: any, thisArg?: any, args?: any }
 
+
+
 /**
  * Base class for components. Components that derive from this class must implement the render
  * method.
@@ -1298,9 +1268,9 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 
 	/**
 	 * This method is called by the component to request to be updated. If no arguments are
-	 * provided, the entire component is requested to be updated. If argument are provided, they
+	 * provided, the entire component is requested to be updated. If arguments are provided, they
 	 * indicate what rendering functions should be updated.
-	 * @param updateRequests 
+	 * @param updateRequests
 	 */
 	protected updateMe( ...updateRequests: ComponentUpdateRequest[]): void
 	{
@@ -1364,23 +1334,23 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * callback throws an exception, it is processed by the Mimbl error handling mechanism so that the
 	 * exception bubbles from this component up the hierarchy until a component that knows to
 	 * handle errors is found.
-	 * 
+	 *
 	 * Use this method before passing callbacks to document and window event handlers as well as
 	 * non-DOM objects that use callbacks, e.g. promises. For example:
-	 * 
+	 *
 	 * ```typescript
 	 *	class ResizeMonitor
 	 *	{
 	 *		private onWindowResize(e: Event): void {};
 	 *
 	 * 		wrapper: (e: Event): void;
-	 * 
+	 *
 	 * 		public startResizeMonitoring( vn: IVNode)
 	 *		{
 	 *			this.wrapper = vn.wrapCallback( this.onWindowResize, this);
 	 *			window.addEventListener( "resize", this.wrapper);
 	 *		}
-	 * 
+	 *
 	 * 		public stopResizeMonitoring()
 	 *		{
 	 *			window.removeEventListener( "resize", this.wrapper);
@@ -1388,7 +1358,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 *		}
 	 *	}
 	 * ```
-	 * 
+	 *
 	 * @param callback Callback to be wrapped
 	 * @returns Function that has the same signature as the given callback and that should be used
 	 *     instead of the original callback
@@ -1403,7 +1373,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Built in components
+// Built-in components
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1428,7 +1398,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
  *	}
   ```
 
- * @param props 
+ * @param props
  */
 export function Fragment( props: CompProps<{}>): any {}
 
@@ -1466,15 +1436,15 @@ export interface FuncProxyProps extends ICommonProps
 	 * FuncProxy.update method is called, the argument specified in this call will replace the
 	 * original arguments. The next time the FuncProxy component is rendered, the `args` property
 	 * will be ignored.
-	 * 
+	 *
 	 * Note the following sequence of actions that occurs when `replaceArgs` is false or omitted:
 	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" />. "A" will be used.
 	 * 1. Parent component calls FuncProxy.update( this.foo, undefined, undefined, "B"). "B" will be used.
 	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" />. "B" will still be used.
-	 * 
+	 *
 	 * If the `replaceArgs` property is set to true, then every time the FuncProxy componenet is
 	 * rendered, the value of the `args` property replaces whatever arguments there were before.
-	 * 
+	 *
 	 * Now note the sequence of actions when `replaceArgs` is true:
 	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" replaceArgs />."A" will
 	 * be used.
@@ -1492,24 +1462,24 @@ export interface FuncProxyProps extends ICommonProps
  * methods of classes that have access to "this" thus allowing a single class to "host" multiple
  * components that can be updated separately. The FuncProxy component is not intended to be
  * created by developers; instead it is only used in its JSX form as the following:
- * 
+ *
  * ```tsx
  * <FuncProxy func={this.renderSomething} key={...} args={...} thisArg={...} />
  * ```
- * 
+ *
  * There is a simpler method of specifying a rendering function in JSX, e.g.:
- * 
+ *
  * ```tsx
  * <div>{this.renderSomething}</div>
  * ```
- * 
+ *
  * The FuncProxy component is needed in the case where one (or more) of the following is true:
  * - There is a need to pass arguments to the function
  * - The same function is used multiple times and keys must be used to distinguish between the
  * invocations.
  * - The value of "this" inside the function is not the component that does the rendering. That
  * is, the function is not a method of this component.
- * 
+ *
  * FuncProxy has a public static Update method that can be called to cause the rendering mechanism
  * to invoke the function wrapped by the FuncProxy.
  */

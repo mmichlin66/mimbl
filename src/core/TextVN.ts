@@ -1,4 +1,4 @@
-﻿import {ITextVN, VNType} from "../api/mim"
+﻿import {ITextVN} from "../api/mim"
 import {VNBase, DN, VN, VNUpdateDisp} from "../internal"
 
 /// #if USE_STATS
@@ -23,7 +23,6 @@ export class TextVN extends VNBase implements ITextVN
 	constructor( text: string)
 	{
 		super();
-		this.type = VNType.Text;
 		this.text = text;
 	};
 
