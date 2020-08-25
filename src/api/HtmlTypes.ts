@@ -445,15 +445,16 @@ export interface IHtmlInputElementProps extends IHtmlElementProps<HTMLInputEleme
 	type?: InputTypePropType;
 	value?: string;
 
-    // special property to set value only first time
-    defaultValue?: string;
-
 	// checkbox and radio
 	checked?: boolean;
 
+    // special properties to set value only first time
+    defaultValue?: string;
+    defaultCheck?: boolean;
+
 	// multiple types
-	max?: string;
-	min?: string;
+	max?: string | number;
+	min?: string | number;
 	step?: number | "any";
 	multiple?: boolean;
 	placeholder?: string;
