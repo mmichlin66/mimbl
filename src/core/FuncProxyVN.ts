@@ -1,5 +1,5 @@
 ﻿import {FuncProxyProps} from "../api/mim"
-import {VNBase, s_currentClassComp, createWatcher, VN, VNUpdateDisp, IWatcher} from "../internal"
+import {VN, s_currentClassComp, createWatcher, VNUpdateDisp, IWatcher} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -32,7 +32,7 @@ let symKeysToNodes = Symbol( "symKeysToNodes");
  * The link between the function and the nodes that use this function is kept in a map from the
  * keys to the nodes. The map is stored in a symbol on the function object itself.
  */
-export class FuncProxyVN extends VNBase
+export class FuncProxyVN extends VN
 {
 	constructor( props: FuncProxyProps)
 	{

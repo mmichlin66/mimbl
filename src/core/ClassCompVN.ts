@@ -1,6 +1,6 @@
 ﻿import {IClassCompVN, IComponent, UpdateStrategy} from "../api/mim"
 import {createWatcher, IWatcher} from "../utils/TriggerWatcher"
-import {VNBase} from "../internal"
+import {VN} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -14,7 +14,7 @@ import {VNBase} from "../internal"
 // in terms of update requests and lifecycle management.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export abstract class ClassCompVN extends VNBase implements IClassCompVN
+export abstract class ClassCompVN extends VN implements IClassCompVN
 {
 	// Component instance.
 	public comp: IComponent;

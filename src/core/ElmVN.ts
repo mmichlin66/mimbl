@@ -2,7 +2,7 @@
     IElmVN, setRef, EventFuncType, UpdateStrategy, RefPropType, ICustomAttributeHandler
 } from "../api/mim"
 import {
-    VNBase, DN, VN, VNUpdateDisp, s_deepCompare, PropInfo, PropType,
+    VN, DN, VNUpdateDisp, s_deepCompare, PropInfo, PropType,
     ElmAttr, CustomAttrPropInfo, AttrPropInfo,
     EventPropInfo} from "../internal"
 
@@ -17,7 +17,7 @@ import {
 // Represents a DOM element created using JSX.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class ElmVN extends VNBase implements IElmVN
+export class ElmVN extends VN implements IElmVN
 {
 	// Tag name of an Element.
 	public elmName: string;

@@ -1,5 +1,5 @@
 ﻿import {PromiseProxyProps} from "../api/mim"
-import {VNBase, VN, VNUpdateDisp} from "../internal"
+import {VN, VNUpdateDisp} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -25,7 +25,7 @@ import {VNBase, VN, VNUpdateDisp} from "../internal"
  * The link between the function and the nodes that use this function is kept in a map from the
  * keys to the nodes. The map is stored in a custom property on the function object itself.
  */
-export class PromiseProxyVN extends VNBase
+export class PromiseProxyVN extends VN
 {
 	constructor( props: PromiseProxyProps, children?: any[])
 	{

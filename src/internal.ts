@@ -6,7 +6,6 @@ export * from "./utils/TriggerWatcher"
 
 export * from "./core/ElmAttr"
 export * from "./core/VN"
-export * from "./core/VNBase"
 export * from "./core/ClassCompVN"
 export * from "./core/IndependentCompVN"
 export * from "./core/ManagedCompVN"

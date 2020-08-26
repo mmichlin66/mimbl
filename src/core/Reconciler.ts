@@ -3,7 +3,7 @@
     FuncProxyProps, PromiseProxy, IComponentClass, FuncCompType
 } from "../api/mim"
 import {
-    VN, DN, VNUpdateDisp, VNBase, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN,
+    VN, DN, VNUpdateDisp, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN,
     FuncProxyVN, ElmVN, ManagedCompVN, FuncVN, enterMutationScope, exitMutationScope
 } from "../internal"
 
@@ -1532,7 +1532,7 @@ function createNodesFromContent( content: any): VN | VN[]
 		// the comparison above covers both null and undefined
 		return null;
 	}
-	else if (content instanceof VNBase)
+	else if (content instanceof VN)
 		return content;
 	else if (typeof content === "string")
 	{

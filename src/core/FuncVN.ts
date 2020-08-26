@@ -1,5 +1,5 @@
 ﻿import {Fragment, FuncCompType} from "../api/mim"
-import { VNBase, VN, VNUpdateDisp } from "../internal"
+import { VN, VNUpdateDisp } from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -10,7 +10,7 @@ import { VNBase, VN, VNUpdateDisp } from "../internal"
 /**
  * Represents a rendering function a.k.a. stateless component.
  */
-export class FuncVN extends VNBase
+export class FuncVN extends VN
 {
 	/** Determines whether this node corresponds to a fragment placeholder. */
 	public static isVNaFragment( vn: VN): boolean

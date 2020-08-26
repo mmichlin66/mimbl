@@ -1,5 +1,5 @@
 ﻿import {IManagedCompVN, IComponentClass, IComponent, setRef, RefPropType} from "../api/mim"
-import {ClassCompVN, VNBase, VN, VNUpdateDisp} from "../internal"
+import {ClassCompVN, VN, VNUpdateDisp} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -87,7 +87,7 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 
 	// Initializes the node by passing the parent node to it. After this, the node knows its
 	// place in the hierarchy and gets access to the root of it - the RootVN object.
-	public init( parent: VNBase, creator: IComponent): void
+	public init( parent: VN, creator: IComponent): void
 	{
 		super.init( parent, creator);
 

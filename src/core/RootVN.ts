@@ -1,5 +1,5 @@
 ﻿import {IErrorHandlingService} from "../api/mim"
-import {VNBase, DN, requestNodeUpdate} from "../internal"
+import {VN, DN, requestNodeUpdate} from "../internal"
 
 /// #if USE_STATS
 	import {StatsCategory} from "../utils/Stats"
@@ -15,7 +15,7 @@ import {VNBase, DN, requestNodeUpdate} from "../internal"
 // RootVN also manages service publishers and subscribers.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class RootVN extends VNBase implements IErrorHandlingService
+export class RootVN extends VN implements IErrorHandlingService
 {
 	public constructor( anchorDN: DN)
 	{

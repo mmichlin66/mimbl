@@ -1,4 +1,4 @@
-﻿import {VNBase} from "../internal"
+﻿import {VN} from "../internal"
 
 
 
@@ -10,8 +10,8 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 class ServiceInfo
 {
-	publishingVNs: Set<VNBase> = new Set<VNBase>();
-	subscribedVNs: Set<VNBase> = new Set<VNBase>();
+	publishingVNs: Set<VN> = new Set<VN>();
+	subscribedVNs: Set<VN> = new Set<VN>();
 }
 
 // Map of service IDs to sets of virtual nodes that subscribed to this service.
@@ -20,7 +20,7 @@ let s_serviceInfos = new Map<string,ServiceInfo>();
 
 
 // Informs that a service with the given ID was published by the given node.
-export function notifyServicePublished( id: string, sourceVN: VNBase): void
+export function notifyServicePublished( id: string, sourceVN: VN): void
 {
 	let info: ServiceInfo = s_serviceInfos.get( id);
 	if (info === undefined)
@@ -39,7 +39,7 @@ export function notifyServicePublished( id: string, sourceVN: VNBase): void
 
 
 // Informs that a service with the given ID was unpublished by the given node.
-export function notifyServiceUnpublished( id: string, sourceVN: VNBase): void
+export function notifyServiceUnpublished( id: string, sourceVN: VN): void
 {
 	let info: ServiceInfo = s_serviceInfos.get( id);
 	if (info === undefined)
@@ -60,7 +60,7 @@ export function notifyServiceUnpublished( id: string, sourceVN: VNBase): void
 
 
 // Informs that the given node has subscribed to a service with the given ID.
-export function notifyServiceSubscribed( id: string, sourceVN: VNBase): void
+export function notifyServiceSubscribed( id: string, sourceVN: VN): void
 {
 	let info: ServiceInfo = s_serviceInfos.get( id);
 	if (info === undefined)
@@ -75,7 +75,7 @@ export function notifyServiceSubscribed( id: string, sourceVN: VNBase): void
 
 
 // Informs that the given node has unsubscribed from a service with the given ID.
-export function notifyServiceUnsubscribed( id: string, sourceVN: VNBase): void
+export function notifyServiceUnsubscribed( id: string, sourceVN: VN): void
 {
 	let info: ServiceInfo = s_serviceInfos.get( id);
 	if (info === undefined)
