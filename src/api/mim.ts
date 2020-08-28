@@ -1,6 +1,8 @@
 ﻿import {Styleset, IIDRule, ClassPropType} from "mimcss"
-import {createNodesFromJSX, wrapCallbackWithVN} from "../core/Reconciler";
-import {PropType, ElmAttr, EventSlot, mountRoot, unmountRoot, FuncProxyVN} from "../internal";
+import {
+    PropType, ElmAttr, EventSlot, mountRoot, unmountRoot, FuncProxyVN,
+    createNodesFromJSX, wrapCallbackWithVN
+} from "../internal";
 
 
 
@@ -814,15 +816,8 @@ export function ref( target: any, name: string)
 
 	Object.defineProperty( target, name,
 		{
-            set( v: any)
-            {
-                ensureHandler(this).obj = v;
-            },
-
-            get()
-            {
-                return ensureHandler(this).proxy;
-            }
+            set( v: any) { ensureHandler(this).obj = v; },
+            get() { return ensureHandler(this).proxy; }
 		}
 	);
 }
@@ -862,44 +857,28 @@ class RefProxyHandler implements ProxyHandler<any>
     }
 
     public deleteProperty( target: any, prop: PropertyKey): boolean
-    {
-        return Reflect.deleteProperty( this.obj, prop);
-    }
+        { return Reflect.deleteProperty( this.obj, prop); }
 
     public defineProperty( target: any, prop: PropertyKey, attrs: PropertyDescriptor): boolean
-    {
-        return Reflect.defineProperty( this.obj, prop, attrs);
-    }
+        { return Reflect.defineProperty( this.obj, prop, attrs); }
 
     public has( target: any, prop: PropertyKey): boolean
-    {
-        return Reflect.has( this.obj, prop);
-    }
+        { return Reflect.has( this.obj, prop); }
 
     public getPrototypeOf( target: any): object | null
-    {
-        return Reflect.getPrototypeOf( this.obj);
-    }
+        { return Reflect.getPrototypeOf( this.obj); }
 
     public isExtensible( target: any): boolean
-    {
-        return Reflect.isExtensible( this.obj);
-    }
+        { return Reflect.isExtensible( this.obj); }
 
     public getOwnPropertyDescriptor( target: any, prop: PropertyKey): PropertyDescriptor | undefined
-    {
-        return Reflect.getOwnPropertyDescriptor( this.obj, prop);
-    }
+        { return Reflect.getOwnPropertyDescriptor( this.obj, prop); }
 
     public enumerate( target: any): PropertyKey[]
-    {
-        return Array.from( Reflect.enumerate( this.enumerate));
-    }
+        { return Array.from( Reflect.enumerate( this.enumerate)); }
 
     public ownKeys( target: any): PropertyKey[]
-    {
-        return Reflect.ownKeys( this.obj);
-    }
+        { return Reflect.ownKeys( this.obj); }
 
 }
 
@@ -1263,8 +1242,18 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 			this.props = props;
 	}
 
-	/** Returns the component's content that will be ultimately placed into the DOM tree. */
+	/**
+     * Returns the component's content that will be ultimately placed into the DOM tree. This
+     * method is abstract because it must be implemented by every component.
+     */
 	public abstract render(): any;
+
+	/**
+     * Determines whether the component is currently mounted. If a component has asynchronous
+     * functionality (e.g. fetching data from a server), component's code may be executed after
+     * it was alrady unmounted. This property allows the component to handle this situation.
+     */
+	public get isMounted(): boolean { return this.vn != null; };
 
 	/**
 	 * This method is called by the component to request to be updated. If no arguments are
@@ -1336,18 +1325,18 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * handle errors is found.
 	 *
 	 * Use this method before passing callbacks to document and window event handlers as well as
-	 * non-DOM objects that use callbacks, e.g. promises. For example:
+	 * non-DOM objects that use callbacks, e.g. fetch, Promis, setTimeout, etc. For example:
 	 *
 	 * ```typescript
-	 *	class ResizeMonitor
+	 *	class ResizeMonitor extends mim.Component
 	 *	{
 	 *		private onWindowResize(e: Event): void {};
 	 *
 	 * 		wrapper: (e: Event): void;
 	 *
-	 * 		public startResizeMonitoring( vn: IVNode)
+	 * 		public startResizeMonitoring()
 	 *		{
-	 *			this.wrapper = vn.wrapCallback( this.onWindowResize, this);
+	 *			this.wrapper = vn.wrapCallback( this.onWindowResize);
 	 *			window.addEventListener( "resize", this.wrapper);
 	 *		}
 	 *
@@ -1359,13 +1348,16 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 *	}
 	 * ```
 	 *
-	 * @param callback Callback to be wrapped
+	 * @param callback Method/function to be wrapped
+     * @param thisCallback Optional value of "this" to bind the callback to. If this parameter is
+     * undefined, the component instance will be used. This parameter will be ignored if the the
+     * function is already bound or is an arrow function.
 	 * @returns Function that has the same signature as the given callback and that should be used
 	 *     instead of the original callback
 	 */
 	protected wrapCallback<T extends Function>( callback: T, thisCallback?: object): T
 	{
-		return wrapCallbackWithVN( callback, thisCallback, this.vn);
+		return wrapCallbackWithVN( callback, thisCallback ? thisCallback : this, this.vn);
 	}
 }
 

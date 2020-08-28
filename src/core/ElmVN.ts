@@ -256,10 +256,9 @@ export class ElmVN extends VN implements IElmVN
 			else
 			{
 				// get information about the property and determine its type (regular attribute, event
-				// or custom attribute). Note that getPropertyInfo may return null only for regular
-				// attributes.
+				// or custom attribute).
 				propInfo = ElmAttr.getPropertyInfo( propName);
-				propType = propInfo ? propInfo.type : PropType.Attr;
+				propType = ElmVN.determineAttrType( propInfo, propVal);
 				if (propType === PropType.Attr)
 				{
 					if (!this.attrs)
@@ -291,7 +290,19 @@ export class ElmVN extends VN implements IElmVN
 		}
 	}
 
-
+    // Determines property type (regular attribute, event or custom attribute) based on the
+    // property information object if exists and if not by looking at the value.
+    private static determineAttrType( propInfo: AttrPropInfo, propVal: any): PropType
+	{
+        if (propInfo)
+            return propInfo.type;
+        else if (typeof propVal === "function" ||
+                Array.isArray(propVal) && propVal.length > 0 && typeof propVal[0] === "function" ||
+                typeof propVal === "object" && typeof propVal.func ==="function")
+            return PropType.Event
+        else
+            return PropType.Attr;
+	}
 
 	// Adds DOM attributes to the Element.
 	private addAttrs(): void

@@ -125,7 +125,7 @@ export function wrapCallbackWithVN<T extends Function>( callback: T, thisCallbac
  *   of the callback, watchers will be only notified after the callback has finished its execution.
  * - If the wrapping has been done in the context of a virtual node (e.g. from a Mimbl component),
  *   the "current virtual node" and the "current component" are set to the node and component under
- *   which the callback was wrapped. This allow for proper JSX execution and for using the Mimbl
+ *   which the callback was wrapped. This allows for proper JSX execution and for using the Mimbl
  *   error handling mechanism.
  *
  */
@@ -447,9 +447,6 @@ function renderNewNode( vn: VN, parent: VN): void
 {
 	vn.init( parent, s_currentClassComp);
 
-	// keep track of the node that is being currently processed.
-	let prevVN = trackCurrentVN(vn);
-
     // if willMount function is defined we call it without try/catch. If it throws, the control
     // goes to either the ancestor node that supports error handling or the Mimbl tick loop
     // (which has try/catch).
@@ -461,6 +458,9 @@ function renderNewNode( vn: VN, parent: VN): void
 
 		vn.willMount();
 	}
+
+	// keep track of the node that is being currently processed.
+	let prevVN = trackCurrentVN(vn);
 
 	// if the node doesn't implement `render`, the node never has any sub-nodes (e.g. text nodes)
 	if (vn.render)

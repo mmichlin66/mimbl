@@ -85,23 +85,14 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 
 
 
-	// Initializes the node by passing the parent node to it. After this, the node knows its
-	// place in the hierarchy and gets access to the root of it - the RootVN object.
-	public init( parent: VN, creator: IComponent): void
-	{
-		super.init( parent, creator);
-
-		// create component instance
-		this.comp = new this.compClass( this.props);
-	}
-
-
-
 	// Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
 	// This method is part of the Render phase.
 	public willMount(): void
 	{
+		// create component instance
+		this.comp = new this.compClass( this.props);
+
         super.willMount();
 
         // set the reference value if specified
