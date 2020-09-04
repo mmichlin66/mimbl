@@ -1,6 +1,6 @@
 {
 	"name": "mimbl",
-	"version": "0.5.1",
+	"version": "0.5.2",
 	"description": "MiM Base Library for Web UI Authoring",
 	"homepage": "https://mmichlin66.github.io/mimbl/about.html",
 	"repository": "github:mmichlin66/mimbl",
@@ -42,6 +42,6 @@
 		"lib/comp/Popups.d.ts"
 	],
 	"dependencies": {
-		"mimcss": "^0.7.7"
+		"mimcss": "^0.8.1"
 	}
 }

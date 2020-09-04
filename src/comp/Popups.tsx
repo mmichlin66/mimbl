@@ -1102,17 +1102,17 @@ export class MsgBoxStyles extends DefaultDialogStyles
     })
 
     icon = css.$class({
-        padding: "0.5rem",
-        fontSize: "3em",
+        padding: css.rem(0.5),
+        fontSize: css.em(3),
         fontWeight: 900,
     })
 
     text = css.$class({
         padding: 0.5,
-        minWidth: "15em",
-        maxWidth: "60em",
-        minHeight: "2em",
-        maxHeight: "20em",
+        minWidth: css.em(15),
+        maxWidth: css.em(60),
+        minHeight: css.em(2),
+        maxHeight: css.em(20),
         overflow: "auto",
         verticalAlign: "middle",
     })
@@ -1259,8 +1259,8 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 export class ProgressBoxStyles extends DefaultDialogStyles
 {
     container = css.$class({
-        width: "30rem",
-        height: "5rem",
+        width: css.rem(30),
+        height: css.rem(5),
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -1268,9 +1268,9 @@ export class ProgressBoxStyles extends DefaultDialogStyles
     })
 
     progress = css.$class({
-        width: "20rem",
-        height: "1rem",
-        margin: "1rem"
+        width: css.rem(20),
+        height: css.rem(1),
+        margin: css.rem(1)
     })
 
     text = css.$class({
