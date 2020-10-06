@@ -1,4 +1,4 @@
-﻿import {CssColor} from "mimcss"
+﻿import {CssColor, MediaQuery} from "mimcss"
 import {
     IElementProps, EventPropType, ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType,
     FormenctypePropType, FormmethodPropType
@@ -546,7 +546,7 @@ export interface IHtmlLinkElementProps extends IHtmlElementProps<HTMLLinkElement
 	hrefLang?: string;
 	importance?: ImportancePropType;
 	integrity?: string;
-	media?: string;
+	media?: MediaQuery;
 	referrerpolicy?: ReferrerPolicyPropType;
 	rel?: string;
 	sizes?: string;
@@ -746,7 +746,7 @@ export interface IHtmlSlotElementProps extends IHtmlElementProps<HTMLSlotElement
 // <source>
 export interface IHtmlSourceElementProps extends IHtmlElementProps<HTMLSourceElement>
 {
-	media?: string;
+	media?: MediaQuery;
 	sizes?: string;
 	src?: string;
 	srcset?: string;
@@ -765,7 +765,7 @@ export interface IHtmlSpanElementProps extends IHtmlElementProps<HTMLSpanElement
 // <style>
 export interface IHtmlStyleElementProps extends IHtmlElementProps<HTMLStyleElement>
 {
-	media?: string;
+	media?: MediaQuery;
 	nonce?: string;
 	title?: string;
 	type?: string;

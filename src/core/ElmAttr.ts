@@ -1,4 +1,7 @@
-﻿import {Styleset, setElementStyle, SchedulerType, diffStylesets, StringStyleset, setElementStringStyle} from "mimcss"
+﻿import {
+    Styleset, setElementStyle, SchedulerType, diffStylesets, StringStyleset, setElementStringStyle,
+    MediaQuery, mediaQueryToString
+} from "mimcss"
 import {ICustomAttributeHandlerClass} from "../api/mim"
 
 /// #if USE_STATS
@@ -153,6 +156,7 @@ export class ElmAttr
 	{
 		// attributes - only those attributes are listed that have non-trivial treatment
 		style: { type: PropType.Attr, set: setStyleProp, diff: diffStyleProp, update: updateStyleProp },
+		media: { type: PropType.Attr, set: setMediaProp, diff: diffMediaProp, update: updateMediaProp },
 		value: { type: PropType.Attr, set: setValueProp, diff: diffValueProp, remove: removeValueProp },
 		defaultValue: { type: PropType.Attr, set: setValueProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
 		checked: { type: PropType.Attr, set: setCheckedProp, diff: diffCheckedProp, remove: removeCheckedProp },
@@ -339,7 +343,6 @@ function setStyleProp( elm: Element, attrName: string, propVal: Styleset): void
 
 
 
-
 function diffStyleProp( attrName: string, oldPropVal: Styleset, newPropVal: Styleset): any
 {
 	let res = diffStylesets( oldPropVal, newPropVal);
@@ -353,6 +356,41 @@ function diffStyleProp( attrName: string, oldPropVal: Styleset, newPropVal: Styl
 function updateStyleProp( elm: Element, attrName: string, updateVal: StringStyleset): void
 {
 	setElementStringStyle( elm as HTMLElement, updateVal, SchedulerType.Sync);
+}
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Handling of media property. Media property can be specified either as a string or as the
+// IMediaFeatureset object from the Mimcss library.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+function setMediaProp( elm: Element, attrName: string, propVal: MediaQuery): void
+{
+    elm[attrName] = mediaQueryToString( propVal);
+}
+
+
+
+function diffMediaProp( attrName: string, oldPropVal: MediaQuery, newPropVal: MediaQuery): any
+{
+    if (oldPropVal === newPropVal)
+        return undefined;
+
+	let oldString = mediaQueryToString( oldPropVal);
+	let newString = mediaQueryToString( oldPropVal);
+
+	// we have to return undefined because null is considered a valid update value
+	return newString === oldString ? undefined : newString;
+}
+
+
+
+function updateMediaProp( elm: Element, attrName: string, updateVal: string): void
+{
+    elm[attrName] = updateVal;
 }
 
 
