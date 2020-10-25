@@ -1,6 +1,6 @@
 {
 	"name": "mimbl",
-"version": "0.5.4",
+    "version": "0.5.5",
 	"description": "MiM Base Library for Web UI Authoring",
 	"homepage": "https://mmichlin66.github.io/mimbl/about.html",
 	"repository": "github:mmichlin66/mimbl",
@@ -32,6 +32,7 @@
 	},
 	"files": [
 		"lib/mimbl.js",
+		"lib/mimbl.dev.js",
 		"lib/index.d.ts",
 		"lib/utils/EventSlot.d.ts",
 		"lib/utils/TriggerWatcher.d.ts",
