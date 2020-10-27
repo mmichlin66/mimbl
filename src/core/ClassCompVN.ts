@@ -57,7 +57,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-		return this.renderWatcher();
+        return this.renderWatcher ? this.renderWatcher() : this.comp.render();
 	}
 
 
@@ -73,8 +73,9 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 		if (this.comp.willMount)
 			this.comp.willMount();
 
-        // start watching the function
-        this.renderWatcher = createWatcher( this.comp.render, this.requestUpdate, this.comp, this);
+        // // start watching the function if not disabled
+        if (!this.comp.disableRenderWatcher || !this.comp.disableRenderWatcher())
+            this.renderWatcher = createWatcher( this.comp.render, this.requestUpdate, this.comp, this);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
@@ -88,8 +89,11 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	// This method is part of the render phase.
 	public willUnmount(): void
 	{
-        this.renderWatcher.dispose();
-        this.renderWatcher = null;
+        if (this.renderWatcher)
+        {
+            this.renderWatcher.dispose();
+            this.renderWatcher = null;
+        }
 
         if (this.comp.willUnmount)
         {
@@ -156,7 +160,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
     // Watcher function wrapping the component's render function. The watcher will notice any
     // trigger objects being read during the original function execution and will request update
     // thus triggerring re-rendering.
-	private renderWatcher: IWatcher;
+	private renderWatcher?: IWatcher;
 }
 
 

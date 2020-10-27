@@ -156,6 +156,17 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * during updates.
 	 */
 	getUpdateStrategy?(): UpdateStrategy;
+
+	/**
+	 * Determines whether or not the render method should run under a watcher; that is, should
+     * detect trigger objects used by the render method and re-run when any of the triggers change.
+     * By default, when this method is not implemented, the watcher is created. This method can
+     * be implemented to return false by performance-wary components that are constantly being
+     * created and destroyed (mounted and unmounted) since creating a watcher may slightly impact
+     * the performance.
+	 * @returns True if the render method should run under a watcher and false otherwise.
+	 */
+	disableRenderWatcher?(): boolean;
 }
 
 

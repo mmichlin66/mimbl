@@ -112,6 +112,15 @@ export function wrapCallbackWithVN<T extends Function>( callback: T, thisCallbac
 
 
 /**
+ * Flag thast is true while the callback wrapper is being executed. This is need to not schedule
+ * animation frame from inside the wrapper because the Mimbl tick will be performed right after
+ * the callback is done.
+ */
+let s_insideCallbackWrapper = false;
+
+
+
+/**
  * The CallbackWrapper function is used to wrap callbacks in order to have it executed in a Mimbl
  * context. The function is usually bound to a virtual node as "this" and to two parameters: the
  * object that will be the value of "this" when the original callback is executed and the original
@@ -136,11 +145,13 @@ function CallbackWrapper(): any
     let vn: VN = this;
     let prevVN = trackCurrentVN( vn ? vn : null);
 
+    let retVal: any;
 	try
 	{
+        s_insideCallbackWrapper = true;
         enterMutationScope();
-		let [thisOrgCallback, orgCallback, ...rest] = arguments;
-		return orgCallback.apply( thisOrgCallback, rest);
+        let [thisOrgCallback, orgCallback, ...rest] = arguments;
+		retVal = orgCallback.apply( thisOrgCallback, rest);
 	}
 	catch( err)
 	{
@@ -153,10 +164,19 @@ function CallbackWrapper(): any
 	finally
 	{
         exitMutationScope();
+        s_insideCallbackWrapper = false;
 
         // restore previous current VN
         trackCurrentVN( prevVN);
-	}
+    }
+
+    // Schedule to perform Mimble tick at the end of the event loop.
+    Promise.resolve().then( doMimbleTick);
+
+    // // Perform Mimble tick at the end of the event loop.
+    // doMimbleTick();
+
+    return retVal;
 }
 
 
@@ -248,7 +268,7 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 // been scheduled.
 function requestFrameIfNeeded(): void
 {
-	if (s_scheduledFrameHandle === 0)
+	if (!s_insideCallbackWrapper && s_scheduledFrameHandle === 0)
 		s_scheduledFrameHandle = requestAnimationFrame( onScheduledFrame);
 }
 
@@ -269,6 +289,14 @@ function onScheduledFrame(): void
 // Reconciler main entrance point
 function doMimbleTick(): void
 {
+    // clear a scheduled frame (if any). This can happen if we were invoked from the callback
+    // wrapper while a frame has been previously scheduled.
+    if (s_scheduledFrameHandle !== 0)
+    {
+		cancelAnimationFrame( s_scheduledFrameHandle);
+        s_scheduledFrameHandle = 0;
+    }
+
 	// increment tick number.
 	s_currentTick++;
 
@@ -541,10 +569,6 @@ function commitNewNode( vn: VN, anchorDN: DN, beforeDN: DN)
 	/// #endif
 	let ownDN = vn.mount ? vn.mount() : undefined;
 
-	// if we have our own DOM node, add it under the anchor node
-	if (ownDN)
-		vn.anchorDN.insertBefore( ownDN, beforeDN);
-
 	// if the node has sub-nodes, add DOM nodes for them. If the virtual node has its own
 	// DOM node use it as an anchor for the sub-nodes.
 	if (vn.subNodes)
@@ -557,6 +581,10 @@ function commitNewNode( vn: VN, anchorDN: DN, beforeDN: DN)
 		for( let svn of vn.subNodes)
 			commitNewNode( svn, newAnchorDN, newBeforeDN);
 	}
+
+	// if we have our own DOM node, add it under the anchor node
+	if (ownDN)
+		vn.anchorDN.insertBefore( ownDN, beforeDN);
 
 	/// #if VERBOSE_NODE
 		console.debug( `Calling didMount() on node ${vn.name}`);
@@ -1583,13 +1611,10 @@ function createNodesFromArray( arr: any[]): VN[]
 	for( let item of arr)
 	{
 		let itemNodes = createNodesFromContent( item);
-		if (itemNodes === null)
+		if (itemNodes == null)
 			continue;
-		else if (Array.isArray( itemNodes))
-		{
-			for( let vn of itemNodes)
-				nodes.push( vn);
-		}
+        else if (Array.isArray( itemNodes))
+            nodes.push( ...itemNodes)
 		else
 			nodes.push( itemNodes);
 	}
@@ -1603,7 +1628,7 @@ function createNodesFromArray( arr: any[]): VN[]
 export function createNodesFromJSX( tag: any, props: any, children: any[]): VN | VN[]
 {
 	if (typeof tag === "string")
-		return new ElmVN( tag as string, props, children);
+		return new ElmVN( tag, props, children);
 	else if (tag === Fragment)
 		return createNodesFromArray( children);
 	else if (tag === FuncProxy)

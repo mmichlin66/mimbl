@@ -186,7 +186,7 @@ export class ElmVN extends VN implements IElmVN
 		this.props = (newVN as ElmVN).props;
 		this.children = (newVN as ElmVN).children;
 
-		return { shouldCommit, shouldRender };
+		return VNUpdateDisp.getStockValue( shouldCommit, shouldRender);
 	}
 
 

@@ -41,7 +41,7 @@ export class FuncProxyVN extends VN
         // remember data from the props. Note that if thisArg is undefined it will be changed
         // to the node's creator component upon mounting
 		this.func = props.func as (...args: any) => any;
-		this.thisArg = props.thisArg;
+		this.funcThisArg = props.thisArg;
 		this.args = props.args;
 		this.key = props.key;
 
@@ -97,9 +97,6 @@ export class FuncProxyVN extends VN
 	// Generates list of sub-nodes according to the current state
 	public render(): any
 	{
-        if (!this.funcWatcher)
-            return null;
-
 		/// #if VERBOSE_COMP
 			console.debug( `VERBOSE: Calling function proxy component ${this.name}`);
 		/// #endif
@@ -108,8 +105,7 @@ export class FuncProxyVN extends VN
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-		// return this.func.apply( this.thisArg, this.args);
-		return this.funcWatcher( this.args);
+		return this.funcWatcher ? this.funcWatcher( this.args) : this.func.apply( this.funcThisArg, this.args);
 	}
 
 
@@ -119,17 +115,18 @@ export class FuncProxyVN extends VN
 	// This method is part of the Render phase.
 	public willMount(): void
 	{
-        if (this.thisArg === undefined)
-            this.thisArg = this.creator;
+        if (this.funcThisArg === undefined)
+            this.funcThisArg = this.creator;
 
 		// if a key was not provided we use the value of thisArg (which might be the current
 		// component) as a key. If thisArg is undefined either we use the function itself as a key.
-        this.linkKey = this.key || this.thisArg || this.func;
+        this.linkKey = this.key || this.funcThisArg || this.func;
 
 		this.linkNodeToFunc();
 
-        // start watching the function
-        this.funcWatcher = createWatcher( this.func, this.updateFromWatcher, this.thisArg, this);
+        // // start watching the function if not disabled
+        if (!this.creator || !this.creator.disableRenderWatcher || !this.creator.disableRenderWatcher())
+            this.funcWatcher = createWatcher( this.func, this.updateFromWatcher, this.funcThisArg, this);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
@@ -143,8 +140,12 @@ export class FuncProxyVN extends VN
 	// This method is part of the render phase.
 	public willUnmount(): void
 	{
-        this.funcWatcher.dispose();
-        this.funcWatcher = null;
+        if (this.funcWatcher)
+        {
+            this.funcWatcher.dispose();
+            this.funcWatcher = null;
+        }
+
 		this.unlinkNodeFromFunc();
 
 		/// #if USE_STATS
@@ -161,7 +162,7 @@ export class FuncProxyVN extends VN
 		let newFuncProxyVN = newVN as FuncProxyVN;
 
 		// update is possible if it is the same function object and the same thisArg property
-		return this.func === newFuncProxyVN.func && this.thisArg === newFuncProxyVN.thisArg;
+		return this.func === newFuncProxyVN.func && this.funcThisArg === newFuncProxyVN.funcThisArg;
 	}
 
 
@@ -260,7 +261,7 @@ export class FuncProxyVN extends VN
 	private func: (...args: any) => any;
 
 	// Object to be used as "this" when invoking the function.
-	private thisArg: any;
+	private funcThisArg: any;
 
 	// Optional arguments to be passed to the function.
 	private args: any[];
@@ -276,7 +277,7 @@ export class FuncProxyVN extends VN
     // Watcher function wrapping the original function. The watcher will notice any trigger objects
     // being read during the original function execution and will request update thus triggerring
     // re-rendering.
-	private funcWatcher: IWatcher;
+	private funcWatcher?: IWatcher;
 }
 
 
