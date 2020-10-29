@@ -60,7 +60,6 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 			this.unmount();
             this.comp = newComp;
 			this.willMount();
-			this.mount();
 			this.didMount();
 		}
 

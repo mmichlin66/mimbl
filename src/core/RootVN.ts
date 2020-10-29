@@ -22,7 +22,7 @@ export class RootVN extends VN implements IErrorHandlingService
 		super();
 
 		this.anchorDN = anchorDN;
-		this.depth = 0;
+        this.depth = 0;
 	};
 
 
@@ -78,10 +78,7 @@ export class RootVN extends VN implements IErrorHandlingService
 
 	// Determines whether the node supports handling of errors; that is, exception thrown during
 	// rendering of the node itself and/or its sub-nodes.
-	public get supportsErrorHandling(): boolean
-	{
-		return true;
-	}
+	public get supportsErrorHandling(): boolean { return true; }
 
 
 

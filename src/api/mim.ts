@@ -948,6 +948,12 @@ export interface IVNode
 	/** Component that created this node in its render method (or undefined). */
 	readonly creator?: IComponent;
 
+	/**
+     * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the
+     * root nodes that don't have parents.
+     */
+	readonly index: number;
+
 	/** Reference to the next sibling node or undefined for the last sibling. */
 	readonly next?: IVNode;
 

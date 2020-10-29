@@ -530,19 +530,6 @@ function renderNewNode( vn: VN, parent: VN): void
                     }
                 }
             }
-
-            // interlink the sub-nodes with next and prev properties
-            let prevVN: VN;
-            for( let svn of subNodes)
-            {
-                if (prevVN)
-                {
-                    prevVN.next = svn;
-                    svn.prev = prevVN;
-                }
-
-                prevVN = svn;
-            }
         }
 
         // remember the sub-nodes
@@ -577,9 +564,13 @@ function commitNewNode( vn: VN, anchorDN: DN, beforeDN: DN)
 		let newAnchorDN = ownDN ? ownDN : anchorDN;
 		let newBeforeDN = ownDN ? null : beforeDN;
 
-		// mount all sub-nodes
-		for( let svn of vn.subNodes)
-			commitNewNode( svn, newAnchorDN, newBeforeDN);
+        // mount all sub-nodes
+        let index = 0;
+        for( let svn of vn.subNodes)
+        {
+            svn.index = index++;
+            commitNewNode( svn, newAnchorDN, newBeforeDN);
+        }
 	}
 
 	// if we have our own DOM node, add it under the anchor node
@@ -717,7 +708,7 @@ function renderUpdatedSubNodes( disp: VNDisp): void
 			let newVN = subNodeDisp.newVN;
 			if (subNodeDisp.action === VNDispAction.Update)
 			{
-				if ((oldVN.renderOnUpdate || oldVN !== newVN) && oldVN.prepareUpdate)
+				if ((oldVN !== newVN || oldVN.renderOnUpdate) && oldVN.prepareUpdate)
 				{
 					/// #if VERBOSE_NODE
 						console.debug( `Calling prepareUpdate() on node ${oldVN.name}`);
@@ -797,7 +788,6 @@ function commitUpdatesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, befo
 	// perform DOM operations according to sub-node disposition. We need to decide for each
 	// node what node to use to insert or move it before. We go from the end of the list of
 	// new nodes and on each iteration we decide the value of the "beforeDN".
-	let nextVN: VN;
 	for( let i = disps.length - 1; i >= 0; i--)
 	{
 		let disp = disps[i];
@@ -807,11 +797,11 @@ function commitUpdatesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, befo
 		// for the Update operation, the new node becomes a sub-node; for the Insert operation
 		// the new node become a sub-node.
 		let svn = disp.action === VNDispAction.Update ? oldVN : newVN;
-		parentVN.subNodes[i] = svn;
+        parentVN.subNodes[i] = svn;
 
 		if (disp.action === VNDispAction.Update)
 		{
-			if (oldVN.renderOnUpdate || oldVN !== newVN)
+			if (oldVN !== newVN || oldVN.renderOnUpdate)
 			{
 				if (disp.updateDisp.shouldCommit)
 				{
@@ -827,30 +817,33 @@ function commitUpdatesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, befo
 					commitUpdatedNode( disp);
 			}
 
-			// determine whether all the nodes under this VN should be moved.
-			let subNodeDNs = getImmediateDNs( oldVN);
-			if (subNodeDNs.length > 0)
-			{
-				// check whether the last of the DOM nodes already resides right before the needed node
-				if (subNodeDNs[subNodeDNs.length - 1].nextSibling !== beforeDN)
-				{
-					for( let subNodeDN of subNodeDNs)
-					{
-						anchorDN.insertBefore( subNodeDN, beforeDN);
+            // determine whether all the nodes under this VN should be moved.
+            if (i !== oldVN.index)
+            {
+                let subNodeDNs = getImmediateDNs( oldVN);
+                if (subNodeDNs.length > 0)
+                {
+                    // check whether the last of the DOM nodes already resides right before the needed node
+                    if (subNodeDNs[subNodeDNs.length - 1].nextSibling !== beforeDN)
+                    {
+                        for( let subNodeDN of subNodeDNs)
+                        {
+                            anchorDN.insertBefore( subNodeDN, beforeDN);
 
-						/// #if USE_STATS
-							DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Moved);
-						/// #endif
-					}
+                            /// #if USE_STATS
+                                DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Moved);
+                            /// #endif
+                        }
 
-					/// #if USE_STATS
-						DetailedStats.stats.log( oldVN.statsCategory, StatsAction.Moved);
-					/// #endif
-				}
+                        /// #if USE_STATS
+                            DetailedStats.stats.log( oldVN.statsCategory, StatsAction.Moved);
+                        /// #endif
+                    }
 
-				// the first of DOM nodes become the next beforeDN
-				beforeDN = subNodeDNs[0];
-			}
+                    // the first of DOM nodes become the next beforeDN
+                    beforeDN = subNodeDNs[0];
+                }
+            }
 		}
 		else if (disp.action === VNDispAction.Insert)
 		{
@@ -865,14 +858,8 @@ function commitUpdatesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, befo
 				beforeDN = firstDN;
 		}
 
-		svn.next = svn.prev = undefined;
-		if (nextVN)
-		{
-			nextVN.prev = svn;
-			svn.next = nextVN;
-		}
-
-		nextVN = svn;
+        // set current index as the index of the sub-node
+        svn.index = i;
 	}
 }
 
@@ -883,7 +870,6 @@ function commitUpdatesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, befo
 function commitUpdatesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
 {
 	let currSubNodeIndex = disps.length - 1;
-	let nextVN: VN, svn: VN, disp: VNDisp, newVN: VN, oldVN: VN, firstDN: DN;
 	for( let i = groups.length - 1; i >= 0; i--)
 	{
 		let group = groups[i];
@@ -891,18 +877,19 @@ function commitUpdatesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGro
 		// first update every sub-node in the group and its sub-sub-nodes
 		for( let j = group.last; j >= group.first; j--)
 		{
-			disp = disps[j];
-			newVN = disp.newVN;
-			oldVN = disp.oldVN;
+			let disp = disps[j];
+			let oldVN = disp.oldVN;
+            let newVN = disp.newVN;
 
-			// for the Update operation, the new node becomes a sub-node; for the Insert operation
+			// for the Update operation, the old node becomes a sub-node; for the Insert operation
 			// the new node become a sub-node.
-			svn = group.action === VNDispAction.Update ? oldVN : newVN;
-			parentVN.subNodes[currSubNodeIndex--] = svn;
+			let svn = group.action === VNDispAction.Update ? oldVN : newVN;
+			parentVN.subNodes[currSubNodeIndex] = svn;
 
+            let firstDN: DN | null = null;
 			if (group.action === VNDispAction.Update)
 			{
-				if (oldVN.renderOnUpdate || oldVN !== newVN)
+				if (oldVN !== newVN || oldVN.renderOnUpdate)
 				{
 					if (disp.updateDisp.shouldCommit)
 					{
@@ -919,8 +906,6 @@ function commitUpdatesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGro
 				}
 
 				firstDN = getFirstDN( oldVN);
-				if (firstDN != null)
-					beforeDN = firstDN;
 			}
 			else if (group.action === VNDispAction.Insert)
 			{
@@ -929,18 +914,14 @@ function commitUpdatesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGro
 				// if the new node defines a DOM node, it becomes the DOM node before which
 				// next components should be inserted/moved
 				firstDN = getFirstDN( newVN);
-				if (firstDN != null)
-					beforeDN = firstDN;
 			}
 
-			svn.next = svn.prev = undefined;
-			if (nextVN)
-			{
-				nextVN.prev = svn;
-				svn.next = nextVN;
-			}
+            // set current index as the index of the sub-node
+            svn.index = currSubNodeIndex--;
 
-			nextVN = svn;
+            // change the "before node" to the first DN of the sub-node (if any)
+            if (firstDN != null)
+                beforeDN = firstDN;
 		}
 
 		// now that all nodes in the group have been updated or inserted, we can determine
@@ -1229,9 +1210,10 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
 
     // loop over new nodes
     let oldUnkeyedListIndex = 0;
-    newChain.forEach( (newVN, index) =>
+    let subNodeIndex = 0;
+    for( let newVN of newChain)
     {
-        let oldVN: VN = null;
+        let oldVN: VN;
 
         // try to look up the old node by the new node's key if exists
         key = newVN.key;
@@ -1249,10 +1231,10 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
         if (!oldVN && oldUnkeyedListIndex != oldUnkeyedListLength)
             oldVN = oldUnkeyedList[oldUnkeyedListIndex++];
 
-        disp.subNodeDisps[index] = createSubDispForNodes( disp, newVN, oldVN, allowKeyedNodeRecycling);
-    });
+        disp.subNodeDisps[subNodeIndex++] = createSubDispForNodes( disp, newVN, oldVN, allowKeyedNodeRecycling);
+    }
 
-    // old nodes remaning in the keyed map and in the unkeyed list will be removed
+    // old nodes remaining in the keyed map and in the unkeyed list will be removed
     if (oldKeyedMap.size > 0 || oldUnkeyedListIndex < oldUnkeyedListLength)
     {
         if (!disp.subNodesToRemove)
@@ -1288,6 +1270,7 @@ function createSubDispForNodes( disp: VNDisp, newVN: VN, oldVN?: VN, allowKeyedN
         subDisp.action = VNDispAction.Insert;
         if (!disp.subNodesToRemove)
             disp.subNodesToRemove = [];
+
         disp.subNodesToRemove.push( oldVN);
     }
 
@@ -1313,7 +1296,7 @@ function buildSubNodeGroups( disp: VNDisp): void
     /// #endif
 
     // create array of groups and create the first group starting from the first node
-    let group: VNDispGroup = new VNDispGroup( disp, disp.subNodeDisps[0].action, 0);
+    let group = new VNDispGroup( disp, disp.subNodeDisps[0].action, 0);
     disp.subNodeGroups = [group];
 
     // loop over sub-nodes and on each iteration decide whether we need to open a new group
@@ -1321,6 +1304,7 @@ function buildSubNodeGroups( disp: VNDisp): void
     // a new one.
     let action: VNDispAction;
     let subDisp: VNDisp;
+    let prevOldVN: VN;
     for( let i = 1; i < count; i++)
     {
         subDisp = disp.subNodeDisps[i];
@@ -1336,10 +1320,11 @@ function buildSubNodeGroups( disp: VNDisp): void
         }
         else if (action === VNDispAction.Update)
         {
-            // an "update" node is out-of-order and should close the current group if
-            // its next sibling in the new list is different from the next sibling in the old list.
+            // an "update" sub-node is out-of-order and should close the current group if the index
+            // of its previous sibling + 1 isn't equal to the index of this sub-node.
             // The last node will close the last group after the loop.
-            if (disp.subNodeDisps[i-1].oldVN !== subDisp.oldVN.prev)
+            prevOldVN = disp.subNodeDisps[i-1].oldVN;
+            if (!prevOldVN || prevOldVN.index + 1 !== subDisp.oldVN.index)
             {
                 // close the group with the current index.
                 group.last = i - 1;
@@ -1469,9 +1454,15 @@ function getNextDNUnderSameAnchorDN( vn: VN, anchorDN: DN): DN
 		}
 	}
 
-	// loop over our next siblings
-	for( let nvn = vn.next; nvn !== undefined; nvn = nvn.next)
+    // if we don't have the parent, this means that it is a root node and it doesn't have siblings
+    if (!vn.parent)
+        return null;
+
+    // loop over our next siblings
+    let siblings = vn.parent.subNodes;
+	for( let i = vn.index + 1; i < siblings.length; i++)
 	{
+        let nvn = siblings[i];
 		if (!nvn.anchorDN)
 			return null;
 
@@ -1483,8 +1474,8 @@ function getNextDNUnderSameAnchorDN( vn: VN, anchorDN: DN): DN
 			return dn;
 	}
 
-	// recurse to our parent if exists
-	return vn.parent && vn.parent.anchorDN === anchorDN ? getNextDNUnderSameAnchorDN( vn.parent, anchorDN) : null;
+	// recurse to our parent if it has the same anchor element
+	return vn.parent.anchorDN !== anchorDN ? null : getNextDNUnderSameAnchorDN( vn.parent, anchorDN);
 }
 
 

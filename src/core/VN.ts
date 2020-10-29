@@ -44,6 +44,12 @@ export abstract class VN implements IVNode
 	/** Component that created this node in its render method (or undefined). */
 	public creator: IComponent;
 
+	/**
+     * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the
+     * root nodes that don't have parents.
+     */
+	public index: number;
+
 	// Level of nesting at which the node resides relative to the root node.
 	public depth: number;
 
@@ -59,15 +65,9 @@ export abstract class VN implements IVNode
 	/**
 	 * Flag indicating whether this node should re-render during update even it is the same
 	 * physical node instance. This is needed for nodes that serve as a proxy to a rendering
-	 * function and that function must be invoked even none of the node parameters have changed.
+	 * function and that function must be invoked even if none of the node parameters have changed.
 	 */
 	public renderOnUpdate?: boolean;
-
-	// Reference to the next sibling node or undefined for the last sibling.
-	public next: VN;
-
-	// Reference to the previous sibling node or undefined for the first sibling.
-	public prev: VN;
 
 	// List of sub-nodes - both keyed and unkeyed - defined only if there are some sub-nodes.
 	public subNodes: VN[];
@@ -113,21 +113,19 @@ export abstract class VN implements IVNode
 		if (this.publishedServices !== undefined)
 		{
 			this.publishedServices.forEach( (service, id) => notifyServiceUnpublished( id, this));
-			this.publishedServices.clear();
+			// this.publishedServices.clear();
 		}
 
 		if (this.subscribedServices !== undefined)
 		{
 			this.subscribedServices.forEach( (info, id) => notifyServiceUnsubscribed( id, this));
-			this.subscribedServices.clear();
+			// this.subscribedServices.clear();
 		}
 
-		this.next = undefined;
-		this.prev = undefined;
-		this.subNodes = undefined;
-		this.creator = undefined;
-		this.depth = undefined;
-		this.parent = undefined;
+		// this.subNodes = undefined;
+		// this.creator = undefined;
+		// this.depth = undefined;
+		// this.parent = undefined;
 	}
 
 
@@ -142,61 +140,61 @@ export abstract class VN implements IVNode
 	// sub-nodes, null should be returned. If this method is not implemented that means the node
 	// never has children - for example text nodes.
 	// This method is part of the Render phase.
-	render?(): any;
+	public render?(): any;
 
 	// Initializes internal stuctures of the virtual node. This method is called right after the
 	// node has been constructed.
 	// This method is part of the Render phase.
-	willMount?(): void;
+	public willMount?(): void;
 
 	// Creates and returns DOM node corresponding to this virtual node. This method is implemented
 	// only on nodes that have their own DOM nodes.
 	// This method is part of the Commit phase.
-	mount?(): DN;
+	public mount?(): DN;
 
     // Notifies the virtual node that it was successfully mounted. This method is called after the
     // content of node and all its sub-nodes is added to the DOM tree.
 	// This method is part of the Commit phase.
-	didMount?(): void;
+	public didMount?(): void;
 
 	// Clears internal structures of the virtual node. This method is called before the content
 	// of node and all its sub-nodes is removed from the DOM tree.
 	// This method is part of the Commit phase.
-	willUnmount?(): void;
+	public willUnmount?(): void;
 
 	// Clears DOM node corresponding to this virtual node. This method is implemented only on nodes
 	// that have their own DOM nodes. This method should only release the internally held reference
 	// to the DOM node - the actual removal of the node from DOM is done by the infrastructure.
 	// This method is part of the Commit phase.
-	unmount?(): void;
+	public unmount?(): void;
 
 	// Determines whether the update of this node from the given node is possible. The newVN
 	// parameter is guaranteed to point to a VN of the same type as this node. If this method is
 	// not implemented the update is considered possible - e.g. for text nodes.
 	// This method is part of the Render phase.
-	isUpdatePossible?( newVN: VN): boolean;
+	public isUpdatePossible?( newVN: VN): boolean;
 
 	// Prepares this node to be updated from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node. The returned object indicates whether children
 	// should be updated and whether the commitUpdate method should be called.
 	// This method is part of the Render phase.
-	prepareUpdate?( newVN: VN): VNUpdateDisp;
+	public prepareUpdate?( newVN: VN): VNUpdateDisp;
 
 	// Commits updates made to this node to DOM.
 	// This method is part of the Commit phase.
-	commitUpdate?( newVN: VN): void;
+	public commitUpdate?( newVN: VN): void;
 
 	// Determines whether the node supports handling of errors; that is, exception thrown during
 	// rendering of the node itself and/or its sub-nodes. If this method is not implemented the node
 	// doesn't support error handling.
 	// This method is part of the Render phase.
-	readonly supportsErrorHandling?: boolean;
+	public supportsErrorHandling?: boolean;
 
 	// This method is called after an exception was thrown during rendering of the node itself
 	// and/or its sub-nodes. The render method will be called after this method returns.
 	// This method is part of the Render phase.
-	handleError?( err: any, path: string[]): void;
+	public handleError?( err: any, path: string[]): void;
 
 
 
