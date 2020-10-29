@@ -1,6 +1,6 @@
 ﻿import {IClassCompVN, IComponent, UpdateStrategy} from "../api/mim"
 import {createWatcher, IWatcher} from "../utils/TriggerWatcher"
-import {VN} from "../internal"
+import {VN, DN} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -72,14 +72,23 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         // don't need try/catch because it will be caught up the chain
 		if (this.comp.willMount)
 			this.comp.willMount();
+	}
 
+
+
+	// Creates and returns DOM node corresponding to this virtual node.
+	// This method is part of the Commit phase.
+	public mount(): DN
+	{
         // // start watching the function if not disabled
         if (!this.comp.disableRenderWatcher || !this.comp.disableRenderWatcher())
             this.renderWatcher = createWatcher( this.comp.render, this.requestUpdate, this.comp, this);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
-		/// #endif
+        /// #endif
+
+        return null;
 	}
 
 
@@ -89,12 +98,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	// This method is part of the render phase.
 	public willUnmount(): void
 	{
-        if (this.renderWatcher)
-        {
-            this.renderWatcher.dispose();
-            this.renderWatcher = null;
-        }
-
         if (this.comp.willUnmount)
         {
             // need try/catch but only to log
@@ -106,6 +109,19 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
             {
                 console.error( `Exception in willUnmount of component '${this.name}'`, err);
             }
+        }
+	}
+
+
+
+	// Releases reference to the DOM node corresponding to this virtual node.
+	// This method is part of the Commit phase.
+	public unmount(): void
+	{
+        if (this.renderWatcher)
+        {
+            this.renderWatcher.dispose();
+            this.renderWatcher = null;
         }
 
 		this.comp.vn = undefined;

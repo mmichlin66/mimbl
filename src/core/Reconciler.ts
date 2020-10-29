@@ -599,36 +599,11 @@ function commitNewNode( vn: VN, anchorDN: DN, beforeDN: DN)
 
 
 
-// Calls willUnmount on this VN and, if requested, recursively on its sub-nodes. This function is
-// called for every node being destructed. It is called non-recursively on the virtual nodes that
-// have their own DOM node. On such nodes, the unmount method will be called and the node will be
-// properly marked as unmounted. For virtual nodes that don't have their own DOM node, this
-// function is called recursively. the unmount method will not be called for these nodes;
-// therefore, we need to mark them as unmounted here.
-function callWillUnmount( vn: VN, recursive: boolean)
+// Recursively removes DOM nodes corresponding to this VN and its sub-nodes.
+function commitRemovedNode( vn: VN, removeOwnNode: boolean)
 {
-    // indicate that the node was processed in this cycle - this will prevent it from
-    // rendering again in this cycle.
-    vn.lastUpdateTick = s_currentTick;
-
-    // first notify sub-nodes if recursive
-    if (recursive && vn.subNodes)
-	{
-        for( let svn of vn.subNodes)
-        {
-            // keep track of the node that is being currently processed.
-            let prevVN = trackCurrentVN(svn);
-
-            callWillUnmount( svn, true);
-
-            // restore pointer to the previous current node.
-            trackCurrentVN( prevVN);
-
-            // mark the node as unmounted
-            vn.term();
-            vn.anchorDN = undefined;
-        }
-	}
+	// get the DOM node before we call unmount, because unmount will clear it.
+	let ownDN = vn.ownDN;
 
     // notify our node
 	if (vn.willUnmount)
@@ -639,25 +614,16 @@ function callWillUnmount( vn: VN, recursive: boolean)
 
 		vn.willUnmount();
 	}
-}
 
-
-
-// Recursively removes DOM nodes corresponding to this VN and its sub-nodes.
-function commitRemovedNode( vn: VN)
-{
-	// keep track of the node that is being currently processed.
-	let prevVN = trackCurrentVN(vn);
-
-	// get the DOM node before we call unmount, because unmount will clear it.
-	let ownDN = vn.ownDN;
-
-	// If the virtual node has its own DOM node, we will remove it from the DOM tree. In this case,
-    // we don't need to recursively unmount sub-nodes because they are removed with the parent;
-    // however, we need to call their willUnmount methods. If the node doesn't have its own DOM
-    // node, we need to call willUnmount only on the node itself because later we will recurse
-    // into its sub-nodes.
-    callWillUnmount( vn, ownDN != null);
+    if (vn.subNodes && (!vn.updateStrategy || !vn.updateStrategy.noRecursiveUnmount))
+    // if (vn.subNodes)
+	{
+        // DOM nodes of sub-nodes don't need to be removed if either the upper DOM node
+        // was already removed or our own DOM node is going to be removed.
+        let removeSubNodesOwnNode = removeOwnNode && !ownDN;
+		for( let svn of vn.subNodes)
+			commitRemovedNode( svn, removeSubNodesOwnNode);
+    }
 
     // call unmount on our node - regardless whether it has its own DN or not
     if (vn.unmount)
@@ -670,22 +636,12 @@ function commitRemovedNode( vn: VN)
 
     // If the virtual node has its own DOM node, remove it from the DOM tree; otherwise, recurse
     // into the sub-nodes.
-    if (ownDN)
+    if (ownDN && removeOwnNode)
         (ownDN as any as ChildNode).remove();
-    else if (vn.subNodes)
-	{
-		// loop over sub-nodes from last to first because this way the DOM element removal is
-		// easier.
-		for( let i = vn.subNodes.length - 1; i >=0; i--)
-			commitRemovedNode( vn.subNodes[i]);
-	}
 
     // mark the node as unmounted
 	vn.term();
 	vn.anchorDN = undefined;
-
-	// restore pointer to the previous current node.
-	trackCurrentVN( prevVN);
 }
 
 
@@ -754,12 +710,11 @@ function renderUpdatedSubNodes( disp: VNDisp): void
 	// perform rendering for sub-nodes that should be inserted, replaced or updated
 	if (disp.subNodeDisps)
 	{
-		let oldVN: VN, newVN: VN;
 		let parentVN = disp.oldVN;
 		for( let subNodeDisp of disp.subNodeDisps)
 		{
-			oldVN = subNodeDisp.oldVN;
-			newVN = subNodeDisp.newVN;
+			let oldVN = subNodeDisp.oldVN;
+			let newVN = subNodeDisp.newVN;
 			if (subNodeDisp.action === VNDispAction.Update)
 			{
 				if ((oldVN.renderOnUpdate || oldVN !== newVN) && oldVN.prepareUpdate)
@@ -790,7 +745,7 @@ function commitUpdatedNode( disp: VNDisp): void
 	if (disp.subNodesToRemove)
 	{
 		for( let svn of disp.subNodesToRemove)
-			commitRemovedNode( svn);
+			commitRemovedNode( svn, true);
 	}
 
 	// get the node whose children are being updated. This is always the oldVN member of
@@ -842,16 +797,16 @@ function commitUpdatesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, befo
 	// perform DOM operations according to sub-node disposition. We need to decide for each
 	// node what node to use to insert or move it before. We go from the end of the list of
 	// new nodes and on each iteration we decide the value of the "beforeDN".
-	let nextVN: VN, svn: VN, disp: VNDisp, newVN: VN, oldVN: VN, firstDN: DN;
+	let nextVN: VN;
 	for( let i = disps.length - 1; i >= 0; i--)
 	{
-		disp = disps[i];
-		newVN = disp.newVN;
-		oldVN = disp.oldVN;
+		let disp = disps[i];
+		let newVN = disp.newVN;
+		let oldVN = disp.oldVN;
 
 		// for the Update operation, the new node becomes a sub-node; for the Insert operation
 		// the new node become a sub-node.
-		svn = disp.action === VNDispAction.Update ? oldVN : newVN;
+		let svn = disp.action === VNDispAction.Update ? oldVN : newVN;
 		parentVN.subNodes[i] = svn;
 
 		if (disp.action === VNDispAction.Update)
@@ -905,7 +860,7 @@ function commitUpdatesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, befo
 
 			// if the new node defines a DOM node, it becomes the DOM node before which
 			// next components should be inserted/moved
-			firstDN = getFirstDN( newVN);
+			let firstDN = getFirstDN( newVN);
 			if (firstDN != null)
 				beforeDN = firstDN;
 		}

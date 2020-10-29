@@ -57,8 +57,11 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 		if (needsUpdating)
 		{
 			this.willUnmount();
+			this.unmount();
             this.comp = newComp;
 			this.willMount();
+			this.mount();
+			this.didMount();
 		}
 
 		return VNUpdateDisp.getStockValue( false, needsUpdating);

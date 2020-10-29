@@ -24,7 +24,7 @@ export class ElmVN extends VN implements IElmVN
 
 	// Instance of an Element. The instance is created when the node is rendered for the first
 	// time.
-	public elm: Element;
+	public get elm(): Element { return this.ownDN as Element }
 
 	// Flag indicating whether the Element is SVG (as opposed to HTLM). There are some SVG
 	// elements that have the same name as regular elements (e.g. <a>). Therefore, in order to
@@ -75,11 +75,6 @@ export class ElmVN extends VN implements IElmVN
 
 
 
-	// Returns DOM node corresponding to the virtual node itself and not to any of its sub-nodes.
-	public get ownDN(): DN { return this.elm; }
-
-
-
 	// Generates list of sub-nodes according to the current state
 	public render(): any
 	{
@@ -95,9 +90,9 @@ export class ElmVN extends VN implements IElmVN
 		// determine whether this is an SVG or HTML element and create the element
 		let svgInfo = SvgElms.getSvgElmInfo( this.elmName);
 		this.isSvg = svgInfo !== undefined && (svgInfo !== true || this.anchorDN.namespaceURI.endsWith( "svg"));
-		this.elm = this.isSvg
-			? this.elm = document.createElementNS( SvgElms.namespace, SvgElms.getElmName( svgInfo, this.elmName))
-			: this.elm = document.createElement( this.elmName);
+		this.ownDN = this.isSvg
+			? document.createElementNS( SvgElms.namespace, SvgElms.getElmName( svgInfo, this.elmName))
+			: document.createElement( this.elmName);
 
 		// translate properties into attributes, events and custom attributes
 		this.parseProps();
@@ -113,13 +108,13 @@ export class ElmVN extends VN implements IElmVN
 
 		// set the value of the reference (if specified)
 		if (this.ref !== undefined)
-            setRef( this.ref, this.elm);
+            setRef( this.ref, this.ownDN);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Added);
 		/// #endif
 
-		return this.elm;
+		return this.ownDN;
 	}
 
 
@@ -133,7 +128,7 @@ export class ElmVN extends VN implements IElmVN
 		// more than one element (and/or components) it can happen that the reference is changed
 		// before our element is unmounted.
 		if (this.ref !== undefined)
-			setRef( this.ref, undefined, this.elm);
+			setRef( this.ref, undefined, this.ownDN);
 
 		/// #if REMOVE_EVENT_LISTENERS
 			// remove listeners. Since modern browsers don't leak when listeners are not
@@ -148,7 +143,7 @@ export class ElmVN extends VN implements IElmVN
 			this.removeCustomAttrs( true);
 
 		// clean up
-		this.elm = null;
+		this.ownDN = null;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Deleted);
@@ -206,7 +201,7 @@ export class ElmVN extends VN implements IElmVN
 			// if reference is now specified, set it now; note that we already determined that
 			// the reference object is different.
 			if (this.ref !== undefined)
-				setRef( this.ref, this.elm);
+				setRef( this.ref, this.ownDN);
 		}
 
 		// remeber the new value of the key, updateStartegy and creator property (even if the
@@ -228,7 +223,7 @@ export class ElmVN extends VN implements IElmVN
 		if (!this.props)
 			return;
 
-		let propVal: any, propInfo: PropInfo, propType: PropType;
+        let propVal: any, propInfo: PropInfo, propType: PropType;
 		for( let propName in this.props)
 		{
 			if (propName === "key")
@@ -315,7 +310,7 @@ export class ElmVN extends VN implements IElmVN
 		for( let name in this.attrs)
 		{
 			let rtd = this.attrs[name];
-			ElmAttr.setAttr( this.elm, name, rtd.info, rtd.val);
+			ElmAttr.setAttr( this.ownDN as Element, name, rtd.info, rtd.val);
 		}
 	}
 
@@ -325,7 +320,7 @@ export class ElmVN extends VN implements IElmVN
 	private updateAttrs( newAttrs: { [name: string]: AttrRunTimeData }): void
 	{
 		// "cache" several memebers for faster access
-		let elm = this.elm;
+		let elm = this.ownDN as Element;
 		let oldAttrs = this.attrs;
 
 		// loop over existing attributes, remove those that are not found among the new ones and
@@ -388,7 +383,7 @@ export class ElmVN extends VN implements IElmVN
 	private addEvent( name: string, event: EventRunTimeData): void
 	{
 		event.wrapper = this.createEventWrapper( event);
-		this.elm.addEventListener( name, event.wrapper, event.useCapture);
+		this.ownDN.addEventListener( name, event.wrapper, event.useCapture);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Event, StatsAction.Added);
@@ -418,7 +413,7 @@ export class ElmVN extends VN implements IElmVN
 	// Removes the given event listener from the Element.
 	private removeEvent( name: string, event: EventRunTimeData): void
 	{
-		this.elm.removeEventListener( name, event.wrapper, event.useCapture);
+		this.ownDN.removeEventListener( name, event.wrapper, event.useCapture);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Event, StatsAction.Deleted);
@@ -467,7 +462,7 @@ export class ElmVN extends VN implements IElmVN
 	// Determines whether the old and the new values of the event listener are different and sets
 	// the updated value. Returns true if update has been performed and false if no change has
 	// been detected.
-	private updateEvent( name: string, oldEvent: EventRunTimeData, newEvent: EventRunTimeData): boolean
+	private updateEvent( name: string, oldEvent: EventRunTimeData, newEvent: EventRunTimeData): void
 	{
 		// double-equal-sign for useCapture is on purpose, because useCapture can be undefined or boolean
 		if (oldEvent.orgFunc === newEvent.orgFunc &&
@@ -475,22 +470,19 @@ export class ElmVN extends VN implements IElmVN
 			oldEvent.useCapture == newEvent.useCapture)
 		{
 			newEvent.wrapper = oldEvent.wrapper;
-			return false;
 		}
 		else
 		{
 			// remove old event listener
-			this.elm.removeEventListener( name, oldEvent.wrapper, oldEvent.useCapture);
+			this.ownDN.removeEventListener( name, oldEvent.wrapper, oldEvent.useCapture);
 
 			// create new wrapper and add it as event listener
 			newEvent.wrapper = this.createEventWrapper( newEvent);
-			this.elm.addEventListener( name, newEvent.wrapper, newEvent.useCapture);
+			this.ownDN.addEventListener( name, newEvent.wrapper, newEvent.useCapture);
 
 			/// #if USE_STATS
 				DetailedStats.stats.log( StatsCategory.Event, StatsAction.Updated);
 			/// #endif
-
-			return true;
 		}
 	}
 

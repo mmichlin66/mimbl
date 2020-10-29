@@ -16,7 +16,7 @@ export class TextVN extends VN implements ITextVN
 	public text: string;
 
 	// Text DOM node
-	public textNode: Text;
+	public get textNode(): Text { return this.ownDN as Text }
 
 
 
@@ -39,10 +39,6 @@ export class TextVN extends VN implements ITextVN
 	// it can reflect an "id" property of an element (if any).
 	public get name(): string { return "#text"; }
 
-	// Returns DOM node corresponding to the virtual node itself (if any) and not to any of its
-	// sub-nodes.
-	public get ownDN(): DN { return this.textNode; };
-
 
 
 	// Creates and returns DOM node corresponding to this virtual node.
@@ -53,21 +49,21 @@ export class TextVN extends VN implements ITextVN
 			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Added);
 		/// #endif
 
-		return this.textNode = document.createTextNode( this.text);
+		return this.ownDN = document.createTextNode( this.text);
 	}
 
 
 
-	// Destroys DOM node corresponding to this virtual node.
-	// This method is part of the Commit phase.
-	public unmount(): void
-	{
-		this.textNode = undefined;
+    /// #if USE_STATS
+        // Destroys DOM node corresponding to this virtual node.
+        // This method is part of the Commit phase.
+        public unmount(): void
+        {
+            this.ownDN = undefined;
 
-		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Deleted);
-		/// #endif
-	}
+            DetailedStats.stats.log( StatsCategory.Text, StatsAction.Deleted);
+        }
+    /// #endif
 
 
 
@@ -87,7 +83,7 @@ export class TextVN extends VN implements ITextVN
 	// Commits updates made to this node to DOM.
 	public commitUpdate( newVN: VN): void
 	{
-		this.textNode.nodeValue = this.text = (newVN as TextVN).text;
+		this.ownDN.nodeValue = this.text = (newVN as TextVN).text;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Updated);
