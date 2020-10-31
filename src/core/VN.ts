@@ -375,9 +375,9 @@ export abstract class VN implements IVNode
 	 *
 	 * @param callback
 	 */
-	public wrapCallback<T extends Function>( callback: T, thisCallback?: object): T
+	public wrapCallback<T extends Function>( callback: T, thisCallback?: object, doMimblTick?: boolean): T
 	{
-		return wrapCallbackWithVN( callback, thisCallback, this);
+		return wrapCallbackWithVN( callback, thisCallback, this, doMimblTick);
 	}
 
 

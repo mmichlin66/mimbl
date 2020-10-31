@@ -99,14 +99,15 @@ const enum SchedulerState
  * @param vn Virtual node in whose context the callback will be executed.
  * @returns The wrapper function that should be used instead of the original callback.
  */
-export function wrapCallbackWithVN<T extends Function>( callback: T, thisCallback?: object, vn?: IVNode): T
+export function wrapCallbackWithVN<T extends Function>( callback: T, thisCallback?: object,
+    vn?: IVNode, doMimblTick?: boolean): T
 {
     // if "this" for the callback was not passed but vn was, check whether the vn is a component;
     // if yes, use it as "this"; otherwise, use vn's creator component.
     if (!thisCallback && vn)
         thisCallback = (vn as any).comp != null ? (vn as any).comp : vn.creator;
 
-    return CallbackWrapper.bind( vn, thisCallback, callback);
+    return CallbackWrapper.bind( vn, thisCallback, callback, doMimblTick);
 }
 
 
@@ -146,11 +147,11 @@ function CallbackWrapper(): any
     let prevVN = trackCurrentVN( vn ? vn : null);
 
     let retVal: any;
+    let [thisOrgCallback, orgCallback, doMimblTick, ...rest] = arguments;
 	try
 	{
         s_insideCallbackWrapper = true;
         enterMutationScope();
-        let [thisOrgCallback, orgCallback, ...rest] = arguments;
 		retVal = orgCallback.apply( thisOrgCallback, rest);
 	}
 	catch( err)
@@ -170,8 +171,9 @@ function CallbackWrapper(): any
         trackCurrentVN( prevVN);
     }
 
-    // Schedule to perform Mimble tick at the end of the event loop.
-    Promise.resolve().then( doMimbleTick);
+    // If requested, schedule to perform Mimble tick at the end of the event loop.
+    if (doMimblTick)
+        queueMicrotask( performMimbleTick);
 
     // // Perform Mimble tick at the end of the event loop.
     // doMimbleTick();
@@ -281,13 +283,13 @@ function onScheduledFrame(): void
 	// schedule a new frame.
 	s_scheduledFrameHandle = 0;
 
-    doMimbleTick();
+    performMimbleTick();
 }
 
 
 
 // Reconciler main entrance point
-function doMimbleTick(): void
+function performMimbleTick(): void
 {
     // clear a scheduled frame (if any). This can happen if we were invoked from the callback
     // wrapper while a frame has been previously scheduled.
@@ -487,12 +489,12 @@ function renderNewNode( vn: VN, parent: VN): void
 		vn.willMount();
 	}
 
-	// keep track of the node that is being currently processed.
-	let prevVN = trackCurrentVN(vn);
-
 	// if the node doesn't implement `render`, the node never has any sub-nodes (e.g. text nodes)
 	if (vn.render)
 	{
+        // keep track of the node that is being currently processed.
+        let prevVN = trackCurrentVN(vn);
+
         // we call the render method without try/catch
         let subNodes = createVNChainFromContent( vn.render());
         if (subNodes)
@@ -523,7 +525,7 @@ function renderNewNode( vn: VN, parent: VN): void
                     // up in an infinite loop
                     vn.handleError( err, getVNPath( s_currentVN));
                     subNodes = createVNChainFromContent( vn.render());
-                    if (vn.subNodes)
+                    if (subNodes)
                     {
                         for( let svn of subNodes)
                             renderNewNode( svn, vn);
@@ -534,10 +536,10 @@ function renderNewNode( vn: VN, parent: VN): void
 
         // remember the sub-nodes
         vn.subNodes = subNodes;
-	}
 
-	// restore pointer to the previous current node.
-	trackCurrentVN( prevVN);
+        // restore pointer to the previous current node.
+        trackCurrentVN( prevVN);
+	}
 }
 
 
@@ -651,8 +653,6 @@ function renderUpdatedNode( disp: VNDisp): void
     // we call the render method without try/catch. If it throws, the control goes to either the
     // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
     let subNodes = createVNChainFromContent( vn.render());
-
-	// build array of dispositions objects for the sub-nodes.
 	buildSubNodeDispositions( disp, subNodes);
 	if (subNodes)
     {
@@ -1499,40 +1499,41 @@ function getVNPath( vn: VN): string[]
 // For all types of contents other than an array, the returned value is a single VN. If the input
 // content is an array, then a VN is created for each of the array elements. Since array elements
 // might also be arrays, the process is recursive.
-function createNodesFromContent( content: any): VN | VN[]
+function createNodesFromContent( content: any, nodes: VN[]): void
 {
 	if (content == null || content === false)
 	{
 		// the comparison above covers both null and undefined
-		return null;
+		return;
 	}
 	else if (content instanceof VN)
-		return content;
+		nodes.push( content);
 	else if (typeof content === "string")
 	{
-		return content.length > 0 ? new TextVN( content) : null;
+        if (content.length > 0)
+            nodes.push( new TextVN( content));
 	}
 	else if (typeof content.render === "function")
 	{
 		// if the component (this can only be an Instance component) is already attached to VN,
 		// return this existing VN; otherwise create a new one.
-		return (content as IComponent).vn
+		nodes.push( (content as IComponent).vn
 						? (content as IComponent).vn as VN
-						: new IndependentCompVN( content as IComponent);
+						: new IndependentCompVN( content as IComponent));
 	}
 	else if (Array.isArray( content))
-		return createNodesFromArray( content);
+		createNodesFromArray( content, nodes);
 	else if (content instanceof Promise)
 	{
-		return new PromiseProxyVN( { promise: content});
+		nodes.push( new PromiseProxyVN( { promise: content}));
 	}
 	else if (typeof content === "function")
 	{
 		let vn = FuncProxyVN.findVN( content)
-		return vn || new FuncProxyVN( { func: content, thisArg: s_currentClassComp});
+		nodes.push( vn ? vn : new FuncProxyVN( { func: content, thisArg: s_currentClassComp}));
 	}
 	else
-		return new TextVN( content.toString());
+        nodes.push( new TextVN( content.toString()));
 }
 
 
@@ -1541,31 +1542,21 @@ function createNodesFromContent( content: any): VN | VN[]
 // if it returns a single node, wraps it in an array.
 function createVNChainFromContent( content: any): VN[]
 {
-	let nodes = createNodesFromContent( content);
-	return !nodes ? null : Array.isArray(nodes) ? (nodes.length === 0 ? null : nodes) : [nodes];
+    let nodes: VN[] = [];
+	createNodesFromContent( content, nodes);
+	return nodes.length === 0 ? null : nodes;
 }
 
 
 
 // Creates array of virtual nodes from the given array of items.
-function createNodesFromArray( arr: any[]): VN[]
+function createNodesFromArray( arr: any[], nodes: VN[]): void
 {
 	if (arr.length === 0)
 		return null;
 
-	let nodes: VN[] = [];
 	for( let item of arr)
-	{
-		let itemNodes = createNodesFromContent( item);
-		if (itemNodes == null)
-			continue;
-        else if (Array.isArray( itemNodes))
-            nodes.push( ...itemNodes)
-		else
-			nodes.push( itemNodes);
-	}
-
-	return nodes.length > 0 ? nodes : null;
+		createNodesFromContent( item, nodes);
 }
 
 
@@ -1575,8 +1566,12 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
 {
 	if (typeof tag === "string")
 		return new ElmVN( tag, props, children);
-	else if (tag === Fragment)
-		return createNodesFromArray( children);
+    else if (tag === Fragment)
+    {
+        let nodes: VN[] = [];
+        createNodesFromArray( children, nodes);
+        return nodes.length > 0 ? nodes : null;
+    }
 	else if (tag === FuncProxy)
 	{
 		if (!props || !props.func)

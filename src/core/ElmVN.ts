@@ -509,7 +509,7 @@ export class ElmVN extends VN implements IElmVN
 	// method.
 	private createEventWrapper( event: EventRunTimeData): EventFuncType<Event>
 	{
-		return this.wrapCallback( event.orgFunc, event.that ? event.that : this.creator);
+		return this.wrapCallback( event.orgFunc, event.that ? event.that : this.creator, true);
 	}
 
 

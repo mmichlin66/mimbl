@@ -1381,9 +1381,9 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * @returns Function that has the same signature as the given callback and that should be used
 	 *     instead of the original callback
 	 */
-	protected wrapCallback<T extends Function>( callback: T, thisCallback?: object): T
+	protected wrapCallback<T extends Function>( callback: T, thisCallback?: object, doMimblTick?: boolean): T
 	{
-		return wrapCallbackWithVN( callback, thisCallback ? thisCallback : this, this.vn);
+		return wrapCallbackWithVN( callback, thisCallback ? thisCallback : this, this.vn, doMimblTick);
 	}
 }
 
