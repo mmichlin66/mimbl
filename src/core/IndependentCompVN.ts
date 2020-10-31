@@ -9,7 +9,8 @@ import {VN, VNUpdateDisp, ClassCompVN} from "../internal"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// The class InstanceVN is a node that holds an instance of an IComponent-implementing object.
+// The class IndependentCompVN is a node that holds an instance of an IComponent-implementing
+// object. The component instance also serves as the node's key.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
@@ -18,7 +19,8 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 	{
 		super();
 
-		this.comp = comp;
+        this.comp = comp;
+        this.key = comp;
 	};
 
 
@@ -35,12 +37,6 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 
 
 
-	// Node's key. The derived classes set it based on their respective content. A key
-	// can be of any type. The instance of our component is the key.
-	public get key(): any { return this.comp; }
-
-
-
 	// Prepares this node to be updated from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node. The returned object indicates whether children
@@ -52,15 +48,24 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 		let newComp = (newVN as IndependentCompVN).comp;
 		let needsUpdating = this.comp !== newComp;
 
-		// if the component instances are different, then we need to prepare the new instance for
-		// mounting and the old one for unmounting.
+		// if the component instances are different, then we need to prepare the old instance for
+		// unmounting and the new one for mounting.
 		if (needsUpdating)
 		{
 			this.willUnmount();
 			this.unmount();
+
             this.comp = newComp;
-			this.willMount();
-			this.didMount();
+            this.key = newComp;
+
+            this.willMount();
+
+            /// the mount method is only defined for gathering stats
+            /// #if USE_STATS
+                this.mount();
+            /// #endif
+
+            this.didMount();
 		}
 
 		return VNUpdateDisp.getStockValue( false, needsUpdating);

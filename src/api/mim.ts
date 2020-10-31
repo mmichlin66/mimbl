@@ -294,7 +294,8 @@ export interface IElementProps<TRef,TChildren = any> extends ICommonProps
 	/** Children that can be supplied to the element */
 	children?: TChildren;
 
-	// standard HTML and SVG element properties
+    // standard HTML and SVG element properties
+    xmlns?: string;
 	class?: ClassPropType;
 	draggable?: boolean;
 	dropzone ?: "copy" | "move" | "link";

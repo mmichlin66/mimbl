@@ -9,7 +9,7 @@ import {ClassCompVN, VN, VNUpdateDisp} from "../internal"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Represents a component implementing the IComponent<> interface.
+// Represents a managed component implementing the IComponent<> interface.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
@@ -51,10 +51,10 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 					this.props[propName] = propVal;
 			}
 
-			// if key property was not specified, use id; if id was not specified key will remain
-			// undefined.
-			if (this.key === undefined)
-				this.key = props.id;
+			// // if key property was not specified, use id; if id was not specified key will remain
+			// // undefined.
+			// if (this.key === undefined)
+			// 	this.key = props.id;
 		}
 
 		// remember children as part of props
