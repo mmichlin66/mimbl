@@ -1499,52 +1499,96 @@ function getVNPath( vn: VN): string[]
 // For all types of contents other than an array, the returned value is a single VN. If the input
 // content is an array, then a VN is created for each of the array elements. Since array elements
 // might also be arrays, the process is recursive.
-function createNodesFromContent( content: any, nodes: VN[]): void
+function createNodesFromContent( content: any, nodes?: VN[]): VN | VN[] | null
 {
 	if (content == null || content === false)
 	{
 		// the comparison above covers both null and undefined
-		return;
+		return null;
 	}
-	else if (content instanceof VN)
-		nodes.push( content);
-	else if (typeof content === "string")
+    else if (content instanceof VN)
+    {
+        if (nodes)
+            nodes.push( content);
+
+        return content;
+    }
+    else if (typeof content === "string")
 	{
-        if (content.length > 0)
-            nodes.push( new TextVN( content));
+        if (content.length === 0)
+            return null;
+        else
+        {
+            let vn = new TextVN( content);
+            if (nodes)
+                nodes.push( vn);
+
+            return vn;
+        }
 	}
 	else if (typeof content.render === "function")
 	{
 		// if the component (this can only be an Instance component) is already attached to VN,
 		// return this existing VN; otherwise create a new one.
-		nodes.push( (content as IComponent).vn
+		let vn = (content as IComponent).vn
 						? (content as IComponent).vn as VN
-						: new IndependentCompVN( content as IComponent));
+						: new IndependentCompVN( content as IComponent);
+        if (nodes)
+            nodes.push( vn);
+
+        return vn;
 	}
-	else if (Array.isArray( content))
-		createNodesFromArray( content, nodes);
+    else if (Array.isArray( content))
+    {
+        if (!nodes)
+            nodes = [];
+
+        createNodesFromArray( content, nodes);
+        return nodes;
+    }
 	else if (content instanceof Promise)
 	{
-		nodes.push( new PromiseProxyVN( { promise: content}));
+		let vn = new PromiseProxyVN( { promise: content});
+        if (nodes)
+            nodes.push( vn);
+
+        return vn;
 	}
 	else if (typeof content === "function")
 	{
-		let vn = FuncProxyVN.findVN( content)
-		nodes.push( vn ? vn : new FuncProxyVN( { func: content, thisArg: s_currentClassComp}));
+        let vn = FuncProxyVN.findVN( content)
+        if (!vn)
+		    vn = new FuncProxyVN( { func: content, thisArg: s_currentClassComp});
+
+        if (nodes)
+            nodes.push( vn);
+
+        return vn;
 	}
-	else
-        nodes.push( new TextVN( content.toString()));
+    else
+    {
+        let s = content.toString();
+        if (s.length === 0)
+            return null;
+        else
+        {
+            let vn = new TextVN( s);
+            if (nodes)
+                nodes.push( vn);
+
+            return vn;
+        }
+    }
 }
 
 
 
 // Creates an array of virtual nodes from the given content. Calls the createNodesFromContent and
 // if it returns a single node, wraps it in an array.
-function createVNChainFromContent( content: any): VN[]
+function createVNChainFromContent( content: any): VN[] | null
 {
-    let nodes: VN[] = [];
-	createNodesFromContent( content, nodes);
-	return nodes.length === 0 ? null : nodes;
+    let retVal = createNodesFromContent( content);
+    return !retVal ? null : Array.isArray(retVal) ? retVal : [retVal];
 }
 
 

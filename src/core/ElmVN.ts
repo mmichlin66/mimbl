@@ -1,10 +1,10 @@
 ﻿import {
-    IElmVN, setRef, EventFuncType, UpdateStrategy, RefPropType, ICustomAttributeHandler
+    IElmVN, setRef, EventFuncType, UpdateStrategy, RefPropType, ICustomAttributeHandler, IElementProps
 } from "../api/mim"
 import {
-    VN, DN, VNUpdateDisp, s_deepCompare, PropInfo, PropType,
-    ElmAttr, CustomAttrPropInfo, AttrPropInfo,
-    EventPropInfo} from "../internal"
+    VN, DN, VNUpdateDisp, s_deepCompare, PropInfo, PropType, CustomAttrPropInfo,
+    AttrPropInfo, EventPropInfo, getElmPropInfo, setElmProp, removeElmProp, updateElmProp
+} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -34,7 +34,7 @@ export class ElmVN extends VN implements IElmVN
 
 
 
-	constructor( tagName: string, props: any, children: any[])
+	constructor( tagName: string, props: IElementProps<any>, children: any[])
 	{
 		super();
 
@@ -48,8 +48,24 @@ export class ElmVN extends VN implements IElmVN
 			// specified key will remain undefined.
 			this.key = props.key;
 			if (this.key === undefined)
-				this.key = props.id;
-		}
+                this.key = props.id;
+            else
+                delete props.key;
+
+            if (props.ref)
+            {
+                // remember ref property
+                this.ref = props.ref;
+                delete props.ref;
+            }
+
+            if (props.updateStrategy)
+            {
+                // remember updateStrategy property
+                this.updateStrategy = props.updateStrategy;
+                delete props.updateStrategy;
+            }
+        }
 	}
 
 
@@ -239,40 +255,20 @@ export class ElmVN extends VN implements IElmVN
         let propVal: any, propInfo: PropInfo, propType: PropType;
 		for( let propName in this.props)
 		{
-			if (propName === "key")
-			{
-				// ignore the key property because we already extracted it in the constructor
-				continue;
-			}
-
+            // ignore properties with values undefined, null and false
 			propVal = this.props[propName];
-			if (propVal == null || propVal === false)
-			{
-				// ignore properties with values undefined, null and false
-				continue;
-			}
-			else if (propName === "ref")
-			{
-				// remember ref property
-				this.ref = propVal;
-			}
-			else if (propName === "updateStrategy")
-			{
-				// remember updateStrategy property
-				this.updateStrategy = propVal;
-			}
-			else
+			if (propVal != null && propVal !== false)
 			{
 				// get information about the property and determine its type (regular attribute, event
 				// or custom attribute).
-				propInfo = ElmAttr.getPropertyInfo( propName);
+				propInfo = getElmPropInfo( propName);
 				propType = ElmVN.determineAttrType( propInfo, propVal);
 				if (propType === PropType.Attr)
 				{
 					if (!this.attrs)
-						this.attrs = {};
-
-					this.attrs[propName] = { info: propInfo, val: propVal };
+						this.attrs = { [propName]: { info: propInfo, val: propVal } };
+                    else
+					    this.attrs[propName] = { info: propInfo, val: propVal };
 				}
 				else if (propType === PropType.Event)
 				{
@@ -280,9 +276,9 @@ export class ElmVN extends VN implements IElmVN
 					if (eventInfo)
 					{
 						if (!this.events)
-							this.events = {}
-
-						this.events[propName] = eventInfo;
+							this.events = { [propName]: eventInfo }
+                        else
+						    this.events[propName] = eventInfo;
 					}
 				}
 				else // if (propType === PropType.CustomAttr)
@@ -305,8 +301,7 @@ export class ElmVN extends VN implements IElmVN
         if (propInfo)
             return propInfo.type;
         else if (typeof propVal === "function" ||
-                Array.isArray(propVal) && propVal.length > 0 && typeof propVal[0] === "function" ||
-                typeof propVal === "object" && typeof propVal.func ==="function")
+                Array.isArray(propVal) && propVal.length > 0 && typeof propVal[0] === "function")
             return PropType.Event
         else
             return PropType.Attr;
@@ -315,15 +310,10 @@ export class ElmVN extends VN implements IElmVN
 	// Adds DOM attributes to the Element.
 	private addAttrs(): void
 	{
-		/// #if DEBUG
-			if (!this.attrs)
-				throw new Error( "ElmVN.addAttrs called with this.attrs = null");
-		/// #endif
-
 		for( let name in this.attrs)
 		{
 			let rtd = this.attrs[name];
-			ElmAttr.setAttr( this.ownDN as Element, name, rtd.info, rtd.val);
+			setElmProp( this.ownDN as Element, name, rtd.info, rtd.val);
 		}
 	}
 
@@ -348,13 +338,13 @@ export class ElmVN extends VN implements IElmVN
 				{
 					// if there is no new property with the given name, remove the old property and
 					// remove the attribute from the element
-					ElmAttr.removeAttr( elm, name, oldRTD.info);
+					removeElmProp( elm, name, oldRTD.info);
 				}
 				else
 				{
 					// if the new property with the given name has a different value, remmeber this
 					// value and set it to the attribute in the element
-					ElmAttr.updateAttr( elm, name, oldRTD.info, oldRTD.val, newRTD.val);
+					updateElmProp( elm, name, oldRTD.info, oldRTD.val, newRTD.val);
 				}
 			}
 		}
@@ -368,7 +358,7 @@ export class ElmVN extends VN implements IElmVN
 					continue;
 
 				let newRTD = newAttrs[name];
-				ElmAttr.setAttr( elm, name, newRTD.info, newRTD.val);
+				setElmProp( elm, name, newRTD.info, newRTD.val);
 			}
 		}
 
@@ -380,11 +370,6 @@ export class ElmVN extends VN implements IElmVN
 	// Adds information about events to the Element.
 	private addEvents(): void
 	{
-		/// #if DEBUG
-			if (!this.events)
-				throw new Error( "ElmVN.addEvents called with this.events = null");
-		/// #endif
-
 		for( let name in this.events)
 			this.addEvent( name, this.events[name]);
 	}
@@ -517,11 +502,6 @@ export class ElmVN extends VN implements IElmVN
 	// Creates custom attributes.
 	private addCustomAttrs(): void
 	{
-		/// #if DEBUG
-			if (!this.customAttrs)
-				throw new Error( "ElmVN.addCustomAttrs called with this.customAttrs = null");
-		/// #endif
-
 		// create and initialize custom property handlers
 		for( let name in this.customAttrs)
 		{
@@ -547,11 +527,6 @@ export class ElmVN extends VN implements IElmVN
 	// Destroys custom attributes of this element.
 	private removeCustomAttrs( isRemoval: boolean): void
 	{
-		/// #if DEBUG
-			if (!this.customAttrs)
-				throw new Error( "ElmVN.removeCustomAttrs called with this.customAttrs = null");
-		/// #endif
-
 		for( let name in this.customAttrs)
 		{
 			let customAttr = this.customAttrs[name];
@@ -679,7 +654,7 @@ interface AttrRunTimeData
 	// Information about this attribute - can be null
 	info: AttrPropInfo;
 
-	// Flag indicating whether this event should be used as Capturing (true) or Bubbling (false)
+	// Current attribute value
 	val: any;
 };
 

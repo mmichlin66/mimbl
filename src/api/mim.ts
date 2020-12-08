@@ -1,7 +1,7 @@
 ﻿import {Styleset, IIDRule, ClassPropType} from "mimcss"
 import {
-    PropType, ElmAttr, EventSlot, mountRoot, unmountRoot, FuncProxyVN,
-    createNodesFromJSX, wrapCallbackWithVN
+    PropType, EventSlot, mountRoot, unmountRoot, FuncProxyVN,
+    createNodesFromJSX, wrapCallbackWithVN, registerElmProp
 } from "../internal";
 
 
@@ -1214,7 +1214,7 @@ export interface ICustomAttributeHandler<T = any>
  */
 export function registerCustomAttribute<T>( attrName: string, handlerClass: ICustomAttributeHandlerClass<T>): void
 {
-	ElmAttr.registerProperty( attrName, { type: PropType.CustomAttr, handlerClass });
+	registerElmProp( attrName, { type: PropType.CustomAttr, handlerClass });
 }
 
 /**
@@ -1223,7 +1223,7 @@ export function registerCustomAttribute<T>( attrName: string, handlerClass: ICus
  */
 export function registerCustomEvent( eventName: string): void
 {
-	ElmAttr.registerProperty( eventName, { type: PropType.Event });
+	registerElmProp( eventName, { type: PropType.Event });
 }
 
 

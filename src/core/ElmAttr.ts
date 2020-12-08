@@ -117,6 +117,30 @@ export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
 
 
 
+// Object that maps property names to PropInfo-derived objects. Information about custom
+// attributes is added to this object when the registerProperty method is called.
+let propInfos: {[P:string]: PropInfo} =
+{
+    // attributes - only those attributes are listed that have non-trivial treatment
+    style: { type: PropType.Attr, set: setStyleProp, diff: diffStyleProp, update: updateStyleProp },
+    media: { type: PropType.Attr, set: setMediaProp, diff: diffMediaProp, update: updateMediaProp },
+    value: { type: PropType.Attr, set: setValueProp, diff: diffValueProp, remove: removeValueProp },
+    defaultValue: { type: PropType.Attr, set: setValueProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
+    checked: { type: PropType.Attr, set: setCheckedProp, diff: diffCheckedProp, remove: removeCheckedProp },
+    defaultChecked: { type: PropType.Attr, set: setCheckedProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
+
+    // frequently used events for speeding up the lookup
+    click: { type: PropType.Event },
+
+    // // events
+    // mouseenter: { type: PropType.Event, isBubbling: false },
+    // mouseleave: { type: PropType.Event, isBubbling: false },
+    // pointerenter: { type: PropType.Event, isBubbling: false },
+    // pointerleave: { type: PropType.Event, isBubbling: false },
+};
+
+
+
 /**
  * Helper function that converts the given value to string.
  *   - null and undefined are converted to an empty string.
@@ -139,177 +163,145 @@ function valToString( val: any): string
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-// Exported class that provides static methods for setting, updating and removing Element
-// attributes corresponding to property names.
-//
-// Element attributes are determined using properties passed to the ElmVN methods. Some
-// properties allow using non-trivial types, e.g. arrays or objects, and thus cannot be simply
-// handled using the Element.setAttribute method.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-export class ElmAttr
+// Registers information about the given property.
+export function registerElmProp( propName: string, info: AttrPropInfo | EventPropInfo | CustomAttrPropInfo): void
 {
-	// Object that maps property names to PropInfo-derived objects. Information about custom
-	// attributes is added to this object when the registerProperty method is called.
-	private static propInfos: {[P:string]: PropInfo} =
-	{
-		// attributes - only those attributes are listed that have non-trivial treatment
-		style: { type: PropType.Attr, set: setStyleProp, diff: diffStyleProp, update: updateStyleProp },
-		media: { type: PropType.Attr, set: setMediaProp, diff: diffMediaProp, update: updateMediaProp },
-		value: { type: PropType.Attr, set: setValueProp, diff: diffValueProp, remove: removeValueProp },
-		defaultValue: { type: PropType.Attr, set: setValueProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
-		checked: { type: PropType.Attr, set: setCheckedProp, diff: diffCheckedProp, remove: removeCheckedProp },
-		defaultChecked: { type: PropType.Attr, set: setCheckedProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
+    if (propName in propInfos)
+        throw new Error( `Attribute ${propName} is already registered.`);
 
-        // // events
-        // mouseenter: { type: PropType.Event, isBubbling: false },
-        // mouseleave: { type: PropType.Event, isBubbling: false },
-        // pointerenter: { type: PropType.Event, isBubbling: false },
-        // pointerleave: { type: PropType.Event, isBubbling: false },
-	};
+    propInfos[propName] = info;
+}
 
 
 
-	// Registers information about the given property.
-	public static registerProperty( propName: string, info: AttrPropInfo | EventPropInfo | CustomAttrPropInfo): void
-	{
-		ElmAttr.propInfos[propName] = info;
-	}
+// Registers information about the given property.
+export function getElmPropInfo( propName: string): PropInfo | undefined
+{
+    return propInfos[propName];
+}
 
 
 
-	// Registers information about the given property.
-	public static getPropertyInfo( propName: string): PropInfo | undefined
-	{
-		return ElmAttr.propInfos[propName];
-	}
+// Using the given property name and its value set the appropriate attribute(s) on the
+// element. This method handles special cases of properties with non-trivial values.
+export function setElmProp( elm: Element, propName: string, info: AttrPropInfo | null, propVal: any): void
+{
+    // get property info object
+    if (info === undefined)
+        elm.setAttribute( propName, valToString( propVal));
+    else
+    {
+        // get actual attribute name to use
+        let attrName = info.attrName;
+        if (attrName === undefined)
+            attrName = propName;
+
+        if (info.set !== undefined)
+            info.set( elm, attrName, propVal);
+        else
+            elm.setAttribute( attrName, valToString( propVal));
+    }
+
+    /// #if USE_STATS
+        DetailedStats.stats.log( StatsCategory.Attr, StatsAction.Added);
+    /// #endif
+}
 
 
 
-	// Using the given property name and its value set the appropriate attribute(s) on the
-	// element. This method handles special cases of properties with non-trivial values.
-	public static setAttr( elm: Element, propName: string, info: AttrPropInfo | null, propVal: any): void
-	{
-		// get property info object
-		if (info === undefined)
-			elm.setAttribute( propName, valToString( propVal));
-		else
-		{
-			// get actual attribute name to use
-			let attrName: string = info.attrName;
-			if (attrName === undefined)
-				attrName = propName;
+// Determines whether the old and the new values of the property are different and sets the
+// updated value to the element's attribute. Returns true if update has been performed and
+// false if no change in property value has been detected.
+export function updateElmProp( elm: Element, propName: string, info: AttrPropInfo | null, oldPropVal: any, newPropVal: any): boolean
+{
+    // get property info object
+    if (info === undefined)
+    {
+        // if this is not a special case (property is not in our list) just compare them and
+        // if they are different set the attribute to the new value.
+        if (oldPropVal === newPropVal)
+            return false;
+        else
+        {
+            elm.setAttribute( propName, valToString( newPropVal));
 
-			if (info.set !== undefined)
-				info.set( elm, attrName, propVal);
-			else
-				elm.setAttribute( attrName, valToString( propVal));
-		}
+            /// #if USE_STATS
+                DetailedStats.stats.log( StatsCategory.Attr, StatsAction.Updated);
+            /// #endif
 
-		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Attr, StatsAction.Added);
-		/// #endif
-	}
+            return true;
+        }
+    }
 
+    // compare old and new value using the update function if defined; if not, just compare
+    // the two values and if they are different use the new one as a value to update with.
+    // Note that the neither old nor new values can be undefined or null.
+    let updateVal: any;
+    if (info.diff !== undefined)
+    {
+        updateVal = info.diff( propName, oldPropVal, newPropVal);
 
+        // if updateValue is undefined then no change has been detected.
+        if (updateVal === undefined)
+            return false;
+    }
+    else if (oldPropVal !== newPropVal)
+        updateVal = newPropVal;
 
-	// Determines whether the old and the new values of the property are different and sets the
-	// updated value to the element's attribute. Returns true if update has been performed and
-	// false if no change in property value has been detected.
-	public static updateAttr( elm: Element, propName: string, info: AttrPropInfo | null, oldPropVal: any, newPropVal: any): boolean
-	{
-		// get property info object
-		if (info === undefined)
-		{
-			// if this is not a special case (property is not in our list) just compare them and
-			// if they are different set the attribute to the new value.
-			if (oldPropVal === newPropVal)
-				return false;
-			else
-			{
-				elm.setAttribute( propName, valToString( newPropVal));
+    // get actual attribute name to use
+    let attrName = info.attrName;
+    if (attrName === undefined)
+        attrName = propName;
 
-				/// #if USE_STATS
-					DetailedStats.stats.log( StatsCategory.Attr, StatsAction.Updated);
-				/// #endif
+    // if update method is defined use it; otherwise, remove the old value and set the new one
+    if (info.update !== undefined)
+        info.update( elm, attrName, updateVal);
+    else
+    {
+        // if remove method is defined, use it. Note that if remove method is not defined
+        // we don't use elm.removeAttribute to save time (as the following info.set or
+        // elm.setAttribute will override it anyway).
+        if (info.remove !== undefined && info.set === undefined)
+            info.remove( elm, attrName);
 
-				return true;
-			}
-		}
+        if (info.set !== undefined)
+            info.set( elm, attrName, updateVal);
+        else
+            elm.setAttribute( attrName, valToString( updateVal));
+    }
 
-		// compare old and new value using the update function if defined; if not, just compare
-		// the two values and if they are different use the new one as a value to update with.
-		// Note that the neither old nor new values can be undefined or null.
-		let updateVal: any;
-		if (info.diff !== undefined)
-		{
-			updateVal = info.diff( propName, oldPropVal, newPropVal);
+    /// #if USE_STATS
+        DetailedStats.stats.log( StatsCategory.Attr, StatsAction.Updated);
+    /// #endif
 
-			// if updateValue is undefined then no change has been detected.
-			if (updateVal === undefined)
-				return false;
-		}
-		else if (oldPropVal !== newPropVal)
-			updateVal = newPropVal;
-
-		// get actual attribute name to use
-		let attrName: string = info.attrName;
-		if (attrName === undefined)
-			attrName = propName;
-
-		// if update method is defined use it; otherwise, remove the old value and set the new one
-		if (info.update !== undefined)
-			info.update( elm, attrName, updateVal);
-		else
-		{
-			// if remove method is defined, use it. Note that if remove method is not defined
-			// we don't use elm.removeAttribute to save time (as the following info.set or
-			// elm.setAttribute will override it anyway.
-			if (info.remove !== undefined)
-				info.remove( elm, attrName);
-
-			if (info.set !== undefined)
-				info.set( elm, attrName, updateVal);
-			else
-				elm.setAttribute( attrName, valToString( updateVal));
-		}
-
-		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Attr, StatsAction.Updated);
-		/// #endif
-
-		// indicate that there was change in attribute value.
-		return true;
-	}
+    // indicate that there was change in attribute value.
+    return true;
+}
 
 
 
-	// Removes the attribute(s) corresponding to the given property.
-	public static removeAttr( elm: Element, propName: string, info: AttrPropInfo | null): void
-	{
-		// get property info object
-		if (info === undefined)
-			elm.removeAttribute( propName);
-		else
-		{
-			// get actual attribute name to use
-			let attrName: string = info.attrName;
-			if (attrName === undefined)
-				attrName = propName;
+// Removes the attribute(s) corresponding to the given property.
+export function removeElmProp( elm: Element, propName: string, info: AttrPropInfo | null): void
+{
+    // get property info object
+    if (info === undefined)
+        elm.removeAttribute( propName);
+    else
+    {
+        // get actual attribute name to use
+        let attrName = info.attrName;
+        if (attrName === undefined)
+            attrName = propName;
 
-			if (info.remove !== undefined)
-			{
-				info.remove( elm, attrName);
-			}
-			else
-				elm.removeAttribute( attrName);
-		}
+        if (info.remove !== undefined)
+            info.remove( elm, attrName);
+        else
+            elm.removeAttribute( attrName);
+    }
 
-		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Attr, StatsAction.Deleted);
-		/// #endif
-	}
+    /// #if USE_STATS
+        DetailedStats.stats.log( StatsCategory.Attr, StatsAction.Deleted);
+    /// #endif
 }
 
 
