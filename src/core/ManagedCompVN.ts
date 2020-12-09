@@ -1,9 +1,5 @@
-﻿import {IManagedCompVN, IComponentClass, IComponent, setRef, RefPropType} from "../api/mim"
-import {ClassCompVN, VN, VNUpdateDisp} from "../internal"
-
-/// #if USE_STATS
-	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
-/// #endif
+﻿import {IManagedCompVN, IComponentClass, setRef, RefPropType} from "../api/mim"
+import {ClassCompVN, VNUpdateDisp} from "../internal"
 
 
 

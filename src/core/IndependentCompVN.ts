@@ -1,9 +1,5 @@
 ﻿import {IIndependentCompVN, IComponent} from "../api/mim"
-import {VN, VNUpdateDisp, ClassCompVN} from "../internal"
-
-/// #if USE_STATS
-	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
-/// #endif
+import {VNUpdateDisp, ClassCompVN} from "../internal"
 
 
 
