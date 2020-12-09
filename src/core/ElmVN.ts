@@ -183,11 +183,11 @@ export class ElmVN extends VN implements IElmVN
 
 	// Determines whether the update of this node from the given node is possible. The newVN
 	// parameter is guaranteed to point to a VN of the same type as this node.
-	public isUpdatePossible( newVN: VN): boolean
+	public isUpdatePossible( newVN: ElmVN): boolean
 	{
 		// update is possible if this is the same type of element; that is, it has the same
 		// name.
-		return this.elmName === (newVN as ElmVN).elmName;
+		return this.elmName === newVN.elmName;
 	}
 
 
@@ -197,18 +197,17 @@ export class ElmVN extends VN implements IElmVN
 	// point to a VN of the same type as this node. The returned object indicates whether children
 	// should be updated and whether the commitUpdate method should be called.
 	// This method is part of the Render phase.
-	public prepareUpdate( newVN: VN): VNUpdateDisp
+	public prepareUpdate( newVN: ElmVN): VNUpdateDisp
 	{
 		// commitUpdate method should be called if new props are different from the current ones
-		let shouldCommit = !s_deepCompare( this.props, (newVN as ElmVN).props);
+		let shouldCommit = !s_deepCompare( this.props, newVN.props);
 
 		// render method should be called if either old or new node has children
-		let shouldRender = this.children && this.children.length > 0 ||
-					(newVN as ElmVN).children && (newVN as ElmVN).children.length > 0;
+		let shouldRender = this.children && this.children.length > 0 || newVN.children && newVN.children.length > 0;
 
 		// remember the new props and children
-		this.props = (newVN as ElmVN).props;
-		this.children = (newVN as ElmVN).children;
+		this.props = newVN.props;
+		this.children = newVN.children;
 
 		return VNUpdateDisp.getStockValue( shouldCommit, shouldRender);
 	}
@@ -216,16 +215,15 @@ export class ElmVN extends VN implements IElmVN
 
 
 	// Commits updates made to this node to DOM.
-	public commitUpdate( newVN: VN): void
+	public commitUpdate( newVN: ElmVN): void
 	{
-		const newElmVN: ElmVN = newVN as ElmVN;
-		newElmVN.parseProps();
+		newVN.parseProps();
 
 		// if reference specification changed then set or unset it as necessary
-		if (newElmVN.ref !== this.ref)
+		if (newVN.ref !== this.ref)
 		{
 			// remember the new reference specification
-			this.ref = newElmVN.ref;
+			this.ref = newVN.ref;
 
 			// if reference is now specified, set it now; note that we already determined that
 			// the reference object is different.
@@ -235,12 +233,12 @@ export class ElmVN extends VN implements IElmVN
 
 		// remeber the new value of the key, updateStartegy and creator property (even if the
 		// values are the same)
-		this.key = newElmVN.key;
-		this.updateStrategy = newElmVN.updateStrategy;
+		this.key = newVN.key;
+		this.updateStrategy = newVN.updateStrategy;
 
-		this.updateAttrs( newElmVN.attrs);
-		this.updateEvents( newElmVN.events);
-		this.updateCustomAttrs( newElmVN.customAttrs);
+		this.updateAttrs( newVN.attrs);
+		this.updateEvents( newVN.events);
+		this.updateCustomAttrs( newVN.customAttrs);
 	}
 
 
@@ -494,7 +492,7 @@ export class ElmVN extends VN implements IElmVN
 	// method.
 	private createEventWrapper( event: EventRunTimeData): EventFuncType<Event>
 	{
-		return this.wrapCallback( event.orgFunc, event.that ? event.that : this.creator, true);
+		return this.wrapCallback( event.orgFunc, event.that ? event.that : this.creator);
 	}
 
 

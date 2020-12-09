@@ -72,18 +72,18 @@ export class TextVN extends VN implements ITextVN
 	// point to a VN of the same type as this node. The returned object indicates whether children
 	// should be updated and whether the commitUpdate method should be called.
 	// This method is part of the Render phase.
-	public prepareUpdate( newVN: VN): VNUpdateDisp
+	public prepareUpdate( newVN: TextVN): VNUpdateDisp
 	{
 		// text nodes don't have sub-nodes
-		return VNUpdateDisp.getStockValue( this.text !== (newVN as TextVN).text, false);
+		return VNUpdateDisp.getStockValue( this.text !== newVN.text, false);
 	}
 
 
 
 	// Commits updates made to this node to DOM.
-	public commitUpdate( newVN: VN): void
+	public commitUpdate( newVN: TextVN): void
 	{
-		this.ownDN.nodeValue = this.text = (newVN as TextVN).text;
+		this.ownDN.nodeValue = this.text = newVN.text;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Updated);

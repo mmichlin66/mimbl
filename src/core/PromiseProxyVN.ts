@@ -110,12 +110,10 @@ export class PromiseProxyVN extends VN
 
 	// Determines whether the update of this node from the given node is possible. The newVN
 	// parameter is guaranteed to point to a VN of the same type as this node.
-	public isUpdatePossible( newVN: VN): boolean
+	public isUpdatePossible( newVN: PromiseProxyVN): boolean
 	{
-		let newPromiseProxyVN = newVN as PromiseProxyVN;
-
 		// update is possible if it is the same promise object
-		return this.promise === newPromiseProxyVN.promise;
+		return this.promise === newVN.promise;
 	}
 
 
@@ -125,14 +123,12 @@ export class PromiseProxyVN extends VN
 	// point to a VN of the same type as this node. The returned object indicates whether children
 	// should be updated and whether the commitUpdate method should be called.
 	// This method is part of the Render phase.
-	public prepareUpdate( newVN: VN): VNUpdateDisp
+	public prepareUpdate( newVN: PromiseProxyVN): VNUpdateDisp
 	{
-		let newPromiseProxyVN = newVN as PromiseProxyVN;
-
 		// remeber the new value of the key property (even if it is the same)
-		this.key = newPromiseProxyVN.key;
-		this.content = newPromiseProxyVN.content;
-		this.errorContentFunc = newPromiseProxyVN.errorContentFunc;
+		this.key = newVN.key;
+		this.content = newVN.content;
+		this.errorContentFunc = newVN.errorContentFunc;
 
 		// indicate that it is necessary to update the sub-nodes. The commitUpdate
 		// method should NOT be called.

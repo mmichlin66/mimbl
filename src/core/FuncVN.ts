@@ -118,10 +118,10 @@ export class FuncVN extends VN
 
 	// Determines whether the update of this node from the given node is possible. The newVN
 	// parameter is guaranteed to point to a VN of the same type as this node.
-	public isUpdatePossible( newVN: VN): boolean
+	public isUpdatePossible( newVN: FuncVN): boolean
 	{
 		// update is possible if it is the same function object
-		return this.func === (newVN as FuncVN).func;
+		return this.func === newVN.func;
 	}
 
 
@@ -131,16 +131,14 @@ export class FuncVN extends VN
 	// point to a VN of the same type as this node. The returned object indicates whether children
 	// should be updated and whether the commitUpdate method should be called.
 	// This method is part of the Render phase.
-	public prepareUpdate( newVN: VN): VNUpdateDisp
+	public prepareUpdate( newVN: FuncVN): VNUpdateDisp
 	{
-		let newFuncVN = newVN as FuncVN;
-
 		// remeber the new value of the key property (even if it is the same)
-		this.key = newFuncVN.key;
+		this.key = newVN.key;
 
 		// take properties from the new node
-		this.func = newFuncVN.func;
-		this.props = newFuncVN.props;
+		this.func = newVN.func;
+		this.props = newVN.props;
 
 		// since the rendering produced by a function may depend on factors beyond properties,
 		// we always indicate that it is necessary to update the sub-nodes. The commitUpdate

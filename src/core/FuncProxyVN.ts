@@ -157,12 +157,11 @@ export class FuncProxyVN extends VN
 
 	// Determines whether the update of this node from the given node is possible. The newVN
 	// parameter is guaranteed to point to a VN of the same type as this node.
-	public isUpdatePossible( newVN: VN): boolean
+	public isUpdatePossible( newVN: FuncProxyVN): boolean
 	{
-		let newFuncProxyVN = newVN as FuncProxyVN;
 
 		// update is possible if it is the same function object and the same thisArg property
-		return this.func === newFuncProxyVN.func && this.funcThisArg === newFuncProxyVN.funcThisArg;
+		return this.func === newVN.func && this.funcThisArg === newVN.funcThisArg;
 	}
 
 
@@ -172,16 +171,14 @@ export class FuncProxyVN extends VN
 	// point to a VN of the same type as this node. The returned object indicates whether children
 	// should be updated and whether the commitUpdate method should be called.
 	// This method is part of the Render phase.
-	public prepareUpdate( newVN: VN): VNUpdateDisp
+	public prepareUpdate( newVN: FuncProxyVN): VNUpdateDisp
 	{
-		let newFuncProxyVN = newVN as FuncProxyVN;
-
 		// remeber the new value of the key property (even if it is the same)
-		this.key = newFuncProxyVN.key;
-		this.linkKey = newFuncProxyVN.linkKey;
+		this.key = newVN.key;
+		this.linkKey = newVN.linkKey;
 
 		// take arguments from the new node; the function itself and "thisArg" remain the same.
-		this.args = newFuncProxyVN.args;
+		this.args = newVN.args;
 
 		// indicate that it is necessary to update the sub-nodes. The commitUpdate
 		// method should also be called - but only to clear the renderRequired flag.
@@ -192,7 +189,7 @@ export class FuncProxyVN extends VN
 
 	// Commits updates made to this node to DOM.
 	// This method is part of the Commit phase.
-    public commitUpdate( newVN: VN): void
+    public commitUpdate( newVN: FuncProxyVN): void
     {
         // we use this method only to clear the renderRequired flag"
         this.renderRequired = false;

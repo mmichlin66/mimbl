@@ -42,10 +42,10 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 	// point to a VN of the same type as this node. The returned object indicates whether children
 	// should be updated and whether the commitUpdate method should be called.
 	// This method is part of the Render phase.
-	public prepareUpdate( newVN: VN): VNUpdateDisp
+	public prepareUpdate( newVN: IndependentCompVN): VNUpdateDisp
 	{
 		// if it is the same component instance, we don't need to do anything
-		let newComp = (newVN as IndependentCompVN).comp;
+		let newComp = newVN.comp;
 		let needsUpdating = this.comp !== newComp;
 
 		// if the component instances are different, then we need to prepare the old instance for

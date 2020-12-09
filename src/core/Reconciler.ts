@@ -100,14 +100,14 @@ const enum SchedulerState
  * @returns The wrapper function that should be used instead of the original callback.
  */
 export function wrapCallbackWithVN<T extends Function>( callback: T, thisCallback?: object,
-    vn?: IVNode, doMimblTick?: boolean): T
+    vn?: IVNode, dontDoMimblTick?: boolean): T
 {
     // if "this" for the callback was not passed but vn was, check whether the vn is a component;
     // if yes, use it as "this"; otherwise, use vn's creator component.
     if (!thisCallback && vn)
         thisCallback = (vn as any).comp != null ? (vn as any).comp : vn.creator;
 
-    return CallbackWrapper.bind( vn, thisCallback, callback, doMimblTick);
+    return CallbackWrapper.bind( vn, thisCallback, callback, dontDoMimblTick);
 }
 
 
@@ -147,7 +147,7 @@ function CallbackWrapper(): any
     let prevVN = trackCurrentVN( vn ? vn : null);
 
     let retVal: any;
-    let [thisOrgCallback, orgCallback, doMimblTick, ...rest] = arguments;
+    let [thisOrgCallback, orgCallback, dontDoMimblTick, ...rest] = arguments;
 	try
 	{
         s_insideCallbackWrapper = true;
@@ -172,7 +172,7 @@ function CallbackWrapper(): any
     }
 
     // If requested, schedule to perform Mimble tick at the end of the event loop.
-    if (doMimblTick)
+    if (!dontDoMimblTick)
         queueMicrotask( performMimbleTick);
 
     // // Perform Mimble tick at the end of the event loop.
@@ -1189,7 +1189,7 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
     // we are here if either old and new chains contain more than one node and we need to
     // reconcile the chains. First go over the old nodes and build a map of keyed ones and a
     // list of non-keyed ones. If there are more than one node with the same key, the first one
-    // goes to the map and the rest to the unleyed list.
+    // goes to the map and the rest to the unkeyed list.
     let oldKeyedMap = new Map<any,VN>();
     let oldUnkeyedList: VN[] = [];
     let key: any;

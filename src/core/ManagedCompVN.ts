@@ -121,10 +121,10 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 
 	// Determines whether the update of this node from the given node is possible. The newVN
 	// parameter is guaranteed to point to a VN of the same type as this node.
-	public isUpdatePossible( newVN: VN): boolean
+	public isUpdatePossible( newVN: ManagedCompVN): boolean
 	{
 		// update is possible if the component class name is the same
-		return this.compClass === (newVN as ManagedCompVN).compClass;
+		return this.compClass === newVN.compClass;
 	}
 
 
@@ -132,40 +132,38 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 	// Updates this node from the given node. The newVN parameter is guaranteed to point to a
 	// VN of the same type as this node. Returns true if updating sub-nodes is necessary and
 	// false otherwise.
-	public prepareUpdate( newVN: VN): VNUpdateDisp
+	public prepareUpdate( newVN: ManagedCompVN): VNUpdateDisp
 	{
-		let newClassVN = newVN as ManagedCompVN;
-
 		// let the component know about the new properties (if it is interested in them)
 		let shouldRender: boolean = true;
 		if (this.comp.shouldUpdate !== undefined)
-			shouldRender = this.comp.shouldUpdate( newClassVN.props);
+			shouldRender = this.comp.shouldUpdate( newVN.props);
 
 		// if reference specification changed then set or unset it as necessary
-		if (newClassVN.ref !== this.ref)
+		if (newVN.ref !== this.ref)
 		{
 			// remember the new reference object
-			this.ref = newClassVN.ref;
+			this.ref = newVN.ref;
 
 			// if reference is now specified, set it now; note that we already determined that
 			// the reference object is different.
 			if (this.ref !== undefined)
 				setRef( this.ref, this.comp);
 		}
-		else if (newClassVN.ref === undefined)
+		else if (newVN.ref === undefined)
 		{
 			// we know that our reference is defined, so unset it
 			setRef( this.ref, undefined, this.comp);
 		}
 
 		// remeber the new value of the key property (even if it is the same)
-		this.key = newClassVN.key;
+		this.key = newVN.key;
 
 		// shallow copy the new properties from the other node to our object. This is needed
 		// because the component got our props object in the constructor and will keep
 		// working with it - especially if it doesn't implement the shouldUpdate method.
 		Object.keys(this.props).forEach( key => delete this.props[key]);
-		Object.assign( this.props, newClassVN.props);
+		Object.assign( this.props, newVN.props);
 
 		// since the rendering produced by a function may depend on factors beyond properties,
 		// we always indicate that it is necessary to update the sub-nodes. The commitUpdate
