@@ -52,16 +52,16 @@ export class ElmVN extends VN implements IElmVN
             else
                 delete props.key;
 
+            // remember ref property
             if (props.ref)
             {
-                // remember ref property
                 this.ref = props.ref;
                 delete props.ref;
             }
 
+            // remember updateStrategy property
             if (props.updateStrategy)
             {
-                // remember updateStrategy property
                 this.updateStrategy = props.updateStrategy;
                 delete props.updateStrategy;
             }
@@ -123,21 +123,24 @@ export class ElmVN extends VN implements IElmVN
                 : document.createElement( this.elmName);
         }
 
-		// translate properties into attributes, events and custom attributes
-		this.parseProps();
+        // translate properties into attributes, events and custom attributes
+        if (this.props)
+        {
+            this.parseProps( this.props);
 
-		if (this.attrs)
-			this.addAttrs();
+            if (this.attrs)
+                this.addAttrs();
 
-		if (this.events)
-			this.addEvents();
+            if (this.events)
+                this.addEvents();
 
-		if (this.customAttrs)
-			this.addCustomAttrs();
+            if (this.customAttrs)
+                this.addCustomAttrs();
 
-		// set the value of the reference (if specified)
-		if (this.ref !== undefined)
-            setRef( this.ref, this.ownDN);
+            // set the value of the reference (if specified)
+            if (this.ref !== undefined)
+                setRef( this.ref, this.ownDN);
+        }
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Added);
@@ -172,7 +175,9 @@ export class ElmVN extends VN implements IElmVN
 			this.removeCustomAttrs( true);
 
 		// clean up
-		this.ownDN = null;
+        this.ownDN = null;
+        this.children = null;
+        this.attrs = this.events = undefined;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Deleted);
@@ -205,8 +210,7 @@ export class ElmVN extends VN implements IElmVN
 		// render method should be called if either old or new node has children
 		let shouldRender = this.children && this.children.length > 0 || newVN.children && newVN.children.length > 0;
 
-		// remember the new props and children
-		this.props = newVN.props;
+		// remember the new children for the next render
 		this.children = newVN.children;
 
 		return VNUpdateDisp.getStockValue( shouldCommit, shouldRender);
@@ -217,7 +221,8 @@ export class ElmVN extends VN implements IElmVN
 	// Commits updates made to this node to DOM.
 	public commitUpdate( newVN: ElmVN): void
 	{
-		newVN.parseProps();
+        if (newVN.props)
+		    newVN.parseProps( newVN.props);
 
 		// if reference specification changed then set or unset it as necessary
 		if (newVN.ref !== this.ref)
@@ -233,6 +238,7 @@ export class ElmVN extends VN implements IElmVN
 
 		// remeber the new value of the key, updateStartegy and creator property (even if the
 		// values are the same)
+		this.props = newVN.props;
 		this.key = newVN.key;
 		this.updateStrategy = newVN.updateStrategy;
 
@@ -245,28 +251,24 @@ export class ElmVN extends VN implements IElmVN
 
 	// Goes over the original properties and puts them into the buckets of attributes, event
 	// listeners and custom attributes.
-	private parseProps(): void
+	private parseProps( props: any): void
 	{
-		if (!this.props)
-			return;
-
-        let propVal: any, propInfo: PropInfo, propType: PropType;
-		for( let propName in this.props)
+		for( let propName in props)
 		{
             // ignore properties with values undefined, null and false
-			propVal = this.props[propName];
+			let propVal = props[propName];
 			if (propVal != null && propVal !== false)
 			{
 				// get information about the property and determine its type (regular attribute, event
 				// or custom attribute).
-				propInfo = getElmPropInfo( propName);
-				propType = ElmVN.determineAttrType( propInfo, propVal);
+				let propInfo = getElmPropInfo( propName);
+				let propType = propInfo ? propInfo.type : typeof propVal === "object" ? PropType.Event : PropType.Attr;
 				if (propType === PropType.Attr)
 				{
 					if (!this.attrs)
-						this.attrs = { [propName]: { info: propInfo, val: propVal } };
-                    else
-					    this.attrs[propName] = { info: propInfo, val: propVal };
+                        this.attrs = {};
+
+				    this.attrs[propName] = { info: propInfo, val: propVal };
 				}
 				else if (propType === PropType.Event)
 				{
@@ -274,9 +276,9 @@ export class ElmVN extends VN implements IElmVN
 					if (eventInfo)
 					{
 						if (!this.events)
-							this.events = { [propName]: eventInfo }
-                        else
-						    this.events[propName] = eventInfo;
+							this.events = {};
+
+                        this.events[propName] = eventInfo;
 					}
 				}
 				else // if (propType === PropType.CustomAttr)
@@ -284,25 +286,11 @@ export class ElmVN extends VN implements IElmVN
 					if (!this.customAttrs)
 						this.customAttrs = {};
 
-					// remember custome attributes value. Handler will be created later.
-					this.customAttrs[propName] = { info: propInfo as CustomAttrPropInfo, val: propVal,
-									handler: undefined};
+					// remember custom attributes value. Handler will be created later.
+					this.customAttrs[propName] = { info: propInfo as CustomAttrPropInfo, val: propVal, handler: undefined};
 				}
 			}
 		}
-	}
-
-    // Determines property type (regular attribute, event or custom attribute) based on the
-    // property information object if exists and if not by looking at the value.
-    private static determineAttrType( propInfo: AttrPropInfo, propVal: any): PropType
-	{
-        if (propInfo)
-            return propInfo.type;
-        else if (typeof propVal === "function" ||
-                Array.isArray(propVal) && propVal.length > 0 && typeof propVal[0] === "function")
-            return PropType.Event
-        else
-            return PropType.Attr;
 	}
 
 	// Adds DOM attributes to the Element.

@@ -121,7 +121,9 @@ export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
 // attributes is added to this object when the registerProperty method is called.
 let propInfos: {[P:string]: PropInfo} =
 {
-    // attributes - only those attributes are listed that have non-trivial treatment
+    // attributes - only those attributes are listed that have non-trivial treatment or whose value
+    // type is object
+    class: { type: PropType.Attr },
     style: { type: PropType.Attr, set: setStyleProp, diff: diffStyleProp, update: updateStyleProp },
     media: { type: PropType.Attr, set: setMediaProp, diff: diffMediaProp, update: updateMediaProp },
     value: { type: PropType.Attr, set: setValueProp, diff: diffValueProp, remove: removeValueProp },

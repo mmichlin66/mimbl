@@ -54,16 +54,16 @@ export class TextVN extends VN implements ITextVN
 
 
 
-    /// #if USE_STATS
-        // Destroys DOM node corresponding to this virtual node.
-        // This method is part of the Commit phase.
-        public unmount(): void
-        {
-            this.ownDN = undefined;
+    // Destroys DOM node corresponding to this virtual node.
+    // This method is part of the Commit phase.
+    public unmount(): void
+    {
+        this.ownDN = undefined;
 
+        /// #if USE_STATS
             DetailedStats.stats.log( StatsCategory.Text, StatsAction.Deleted);
-        }
-    /// #endif
+        /// #endif
+    }
 
 
 

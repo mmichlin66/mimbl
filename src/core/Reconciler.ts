@@ -480,23 +480,25 @@ function renderNewNode( vn: VN, parent: VN): void
     // if willMount function is defined we call it without try/catch. If it throws, the control
     // goes to either the ancestor node that supports error handling or the Mimbl tick loop
     // (which has try/catch).
-    if (vn.willMount)
+    let fn: Function = vn.willMount;
+    if (fn)
 	{
 		/// #if VERBOSE_NODE
 			console.debug( `Calling willMount() on node ${vn.name}`);
 		/// #endif
 
-		vn.willMount();
+		fn.call(vn);
 	}
 
-	// if the node doesn't implement `render`, the node never has any sub-nodes (e.g. text nodes)
-	if (vn.render)
+    // if the node doesn't implement `render`, the node never has any sub-nodes (e.g. text nodes)
+    fn = vn.render;
+	if (fn)
 	{
         // keep track of the node that is being currently processed.
         let prevVN = trackCurrentVN(vn);
 
         // we call the render method without try/catch
-        let subNodes = createVNChainFromContent( vn.render());
+        let subNodes = createVNChainFromContent( fn.call(vn));
         if (subNodes)
         {
             // since we have sub-nodes, we need to create nodes for them and render. If our node
@@ -556,7 +558,8 @@ function commitNewNode( vn: VN, anchorDN: DN, beforeDN: DN)
 	/// #if VERBOSE_NODE
 		console.debug( `Calling mount() on node ${vn.name}`);
 	/// #endif
-	let ownDN = vn.mount ? vn.mount() : undefined;
+    let fn: Function = vn.mount;
+	let ownDN = fn && fn.call(vn);
 
 	// if the node has sub-nodes, add DOM nodes for them. If the virtual node has its own
 	// DOM node use it as an anchor for the sub-nodes.
@@ -583,8 +586,9 @@ function commitNewNode( vn: VN, anchorDN: DN, beforeDN: DN)
 		console.debug( `Calling didMount() on node ${vn.name}`);
 	/// #endif
 
-    if (vn.didMount)
-        vn.didMount();
+    fn = vn.didMount;
+    if (fn)
+        fn.call(vn);
 
 	// restore pointer to the previous current node.
 	trackCurrentVN( prevVN);
@@ -599,13 +603,14 @@ function commitRemovedNode( vn: VN, removeOwnNode: boolean)
 	let ownDN = vn.ownDN;
 
     // notify our node
-	if (vn.willUnmount)
+    let fn: Function = vn.willUnmount;
+	if (fn)
 	{
 		/// #if VERBOSE_NODE
 			console.debug( `Calling willUnmount() on node ${vn.name}`);
 		/// #endif
 
-		vn.willUnmount();
+		fn.call(vn);
 	}
 
     if (vn.subNodes)
@@ -618,12 +623,13 @@ function commitRemovedNode( vn: VN, removeOwnNode: boolean)
     }
 
     // call unmount on our node - regardless whether it has its own DN or not
-    if (vn.unmount)
+    fn = vn.unmount;
+    if (fn)
     {
         /// #if VERBOSE_NODE
             console.debug( `Calling unmount() on node ${vn.name}`);
         /// #endif
-        vn.unmount();
+        fn.call(vn);
     }
 
     // If the virtual node has its own DOM node, remove it from the DOM tree unless the
@@ -678,8 +684,11 @@ function renderUpdatedNode( disp: VNDisp): void
                 // up in an infinite loop
                 vn.handleError( err, getVNPath( s_currentVN));
                 subNodes = createVNChainFromContent( vn.render());
-                buildSubNodeDispositions( disp, subNodes);
-                renderUpdatedSubNodes( disp);
+                if (subNodes)
+                {
+                    buildSubNodeDispositions( disp, subNodes);
+                    renderUpdatedSubNodes( disp);
+                }
             }
         }
     }
@@ -814,7 +823,7 @@ function commitUpdatesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, befo
 
 				// update the sub-nodes if necessary
 				if (disp.updateDisp.shouldRender)
-					commitUpdatedNode( disp);
+                    commitUpdatedNode( disp);
 			}
 
             // determine whether all the nodes under this VN should be moved.

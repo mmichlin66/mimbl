@@ -124,7 +124,7 @@ export abstract class VN implements IVNode
 
 		this.subNodes = undefined;
 		this.creator = undefined;
-		this.parent = undefined;
+        this.parent = undefined;
 	}
 
 
