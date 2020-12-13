@@ -122,10 +122,9 @@ export abstract class VN implements IVNode
 			// this.subscribedServices.clear();
 		}
 
-		// this.subNodes = undefined;
-		// this.creator = undefined;
-		// this.depth = undefined;
-		// this.parent = undefined;
+		this.subNodes = undefined;
+		this.creator = undefined;
+		this.parent = undefined;
 	}
 
 

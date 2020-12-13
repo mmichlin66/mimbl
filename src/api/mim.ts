@@ -193,14 +193,6 @@ export type UpdateStrategy =
 	 * The flag's default value is true.
 	 */
     allowKeyedNodeRecycling?: boolean;
-
-	/**
-	 * Flag determining whether removing the node doesn't perform recursive calls to willUnmount
-     * and unmount methods on sub-nodes. This can speed up removal of the tree of nodes.
-	 *
-	 * The flag's default value is false.
-	 */
-	noRecursiveUnmount?: boolean;
 };
 
 

@@ -608,8 +608,7 @@ function commitRemovedNode( vn: VN, removeOwnNode: boolean)
 		vn.willUnmount();
 	}
 
-    if (vn.subNodes && (!vn.updateStrategy || !vn.updateStrategy.noRecursiveUnmount))
-    // if (vn.subNodes)
+    if (vn.subNodes)
 	{
         // DOM nodes of sub-nodes don't need to be removed if either the upper DOM node
         // was already removed or our own DOM node is going to be removed.
@@ -627,8 +626,9 @@ function commitRemovedNode( vn: VN, removeOwnNode: boolean)
         vn.unmount();
     }
 
-    // If the virtual node has its own DOM node, remove it from the DOM tree; otherwise, recurse
-    // into the sub-nodes.
+    // If the virtual node has its own DOM node, remove it from the DOM tree unless the
+    // removeOwnNode parameter is false, which means this node will be removed when the upper
+    // node is removed.
     if (ownDN && removeOwnNode)
         (ownDN as any as ChildNode).remove();
 
