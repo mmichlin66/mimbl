@@ -330,7 +330,7 @@ function performMimbleTick(): void
 		s_schedulerState = SchedulerState.Update;
 		let vnsScheduledForUpdate = s_vnsScheduledForUpdate;
 		s_vnsScheduledForUpdate = new Set<VN>();
-		performCommitPhase( performRenderPhase( arrangeNodesByDepth( vnsScheduledForUpdate)));
+		performUpdate( vnsScheduledForUpdate);
 
         /// #if USE_STATS
             if (!statsAlreadyExisted)
@@ -355,15 +355,17 @@ function performMimbleTick(): void
 
 
 
-// Arranges the scheduled nodes by their nesting depths so that we update "upper" nodes before
-// the lower ones. This can help avoid two conditions:
-//	- rendering a child component twice: first because it called updateMe, and second
-//		because its parent was also updated.
-//	- unnecessary rendering a child component before it is removed by the parent
-// We allocate contiguous array where indices correspond to depth. Each element in this
-// array will either be undefined or contain an array of nodes at this depth.
-function arrangeNodesByDepth( vnsScheduledForUpdate: Set<VN>): VN[][]
+// Performs rendering phase for all components scheduled for update and recursively for their
+// sub-nodes where necessary. Returns array of VNDisp structures for each updated node.
+function performUpdate( vnsScheduledForUpdate: Set<VN>): void
 {
+    // Arranges the scheduled nodes by their nesting depths so that we update "upper" nodes before
+    // the lower ones. This can help avoid two conditions:
+    //	- rendering a child component twice: first because it called updateMe, and second
+    //		because its parent was also updated.
+    //	- unnecessary rendering a child component before it is removed by the parent
+    // We allocate contiguous array where indices correspond to depth. Each element in this
+    // array will either be undefined or contain an array of nodes at this depth.
 	let vnsByDepth: VN[][] = [];
 	vnsScheduledForUpdate.forEach( (vn: VN) =>
 	{
@@ -377,17 +379,6 @@ function arrangeNodesByDepth( vnsScheduledForUpdate: Set<VN>): VN[][]
         else
 		    arr.push(vn);
 	});
-
-	return vnsByDepth;
-}
-
-
-
-// Performs rendering phase for all components scheduled for update and recursively for their
-// sub-nodes where necessary. Returns array of VNDisp structures for each updated node.
-function performRenderPhase( vnsByDepth: VN[][]): VNDisp[]
-{
-	let updatedNodeDisps: VNDisp[] = [];
 
     for( let index in vnsByDepth)
 	{
@@ -403,9 +394,7 @@ function performRenderPhase( vnsByDepth: VN[][]): VNDisp[]
                 if (vn.lastUpdateTick === s_currentTick)
                     continue;
 
-                let disp = { oldVN: vn, action: VNDispAction.Unknown};
-                renderUpdatedNode( disp);
-                updatedNodeDisps.push( disp);
+                updateNode( {oldVN: vn});
             }
             catch( err)
             {
@@ -421,20 +410,6 @@ function performRenderPhase( vnsByDepth: VN[][]): VNDisp[]
             trackCurrentVN( null);
         }
 	}
-
-	return updatedNodeDisps;
-}
-
-
-
-// Performs the commit phase for all components scheduled for update and recursively for their
-// sub-nodes where necessary. The Commit phase consists of updating DOM and calling life-cycle
-// methods didMount, didUpdate and willUnmount.
-function performCommitPhase( updatedNodeDisps: VNDisp[]): void
-{
-	// we don't unticipate any exceptions here because we don't invoke 3rd-party code here.
-	for( let disp of updatedNodeDisps)
-		commitUpdatedNode( disp);
 }
 
 
@@ -442,7 +417,7 @@ function performCommitPhase( updatedNodeDisps: VNDisp[]): void
 // Call functions scheduled before or after update cycle.
 function callScheduledFunctions( funcs: Map<ScheduledFuncType,ScheduledFuncType>, beforeUpdate: boolean)
 {
-	funcs.forEach( (wrapper, func) =>
+	funcs.forEach( wrapper =>
 	{
 		try
 		{
@@ -464,7 +439,7 @@ function callScheduledFunctions( funcs: Map<ScheduledFuncType,ScheduledFuncType>
 // content returned from the error handling method is rendered; otherwise, the exception
 // is re-thrown. Thus, the exception is propagated up until it is handled by a node that
 // handles it or up to the root node.
-function renderNewNode( vn: VN, parent: VN): void
+function createNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
 {
 	vn.init( parent, s_currentClassComp);
 
@@ -481,31 +456,40 @@ function renderNewNode( vn: VN, parent: VN): void
 		fn.call(vn);
 	}
 
-    // if the node doesn't implement `render`, the node never has any sub-nodes (e.g. text nodes)
+    // keep track of the node that is being currently processed.
+    let prevVN = trackCurrentVN(vn);
+
+	// set the anchor node
+	vn.anchorDN = anchorDN;
+
+	/// #if VERBOSE_NODE
+		console.debug( `Calling mount() on node ${vn.name}`);
+	/// #endif
+    fn = vn.mount;
+	let ownDN = fn && fn.call(vn);
+
+    // if the node doesn't implement render(), the node never has any sub-nodes (e.g. text nodes)
     fn = vn.render;
 	if (fn)
 	{
-        // keep track of the node that is being currently processed.
-        let prevVN = trackCurrentVN(vn);
-
         // we call the render method without try/catch
         let subNodes = createVNChainFromContent( fn.call(vn));
         if (subNodes)
         {
+            // determine what nodes to use as anchor and "before" for the sub-nodes
+            let newAnchorDN = ownDN ? ownDN : anchorDN;
+            let newBeforeDN = ownDN ? null : beforeDN;
+
             // since we have sub-nodes, we need to create nodes for them and render. If our node
             // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
-            // either the uncestor node that knows to handle errors or to the Mimbl tick loop.
+            // either the ancestor node that knows to handle errors or to the Mimbl tick loop.
             if (!vn.supportsErrorHandling)
-            {
-                for( let svn of subNodes)
-                    renderNewNode( svn, vn);
-            }
+                createSubNodes( vn, subNodes, newAnchorDN, newBeforeDN);
             else
             {
                 try
                 {
-                    for( let svn of subNodes)
-                        renderNewNode( svn, vn);
+                    createSubNodes( vn, subNodes, newAnchorDN, newBeforeDN);
                 }
                 catch( err)
                 {
@@ -517,56 +501,15 @@ function renderNewNode( vn: VN, parent: VN): void
                     // content but we do it without try/catch this time; otherwise, we may end
                     // up in an infinite loop
                     vn.handleError( err, getVNPath( s_currentVN));
-                    subNodes = createVNChainFromContent( vn.render());
+                    subNodes = createVNChainFromContent( fn.call(vn));
                     if (subNodes)
-                    {
-                        for( let svn of subNodes)
-                            renderNewNode( svn, vn);
-                    }
+                        createSubNodes( vn, subNodes, newAnchorDN, newBeforeDN)
                 }
             }
         }
 
         // remember the sub-nodes
         vn.subNodes = subNodes;
-
-        // restore pointer to the previous current node.
-        trackCurrentVN( prevVN);
-	}
-}
-
-
-
-// Recursively creates DOM nodes for this VN and its sub-nodes.
-function commitNewNode( vn: VN, anchorDN: DN, beforeDN: DN)
-{
-	// keep track of the node that is being currently processed.
-	let prevVN = trackCurrentVN(vn);
-
-	// remember the anchor node
-	vn.anchorDN = anchorDN;
-
-	/// #if VERBOSE_NODE
-		console.debug( `Calling mount() on node ${vn.name}`);
-	/// #endif
-    let fn: Function = vn.mount;
-	let ownDN = fn && fn.call(vn);
-
-	// if the node has sub-nodes, add DOM nodes for them. If the virtual node has its own
-	// DOM node use it as an anchor for the sub-nodes.
-	if (vn.subNodes)
-	{
-		// determine what nodes to use as anchor and "before" for the sub-nodes
-		let newAnchorDN = ownDN ? ownDN : anchorDN;
-		let newBeforeDN = ownDN ? null : beforeDN;
-
-        // mount all sub-nodes
-        let index = 0;
-        for( let svn of vn.subNodes)
-        {
-            svn.index = index++;
-            commitNewNode( svn, newAnchorDN, newBeforeDN);
-        }
 	}
 
 	// if we have our own DOM node, add it under the anchor node
@@ -581,14 +524,28 @@ function commitNewNode( vn: VN, anchorDN: DN, beforeDN: DN)
     if (fn)
         fn.call(vn);
 
-	// restore pointer to the previous current node.
-	trackCurrentVN( prevVN);
+
+    // restore pointer to the previous current node.
+    trackCurrentVN( prevVN);
+}
+
+
+
+// Recursively creates DOM nodes for the sub-nodes of the given VN.
+function createSubNodes( parentVN: VN, vns: VN[], anchorDN: DN, beforeDN: DN)
+{
+    let index = 0;
+    for( let vn of vns)
+    {
+        vn.index = index++;
+        createNode( vn, parentVN, anchorDN, beforeDN);
+    }
 }
 
 
 
 // Recursively removes DOM nodes corresponding to this VN and its sub-nodes.
-function commitRemovedNode( vn: VN, removeOwnNode: boolean)
+function removeNode( vn: VN, removeOwnNode: boolean)
 {
 	// get the DOM node before we call unmount, because unmount will clear it.
 	let ownDN = vn.ownDN;
@@ -610,7 +567,7 @@ function commitRemovedNode( vn: VN, removeOwnNode: boolean)
         // was already removed or our own DOM node is going to be removed.
         let removeSubNodesOwnNode = removeOwnNode && !ownDN;
 		for( let svn of vn.subNodes)
-			commitRemovedNode( svn, removeSubNodesOwnNode);
+			removeNode( svn, removeSubNodesOwnNode);
     }
 
     // call unmount on our node - regardless whether it has its own DN or not
@@ -639,105 +596,8 @@ function commitRemovedNode( vn: VN, removeOwnNode: boolean)
 // Recursively renders this node and updates its sub-nodes if necessary. This method is
 // invoked when a node is being updated either as a result of updateMe invocation or because
 // the parent node was updated.
-function renderUpdatedNode( disp: VNDisp): void
+function updateNode( disp: VNDisp): void
 {
-	let vn = disp.oldVN;
-
-	// keep track of the node that is being currently processed.
-	let prevVN = trackCurrentVN(vn);
-
-    // we call the render method without try/catch. If it throws, the control goes to either the
-    // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
-    let subNodes = createVNChainFromContent( vn.render());
-	buildSubNodeDispositions( disp, subNodes);
-	if (subNodes)
-    {
-        // since we have sub-nodes, we need to create nodes for them and render. If our node
-        // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
-        // either the uncestor node that knows to handle errors or to the Mimbl tick loop.
-        if (!vn.supportsErrorHandling)
-            renderUpdatedSubNodes( disp);
-        else
-        {
-            try
-            {
-                renderUpdatedSubNodes( disp);
-            }
-            catch( err)
-            {
-                /// #if VERBOSE_NODE
-                    console.debug( `Calling handleError() on node ${vn.name}. Error`, err);
-                /// #endif
-
-                // let the node handle its own error and re-render; then we render the new
-                // content but we do it without try/catch this time; otherwise, we may end
-                // up in an infinite loop
-                vn.handleError( err, getVNPath( s_currentVN));
-                subNodes = createVNChainFromContent( vn.render());
-                buildSubNodeDispositions( disp, subNodes);
-                if (subNodes)
-                    renderUpdatedSubNodes( disp);
-            }
-        }
-    }
-
-    // indicate that the node was updated in this cycle - this will prevent it from
-    // rendering again in this cycle.
-    vn.lastUpdateTick = s_currentTick;
-
-	// restore pointer to the currently being processed node after processing its sub-nodes
-	trackCurrentVN( prevVN);
-}
-
-
-
-// Performs rendering phase of the update on the sub-nodes of the node, which is passed as
-// the oldVN member of the VNDisp structure.
-function renderUpdatedSubNodes( disp: VNDisp): void
-{
-    if (!disp.subNodeDisps)
-        return;
-
-	// perform rendering for sub-nodes that should be inserted, replaced or updated
-    let parentVN = disp.oldVN;
-    for( let subNodeDisp of disp.subNodeDisps)
-    {
-        let oldVN = subNodeDisp.oldVN;
-        let newVN = subNodeDisp.newVN;
-        if (subNodeDisp.action === VNDispAction.Update)
-        {
-            if ((oldVN !== newVN || oldVN.renderOnUpdate) && oldVN.prepareUpdate)
-            {
-                /// #if VERBOSE_NODE
-                    console.debug( `Calling prepareUpdate() on node ${oldVN.name}`);
-                /// #endif
-                subNodeDisp.updateDisp = oldVN.prepareUpdate( newVN);
-                if (subNodeDisp.updateDisp.shouldRender)
-                    renderUpdatedNode( subNodeDisp);
-            }
-        }
-        else if (subNodeDisp.action === VNDispAction.Insert)
-            renderNewNode( newVN, parentVN);
-    }
-}
-
-
-
-// Recursively performs DOM updates corresponding to this VN and its sub-nodes.
-function commitUpdatedNode( disp: VNDisp): void
-{
-	// remove from DOM the old nodes designated to be removed (that is, those for which there
-	// was no counterpart new node that would either update or replace it). We need to remove
-	// old nodes first before we start inserting new - one reason is to properly maintain
-	// references.
-	if (disp.subNodesToRemove)
-	{
-		for( let svn of disp.subNodesToRemove)
-			commitRemovedNode( svn, true);
-	}
-
-	// get the node whose children are being updated. This is always the oldVN member of
-	// the disp structure.
 	let vn = disp.oldVN;
 
 	// it might happen that the node being updated was already deleted by its parent. Check
@@ -759,19 +619,57 @@ function commitUpdatedNode( disp: VNDisp): void
 	// append to the end of the anchor node's children.
 	let beforeDN = ownDN != null ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
 
-	// re-create our current list of sub-nodes - we will populate it while updating them
-	vn.subNodes = disp.subNodeDisps ? new Array<VN>(disp.subNodeDisps.length) : undefined;
+    // we call the render method without try/catch. If it throws, the control goes to either the
+    // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
+    let subNodes = createVNChainFromContent( vn.render());
+    buildSubNodeDispositions( disp, subNodes);
 
-	// perform updates and inserts by either groups or individual nodes.
-	if (disp.subNodeGroups)
+	// remove from DOM the old nodes designated to be removed (that is, those for which there
+	// was no counterpart new node that would either update or replace it). We need to remove
+	// old nodes first before we start inserting new - one reason is to properly maintain
+	// references.
+	if (disp.subNodesToRemove)
 	{
-		commitUpdatesByGroups( vn, disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
-		arrangeGroups( disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
+		for( let svn of disp.subNodesToRemove)
+			removeNode( svn, true);
 	}
-	else if (disp.subNodeDisps)
-	{
-		commitUpdatesByNodes( vn, disp.subNodeDisps, anchorDN, beforeDN);
-	}
+
+    if (!subNodes)
+        vn.subNodes = null;
+    else
+    {
+        // since we have sub-nodes, we need to create nodes for them and render. If our node
+        // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
+        // either the uncestor node that knows to handle errors or to the Mimbl tick loop.
+        if (!vn.supportsErrorHandling)
+            updateSubNodes( vn, disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
+        else
+        {
+            try
+            {
+                updateSubNodes( vn, disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
+            }
+            catch( err)
+            {
+                /// #if VERBOSE_NODE
+                    console.debug( `Calling handleError() on node ${vn.name}. Error`, err);
+                /// #endif
+
+                // let the node handle its own error and re-render; then we render the new
+                // content but we do it without try/catch this time; otherwise, we may end
+                // up in an infinite loop
+                vn.handleError( err, getVNPath( s_currentVN));
+                subNodes = createVNChainFromContent( vn.render());
+                buildSubNodeDispositions( disp, subNodes);
+                if (subNodes)
+                    updateSubNodes( vn, disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
+            }
+        }
+    }
+
+    // indicate that the node was updated in this cycle - this will prevent it from
+    // rendering again in this cycle.
+    vn.lastUpdateTick = s_currentTick;
 
 	// restore pointer to the currently being processed node after processing its sub-nodes
 	trackCurrentVN( prevVN);
@@ -779,8 +677,29 @@ function commitUpdatedNode( disp: VNDisp): void
 
 
 
+// Performs rendering phase of the update on the sub-nodes of the node, which is passed as
+// the oldVN member of the VNDisp structure.
+function updateSubNodes( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
+{
+	// re-create our current list of sub-nodes - we will populate it while updating them
+	parentVN.subNodes = disps ? new Array<VN>(disps.length) : undefined;
+
+	// perform updates and inserts by either groups or individual nodes.
+    if (groups)
+    {
+		updateSubNodesByGroups( parentVN, disps, groups, anchorDN, beforeDN);
+        arrangeGroups( disps, groups, anchorDN, beforeDN);
+    }
+	else if (disps)
+	{
+		updateSubNodesByNodes( parentVN, disps, anchorDN, beforeDN);
+	}
+}
+
+
+
 // Performs updates and inserts by individual nodes.
-function commitUpdatesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, beforeDN: DN): void
+function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, beforeDN: DN): void
 {
 	// perform DOM operations according to sub-node disposition. We need to decide for each
 	// node what node to use to insert or move it before. We go from the end of the list of
@@ -800,7 +719,16 @@ function commitUpdatesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, befo
 		{
 			if (oldVN !== newVN || oldVN.renderOnUpdate)
 			{
-				if (disp.updateDisp.shouldCommit)
+                let updateDisp: VNUpdateDisp = null;
+                if (oldVN.prepareUpdate)
+                {
+                    /// #if VERBOSE_NODE
+                        console.debug( `Calling prepareUpdate() on node ${oldVN.name}`);
+                    /// #endif
+                    updateDisp = oldVN.prepareUpdate( newVN);
+                }
+
+                if (updateDisp.shouldCommit)
 				{
 					/// #if VERBOSE_NODE
 						console.debug( `Calling commitUpdate() on node ${oldVN.name}`);
@@ -810,8 +738,8 @@ function commitUpdatesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, befo
 				}
 
 				// update the sub-nodes if necessary
-				if (disp.updateDisp.shouldRender)
-                    commitUpdatedNode( disp);
+				if (updateDisp.shouldRender)
+                    updateNode( disp);
 			}
 
             // determine whether all the nodes under this VN should be moved.
@@ -846,7 +774,7 @@ function commitUpdatesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, befo
 		{
 			// since we already destroyed old nodes designated to be replaced, the code is
 			// identical for Replace and Insert actions
-			commitNewNode( newVN, anchorDN, beforeDN);
+			createNode( newVN, parentVN, anchorDN, beforeDN);
 
 			// if the new node defines a DOM node, it becomes the DOM node before which
 			// next components should be inserted/moved
@@ -864,7 +792,7 @@ function commitUpdatesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, befo
 
 // Performs updates and inserts by groups. We go from the end of the list of update groups
 // and on each iteration we decide the value of the "beforeDN".
-function commitUpdatesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
+function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
 {
 	let currSubNodeIndex = disps.length - 1;
 	for( let i = groups.length - 1; i >= 0; i--)
@@ -886,9 +814,18 @@ function commitUpdatesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGro
             let firstDN: DN | null = null;
 			if (group.action === VNDispAction.Update)
 			{
+                let updateDisp: VNUpdateDisp = null;
 				if (oldVN !== newVN || oldVN.renderOnUpdate)
 				{
-					if (disp.updateDisp.shouldCommit)
+                    if (oldVN.prepareUpdate)
+                    {
+                        /// #if VERBOSE_NODE
+                            console.debug( `Calling prepareUpdate() on node ${oldVN.name}`);
+                        /// #endif
+                        updateDisp = oldVN.prepareUpdate( newVN);
+                    }
+
+                    if (updateDisp.shouldCommit)
 					{
 						/// #if VERBOSE_NODE
 							console.debug( `Calling commitUpdate() on node ${oldVN.name}`);
@@ -898,15 +835,15 @@ function commitUpdatesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGro
 					}
 
 					// update the sub-nodes if necessary
-					if (disp.updateDisp.shouldRender)
-						commitUpdatedNode( disp);
+					if (updateDisp.shouldRender)
+                        updateNode( disp);
 				}
 
 				firstDN = getFirstDN( oldVN);
 			}
 			else if (group.action === VNDispAction.Insert)
 			{
-				commitNewNode( newVN, anchorDN, beforeDN);
+				createNode( newVN, parentVN, anchorDN, beforeDN);
 
 				// if the new node defines a DOM node, it becomes the DOM node before which
 				// next components should be inserted/moved
@@ -1106,17 +1043,14 @@ const NO_GROUP_THRESHOLD = 8;
  */
 type VNDisp =
 {
+	/** Old virtual node to be updated. This is only used for the Update action. */
+	oldVN?: VN;
+
 	/** New virtual node to insert or to update an old node */
 	newVN?: VN;
 
 	/** Action to be performed on the node */
 	action?: VNDispAction;
-
-	/** Old virtual node to be updated. This is only used for the Update action. */
-	oldVN?: VN;
-
-	/** Disposition flags for the Update action. This is not used for the Insert actions. */
-	updateDisp?: VNUpdateDisp;
 
 	/**
 	 * Array of disposition objects for sub-nodes. This includes nodes to be updated
