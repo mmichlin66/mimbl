@@ -249,6 +249,8 @@ export function updateElmProp( elm: Element, propName: string, info: AttrPropInf
     }
     else if (oldPropVal !== newPropVal)
         updateVal = newPropVal;
+    else
+        return false;
 
     // get actual attribute name to use
     let attrName = info.attrName;

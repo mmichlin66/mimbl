@@ -262,7 +262,12 @@ export class ElmVN extends VN implements IElmVN
 				// get information about the property and determine its type (regular attribute, event
 				// or custom attribute).
 				let propInfo = getElmPropInfo( propName);
-				let propType = propInfo ? propInfo.type : typeof propVal === "object" ? PropType.Event : PropType.Attr;
+                let propType = propInfo
+                    ? propInfo.type
+                    : typeof propVal === "function" || typeof propVal === "object"
+                        ? PropType.Event
+                        : PropType.Attr;
+
 				if (propType === PropType.Attr)
 				{
 					if (!this.attrs)
@@ -326,7 +331,7 @@ export class ElmVN extends VN implements IElmVN
 					// remove the attribute from the element
 					removeElmProp( elm, name, oldRTD.info);
 				}
-				else
+				else if (oldRTD.val !== newRTD.val)
 				{
 					// if the new property with the given name has a different value, remmeber this
 					// value and set it to the attribute in the element
