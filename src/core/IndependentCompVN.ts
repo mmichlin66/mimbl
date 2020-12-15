@@ -62,9 +62,10 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
             /// #endif
 
             this.didMount();
-		}
-
-		return VNUpdateDisp.getStockValue( false, needsUpdating);
+            return VNUpdateDisp.NoCommitDoRender;
+        }
+        else
+    		return VNUpdateDisp.NoCommitNoRender;
 	}
 }
 

@@ -674,11 +674,9 @@ function renderUpdatedNode( disp: VNDisp): void
                 // up in an infinite loop
                 vn.handleError( err, getVNPath( s_currentVN));
                 subNodes = createVNChainFromContent( vn.render());
+                buildSubNodeDispositions( disp, subNodes);
                 if (subNodes)
-                {
-                    buildSubNodeDispositions( disp, subNodes);
                     renderUpdatedSubNodes( disp);
-                }
             }
         }
     }
@@ -697,30 +695,30 @@ function renderUpdatedNode( disp: VNDisp): void
 // the oldVN member of the VNDisp structure.
 function renderUpdatedSubNodes( disp: VNDisp): void
 {
+    if (!disp.subNodeDisps)
+        return;
+
 	// perform rendering for sub-nodes that should be inserted, replaced or updated
-	if (disp.subNodeDisps)
-	{
-		let parentVN = disp.oldVN;
-		for( let subNodeDisp of disp.subNodeDisps)
-		{
-			let oldVN = subNodeDisp.oldVN;
-			let newVN = subNodeDisp.newVN;
-			if (subNodeDisp.action === VNDispAction.Update)
-			{
-				if ((oldVN !== newVN || oldVN.renderOnUpdate) && oldVN.prepareUpdate)
-				{
-					/// #if VERBOSE_NODE
-						console.debug( `Calling prepareUpdate() on node ${oldVN.name}`);
-					/// #endif
-					subNodeDisp.updateDisp = oldVN.prepareUpdate( newVN);
-					if (subNodeDisp.updateDisp.shouldRender)
-						renderUpdatedNode( subNodeDisp);
-				}
-			}
-			else if (subNodeDisp.action === VNDispAction.Insert)
-				renderNewNode( newVN, parentVN);
-		}
-	}
+    let parentVN = disp.oldVN;
+    for( let subNodeDisp of disp.subNodeDisps)
+    {
+        let oldVN = subNodeDisp.oldVN;
+        let newVN = subNodeDisp.newVN;
+        if (subNodeDisp.action === VNDispAction.Update)
+        {
+            if ((oldVN !== newVN || oldVN.renderOnUpdate) && oldVN.prepareUpdate)
+            {
+                /// #if VERBOSE_NODE
+                    console.debug( `Calling prepareUpdate() on node ${oldVN.name}`);
+                /// #endif
+                subNodeDisp.updateDisp = oldVN.prepareUpdate( newVN);
+                if (subNodeDisp.updateDisp.shouldRender)
+                    renderUpdatedNode( subNodeDisp);
+            }
+        }
+        else if (subNodeDisp.action === VNDispAction.Insert)
+            renderNewNode( newVN, parentVN);
+    }
 }
 
 
