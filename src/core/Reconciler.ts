@@ -211,7 +211,7 @@ function addNodeToScheduler( vn: VN): void
 	// if this is a class-based component and it has beforeUpdate and/or afterUpdate methods
 	// implemented, schedule their executions. Note that the "beforeUpdate" method is not
 	// scheduled if the current scheduler state is BeforeUpdate. This is because the component
-	// wil be updated in the current cycle and there is already no time to execute the "before
+	// will be updated in the current cycle and there is already no time to execute the "before
 	// update" method.
 	if (vn instanceof ClassCompVN)
 	{
@@ -417,10 +417,6 @@ function performRenderPhase( vnsByDepth: VN[][]): VNDisp[]
                 else
                     console.error( "BUG: updateVirtual threw exception but StdErrorHandling service was not found.", err);
             }
-
-            // indicate that the node was updated in this cycle - this will prevent it from
-            // rendering again in this cycle.
-            vn.lastUpdateTick = s_currentTick;
 
             trackCurrentVN( null);
         }
@@ -686,6 +682,10 @@ function renderUpdatedNode( disp: VNDisp): void
             }
         }
     }
+
+    // indicate that the node was updated in this cycle - this will prevent it from
+    // rendering again in this cycle.
+    vn.lastUpdateTick = s_currentTick;
 
 	// restore pointer to the currently being processed node after processing its sub-nodes
 	trackCurrentVN( prevVN);
