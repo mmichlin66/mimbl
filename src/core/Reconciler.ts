@@ -364,9 +364,7 @@ function performMimbleTick(): void
 // array will either be undefined or contain an array of nodes at this depth.
 function arrangeNodesByDepth( vnsScheduledForUpdate: Set<VN>): VN[][]
 {
-	// create a sparse array of certain reasonable size. If we have depths greater than this,
-	// the array will grow automatically (although it is less performant it is still acceptable).
-	let vnsByDepth: VN[][] = new Array<VN[]>(32);
+	let vnsByDepth: VN[][] = [];
 	vnsScheduledForUpdate.forEach( (vn: VN) =>
 	{
         // it can happen that we encounter already unmounted virtual nodes - ignore them
@@ -375,12 +373,9 @@ function arrangeNodesByDepth( vnsScheduledForUpdate: Set<VN>): VN[][]
 
 		let arr = vnsByDepth[vn.depth];
 		if (!arr)
-		{
-			arr = [];
-			vnsByDepth[vn.depth] = arr;
-		}
-
-		arr.push(vn);
+			vnsByDepth[vn.depth] = [vn];
+        else
+		    arr.push(vn);
 	});
 
 	return vnsByDepth;
@@ -394,13 +389,9 @@ function performRenderPhase( vnsByDepth: VN[][]): VNDisp[]
 {
 	let updatedNodeDisps: VNDisp[] = [];
 
-    let disp: VNDisp;
-    for( let vns of vnsByDepth)
+    for( let index in vnsByDepth)
 	{
-        // vnsByDepth is a sparse array so it can have holes
-        if (!vns)
-            continue;
-
+        let vns = vnsByDepth[index];
         for( let vn of vns)
         {
             try
@@ -412,7 +403,7 @@ function performRenderPhase( vnsByDepth: VN[][]): VNDisp[]
                 if (vn.lastUpdateTick === s_currentTick)
                     continue;
 
-                disp = { newVN: vn, action: VNDispAction.Unknown, oldVN: vn};
+                let disp = { oldVN: vn, action: VNDispAction.Unknown};
                 renderUpdatedNode( disp);
                 updatedNodeDisps.push( disp);
             }
@@ -426,6 +417,10 @@ function performRenderPhase( vnsByDepth: VN[][]): VNDisp[]
                 else
                     console.error( "BUG: updateVirtual threw exception but StdErrorHandling service was not found.", err);
             }
+
+            // indicate that the node was updated in this cycle - this will prevent it from
+            // rendering again in this cycle.
+            vn.lastUpdateTick = s_currentTick;
 
             trackCurrentVN( null);
         }
@@ -650,7 +645,6 @@ function commitRemovedNode( vn: VN, removeOwnNode: boolean)
 // the parent node was updated.
 function renderUpdatedNode( disp: VNDisp): void
 {
-	// let vn = disp.action === VNDispAction.Insert ? disp.newVN : disp.oldVN;
 	let vn = disp.oldVN;
 
 	// keep track of the node that is being currently processed.
@@ -692,10 +686,6 @@ function renderUpdatedNode( disp: VNDisp): void
             }
         }
     }
-
-	// indicate that the node was updated in this cycle - this will prevent it from
-	// rendering again in this cycle.
-	vn.lastUpdateTick = s_currentTick;
 
 	// restore pointer to the currently being processed node after processing its sub-nodes
 	trackCurrentVN( prevVN);
@@ -1119,7 +1109,7 @@ const NO_GROUP_THRESHOLD = 8;
 type VNDisp =
 {
 	/** New virtual node to insert or to update an old node */
-	newVN: VN;
+	newVN?: VN;
 
 	/** Action to be performed on the node */
 	action?: VNDispAction;
