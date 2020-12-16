@@ -1,4 +1,4 @@
-﻿import {FuncProxyProps, IComponent} from "../api/mim"
+﻿import {FuncProxyProps} from "../api/mim"
 import {VN, s_currentClassComp, createWatcher, VNUpdateDisp, IWatcher} from "../internal"
 
 /// #if USE_STATS
@@ -94,13 +94,13 @@ export class FuncProxyVN extends VN
 
 
 
-	// Initializes the node by passing the parent node to it. After this, the node knows its
-	// place in the hierarchy and gets access to the root of it - the RootVN object.
-	public init( parent: VN, creator: IComponent): void
+	// Initializes internal stuctures of the virtual node. This method is called right after the
+    // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
+    // corresponding to this virtual node.
+	// This method is part of the Commit phase.
+	public mount(): void
 	{
-        super.init( parent, creator);
-
-        if (this.funcThisArg === undefined)
+        if (!this.funcThisArg)
             this.funcThisArg = this.creator;
 
 		// if a key was not provided we use the value of thisArg (which might be the current
@@ -121,10 +121,8 @@ export class FuncProxyVN extends VN
 
 
     // Cleans up the node object before it is released.
-    public term(): void
+    public unmount(): void
     {
-        super.term();
-
         if (this.funcWatcher)
         {
             this.funcWatcher.dispose();

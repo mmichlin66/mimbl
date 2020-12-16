@@ -43,27 +43,24 @@ export class TextVN extends VN implements ITextVN
 
 	// Creates and returns DOM node corresponding to this virtual node.
 	// This method is part of the Commit phase.
-	public mount(): DN
+	public mount(): void
 	{
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Added);
 		/// #endif
 
-		return this.ownDN = document.createTextNode( this.text);
+		this.ownDN = document.createTextNode( this.text);
 	}
 
 
 
-    // Destroys DOM node corresponding to this virtual node.
-    // This method is part of the Commit phase.
-    public unmount(): void
-    {
-        this.ownDN = undefined;
-
-        /// #if USE_STATS
+    /// #if USE_STATS
+        // Cleans up the node object before it is released.
+        public unmount(): void
+        {
             DetailedStats.stats.log( StatsCategory.Text, StatsAction.Deleted);
-        /// #endif
-    }
+        }
+    /// #endif
 
 
 

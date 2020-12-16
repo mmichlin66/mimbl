@@ -53,14 +53,9 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 
             this.comp = this.key = newVN.comp;
 
-            this.willMount();
-
-            /// the mount method is only defined for gathering stats
-            /// #if USE_STATS
-                this.mount();
-            /// #endif
-
+            this.mount();
             this.didMount();
+
             return VNUpdateDisp.NoCommitDoRender;
         }
         else

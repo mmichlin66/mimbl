@@ -81,20 +81,20 @@ export class FuncVN extends VN
 
 
     /// #if USE_STATS
-        // Initializes the node by passing the parent node to it. After this, the node knows its
-        // place in the hierarchy and gets access to the root of it - the RootVN object.
-        public init( parent: VN, creator: IComponent): void
+        // Initializes internal stuctures of the virtual node. This method is called right after the
+        // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
+        // corresponding to this virtual node.
+        // This method is part of the Commit phase.
+        public mount(): void
         {
-            super.init( parent, creator);
             DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
         }
 
 
 
         // Cleans up the node object before it is released.
-        public term(): void
+        public unmount(): void
         {
-            super.term();
             DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
         }
     /// #endif

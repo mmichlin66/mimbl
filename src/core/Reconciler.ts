@@ -436,29 +436,35 @@ function callScheduledFunctions( funcs: Map<ScheduledFuncType,ScheduledFuncType>
 // content returned from the error handling method is rendered; otherwise, the exception
 // is re-thrown. Thus, the exception is propagated up until it is handled by a node that
 // handles it or up to the root node.
-function createNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
+function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
 {
-	vn.init( parent, s_currentClassComp);
+	// initialize the node
+    vn.parent = parent;
+    vn.depth = parent ? parent.depth + 1 : 0;
+    vn.creator = s_currentClassComp;
+	vn.anchorDN = anchorDN;
+
+    // call init() if the node implements it
+    let fn: Function = vn.init;
+    fn && fn.call(vn);
 
     // keep track of the node that is being currently processed.
     let prevVN = trackCurrentVN(vn);
 
-	// set the anchor node
-	vn.anchorDN = anchorDN;
-
 	/// #if VERBOSE_NODE
 		console.debug( `Calling mount() on node ${vn.name}`);
 	/// #endif
-    let fn: Function = vn.mount;
-	let ownDN = fn && fn.call(vn);
+    fn = vn.mount;
+	fn && fn.call(vn);
+	let ownDN = vn.ownDN;
 
     // if the node doesn't implement render(), the node never has any sub-nodes (e.g. text nodes)
     fn = vn.render;
 	if (fn)
 	{
         // we call the render method without try/catch
-        vn.subNodes = createVNChainFromContent( fn.call(vn));
-        if (vn.subNodes)
+        let subNodes = createVNChainFromContent( fn.call(vn));
+        if (subNodes)
         {
             // determine what nodes to use as anchor and "before" for the sub-nodes
             let newAnchorDN = ownDN ? ownDN : anchorDN;
@@ -468,12 +474,12 @@ function createNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
             // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
             // either the ancestor node that knows to handle errors or to the Mimbl tick loop.
             if (!vn.supportsErrorHandling)
-                createSubNodes( vn, vn.subNodes, newAnchorDN, newBeforeDN);
+                mountSubNodes( vn, subNodes, newAnchorDN, newBeforeDN);
             else
             {
                 try
                 {
-                    createSubNodes( vn, vn.subNodes, newAnchorDN, newBeforeDN);
+                    mountSubNodes( vn, subNodes, newAnchorDN, newBeforeDN);
                 }
                 catch( err)
                 {
@@ -485,12 +491,14 @@ function createNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
                     // content but we do it without try/catch this time; otherwise, we may end
                     // up in an infinite loop
                     vn.handleError( err, getVNPath( s_currentVN));
-                    vn.subNodes = createVNChainFromContent( fn.call(vn));
-                    if (vn.subNodes)
-                        createSubNodes( vn, vn.subNodes, newAnchorDN, newBeforeDN)
+                    subNodes = createVNChainFromContent( fn.call(vn));
+                    if (subNodes)
+                        mountSubNodes( vn, subNodes, newAnchorDN, newBeforeDN)
                 }
             }
         }
+
+        vn.subNodes = subNodes;
 	}
 
 	// if we have our own DOM node, add it under the anchor node
@@ -513,30 +521,31 @@ function createNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
 
 
 // Recursively creates DOM nodes for the sub-nodes of the given VN.
-function createSubNodes( parentVN: VN, vns: VN[], anchorDN: DN, beforeDN: DN)
+function mountSubNodes( parentVN: VN, vns: VN[], anchorDN: DN, beforeDN: DN)
 {
     let index = 0;
     for( let vn of vns)
     {
         vn.index = index++;
-        createNode( vn, parentVN, anchorDN, beforeDN);
+        mountNode( vn, parentVN, anchorDN, beforeDN);
     }
 }
 
 
 
 // Recursively removes DOM nodes corresponding to this VN and its sub-nodes.
-function removeNode( vn: VN, removeOwnNode: boolean)
+function unmountNode( vn: VN, removeOwnNode: boolean)
 {
 	// get the DOM node before we call unmount, because unmount will clear it.
 	let ownDN = vn.ownDN;
 
     if (vn.subNodes)
 	{
-        // DOM nodes of sub-nodes don't need to be removed if either the upper DOM node
-        // was already removed or our own DOM node is going to be removed.
+        // DOM nodes of sub-nodes don't need to be removed if either the upper DOM node has
+        // already been removed or our own DOM node is going to be removed (true is only passed
+        // further if our parameter was true and we don't have own DN).
 		for( let svn of vn.subNodes)
-			removeNode( svn, removeOwnNode && !ownDN);
+			unmountNode( svn, removeOwnNode && !ownDN);
     }
 
     // call unmount on our node - regardless whether it has its own DN or not
@@ -556,8 +565,9 @@ function removeNode( vn: VN, removeOwnNode: boolean)
         (ownDN as any as ChildNode).remove();
 
     // mark the node as unmounted
-	vn.term();
-	vn.anchorDN = undefined;
+	// vn.term();
+    vn.ownDN = null;
+	vn.anchorDN = null;
 }
 
 
@@ -600,7 +610,7 @@ function updateNode( disp: VNDisp): void
 	if (disp.subNodesToRemove)
 	{
 		for( let svn of disp.subNodesToRemove)
-			removeNode( svn, true);
+			unmountNode( svn, true);
 	}
 
     if (!subNodes)
@@ -750,7 +760,7 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 		{
 			// since we already destroyed old nodes designated to be replaced, the code is
 			// identical for Replace and Insert actions
-			createNode( newVN, parentVN, anchorDN, beforeDN);
+			mountNode( newVN, parentVN, anchorDN, beforeDN);
 
             // if the virtual node defines a DOM node, it becomes the DOM node before which
             // next components should be inserted/moved
@@ -816,7 +826,7 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 			}
 			else if (group.action === VNDispAction.Insert)
 			{
-				createNode( newVN, parentVN, anchorDN, beforeDN);
+				mountNode( newVN, parentVN, anchorDN, beforeDN);
 
 				// if the new node defines a DOM node, it becomes the DOM node before which
 				// next components should be inserted/moved
@@ -1345,7 +1355,7 @@ function getNextDNUnderSameAnchorDN( vn: VN, anchorDN: DN): DN
 		if (dn)
 		{
 			let nextSibling = dn.nextSibling;
-			if (nextSibling !== null)
+			if (nextSibling)
 				return nextSibling;
 		}
 	}
@@ -1413,15 +1423,13 @@ function createNodesFromContent( content: any, nodes?: VN[]): VN | VN[] | null
 	{
         if (content.length === 0)
             return null;
-        else
-        {
-            let vn = new TextVN( content);
-            if (nodes)
-                nodes.push( vn);
 
-            return vn;
-        }
-	}
+        let vn = new TextVN( content);
+        if (nodes)
+            nodes.push( vn);
+
+        return vn;
+    }
 	else if (typeof content.render === "function")
 	{
 		// if the component (this can only be an Instance component) is already attached to VN,
@@ -1436,6 +1444,9 @@ function createNodesFromContent( content: any, nodes?: VN[]): VN | VN[] | null
 	}
     else if (Array.isArray( content))
     {
+        if (content.length === 0)
+            return null;
+
         if (!nodes)
             nodes = [];
 
@@ -1492,8 +1503,13 @@ function createVNChainFromContent( content: any): VN[] | null
 // Creates array of virtual nodes from the given array of items.
 function createNodesFromArray( arr: any[], nodes: VN[]): void
 {
-	if (arr.length === 0)
-		return null;
+    /// #if DEBUG
+    if (arr.length === 0)
+    {
+        console.error("createNodesFromArray was called with empty array");
+        return null;
+    }
+    /// #endif
 
 	for( let item of arr)
 		createNodesFromContent( item, nodes);
@@ -1508,9 +1524,14 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
 		return new ElmVN( tag, props, children);
     else if (tag === Fragment)
     {
-        let nodes: VN[] = [];
-        createNodesFromArray( children, nodes);
-        return nodes.length > 0 ? nodes : null;
+        if (children.length === 0)
+            return null;
+        else
+        {
+            let nodes: VN[] = [];
+            createNodesFromArray( children, nodes);
+            return nodes;
+        }
     }
 	else if (tag === FuncProxy)
 	{

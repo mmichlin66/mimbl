@@ -81,18 +81,26 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 
 
 
-	// Creates internal stuctures of the virtual node so that it is ready to produce children.
+    // Initializes internal stuctures of the virtual node before it is mounted. This method is used
+    // to let the node know that it it is going to be mounted; however, the node doesn't need to
+    // create any DOM elements yet. This will be done during the mount() method.
+	// This method is part of the Render phase.
+    public init?(): void
+    {
+		// create component instance
+		this.comp = new this.compClass( this.props);
+    }
+
+
+    // Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
 	// This method is part of the Render phase.
 	public willMount(): void
 	{
-		// create component instance
-		this.comp = new this.compClass( this.props);
-
         super.willMount();
 
         // set the reference value if specified
-		if (this.ref !== undefined)
+		if (this.ref)
 			setRef( this.ref, this.comp);
 	}
 
@@ -107,7 +115,7 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 		// to our component before setting it to undefined. If the same Ref object is used for
 		// more than one components (and/or elements) it can happen that the reference is changed
 		// before our component is unmounted.
-		if (this.ref !== undefined)
+		if (this.ref)
 			setRef( this.ref, undefined, this.comp);
 
         super.willUnmount();

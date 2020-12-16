@@ -95,37 +95,37 @@ export abstract class VN implements IVNode
 
 
 
-	// Initializes the node by passing the parent node to it. After this, the node knows its
-	// place in the hierarchy and gets access to the root of it - the RootVN object.
-	public init( parent: VN, creator: IComponent): void
-	{
-		this.parent = parent;
-		this.depth = this.parent ? this.parent.depth + 1 : 0;
-		this.creator = creator;
-	}
+	// // Initializes the node by passing the parent node to it. After this, the node knows its
+	// // place in the hierarchy and gets access to the root of it - the RootVN object.
+	// public init( parent: VN, creator: IComponent): void
+	// {
+	// 	this.parent = parent;
+	// 	this.depth = this.parent ? this.parent.depth + 1 : 0;
+	// 	this.creator = creator;
+	// }
 
 
 
-	// Cleans up the node object before it is released.
-	public term(): void
-	{
-		// remove information about any published and subscribed services
-		if (this.publishedServices !== undefined)
-		{
-			this.publishedServices.forEach( (service, id) => notifyServiceUnpublished( id, this));
-			// this.publishedServices.clear();
-		}
+	// // Cleans up the node object before it is released.
+	// public term(): void
+	// {
+	// 	// // remove information about any published and subscribed services
+	// 	// if (this.publishedServices !== undefined)
+	// 	// {
+	// 	// 	this.publishedServices.forEach( (service, id) => notifyServiceUnpublished( id, this));
+	// 	// 	// this.publishedServices.clear();
+	// 	// }
 
-		if (this.subscribedServices !== undefined)
-		{
-			this.subscribedServices.forEach( (info, id) => notifyServiceUnsubscribed( id, this));
-			// this.subscribedServices.clear();
-		}
+	// 	// if (this.subscribedServices !== undefined)
+	// 	// {
+	// 	// 	this.subscribedServices.forEach( (info, id) => notifyServiceUnsubscribed( id, this));
+	// 	// 	// this.subscribedServices.clear();
+	// 	// }
 
-		this.subNodes = undefined;
-		this.creator = undefined;
-        this.parent = undefined;
-	}
+	// 	// this.subNodes = undefined;
+	// 	// this.creator = undefined;
+    //     // this.parent = undefined;
+	// }
 
 
 
@@ -135,17 +135,23 @@ export abstract class VN implements IVNode
 	//
 	///////////////////////////////////////////////////////////////////////////////////////////////
 
+    // Initializes internal stuctures of the virtual node before it is mounted. This method is used
+    // to let the node know that it is going to be mounted; however, the node doesn't need to
+    // create any DOM elements yet. This will be done during the mount() method.
+	// This method is part of the Render phase.
+	public init?(): void;
+
+	// Initializes internal stuctures of the virtual node. This method is called right after the
+    // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
+    // corresponding to this virtual node.
+	// This method is part of the Commit phase.
+	public mount?(): void;
+
 	// Returns content that comprises the children of the node. If the node doesn't have
 	// sub-nodes, null should be returned. If this method is not implemented that means the node
 	// never has children - for example text nodes.
 	// This method is part of the Render phase.
 	public render?(): any;
-
-	// Initializes internal stuctures of the virtual node. This method is called right after the
-    // node has been constructed. For nodes that have their own DOM nodes, creates and returns DOM
-    // node corresponding to this virtual node.
-	// This method is part of the Commit phase.
-	public mount?(): DN;
 
     // Notifies the virtual node that it was successfully mounted. This method is called after the
     // content of node and all its sub-nodes is added to the DOM tree.

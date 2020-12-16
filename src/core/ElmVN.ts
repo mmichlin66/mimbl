@@ -99,9 +99,11 @@ export class ElmVN extends VN implements IElmVN
 
 
 
-	// Creates and returns DOM node corresponding to this virtual node.
+	// Initializes internal stuctures of the virtual node. This method is called right after the
+    // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
+    // corresponding to this virtual node.
 	// This method is part of the Commit phase.
-	public mount(): DN
+	public mount(): void
 	{
         // create the element. If namespace is provided use it; otherwise, try to determine
         // whether this is an SVG or HTML element
@@ -138,15 +140,13 @@ export class ElmVN extends VN implements IElmVN
                 this.addCustomAttrs();
 
             // set the value of the reference (if specified)
-            if (this.ref !== undefined)
+            if (this.ref)
                 setRef( this.ref, this.ownDN);
         }
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Added);
 		/// #endif
-
-		return this.ownDN;
 	}
 
 
@@ -159,7 +159,7 @@ export class ElmVN extends VN implements IElmVN
 		// to our element before setting it to undefined. If the same Ref object is used for
 		// more than one element (and/or components) it can happen that the reference is changed
 		// before our element is unmounted.
-		if (this.ref !== undefined)
+		if (this.ref)
 			setRef( this.ref, undefined, this.ownDN);
 
 		/// #if REMOVE_EVENT_LISTENERS
@@ -174,10 +174,8 @@ export class ElmVN extends VN implements IElmVN
 		if (this.customAttrs)
 			this.removeCustomAttrs( true);
 
-		// clean up
-        this.ownDN = null;
-        this.children = null;
-        this.attrs = this.events = undefined;
+		// // clean up
+        // this.children = null;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Deleted);

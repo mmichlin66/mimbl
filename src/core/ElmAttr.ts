@@ -122,7 +122,9 @@ export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
 let propInfos: {[P:string]: PropInfo} =
 {
     // attributes - only those attributes are listed that have non-trivial treatment or whose value
-    // type is object
+    // type is object or function. ID and class are present here because their value can be
+    // specified as Mimcss IDRule and ClassRule objects respectively.
+    id: { type: PropType.Attr },
     class: { type: PropType.Attr },
     style: { type: PropType.Attr, set: setStyleProp, diff: diffStyleProp, update: updateStyleProp },
     media: { type: PropType.Attr, set: setMediaProp, diff: diffMediaProp, update: updateMediaProp },

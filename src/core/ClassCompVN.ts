@@ -1,6 +1,6 @@
 ﻿import {IClassCompVN, IComponent, UpdateStrategy} from "../api/mim"
 import {createWatcher, IWatcher} from "../utils/TriggerWatcher"
-import {VN, DN} from "../internal"
+import {VN} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -33,16 +33,18 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	 */
 	public get updateStrategy(): UpdateStrategy
 	{
-		return this.comp.getUpdateStrategy ? this.comp.getUpdateStrategy() : undefined;
+        let fn = this.comp.getUpdateStrategy;
+		return fn ? fn.call(this) : undefined;
 	}
 
 
 
-	// Initializes the node by passing the parent node to it. After this, the node knows its
-	// place in the hierarchy and gets access to the root of it - the RootVN object.
-	public init( parent: VN, creator: IComponent): void
+	// Initializes internal stuctures of the virtual node. This method is called right after the
+    // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
+    // corresponding to this virtual node.
+	// This method is part of the Commit phase.
+	public mount(): void
     {
-        super.init( parent, creator);
         this.willMount();
     }
 
@@ -68,6 +70,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 		/// #endif
 
         return this.renderWatcher ? this.renderWatcher() : this.comp.render();
+        // return this.comp.render();
 	}
 
 
@@ -77,12 +80,13 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	// This method is part of the Commit phase.
     public didMount(): void
     {
-        if (this.comp.didMount)
+        let fn = this.comp.didMount;
+        if (fn)
         {
             // need try/catch but only to log
             try
             {
-                this.comp.didMount();
+                fn.call( this.comp);
             }
             catch( err)
             {
@@ -141,8 +145,9 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 		this.comp.vn = this;
 
         // don't need try/catch because it will be caught up the chain
-		if (this.comp.willMount)
-			this.comp.willMount();
+        let fn = this.comp.willMount;
+		if (fn)
+			fn.call( this.comp);
 
         // start watching the function if not disabled
         if (!this.comp.disableRenderWatcher || !this.comp.disableRenderWatcher())
@@ -160,12 +165,13 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	// This method is part of the render phase.
 	protected willUnmount(): void
 	{
-        if (this.comp.willUnmount)
+        let fn = this.comp.willUnmount;
+		if (fn)
         {
             // need try/catch but only to log
             try
             {
-                this.comp.willUnmount();
+                fn.call( this.comp);
             }
             catch( err)
             {
