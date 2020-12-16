@@ -38,7 +38,17 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
 
-	// Generates list of sub-nodes according to the current state
+	// Initializes the node by passing the parent node to it. After this, the node knows its
+	// place in the hierarchy and gets access to the root of it - the RootVN object.
+	public init( parent: VN, creator: IComponent): void
+    {
+        super.init( parent, creator);
+        this.willMount();
+    }
+
+
+
+    // Generates list of sub-nodes according to the current state
 	public render(): any
 	{
 		/// #if DEBUG
@@ -59,36 +69,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
         return this.renderWatcher ? this.renderWatcher() : this.comp.render();
 	}
-
-
-
-	// Creates internal stuctures of the virtual node so that it is ready to produce children.
-	// This method is called right after the node has been constructed.
-	// This method is part of the Render phase.
-	public willMount(): void
-	{
-		this.comp.vn = this;
-
-        // don't need try/catch because it will be caught up the chain
-		if (this.comp.willMount)
-			this.comp.willMount();
-
-        // start watching the function if not disabled
-        if (!this.comp.disableRenderWatcher || !this.comp.disableRenderWatcher())
-            this.renderWatcher = createWatcher( this.comp.render, this.requestUpdate, this.comp, this);
-	}
-
-
-
-    /// #if USE_STATS
-        // Creates and returns DOM node corresponding to this virtual node.
-        // This method is part of the Commit phase.
-        public mount(): DN
-        {
-            DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
-            return null;
-        }
-    /// #endif
 
 
 
@@ -113,31 +93,12 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
 
-	// This method is called before the content of node and all its sub-nodes is removed from the
-	// DOM tree.
-	// This method is part of the render phase.
-	public willUnmount(): void
-	{
-        if (this.comp.willUnmount)
-        {
-            // need try/catch but only to log
-            try
-            {
-                this.comp.willUnmount();
-            }
-            catch( err)
-            {
-                console.error( `Exception in willUnmount of component '${this.name}'`, err);
-            }
-        }
-	}
-
-
-
     // Releases reference to the DOM node corresponding to this virtual node.
     // This method is part of the Commit phase.
     public unmount(): void
     {
+        this.willUnmount();
+
         if (this.renderWatcher)
         {
             this.renderWatcher.dispose();
@@ -168,6 +129,49 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	public handleError( err: any, path: string[]): void
 	{
 		this.comp.handleError( err, path);
+	}
+
+
+
+	// Creates internal stuctures of the virtual node so that it is ready to produce children.
+	// This method is called right after the node has been constructed.
+	// This method is part of the Render phase.
+	protected willMount(): void
+	{
+		this.comp.vn = this;
+
+        // don't need try/catch because it will be caught up the chain
+		if (this.comp.willMount)
+			this.comp.willMount();
+
+        // start watching the function if not disabled
+        if (!this.comp.disableRenderWatcher || !this.comp.disableRenderWatcher())
+            this.renderWatcher = createWatcher( this.comp.render, this.requestUpdate, this.comp, this);
+
+        /// #if USE_STATS
+            DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
+        /// #endif
+	}
+
+
+
+	// This method is called before the content of node and all its sub-nodes is removed from the
+	// DOM tree.
+	// This method is part of the render phase.
+	protected willUnmount(): void
+	{
+        if (this.comp.willUnmount)
+        {
+            // need try/catch but only to log
+            try
+            {
+                this.comp.willUnmount();
+            }
+            catch( err)
+            {
+                console.error( `Exception in willUnmount of component '${this.name}'`, err);
+            }
+        }
 	}
 
 

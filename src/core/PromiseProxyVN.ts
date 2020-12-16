@@ -1,4 +1,4 @@
-﻿import {PromiseProxyProps} from "../api/mim"
+﻿import {PromiseProxyProps, IComponent} from "../api/mim"
 import {VN, VNUpdateDisp} from "../internal"
 
 /// #if USE_STATS
@@ -70,24 +70,13 @@ export class PromiseProxyVN extends VN
 
 
 
-	// Generates list of sub-nodes according to the current state
-	public render(): any
+	// Initializes the node by passing the parent node to it. After this, the node knows its
+	// place in the hierarchy and gets access to the root of it - the RootVN object.
+	public init( parent: VN, creator: IComponent): void
 	{
-		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
-		/// #endif
+        super.init( parent, creator);
 
-		return this.content;
-	}
-
-
-
-	// Creates internal stuctures of the virtual node so that it is ready to produce children.
-	// This method is called right after the node has been constructed.
-	// This method is part of the Render phase.
-	public willMount(): void
-	{
-		this.watchPromise();
+        this.watchPromise();
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
@@ -97,14 +86,25 @@ export class PromiseProxyVN extends VN
 
 
     /// #if USE_STATS
-        // This method is called before the content of node and all its sub-nodes is removed from the
-        // DOM tree.
-        // This method is part of the render phase.
-        public willUnmount(): void
+        // Cleans up the node object before it is released.
+        public term(): void
         {
-                DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
+            super.term();
+            DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
         }
     /// #endif
+
+
+
+	// Generates list of sub-nodes according to the current state
+	public render(): any
+	{
+		/// #if USE_STATS
+			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
+		/// #endif
+
+		return this.content;
+	}
 
 
 

@@ -1,4 +1,4 @@
-﻿import {Fragment, FuncCompType} from "../api/mim"
+﻿import {Fragment, FuncCompType, IComponent} from "../api/mim"
 import { VN, VNUpdateDisp } from "../internal"
 
 /// #if USE_STATS
@@ -80,6 +80,27 @@ export class FuncVN extends VN
 
 
 
+    /// #if USE_STATS
+        // Initializes the node by passing the parent node to it. After this, the node knows its
+        // place in the hierarchy and gets access to the root of it - the RootVN object.
+        public init( parent: VN, creator: IComponent): void
+        {
+            super.init( parent, creator);
+            DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
+        }
+
+
+
+        // Cleans up the node object before it is released.
+        public term(): void
+        {
+            super.term();
+            DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
+        }
+    /// #endif
+
+
+
 	// Generates list of sub-nodes according to the current state
 	public render(): any
 	{
@@ -93,26 +114,6 @@ export class FuncVN extends VN
 
 		return this.func( this.props);
 	}
-
-
-
-	/// #if USE_STATS
-		// Creates internal stuctures of the virtual node so that it is ready to produce children.
-		// This method is called right after the node has been constructed.
-		// This method is part of the Render phase.
-		public willMount(): void
-		{
-			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
-		}
-
-		// This method is called before the content of node and all its sub-nodes is removed from the
-		// DOM tree.
-		// This method is part of the render phase.
-		public willUnmount(): void
-		{
-			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
-		}
-	/// #endif
 
 
 

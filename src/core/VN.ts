@@ -142,12 +142,8 @@ export abstract class VN implements IVNode
 	public render?(): any;
 
 	// Initializes internal stuctures of the virtual node. This method is called right after the
-	// node has been constructed.
-	// This method is part of the Render phase.
-	public willMount?(): void;
-
-	// Creates and returns DOM node corresponding to this virtual node. This method is implemented
-	// only on nodes that have their own DOM nodes.
+    // node has been constructed. For nodes that have their own DOM nodes, creates and returns DOM
+    // node corresponding to this virtual node.
 	// This method is part of the Commit phase.
 	public mount?(): DN;
 
@@ -156,14 +152,9 @@ export abstract class VN implements IVNode
 	// This method is part of the Commit phase.
 	public didMount?(): void;
 
-	// Clears internal structures of the virtual node. This method is called before the content
-	// of node and all its sub-nodes is removed from the DOM tree.
-	// This method is part of the Commit phase.
-	public willUnmount?(): void;
-
-	// Clears DOM node corresponding to this virtual node. This method is implemented only on nodes
-	// that have their own DOM nodes. This method should only release the internally held reference
-	// to the DOM node - the actual removal of the node from DOM is done by the infrastructure.
+    // Clears internal structures of the virtual node. For nodes that have their own DOM nodes,
+    // should only release the internally held reference to the DOM node - the actual removal of
+    // the node from DOM is done by the infrastructure.
 	// This method is part of the Commit phase.
 	public unmount?(): void;
 

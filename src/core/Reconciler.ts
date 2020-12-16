@@ -175,9 +175,6 @@ function CallbackWrapper(): any
     if (!dontDoMimblTick)
         queueMicrotask( performMimbleTick);
 
-    // // Perform Mimble tick at the end of the event loop.
-    // doMimbleTick();
-
     return retVal;
 }
 
@@ -443,19 +440,6 @@ function createNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
 {
 	vn.init( parent, s_currentClassComp);
 
-    // if willMount function is defined we call it without try/catch. If it throws, the control
-    // goes to either the ancestor node that supports error handling or the Mimbl tick loop
-    // (which has try/catch).
-    let fn: Function = vn.willMount;
-    if (fn)
-	{
-		/// #if VERBOSE_NODE
-			console.debug( `Calling willMount() on node ${vn.name}`);
-		/// #endif
-
-		fn.call(vn);
-	}
-
     // keep track of the node that is being currently processed.
     let prevVN = trackCurrentVN(vn);
 
@@ -465,7 +449,7 @@ function createNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
 	/// #if VERBOSE_NODE
 		console.debug( `Calling mount() on node ${vn.name}`);
 	/// #endif
-    fn = vn.mount;
+    let fn: Function = vn.mount;
 	let ownDN = fn && fn.call(vn);
 
     // if the node doesn't implement render(), the node never has any sub-nodes (e.g. text nodes)
@@ -473,8 +457,8 @@ function createNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
 	if (fn)
 	{
         // we call the render method without try/catch
-        let subNodes = createVNChainFromContent( fn.call(vn));
-        if (subNodes)
+        vn.subNodes = createVNChainFromContent( fn.call(vn));
+        if (vn.subNodes)
         {
             // determine what nodes to use as anchor and "before" for the sub-nodes
             let newAnchorDN = ownDN ? ownDN : anchorDN;
@@ -484,12 +468,12 @@ function createNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
             // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
             // either the ancestor node that knows to handle errors or to the Mimbl tick loop.
             if (!vn.supportsErrorHandling)
-                createSubNodes( vn, subNodes, newAnchorDN, newBeforeDN);
+                createSubNodes( vn, vn.subNodes, newAnchorDN, newBeforeDN);
             else
             {
                 try
                 {
-                    createSubNodes( vn, subNodes, newAnchorDN, newBeforeDN);
+                    createSubNodes( vn, vn.subNodes, newAnchorDN, newBeforeDN);
                 }
                 catch( err)
                 {
@@ -501,15 +485,12 @@ function createNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
                     // content but we do it without try/catch this time; otherwise, we may end
                     // up in an infinite loop
                     vn.handleError( err, getVNPath( s_currentVN));
-                    subNodes = createVNChainFromContent( fn.call(vn));
-                    if (subNodes)
-                        createSubNodes( vn, subNodes, newAnchorDN, newBeforeDN)
+                    vn.subNodes = createVNChainFromContent( fn.call(vn));
+                    if (vn.subNodes)
+                        createSubNodes( vn, vn.subNodes, newAnchorDN, newBeforeDN)
                 }
             }
         }
-
-        // remember the sub-nodes
-        vn.subNodes = subNodes;
 	}
 
 	// if we have our own DOM node, add it under the anchor node
@@ -550,28 +531,16 @@ function removeNode( vn: VN, removeOwnNode: boolean)
 	// get the DOM node before we call unmount, because unmount will clear it.
 	let ownDN = vn.ownDN;
 
-    // notify our node
-    let fn: Function = vn.willUnmount;
-	if (fn)
-	{
-		/// #if VERBOSE_NODE
-			console.debug( `Calling willUnmount() on node ${vn.name}`);
-		/// #endif
-
-		fn.call(vn);
-	}
-
     if (vn.subNodes)
 	{
         // DOM nodes of sub-nodes don't need to be removed if either the upper DOM node
         // was already removed or our own DOM node is going to be removed.
-        let removeSubNodesOwnNode = removeOwnNode && !ownDN;
 		for( let svn of vn.subNodes)
-			removeNode( svn, removeSubNodesOwnNode);
+			removeNode( svn, removeOwnNode && !ownDN);
     }
 
     // call unmount on our node - regardless whether it has its own DN or not
-    fn = vn.unmount;
+    let fn: Function = vn.unmount;
     if (fn)
     {
         /// #if VERBOSE_NODE
@@ -713,6 +682,7 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 		// for the Update operation, the new node becomes a sub-node; for the Insert operation
 		// the new node become a sub-node.
 		let svn = disp.action === VNDispAction.Update ? oldVN : newVN;
+        svn.index = i;
         parentVN.subNodes[i] = svn;
 
 		if (disp.action === VNDispAction.Update)
@@ -743,7 +713,13 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 			}
 
             // determine whether all the nodes under this VN should be moved.
-            if (i !== oldVN.index)
+            if (i === oldVN.index)
+            {
+                // if the virtual node defines a DOM node, it becomes the DOM node before which
+                // next components should be inserted/moved
+                beforeDN = getFirstDN( oldVN) || beforeDN;
+            }
+            else
             {
                 let subNodeDNs = getImmediateDNs( oldVN);
                 if (subNodeDNs.length > 0)
@@ -776,15 +752,10 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 			// identical for Replace and Insert actions
 			createNode( newVN, parentVN, anchorDN, beforeDN);
 
-			// if the new node defines a DOM node, it becomes the DOM node before which
-			// next components should be inserted/moved
-			let firstDN = getFirstDN( newVN);
-			if (firstDN != null)
-				beforeDN = firstDN;
+            // if the virtual node defines a DOM node, it becomes the DOM node before which
+            // next components should be inserted/moved
+            beforeDN = getFirstDN( newVN) || beforeDN;
 		}
-
-        // set current index as the index of the sub-node
-        svn.index = i;
 	}
 }
 
@@ -810,8 +781,8 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 			// the new node become a sub-node.
 			let svn = group.action === VNDispAction.Update ? oldVN : newVN;
 			parentVN.subNodes[currSubNodeIndex] = svn;
+            svn.index = currSubNodeIndex--;
 
-            let firstDN: DN | null = null;
 			if (group.action === VNDispAction.Update)
 			{
                 let updateDisp: VNUpdateDisp = null;
@@ -839,7 +810,9 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
                         updateNode( disp);
 				}
 
-				firstDN = getFirstDN( oldVN);
+				// if the old node defines a DOM node, it becomes the DOM node before which
+				// next components should be inserted/moved
+                beforeDN = getFirstDN( oldVN) || beforeDN;
 			}
 			else if (group.action === VNDispAction.Insert)
 			{
@@ -847,15 +820,8 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 
 				// if the new node defines a DOM node, it becomes the DOM node before which
 				// next components should be inserted/moved
-				firstDN = getFirstDN( newVN);
+                beforeDN = getFirstDN( newVN) || beforeDN;
 			}
-
-            // set current index as the index of the sub-node
-            svn.index = currSubNodeIndex--;
-
-            // change the "before node" to the first DN of the sub-node (if any)
-            if (firstDN != null)
-                beforeDN = firstDN;
 		}
 
 		// now that all nodes in the group have been updated or inserted, we can determine
@@ -864,8 +830,7 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 
 		// if the group has at least one DN, its first DN becomes the node before which the next
 		// group of new nodes (if any) should be inserted.
-		if (group.firstDN)
-			beforeDN = group.firstDN;
+		beforeDN = group.firstDN || beforeDN;
 	}
 }
 

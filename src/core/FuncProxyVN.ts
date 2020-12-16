@@ -1,4 +1,4 @@
-﻿import {FuncProxyProps} from "../api/mim"
+﻿import {FuncProxyProps, IComponent} from "../api/mim"
 import {VN, s_currentClassComp, createWatcher, VNUpdateDisp, IWatcher} from "../internal"
 
 /// #if USE_STATS
@@ -94,27 +94,12 @@ export class FuncProxyVN extends VN
 
 
 
-	// Generates list of sub-nodes according to the current state
-	public render(): any
+	// Initializes the node by passing the parent node to it. After this, the node knows its
+	// place in the hierarchy and gets access to the root of it - the RootVN object.
+	public init( parent: VN, creator: IComponent): void
 	{
-		/// #if VERBOSE_COMP
-			console.debug( `VERBOSE: Calling function proxy component ${this.name}`);
-		/// #endif
+        super.init( parent, creator);
 
-		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
-		/// #endif
-
-		return this.funcWatcher ? this.funcWatcher( this.args) : this.func.apply( this.funcThisArg, this.args);
-	}
-
-
-
-	// Creates internal stuctures of the virtual node so that it is ready to produce children.
-	// This method is called right after the node has been constructed.
-	// This method is part of the Render phase.
-	public willMount(): void
-	{
         if (this.funcThisArg === undefined)
             this.funcThisArg = this.creator;
 
@@ -135,11 +120,11 @@ export class FuncProxyVN extends VN
 
 
 
-	// This method is called before the content of node and all its sub-nodes is removed from the
-	// DOM tree.
-	// This method is part of the render phase.
-	public willUnmount(): void
-	{
+    // Cleans up the node object before it is released.
+    public term(): void
+    {
+        super.term();
+
         if (this.funcWatcher)
         {
             this.funcWatcher.dispose();
@@ -151,6 +136,22 @@ export class FuncProxyVN extends VN
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
 		/// #endif
+    }
+
+
+
+	// Generates list of sub-nodes according to the current state
+	public render(): any
+	{
+		/// #if VERBOSE_COMP
+			console.debug( `VERBOSE: Calling function proxy component ${this.name}`);
+		/// #endif
+
+		/// #if USE_STATS
+			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
+		/// #endif
+
+		return this.funcWatcher ? this.funcWatcher( this.args) : this.func.apply( this.funcThisArg, this.args);
 	}
 
 
