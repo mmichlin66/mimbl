@@ -58,7 +58,6 @@ export class RootVN extends VN implements IErrorHandlingService
 
 	// Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
-	// This method is part of the Render phase.
 	public willMount(): void
 	{
 		this.publishService( "StdErrorHandling", this);

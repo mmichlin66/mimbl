@@ -214,7 +214,7 @@ export function createWatcher<T extends AnyAnyFunc>( func: T, responder: NoneVoi
         let watcher = watcherFunc[symWatcher] as Watcher;
         watcher && watcher.dispose();
         delete watcherFunc[symWatcher];
-    } 
+    }
 
     return watcherFunc as IWatcher<T>;
 }
@@ -322,7 +322,7 @@ class Watcher<T extends AnyAnyFunc = any>
     }
 
 
-    
+
     // Function being watched; that is, during which we should listen to triggers being read, so
     // that we can remember them and later respond when they notify that their values have been
     // changed.
@@ -359,7 +359,7 @@ class Watcher<T extends AnyAnyFunc = any>
  * their functions and watching for trigger objects to be read. When a trigger object is being
  * read (that is its get() method is called), all the watchers in the stack are notified, because
  * they all depend on the trigger object's value for their functionality.
- * 
+ *
  * It also maintains a reference count of mutation scopes and handles notifying watchers of
  * mutations only when the last mutation scope has exited. The triggers don't notify the watchers
  * directly; instead, they notify the manager, which accumulates the information and notifies all
@@ -438,7 +438,7 @@ class TriggerWatcherManager
      * watchers of this trigger right away.
      */
     public notifyTriggerChanged( trigger: Trigger): void
-    { 
+    {
         // this method is supposed to be called only if the trigger has watchers
         /// #if DEBUG
             if (trigger.watchers.size === 0)
@@ -512,7 +512,7 @@ export function exitMutationScope(): void
  * combination of Trigger and Watcher. It is a watcher because it watches over the function and
  * calls it whenever any triggers this function uses are changed. It is a trigger because it
  * triggers change when the function returns a new value.
- * 
+ *
  * The important fact about a computed trigger is that it only invokes the watched function
  * if it's value is being used by at least one watcher.
  */
@@ -539,7 +539,7 @@ export function createComputedTrigger<T = any>( func: NoneTypeFunc<T>, funcThis?
  * combination of Trigger and Watcher. It is a watcher because it watches over the function and
  * calls it whenever any triggers this function uses are changed. It is a trigger because it
  * triggers change when the function returns a new value.
- * 
+ *
  * The important fact about a computed trigger is that it only invokes the watched function
  * if it's value is being used by at least one watcher.
  */
@@ -685,7 +685,7 @@ export function createMutator<T extends AnyAnyFunc>( func: T, funcThis?: any): I
         let mutator = mutatorFunc[symMutator] as Watcher;
         mutator && mutator.dispose();
         delete mutatorFunc[symMutator];
-    } 
+    }
 
     return mutatorFunc as IWatcher<T>;
 }
@@ -860,9 +860,9 @@ class NonSlotContainerHandler implements ProxyHandler<any>
     }
 
 
-    
+
     // The trigger object which should send notifications to its watchers when reads or changes
-    // occur 
+    // occur
     protected trigger: Trigger;
 
     // Number indicating to what level the items of container types should be triggerrized.
@@ -901,7 +901,7 @@ class NonSlotContainerHandler implements ProxyHandler<any>
 /**
  * Base class for shallow Map/Set handlers. Methods whose names were supplied in the constructor,
  * notify change; all other methods notify read.
- * 
+ *
  * For Map and Set in order to be proxied, the methods returned from get() must be
  * bound to the target. See https://javascript.info/proxy#built-in-objects-internal-slots.
  */
@@ -971,8 +971,8 @@ class SlotContainerHandler implements ProxyHandler<any>
     /**
      * Method that must be overridden in the derived classes and which is responsible for calling
      * a muutator method with the given name.
-     * @param name 
-     * @param orgMethod 
+     * @param name
+     * @param orgMethod
      * @param args Two element tuple where the first element is the return value and the second
      * element is a flag indicating whether the container has changed.
      */
@@ -984,7 +984,7 @@ class SlotContainerHandler implements ProxyHandler<any>
 
 
     // The trigger object which should send notifications to its watchers when reads or changes
-    // occur 
+    // occur
     protected trigger: Trigger;
 
     // Number indicating to what level the items of container types should be triggerrized.
@@ -993,7 +993,7 @@ class SlotContainerHandler implements ProxyHandler<any>
     // Set of method names, which mutate the contaier. All other methods only read from it.
     private mutatorMethodNames: Set<PropertyKey>;
 
-    // This map keeps already wrapped methods so that we don't do binding more than once. 
+    // This map keeps already wrapped methods so that we don't do binding more than once.
     private wrappedMethods = new Map<PropertyKey,Function>();
 }
 
@@ -1013,8 +1013,8 @@ class MapHandler extends SlotContainerHandler
 
     /**
      * Implements map-specific mutator methods.
-     * @param name 
-     * @param orgMethod 
+     * @param name
+     * @param orgMethod
      * @param args Two element tuple where the first element is the return value and the second
      * element is a flag indicating whether the container has changed.
      */
@@ -1052,8 +1052,8 @@ class SetHandler extends SlotContainerHandler
 
     /**
      * Implements set-specific mutator methods.
-     * @param name 
-     * @param orgMethod 
+     * @param name
+     * @param orgMethod
      * @param args Two element tuple where the first element is the return value and the second
      * element is a flag indicating whether the container has changed.
      */

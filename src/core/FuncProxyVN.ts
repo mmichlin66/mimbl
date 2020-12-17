@@ -1,5 +1,5 @@
-﻿import {FuncProxyProps} from "../api/mim"
-import {VN, s_currentClassComp, createWatcher, VNUpdateDisp, IWatcher} from "../internal"
+﻿import {FuncProxyProps, symRenderWatcher} from "../api/mim"
+import {VN, s_currentClassComp, createWatcher, IWatcher} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -97,7 +97,6 @@ export class FuncProxyVN extends VN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	// This method is part of the Commit phase.
 	public mount(): void
 	{
         if (!this.funcThisArg)
@@ -109,9 +108,12 @@ export class FuncProxyVN extends VN
 
 		this.linkNodeToFunc();
 
-        // // start watching the function if not disabled
-        if (!this.creator || !this.creator.disableRenderWatcher || !this.creator.disableRenderWatcher())
-            this.funcWatcher = createWatcher( this.func, this.updateFromWatcher, this.funcThisArg, this);
+        // establish watcher if requested using the @watcher decorator
+        let func = this.func as (...args: any) => any;
+        if (func[symRenderWatcher])
+            this.actFunc = this.funcWatcher = createWatcher( func, this.updateFromWatcher, this.funcThisArg, this);
+        else
+            this.actFunc = func.bind( this.funcThisArg);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
@@ -129,7 +131,8 @@ export class FuncProxyVN extends VN
             this.funcWatcher = null;
         }
 
-		this.unlinkNodeFromFunc();
+        this.unlinkNodeFromFunc();
+        this.actFunc = undefined;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
@@ -149,7 +152,7 @@ export class FuncProxyVN extends VN
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-		return this.funcWatcher ? this.funcWatcher( this.args) : this.func.apply( this.funcThisArg, this.args);
+		return this.actFunc( this.args);
 	}
 
 
@@ -165,12 +168,11 @@ export class FuncProxyVN extends VN
 
 
 
-	// Prepares this node to be updated from the given node. This method is invoked only if update
+	// Updated this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node. The returned object indicates whether children
-	// should be updated and whether the commitUpdate method should be called.
-	// This method is part of the Render phase.
-	public prepareUpdate( newVN: FuncProxyVN): VNUpdateDisp
+	// point to a VN of the same type as this node. The returned value indicates whether children
+	// should be updated (that is, this node's render method should be called).
+	public update( newVN: FuncProxyVN): boolean
 	{
 		// remeber the new value of the key property (even if it is the same)
 		this.key = newVN.key;
@@ -179,20 +181,13 @@ export class FuncProxyVN extends VN
 		// take arguments from the new node; the function itself and "thisArg" remain the same.
 		this.args = newVN.args;
 
+        // clear the flag
+        this.renderRequired = false;
+
 		// indicate that it is necessary to update the sub-nodes. The commitUpdate
 		// method should also be called - but only to clear the renderRequired flag.
-		return VNUpdateDisp.DoCommitDoRender;
+		return true;
 	}
-
-
-
-	// Commits updates made to this node to DOM.
-	// This method is part of the Commit phase.
-    public commitUpdate( newVN: FuncProxyVN): void
-    {
-        // we use this method only to clear the renderRequired flag"
-        this.renderRequired = false;
-    }
 
 
 
@@ -253,7 +248,7 @@ export class FuncProxyVN extends VN
 	}
 
 
-	// Function to be invoked during the rendering
+	// Original rendering function
 	private func: (...args: any) => any;
 
 	// Object to be used as "this" when invoking the function.
@@ -274,6 +269,10 @@ export class FuncProxyVN extends VN
     // being read during the original function execution and will request update thus triggerring
     // re-rendering.
 	private funcWatcher?: IWatcher;
+
+    // Actual function to be invoked during the rendering - it can be either the original func or
+    // the watcher.
+	private actFunc: (...args: any) => any;
 }
 
 

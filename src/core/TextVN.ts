@@ -1,5 +1,5 @@
 ﻿import {ITextVN} from "../api/mim"
-import {VN, DN, VNUpdateDisp} from "../internal"
+import {VN} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -42,7 +42,6 @@ export class TextVN extends VN implements ITextVN
 
 
 	// Creates and returns DOM node corresponding to this virtual node.
-	// This method is part of the Commit phase.
 	public mount(): void
 	{
 		/// #if USE_STATS
@@ -64,29 +63,24 @@ export class TextVN extends VN implements ITextVN
 
 
 
-	// Prepares this node to be updated from the given node. This method is invoked only if update
+	// Updated this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node. The returned object indicates whether children
-	// should be updated and whether the commitUpdate method should be called.
-	// This method is part of the Render phase.
-	public prepareUpdate( newVN: TextVN): VNUpdateDisp
+	// point to a VN of the same type as this node. The returned value indicates whether children
+	// should be updated (that is, this node's render method should be called).
+	public update( newVN: TextVN): boolean
 	{
 		// text nodes don't have sub-nodes
-		return VNUpdateDisp.getStockValue( this.text !== newVN.text, false);
-	}
-
-
-
-	// Commits updates made to this node to DOM.
-	public commitUpdate( newVN: TextVN): void
-	{
-		this.ownDN.nodeValue = this.text = newVN.text;
+        if (this.text !== newVN.text)
+        {
+            this.ownDN.nodeValue = this.text = newVN.text;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Updated);
 		/// #endif
+        }
+
+		return false;
 	}
 }
-
 
 

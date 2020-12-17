@@ -1,5 +1,5 @@
 ﻿import {IManagedCompVN, IComponentClass, setRef, RefPropType} from "../api/mim"
-import {ClassCompVN, VNUpdateDisp} from "../internal"
+import {ClassCompVN} from "../internal"
 
 
 
@@ -84,7 +84,6 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
     // Initializes internal stuctures of the virtual node before it is mounted. This method is used
     // to let the node know that it it is going to be mounted; however, the node doesn't need to
     // create any DOM elements yet. This will be done during the mount() method.
-	// This method is part of the Render phase.
     public init?(): void
     {
 		// create component instance
@@ -94,7 +93,6 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 
     // Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
-	// This method is part of the Render phase.
 	public willMount(): void
 	{
         super.willMount();
@@ -133,15 +131,14 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 
 
 
-	// Updates this node from the given node. The newVN parameter is guaranteed to point to a
-	// VN of the same type as this node. Returns true if updating sub-nodes is necessary and
-	// false otherwise.
-	public prepareUpdate( newVN: ManagedCompVN): VNUpdateDisp
+	// Updated this node from the given node. This method is invoked only if update
+	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
+	// point to a VN of the same type as this node. The returned value indicates whether children
+	// should be updated (that is, this node's render method should be called).
+	public update( newVN: ManagedCompVN): boolean
 	{
 		// let the component know about the new properties (if it is interested in them)
-		let shouldRender: boolean = true;
-		if (this.comp.shouldUpdate !== undefined)
-			shouldRender = this.comp.shouldUpdate( newVN.props);
+		let shouldRender = this.comp.shouldUpdate && this.comp.shouldUpdate( newVN.props);
 
 		// if reference specification changed then set or unset it as necessary
 		if (newVN.ref !== this.ref)
@@ -151,10 +148,10 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 
 			// if reference is now specified, set it now; note that we already determined that
 			// the reference object is different.
-			if (this.ref !== undefined)
+			if (this.ref)
 				setRef( this.ref, this.comp);
 		}
-		else if (newVN.ref === undefined)
+		else if (!newVN.ref)
 		{
 			// we know that our reference is defined, so unset it
 			setRef( this.ref, undefined, this.comp);
@@ -163,16 +160,17 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 		// remeber the new value of the key property (even if it is the same)
 		this.key = newVN.key;
 
-		// shallow copy the new properties from the other node to our object. This is needed
-		// because the component got our props object in the constructor and will keep
-		// working with it - especially if it doesn't implement the shouldUpdate method.
-		Object.keys(this.props).forEach( key => delete this.props[key]);
-		Object.assign( this.props, newVN.props);
+		// // shallow copy the new properties from the other node to our object. This is needed
+		// // because the component got our props object in the constructor and will keep
+		// // working with it - especially if it doesn't implement the shouldUpdate method.
+		// Object.keys(this.props).forEach( key => delete this.props[key]);
+        // Object.assign( this.props, newVN.props);
+        this.props = newVN.props;
 
 		// since the rendering produced by a function may depend on factors beyond properties,
 		// we always indicate that it is necessary to update the sub-nodes. The commitUpdate
 		// method should NOT be called.
-		return VNUpdateDisp.getStockValue( false, shouldRender);
+		return shouldRender;
 	}
 
 

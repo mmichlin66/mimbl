@@ -1,4 +1,4 @@
-﻿import {IClassCompVN, IComponent, UpdateStrategy} from "../api/mim"
+﻿import {IClassCompVN, IComponent, UpdateStrategy, symRenderWatcher} from "../api/mim"
 import {createWatcher, IWatcher} from "../utils/TriggerWatcher"
 import {VN} from "../internal"
 
@@ -42,10 +42,41 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	// This method is part of the Commit phase.
 	public mount(): void
     {
+        // connect the component to this virtual node
+        this.comp.vn = this;
+
         this.willMount();
+
+        // establish watcher if requested using the @watcher decorator
+        let render = this.comp.render as (...args: any) => any;
+        if (render[symRenderWatcher])
+            this.actRender = this.renderWatcher = createWatcher( render, this.requestUpdate, this.comp, this);
+        else
+            this.actRender = render.bind( this.comp);
+    }
+
+
+
+    // Releases reference to the DOM node corresponding to this virtual node.
+    public unmount(): void
+    {
+        this.willUnmount();
+
+        if (this.renderWatcher)
+        {
+            this.renderWatcher.dispose();
+            this.renderWatcher = null;
+        }
+
+		this.comp.vn = undefined;
+        this.comp = undefined;
+        this.actRender = undefined;
+
+        /// #if USE_STATS
+            DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
+        /// #endif
     }
 
 
@@ -69,15 +100,13 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-        return this.renderWatcher ? this.renderWatcher() : this.comp.render();
-        // return this.comp.render();
+        return this.actRender();
 	}
 
 
 
     // Notifies the virtual node that it was successfully mounted. This method is called after the
     // content of node and all its sub-nodes is added to the DOM tree.
-	// This method is part of the Commit phase.
     public didMount(): void
     {
         let fn = this.comp.didMount;
@@ -93,28 +122,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
                 console.error( `Exception in didMount of component '${this.name}'`, err);
             }
         }
-    }
-
-
-
-    // Releases reference to the DOM node corresponding to this virtual node.
-    // This method is part of the Commit phase.
-    public unmount(): void
-    {
-        this.willUnmount();
-
-        if (this.renderWatcher)
-        {
-            this.renderWatcher.dispose();
-            this.renderWatcher = null;
-        }
-
-		this.comp.vn = undefined;
-        this.comp = undefined;
-
-        /// #if USE_STATS
-            DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
-        /// #endif
     }
 
 
@@ -139,19 +146,12 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 	// Creates internal stuctures of the virtual node so that it is ready to produce children.
 	// This method is called right after the node has been constructed.
-	// This method is part of the Render phase.
 	protected willMount(): void
 	{
-		this.comp.vn = this;
-
         // don't need try/catch because it will be caught up the chain
-        let fn = this.comp.willMount;
+        let fn: Function = this.comp.willMount;
 		if (fn)
 			fn.call( this.comp);
-
-        // start watching the function if not disabled
-        if (!this.comp.disableRenderWatcher || !this.comp.disableRenderWatcher())
-            this.renderWatcher = createWatcher( this.comp.render, this.requestUpdate, this.comp, this);
 
         /// #if USE_STATS
             DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
@@ -186,6 +186,10 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
     // trigger objects being read during the original function execution and will request update
     // thus triggerring re-rendering.
 	private renderWatcher?: IWatcher;
+
+    // Actual function to be invoked during the rendering - it can be either the original func or
+    // the watcher.
+	private actRender: (...args: any) => any;
 }
 
 

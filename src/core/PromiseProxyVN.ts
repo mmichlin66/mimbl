@@ -1,5 +1,5 @@
 ﻿import {PromiseProxyProps} from "../api/mim"
-import {VN, VNUpdateDisp} from "../internal"
+import {VN} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -73,7 +73,6 @@ export class PromiseProxyVN extends VN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	// This method is part of the Commit phase.
 	public mount(): void
 	{
         this.watchPromise();
@@ -117,12 +116,11 @@ export class PromiseProxyVN extends VN
 
 
 
-	// Prepares this node to be updated from the given node. This method is invoked only if update
+	// Updated this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node. The returned object indicates whether children
-	// should be updated and whether the commitUpdate method should be called.
-	// This method is part of the Render phase.
-	public prepareUpdate( newVN: PromiseProxyVN): VNUpdateDisp
+	// point to a VN of the same type as this node. The returned value indicates whether children
+	// should be updated (that is, this node's render method should be called).
+	public update( newVN: PromiseProxyVN): boolean
 	{
 		// remeber the new value of the key property (even if it is the same)
 		this.key = newVN.key;
@@ -131,7 +129,7 @@ export class PromiseProxyVN extends VN
 
 		// indicate that it is necessary to update the sub-nodes. The commitUpdate
 		// method should NOT be called.
-		return VNUpdateDisp.NoCommitDoRender;
+		return true;
 	}
 
 

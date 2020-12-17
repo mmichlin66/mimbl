@@ -3,8 +3,8 @@
     FuncProxyProps, PromiseProxy, IComponentClass, FuncCompType
 } from "../api/mim"
 import {
-    VN, DN, VNUpdateDisp, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN,
-    FuncProxyVN, ElmVN, ManagedCompVN, FuncVN, enterMutationScope, exitMutationScope
+    VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN,
+    FuncProxyVN, ManagedCompVN, FuncVN, enterMutationScope, exitMutationScope
 } from "../internal"
 
 /// #if USE_STATS
@@ -698,27 +698,15 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 		{
 			if (oldVN !== newVN || oldVN.renderOnUpdate)
 			{
-                let updateDisp: VNUpdateDisp = null;
-                if (oldVN.prepareUpdate)
+                let fn = oldVN.update;
+                if (fn)
                 {
                     /// #if VERBOSE_NODE
-                        console.debug( `Calling prepareUpdate() on node ${oldVN.name}`);
+                        console.debug( `Calling update() on node ${oldVN.name}`);
                     /// #endif
-                    updateDisp = oldVN.prepareUpdate( newVN);
+                    if (fn.call( oldVN, newVN))
+                        updateNode( disp);
                 }
-
-                if (updateDisp.shouldCommit)
-				{
-					/// #if VERBOSE_NODE
-						console.debug( `Calling commitUpdate() on node ${oldVN.name}`);
-					/// #endif
-
-					oldVN.commitUpdate( newVN);
-				}
-
-				// update the sub-nodes if necessary
-				if (updateDisp.shouldRender)
-                    updateNode( disp);
 			}
 
             // determine whether all the nodes under this VN should be moved.
@@ -795,30 +783,18 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 
 			if (group.action === VNDispAction.Update)
 			{
-                let updateDisp: VNUpdateDisp = null;
-				if (oldVN !== newVN || oldVN.renderOnUpdate)
-				{
-                    if (oldVN.prepareUpdate)
+                if (oldVN !== newVN || oldVN.renderOnUpdate)
+                {
+                    let fn = oldVN.update;
+                    if (fn)
                     {
                         /// #if VERBOSE_NODE
-                            console.debug( `Calling prepareUpdate() on node ${oldVN.name}`);
+                            console.debug( `Calling update() on node ${oldVN.name}`);
                         /// #endif
-                        updateDisp = oldVN.prepareUpdate( newVN);
+                        if (fn.call( oldVN, newVN))
+                            updateNode( disp);
                     }
-
-                    if (updateDisp.shouldCommit)
-					{
-						/// #if VERBOSE_NODE
-							console.debug( `Calling commitUpdate() on node ${oldVN.name}`);
-						/// #endif
-
-						oldVN.commitUpdate( newVN);
-					}
-
-					// update the sub-nodes if necessary
-					if (updateDisp.shouldRender)
-                        updateNode( disp);
-				}
+                }
 
 				// if the old node defines a DOM node, it becomes the DOM node before which
 				// next components should be inserted/moved

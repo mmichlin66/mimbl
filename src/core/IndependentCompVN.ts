@@ -1,5 +1,5 @@
 ﻿import {IIndependentCompVN, IComponent} from "../api/mim"
-import {VNUpdateDisp, ClassCompVN} from "../internal"
+import {ClassCompVN} from "../internal"
 
 
 
@@ -33,33 +33,26 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 
 
 
-	// Prepares this node to be updated from the given node. This method is invoked only if update
+	// Updated this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node. The returned object indicates whether children
-	// should be updated and whether the commitUpdate method should be called.
-	// This method is part of the Render phase.
-	public prepareUpdate( newVN: IndependentCompVN): VNUpdateDisp
+	// point to a VN of the same type as this node. The returned value indicates whether children
+	// should be updated (that is, this node's render method should be called).
+	public update( newVN: IndependentCompVN): boolean
 	{
-		// if it is the same component instance, we don't need to do anything
-		let newComp = newVN.comp;
-		let needsUpdating = this.comp !== newVN.comp;
+        // if it is the same component instance, we don't need to do anything
+		if (this.comp === newVN.comp)
+    		return false;
 
-		// if the component instances are different, then we need to prepare the old instance for
-		// unmounting and the new one for mounting.
-		if (needsUpdating)
-		{
-			this.willUnmount();
-			this.unmount();
+        // we are here if the component instances are different; we need to prepare the old
+        // instance for unmounting and the new one for mounting.
+        this.unmount();
 
-            this.comp = this.key = newVN.comp;
+        this.comp = this.key = newVN.comp;
 
-            this.mount();
-            this.didMount();
+        this.mount();
+        this.didMount();
 
-            return VNUpdateDisp.NoCommitDoRender;
-        }
-        else
-    		return VNUpdateDisp.NoCommitNoRender;
+        return true;
 	}
 }
 

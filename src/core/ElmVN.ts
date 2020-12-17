@@ -2,7 +2,7 @@
     IElmVN, setRef, EventFuncType, UpdateStrategy, RefPropType, ICustomAttributeHandler, IElementProps
 } from "../api/mim"
 import {
-    VN, VNUpdateDisp, s_deepCompare, PropType, CustomAttrPropInfo,
+    VN, s_deepCompare, PropType, CustomAttrPropInfo,
     AttrPropInfo, EventPropInfo, getElmPropInfo, setElmProp, removeElmProp, updateElmProp
 } from "../internal"
 
@@ -81,7 +81,6 @@ export class ElmVN extends VN implements IElmVN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	// This method is part of the Commit phase.
 	public mount(): void
 	{
         // create the element. If namespace is provided use it; otherwise, try to determine
@@ -131,7 +130,6 @@ export class ElmVN extends VN implements IElmVN
 
 
 	// Releases reference to the DOM node corresponding to this virtual node.
-	// This method is part of the Commit phase.
 	public unmount(): void
 	{
 		// unset the reference value if specified. We check whether the reference still points
@@ -174,15 +172,40 @@ export class ElmVN extends VN implements IElmVN
 
 
 
-	// Prepares this node to be updated from the given node. This method is invoked only if update
+	// Updated this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node. The returned object indicates whether children
-	// should be updated and whether the commitUpdate method should be called.
-	// This method is part of the Render phase.
-	public prepareUpdate( newVN: ElmVN): VNUpdateDisp
+	// point to a VN of the same type as this node. The returned value indicates whether children
+	// should be updated (that is, this node's render method should be called).
+	public update( newVN: ElmVN): boolean
 	{
 		// commitUpdate method should be called if new props are different from the current ones
-		let shouldCommit = !s_deepCompare( this.props, newVN.props, 3);
+        if (!s_deepCompare( this.props, newVN.props, 3))
+        {
+            if (newVN.props)
+                newVN.parseProps( newVN.props);
+
+            // if reference specification changed then set or unset it as necessary
+            if (newVN.ref !== this.ref)
+            {
+                // remember the new reference specification
+                this.ref = newVN.ref;
+
+                // if reference is now specified, set it now; note that we already determined that
+                // the reference object is different.
+                if (this.ref !== undefined)
+                    setRef( this.ref, this.ownDN);
+            }
+
+            // remeber the new value of the key, updateStartegy and creator property (even if the
+            // values are the same)
+            this.props = newVN.props;
+            this.key = newVN.key;
+            this.updateStrategy = newVN.updateStrategy;
+
+            this.updateAttrs( newVN.attrs);
+            this.updateEvents( newVN.events);
+            this.updateCustomAttrs( newVN.customAttrs);
+        }
 
 		// render method should be called if either old or new node has children
 		let shouldRender = this.children && this.children.length > 0 || newVN.children && newVN.children.length > 0;
@@ -190,38 +213,7 @@ export class ElmVN extends VN implements IElmVN
 		// remember the new children for the next render
 		this.children = newVN.children;
 
-		return VNUpdateDisp.getStockValue( shouldCommit, shouldRender);
-	}
-
-
-
-	// Commits updates made to this node to DOM.
-	public commitUpdate( newVN: ElmVN): void
-	{
-        if (newVN.props)
-		    newVN.parseProps( newVN.props);
-
-		// if reference specification changed then set or unset it as necessary
-		if (newVN.ref !== this.ref)
-		{
-			// remember the new reference specification
-			this.ref = newVN.ref;
-
-			// if reference is now specified, set it now; note that we already determined that
-			// the reference object is different.
-			if (this.ref !== undefined)
-				setRef( this.ref, this.ownDN);
-		}
-
-		// remeber the new value of the key, updateStartegy and creator property (even if the
-		// values are the same)
-		this.props = newVN.props;
-		this.key = newVN.key;
-		this.updateStrategy = newVN.updateStrategy;
-
-		this.updateAttrs( newVN.attrs);
-		this.updateEvents( newVN.events);
-		this.updateCustomAttrs( newVN.customAttrs);
+		return shouldRender;
 	}
 
 

@@ -95,7 +95,6 @@ export interface IComponent<TProps = {}, TChildren = any>
      * Notifies the component that it was successfully mounted. This method is called after the
      * component is rendered for the first time and the content of all its sub-nodes is added to
      * the DOM tree.
-     * This method is part of the Commit phase.
      */
     didMount?(): void;
 
@@ -110,7 +109,6 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * a Mimbl tick, are updated. If implemented, this method will be called every time the
 	 * component is scheduled to be updated. This method can read DOM layout information (e.g.
 	 * element measurements) without the risk of causing forced layouts.
-	 * This method is invoked before the Render phase.
 	 */
 	beforeUpdate?(): void;
 
@@ -119,7 +117,6 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * a Mimbl tick, are updated. If implemented, this method will be called every time the
 	 * component is scheduled to be updated. This method is called after all modifications to
 	 * DOM resulting from updaing components have been already done.
-	 * This method is invoked after the Commit phase.
 	 */
 	afterUpdate?(): void;
 
@@ -156,17 +153,6 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * during updates.
 	 */
 	getUpdateStrategy?(): UpdateStrategy;
-
-	/**
-	 * Determines whether or not the render method should run under a watcher; that is, should
-     * detect trigger objects used by the render method and re-run when any of the triggers change.
-     * By default, when this method is not implemented, the watcher is created. This method can
-     * be implemented to return false by performance-wary components that are constantly being
-     * created and destroyed (mounted and unmounted) since creating a watcher may slightly impact
-     * the performance.
-	 * @returns True if the render method should run under a watcher and false otherwise.
-	 */
-	disableRenderWatcher?(): boolean;
 }
 
 
@@ -1588,6 +1574,26 @@ export function mount( content: any, anchorDN: Node = null): void
 export function unmount( anchorDN: Node = null): void
 {
 	unmountRoot( anchorDN);
+}
+
+
+
+/**
+ * Symbol that is attached to a render function to indicate that it should be wrapped in a watcher.
+ */
+export let symRenderWatcher = Symbol("renderWatcher");
+
+/**
+ * Decorator function for tagging a component's render function so that it will be wrapped in
+ * a watcher.
+ */
+export function watcher( target: any, name: string, propDescr: PropertyDescriptor)
+{
+    // propDesc.value is undefined for accessors and defined for functions
+    if (!propDescr.value)
+        throw new Error("@watcher decorator can only be applied to methods.");
+
+    propDescr.value[symRenderWatcher] = true;
 }
 
 

@@ -138,58 +138,45 @@ export abstract class VN implements IVNode
     // Initializes internal stuctures of the virtual node before it is mounted. This method is used
     // to let the node know that it is going to be mounted; however, the node doesn't need to
     // create any DOM elements yet. This will be done during the mount() method.
-	// This method is part of the Render phase.
 	public init?(): void;
 
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	// This method is part of the Commit phase.
 	public mount?(): void;
 
 	// Returns content that comprises the children of the node. If the node doesn't have
 	// sub-nodes, null should be returned. If this method is not implemented that means the node
 	// never has children - for example text nodes.
-	// This method is part of the Render phase.
 	public render?(): any;
 
     // Notifies the virtual node that it was successfully mounted. This method is called after the
     // content of node and all its sub-nodes is added to the DOM tree.
-	// This method is part of the Commit phase.
 	public didMount?(): void;
 
     // Clears internal structures of the virtual node. For nodes that have their own DOM nodes,
     // should only release the internally held reference to the DOM node - the actual removal of
     // the node from DOM is done by the infrastructure.
-	// This method is part of the Commit phase.
 	public unmount?(): void;
 
 	// Determines whether the update of this node from the given node is possible. The newVN
 	// parameter is guaranteed to point to a VN of the same type as this node. If this method is
 	// not implemented the update is considered possible - e.g. for text nodes.
-	// This method is part of the Render phase.
 	public isUpdatePossible?( newVN: VN): boolean;
 
-	// Prepares this node to be updated from the given node. This method is invoked only if update
+	// Updated this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node. The returned object indicates whether children
-	// should be updated and whether the commitUpdate method should be called.
-	// This method is part of the Render phase.
-	public prepareUpdate?( newVN: VN): VNUpdateDisp;
-
-	// Commits updates made to this node to DOM.
-	// This method is part of the Commit phase.
-	public commitUpdate?( newVN: VN): void;
+	// point to a VN of the same type as this node. The returned value indicates whether children
+	// should be updated (that is, this node's render method should be called).
+	public update?( newVN: VN): boolean;
 
 	// Determines whether the node supports handling of errors; that is, exception thrown during
 	// rendering of the node itself and/or its sub-nodes. If this method is not implemented the node
 	// doesn't support error handling.
-	// This method is part of the Render phase.
 	public supportsErrorHandling?: boolean;
 
 	// This method is called after an exception was thrown during rendering of the node itself
 	// and/or its sub-nodes. The render method will be called after this method returns.
-	// This method is part of the Render phase.
 	public handleError?( err: any, path: string[]): void;
 
 
@@ -411,44 +398,6 @@ class VNSubscribedServiceInfo
 	// implemented by an ancestor component.
 	useSelf: boolean;
 }
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// The VNUpdateDisp type describes whether certain actions should be performed on the node
-// during update. This object is returned from the node's prepareUpdate method.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-export class VNUpdateDisp
-{
-	// Falg indicatng whether the node has changes that should be applied to the DOM tree. If this
-	// flag is true, then the commitUpdate method will be clled on the node during the Commit
-	// phase.
-	public readonly shouldCommit: boolean;
-
-	// Falg indicatng whether the sub-nodes should be updated. If this flag is true, then the
-	// node's render method will be immediately called.
-	public readonly shouldRender: boolean;
-
-	constructor( shouldCommit: boolean, shouldRender: boolean)
-	{
-		this.shouldCommit = shouldCommit;
-		this.shouldRender = shouldRender;
-	}
-
-	public static DoCommitDoRender = new VNUpdateDisp( true, true);
-	public static DoCommitNoRender = new VNUpdateDisp( true, false);
-	public static NoCommitDoRender = new VNUpdateDisp( false, true);
-	public static NoCommitNoRender = new VNUpdateDisp( false, false);
-
-	public static getStockValue( shouldCommit: boolean, shouldRender: boolean)
-	{
-		return shouldCommit
-			? shouldRender ? VNUpdateDisp.DoCommitDoRender : VNUpdateDisp.DoCommitNoRender
-			: shouldRender ? VNUpdateDisp.NoCommitDoRender : VNUpdateDisp.NoCommitNoRender;
-	}
-};
 
 
 
