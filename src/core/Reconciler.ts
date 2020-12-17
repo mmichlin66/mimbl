@@ -692,7 +692,6 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 		// for the Update operation, the new node becomes a sub-node; for the Insert operation
 		// the new node become a sub-node.
 		let svn = disp.action === VNDispAction.Update ? oldVN : newVN;
-        svn.index = i;
         parentVN.subNodes[i] = svn;
 
 		if (disp.action === VNDispAction.Update)
@@ -765,7 +764,9 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
             // if the virtual node defines a DOM node, it becomes the DOM node before which
             // next components should be inserted/moved
             beforeDN = getFirstDN( newVN) || beforeDN;
-		}
+        }
+
+        svn.index = i;
 	}
 }
 
@@ -791,7 +792,6 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 			// the new node become a sub-node.
 			let svn = group.action === VNDispAction.Update ? oldVN : newVN;
 			parentVN.subNodes[currSubNodeIndex] = svn;
-            svn.index = currSubNodeIndex--;
 
 			if (group.action === VNDispAction.Update)
 			{
@@ -832,6 +832,8 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 				// next components should be inserted/moved
                 beforeDN = getFirstDN( newVN) || beforeDN;
 			}
+
+            svn.index = currSubNodeIndex--;
 		}
 
 		// now that all nodes in the group have been updated or inserted, we can determine

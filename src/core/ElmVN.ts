@@ -2,7 +2,7 @@
     IElmVN, setRef, EventFuncType, UpdateStrategy, RefPropType, ICustomAttributeHandler, IElementProps
 } from "../api/mim"
 import {
-    VN, DN, VNUpdateDisp, s_deepCompare, PropInfo, PropType, CustomAttrPropInfo,
+    VN, VNUpdateDisp, s_deepCompare, PropType, CustomAttrPropInfo,
     AttrPropInfo, EventPropInfo, getElmPropInfo, setElmProp, removeElmProp, updateElmProp
 } from "../internal"
 
@@ -42,30 +42,9 @@ export class ElmVN extends VN implements IElmVN
 		this.props = props;
 		this.children = children;
 
-		if (props)
-		{
-			// get the key property. If key property was not specified, use id; if id was not
-			// specified key will remain undefined.
-			this.key = props.key;
-			if (this.key === undefined)
-                this.key = props.id;
-            else
-                delete props.key;
-
-            // remember ref property
-            if (props.ref)
-            {
-                this.ref = props.ref;
-                delete props.ref;
-            }
-
-            // remember updateStrategy property
-            if (props.updateStrategy)
-            {
-                this.updateStrategy = props.updateStrategy;
-                delete props.updateStrategy;
-            }
-        }
+        // get the key property. If key property was not specified, use id; if id was not
+        // specified key will remain undefined.
+        this.key = props && (props.key || props.id);
 	}
 
 
@@ -203,7 +182,7 @@ export class ElmVN extends VN implements IElmVN
 	public prepareUpdate( newVN: ElmVN): VNUpdateDisp
 	{
 		// commitUpdate method should be called if new props are different from the current ones
-		let shouldCommit = !s_deepCompare( this.props, newVN.props);
+		let shouldCommit = !s_deepCompare( this.props, newVN.props, 3);
 
 		// render method should be called if either old or new node has children
 		let shouldRender = this.children && this.children.length > 0 || newVN.children && newVN.children.length > 0;
@@ -251,7 +230,12 @@ export class ElmVN extends VN implements IElmVN
 	// listeners and custom attributes.
 	private parseProps( props: any): void
 	{
-		for( let propName in props)
+        // remember built-in properties
+        this.ref = props.ref;
+        this.updateStrategy = props.updateStrategy;
+
+        // loop over all properties ignoring the built-ins
+        for( let propName in props)
 		{
             // ignore properties with values undefined, null and false
 			let propVal = props[propName];
@@ -284,7 +268,7 @@ export class ElmVN extends VN implements IElmVN
                         this.events[propName] = eventInfo;
 					}
 				}
-				else // if (propType === PropType.CustomAttr)
+				else if (propType === PropType.CustomAttr)
 				{
 					if (!this.customAttrs)
 						this.customAttrs = {};

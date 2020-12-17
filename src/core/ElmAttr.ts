@@ -18,16 +18,19 @@ import {ICustomAttributeHandlerClass} from "../api/mim"
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export const enum PropType
 {
-	// Regular attributes set using Element.setAttribute();
-	Unknown = 0,
+    /**
+     * Built-in attribute that is used internally by the Mimbl infrastructure and is not set
+     * to the element.
+     */
+	BuiltIn = 0,
 
-	// Regular attributes set using Element.setAttribute();
+	/** Regular attributes set using Element.setAttribute */
 	Attr = 1,
 
-	// Event listeners set using Element.addEventListener
+	/** Event listeners set using Element.addEventListener */
 	Event = 2,
 
-	// Custom attributes for which handler factories are registered
+	/**  Custom attributes for which handler factories are registered*/
 	CustomAttr = 3,
 }
 
@@ -121,6 +124,11 @@ export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
 // attributes is added to this object when the registerProperty method is called.
 let propInfos: {[P:string]: PropInfo} =
 {
+    // built-in attributes.
+    key: { type: PropType.BuiltIn },
+    ref: { type: PropType.BuiltIn },
+    updateStrategy: { type: PropType.BuiltIn },
+
     // attributes - only those attributes are listed that have non-trivial treatment or whose value
     // type is object or function. ID and class are present here because their value can be
     // specified as Mimcss IDRule and ClassRule objects respectively.

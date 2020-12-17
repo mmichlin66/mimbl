@@ -1,32 +1,33 @@
 /**
- * Compares the two given values going down to their properties if these are arrays or objects
- * @param o1 
- * @param o2 
+ * Compares the two given values going only one level down to their properties (if objects or arrays)
+ * @param o1
+ * @param o2
  */
-export function s_deepCompare( o1: any, o2: any): boolean
+export function s_shallowCompare( o1: any, o2: any): boolean
+{
+    return s_deepCompare( o1, o2, 1);
+}
+
+
+
+/**
+ * Compares the two given values going down to their properties if these are arrays or objects
+ * up to the given maximum level
+ * @param o1
+ * @param o2
+ */
+export function s_deepCompare( o1: any, o2: any, level: number = -1): boolean
 {
 	if (o1 === o2)
 		return true;
 	else if (o1 == null && o2 == null)
-		return true;
+        return true;
+    else if (level === 0)
+        return false;
 	else if (o1 == null || o2 == null)
 		return false;
 	else if (typeof o1 !== typeof o2)
 		return false;
-	else if (typeof o1 === "object")
-	{
-		for( let p in o1)
-		{
-			if (!s_deepCompare( o1[p], o2[p]))
-				return false;
-		}
-
-		for( let p in o2)
-		{
-			if (!(p in o1))
-				return false;
-		}
-	}
 	else if (Array.isArray(o1) !== Array.isArray(o2))
 		return false;
 	else if (Array.isArray(o1))
@@ -37,18 +38,34 @@ export function s_deepCompare( o1: any, o2: any): boolean
 		{
 			for( let i = 0, len = o1.length; i < len; i++)
 			{
-				if (!s_deepCompare( o1[i], o2[i]))
+				if (!s_deepCompare( o1[i], o2[i], level - 1))
 					return false;
 			}
+
+            return true;
 		}
+	}
+	else if (typeof o1 === "object")
+	{
+		for( let p in o1)
+		{
+			if (!s_deepCompare( o1[p], o2[p], level - 1))
+				return false;
+		}
+
+		for( let p in o2)
+		{
+			if (!(p in o1))
+				return false;
+		}
+
+        return true;
 	}
 	else
 	{
 		// we are here if these are strings, numbers, booleans or functions and they are different
 		return false;
 	}
-
-	return true;
 }
 
 
