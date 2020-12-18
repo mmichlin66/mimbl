@@ -1,5 +1,5 @@
-﻿import {FuncProxyProps, symRenderWatcher} from "../api/mim"
-import {VN, s_currentClassComp, createWatcher, IWatcher} from "../internal"
+﻿import {symRenderWatcher} from "../api/mim"
+import {VN, createWatcher, IWatcher} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -10,7 +10,7 @@ import {VN, s_currentClassComp, createWatcher, IWatcher} from "../internal"
 /**
  * A Symbol used to connect between the original function and the VNs created for it.
  */
-let symKeysToNodes = Symbol( "symKeysToNodes");
+let symFuncsToNodes = Symbol( "symFuncsToNodes");
 
 
 
@@ -34,16 +34,16 @@ let symKeysToNodes = Symbol( "symKeysToNodes");
  */
 export class FuncProxyVN extends VN
 {
-	constructor( props: FuncProxyProps)
+	constructor( func: (...args: any) => any, thisArg?: any, key?: any, args?: any[])
 	{
 		super();
 
         // remember data from the props. Note that if thisArg is undefined it will be changed
         // to the node's creator component upon mounting
-		this.func = props.func as (...args: any) => any;
-		this.funcThisArg = props.thisArg;
-		this.args = props.args;
-		this.key = props.key;
+		this.func = func;
+		this.funcThisArg = thisArg;
+		this.key = key;
+		this.args = args || [];
 
         this.renderRequired = false;
 	}
@@ -51,7 +51,7 @@ export class FuncProxyVN extends VN
 
 	public replaceArgs( args: any[]): void
 	{
-		this.args = args;
+		this.args = args || [];
 		this.renderRequired = true;
 	}
 
@@ -102,10 +102,6 @@ export class FuncProxyVN extends VN
         if (!this.funcThisArg)
             this.funcThisArg = this.creator;
 
-		// if a key was not provided we use the value of thisArg (which might be the current
-		// component) as a key. If thisArg is undefined either we use the function itself as a key.
-        this.linkKey = this.key || this.funcThisArg || this.func;
-
 		this.linkNodeToFunc();
 
         // establish watcher if requested using the @watcher decorator
@@ -152,7 +148,7 @@ export class FuncProxyVN extends VN
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-		return this.actFunc( this.args);
+		return this.actFunc( ...this.args);
 	}
 
 
@@ -161,7 +157,6 @@ export class FuncProxyVN extends VN
 	// parameter is guaranteed to point to a VN of the same type as this node.
 	public isUpdatePossible( newVN: FuncProxyVN): boolean
 	{
-
 		// update is possible if it is the same function object and the same thisArg property
 		return this.func === newVN.func && this.funcThisArg === newVN.funcThisArg;
 	}
@@ -176,7 +171,6 @@ export class FuncProxyVN extends VN
 	{
 		// remeber the new value of the key property (even if it is the same)
 		this.key = newVN.key;
-		this.linkKey = newVN.linkKey;
 
 		// take arguments from the new node; the function itself and "thisArg" remain the same.
 		this.args = newVN.args;
@@ -187,32 +181,6 @@ export class FuncProxyVN extends VN
 		// indicate that it is necessary to update the sub-nodes. The commitUpdate
 		// method should also be called - but only to clear the renderRequired flag.
 		return true;
-	}
-
-
-
-	public static findVN( func: Function, key?: any, thisArg?: any): FuncProxyVN
-	{
-		// if the key is undefined, we use the function object itself
-		let linkKey: any = key || thisArg || s_currentClassComp || func;
-
-		// try to find the key in the map on the function object; if not found, do nothing
-		let mapKeysToNodes: Map<any,FuncProxyVN> = func[symKeysToNodes];
-		return mapKeysToNodes && mapKeysToNodes.get( linkKey);
-	}
-
-
-
-	public static update( func: Function, key?: any, thisArg?: any, args?: any[]): void
-	{
-		// find the node
-		let vn = FuncProxyVN.findVN( func, key, thisArg);
-		if (!vn)
-			return;
-
-		vn.args = args;
-		vn.renderRequired = true;
-		vn.requestUpdate();
 	}
 
 
@@ -229,23 +197,47 @@ export class FuncProxyVN extends VN
 
 	private linkNodeToFunc(): void
 	{
-		let mapKeysToNodes: Map<any,FuncProxyVN> = this.func[symKeysToNodes];
-		if (!mapKeysToNodes)
+		let mapFuncsToNodes: Map<Function,FuncProxyVN> = this.funcThisArg[symFuncsToNodes];
+		if (!mapFuncsToNodes)
 		{
-			mapKeysToNodes = new Map<any,FuncProxyVN>();
-			this.func[symKeysToNodes] = mapKeysToNodes;
+			mapFuncsToNodes = new Map<Function,FuncProxyVN>();
+			this.funcThisArg[symFuncsToNodes] = mapFuncsToNodes;
 		}
 
-		mapKeysToNodes.set( this.linkKey, this);
+		mapFuncsToNodes.set( this.func, this);
 	}
+
 
 
 	private unlinkNodeFromFunc(): void
 	{
-		let mapKeysToNodes: Map<any,FuncProxyVN> = this.func[symKeysToNodes];
-		if (mapKeysToNodes)
-			mapKeysToNodes.delete( this.linkKey);
+		let mapFuncsToNodes: Map<Function,FuncProxyVN> = this.funcThisArg[symFuncsToNodes];
+		if (mapFuncsToNodes)
+			mapFuncsToNodes.delete( this.func);
 	}
+
+
+
+	public static findVN( func: (...args: any) => any, funcThisArg: any, key?: any): FuncProxyVN
+	{
+		let mapFuncsToNodes: Map<Function,FuncProxyVN> = funcThisArg[symFuncsToNodes];
+		return mapFuncsToNodes && mapFuncsToNodes.get( func);
+	}
+
+
+
+	public static update( func: (...args: any) => any, funcThisArg?: any, key?: any, args?: any[]): void
+	{
+		// find the node
+		let vn = FuncProxyVN.findVN( func, funcThisArg, key);
+		if (!vn)
+			return;
+
+		vn.args = args || [];
+		vn.renderRequired = true;
+		vn.requestUpdate();
+	}
+
 
 
 	// Original rendering function
@@ -259,11 +251,6 @@ export class FuncProxyVN extends VN
 
 	// Flag indicating whether the node should be re-rendered; that is, the function should be called.
 	private renderRequired: boolean;
-
-	// Key that links the function and this node. This key is either equals to the key provided
-	// in the properties passed to the constructor or to the current component or to the function
-	// itself.
-	private linkKey: any;
 
     // Watcher function wrapping the original function. The watcher will notice any trigger objects
     // being read during the original function execution and will request update thus triggerring

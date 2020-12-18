@@ -1213,15 +1213,6 @@ export function registerCustomEvent( eventName: string): void
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
- * The ComponentUpdateRequest type defines parameters that can be passed to the component updateMe
- * method if the goal is not to update the entire component but only one or several rendering
- * functions.
- */
-export type ComponentUpdateRequest = Function | { func: Function, key?: any, thisArg?: any, args?: any }
-
-
-
-/**
  * Base class for components. Components that derive from this class must implement the render
  * method.
  */
@@ -1263,33 +1254,22 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * This method is called by the component to request to be updated. If no arguments are
 	 * provided, the entire component is requested to be updated. If arguments are provided, they
 	 * indicate what rendering functions should be updated.
-	 * @param updateRequests
-	 */
-	protected updateMe( ...updateRequests: ComponentUpdateRequest[]): void
+     * @param func Optional rendering function to invoke
+     * @param thisArg Optional value to use as "this" when invoking the rendering function. If
+     * undefined, the component's "this" will be used.
+     * @param key Optional key which distinguishes between multiple uses of the same function.
+     * @param args Optional arguments to be passed to the function.
+     */
+	protected updateMe( func?: (...args: any) => any, thisArg?: any, key?: any, ...args: any): void
 	{
 		if (!this.vn)
 			return;
 
-		if (updateRequests.length === 0)
-		{
-			// if no arguments arer provided we request to update the entire component.
+        // if no arguments are provided we request to update the entire component.
+		if (!func)
 			this.vn.requestUpdate();
-		}
 		else
-		{
-			// loop over update request arguments
-			for( let req of updateRequests)
-			{
-				if (typeof req === "function")
-                    FuncProxyVN.update( req, undefined, this);
-				else
-				{
-					// if a non-array parameter is passed in req.args, we wrap it in an array
-					FuncProxyVN.update( req.func, req.key, req.thisArg ? req.thisArg : this,
-						!req.args || Array.isArray(req.args) ? req.args : [req.args]);
-				}
-			}
-		}
+            FuncProxyVN.update( func, thisArg || this, key, ...args);
 	}
 
 	/**
@@ -1409,7 +1389,7 @@ export function Fragment( props: CompProps<{}>): any {}
 export interface FuncProxyProps extends ICommonProps
 {
 	/** Function that renders content. */
-	func: Function;
+	func: (...args: any) => any;
 
 	/**
 	 * Arguments to be passed to the function. Whenever the FuncProxy component is rendered, this
@@ -1494,14 +1474,15 @@ export class FuncProxy extends Component<FuncProxyProps,void>
 	/**
 	 * Request re-rendering of the content produced by the given function by invoking this
 	 * function. The function must have been previously used in rendering using either
-	 * <FuncProxy func={} /> JSX construct or a simpler constuct
+	 * <FuncProxy func={} /> JSX construct or a simpler construct {func}
 	 * @param func Function to invoke.
+     * @param thisArg Value to use as "this" when invoking the function.
 	 * @param key Value that helps distinguishing between multiple usages of the function.
 	 * @param args Arguments to be passed to the function.
 	 */
-	public static update( func: Function, key?: any, thisArg?: any, ...args: any[])
+	public static update( func: (...args: any) => any, thisArg?: any, key?: any, ...args: any[])
 	{
-		FuncProxyVN.update( func, key, thisArg, args);
+		FuncProxyVN.update( func, thisArg, key, args);
 	}
 }
 

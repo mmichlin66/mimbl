@@ -1441,10 +1441,7 @@ function createNodesFromContent( content: any, nodes?: VN[]): VN | VN[] | null
 	}
 	else if (typeof content === "function")
 	{
-        let vn = FuncProxyVN.findVN( content)
-        if (!vn)
-		    vn = new FuncProxyVN( { func: content, thisArg: s_currentClassComp});
-
+        let vn = FuncProxyVN.findVN( content, s_currentClassComp) || new FuncProxyVN( content, s_currentClassComp);
         if (nodes)
             nodes.push( vn);
 
@@ -1485,7 +1482,7 @@ function createNodesFromArray( arr: any[], nodes: VN[]): void
     if (arr.length === 0)
     {
         console.error("createNodesFromArray was called with empty array");
-        return null;
+        return;
     }
     /// #endif
 
@@ -1513,15 +1510,16 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
     }
 	else if (tag === FuncProxy)
 	{
-		if (!props || !props.func)
+		let funcProxyProps = props as FuncProxyProps;
+		if (!funcProxyProps || !funcProxyProps.func)
 			return undefined;
 
 		// check whether we already have a node linked to this function. If yes return it;
 		// otherwise, create a new node.
-		let funcProxyProps = props as FuncProxyProps;
-		let vn = FuncProxyVN.findVN( props.func, funcProxyProps.key);
+		let funcThisArg = funcProxyProps.thisArg || s_currentClassComp;
+		let vn = FuncProxyVN.findVN( funcProxyProps.func, funcThisArg, funcProxyProps.key);
 		if (!vn)
-			return new FuncProxyVN( props);
+			return new FuncProxyVN( funcProxyProps.func, funcThisArg, funcProxyProps.key, funcProxyProps.args);
 		else
 		{
 			// if the updateArgs property is true, we replace the arguments in the node; otherwise,
