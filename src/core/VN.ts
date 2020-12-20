@@ -62,13 +62,6 @@ export abstract class VN implements IVNode
 	 */
 	public key?: any;
 
-	/**
-	 * Flag indicating whether this node should re-render during update even it is the same
-	 * physical node instance. This is needed for nodes that serve as a proxy to a rendering
-	 * function and that function must be invoked even if none of the node parameters have changed.
-	 */
-	public renderOnUpdate?: boolean;
-
 	// List of sub-nodes - both keyed and unkeyed - defined only if there are some sub-nodes.
 	public subNodes: VN[];
 

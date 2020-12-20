@@ -157,7 +157,7 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 			setRef( this.ref, undefined, this.comp);
 		}
 
-		// remeber the new value of the key property (even if it is the same)
+		// remember the new value of the key property (even if it is the same)
 		this.key = newVN.key;
 
 		// // shallow copy the new properties from the other node to our object. This is needed

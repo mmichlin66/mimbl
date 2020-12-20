@@ -15,8 +15,7 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 	{
 		super();
 
-        this.comp = comp;
-        this.key = comp;
+        this.comp = this.key = comp;
 	};
 
 

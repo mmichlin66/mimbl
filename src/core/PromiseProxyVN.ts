@@ -122,7 +122,7 @@ export class PromiseProxyVN extends VN
 	// should be updated (that is, this node's render method should be called).
 	public update( newVN: PromiseProxyVN): boolean
 	{
-		// remeber the new value of the key property (even if it is the same)
+		// remember the new value of the key property (even if it is the same)
 		this.key = newVN.key;
 		this.content = newVN.content;
 		this.errorContentFunc = newVN.errorContentFunc;

@@ -132,7 +132,7 @@ export class FuncVN extends VN
 	// should be updated (that is, this node's render method should be called).
 	public update( newVN: FuncVN): boolean
 	{
-		// remeber the new value of the key property (even if it is the same)
+		// remember the new value of the key property (even if it is the same)
 		this.key = newVN.key;
 
 		// take properties from the new node

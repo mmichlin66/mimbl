@@ -1255,12 +1255,12 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * provided, the entire component is requested to be updated. If arguments are provided, they
 	 * indicate what rendering functions should be updated.
      * @param func Optional rendering function to invoke
-     * @param thisArg Optional value to use as "this" when invoking the rendering function. If
+     * @param funcThisArg Optional value to use as "this" when invoking the rendering function. If
      * undefined, the component's "this" will be used.
-     * @param key Optional key which distinguishes between multiple uses of the same function.
-     * @param args Optional arguments to be passed to the function.
+     * @param key Optional key which distinguishes between multiple uses of the same function. This
+     * can be either the "arg" or the "key" property originally passed to the FunProxy component.
      */
-	protected updateMe( func?: (...args: any) => any, thisArg?: any, key?: any, ...args: any): void
+	protected updateMe( func?: RenderMethodType, funcThisArg?: any, key?: any): void
 	{
 		if (!this.vn)
 			return;
@@ -1269,7 +1269,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 		if (!func)
 			this.vn.requestUpdate();
 		else
-            FuncProxyVN.update( func, thisArg || this, key, ...args);
+            FuncProxyVN.update( func, funcThisArg || this, key);
 	}
 
 	/**
@@ -1381,6 +1381,13 @@ export function Fragment( props: CompProps<{}>): any {}
 
 
 /**
+ * Definition of type of  method that renders content.
+ */
+export type RenderMethodType = (arg: any) => any;
+
+
+
+/**
  * Properties to be used with the FuncProxy component. FuncProxy component cannot have children.
  * A key property can be used to distinguish between multiple uses of the same function. If the
  * function is used only once within a component, the key is not necessary; however, if the
@@ -1389,46 +1396,20 @@ export function Fragment( props: CompProps<{}>): any {}
 export interface FuncProxyProps extends ICommonProps
 {
 	/** Function that renders content. */
-	func: (...args: any) => any;
-
-	/**
-	 * Arguments to be passed to the function. Whenever the FuncProxy component is rendered, this
-	 * parameter is used when calling the wrapped function.
-	 */
-	args?: any[];
+	func: RenderMethodType;
 
 	/**
 	 * Value to be used as "this" when invoking the function. If this value is undefined, the
 	 * class based component that rendered the FuncProxy component will be used (which is the
 	 * most common case).
 	 */
-	thisArg?: any;
+	funcThisArg?: any;
 
 	/**
-	 * Flag indicating whether the arguments specified by the `args` property should be passed to
-	 * the function overriding arguments that were specified by the most recent call to the
-	 * FuncProxy.update method. By default the value of this property is false and `args` will be
-	 * used only the first time the function is wrapped by the FuncProxy component. If the
-	 * FuncProxy.update method is called, the argument specified in this call will replace the
-	 * original arguments. The next time the FuncProxy component is rendered, the `args` property
-	 * will be ignored.
-	 *
-	 * Note the following sequence of actions that occurs when `replaceArgs` is false or omitted:
-	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" />. "A" will be used.
-	 * 1. Parent component calls FuncProxy.update( this.foo, undefined, undefined, "B"). "B" will be used.
-	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" />. "B" will still be used.
-	 *
-	 * If the `replaceArgs` property is set to true, then every time the FuncProxy componenet is
-	 * rendered, the value of the `args` property replaces whatever arguments there were before.
-	 *
-	 * Now note the sequence of actions when `replaceArgs` is true:
-	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" replaceArgs />."A" will
-	 * be used.
-	 * 1. Parent component calls FuncProxy.update( this.foo, undefined, undefined, "B"). "B" will be used.
-	 * 1. Parent component renders <FuncProxy func={this.foo} args="A" replaceArgs />. "A" will
-	 * be used again.
+	 * Arguments to be passed to the function. Whenever the FuncProxy component is rendered, this
+	 * parameter is used when calling the wrapped function.
 	 */
-	replaceArgs?: boolean;
+	arg?: any;
 }
 
 
@@ -1470,20 +1451,6 @@ export class FuncProxy extends Component<FuncProxyProps,void>
 
 	/** The render method of the FuncProxy component is never actually called */
 	public render(): any {}
-
-	/**
-	 * Request re-rendering of the content produced by the given function by invoking this
-	 * function. The function must have been previously used in rendering using either
-	 * <FuncProxy func={} /> JSX construct or a simpler construct {func}
-	 * @param func Function to invoke.
-     * @param thisArg Value to use as "this" when invoking the function.
-	 * @param key Value that helps distinguishing between multiple usages of the function.
-	 * @param args Arguments to be passed to the function.
-	 */
-	public static update( func: (...args: any) => any, thisArg?: any, key?: any, ...args: any[])
-	{
-		FuncProxyVN.update( func, thisArg, key, args);
-	}
 }
 
 

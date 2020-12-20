@@ -1,4 +1,4 @@
-﻿import {symRenderWatcher} from "../api/mim"
+﻿import {symRenderWatcher, RenderMethodType} from "../api/mim"
 import {VN, createWatcher, IWatcher} from "../internal"
 
 /// #if USE_STATS
@@ -34,48 +34,24 @@ let symFuncsToNodes = Symbol( "symFuncsToNodes");
  */
 export class FuncProxyVN extends VN
 {
-	constructor( func: (...args: any) => any, thisArg?: any, key?: any, args?: any[])
+	constructor( func: RenderMethodType, funcThisArg?: any, arg?: any, key?: any)
 	{
 		super();
 
-        // remember data from the props. Note that if thisArg is undefined it will be changed
-        // to the node's creator component upon mounting
+        // remember data from the props. Note that if funcThisArg is undefined it will be changed
+        // to the node's creator component upon mounting. If there is no key specified, the arg
+        // will be used (which may also be unspecified)
 		this.func = func;
-		this.funcThisArg = thisArg;
-		this.key = key;
-		this.args = args || [];
-
-        this.renderRequired = false;
+		this.funcThisArg = funcThisArg;
+		this.arg = arg;
+		this.key = key || arg;
 	}
-
-
-	public replaceArgs( args: any[]): void
-	{
-		this.args = args || [];
-		this.renderRequired = true;
-	}
-
 
 
 	/// #if USE_STATS
 	public get statsCategory(): StatsCategory { return StatsCategory.Comp; }
 	/// #endif
 	; // ugly trick to not let the TypeScript compiler to strip the #endif comment
-
-
-
-	// Node's key. The derived classes set it based on their respective content. A key
-	// can be of any type.
-	public key: any;
-
-
-
-	/**
-	 * Flag indicating whether this node should re-render during update even it is the same
-	 * physical node instance. This is needed for nodes that serve as a proxy to a rendering
-	 * function and that function must be invoked even if none of the node parameters have changed.
-	 */
-	public get renderOnUpdate(): boolean { return this.renderRequired; };
 
 
 
@@ -105,7 +81,7 @@ export class FuncProxyVN extends VN
 		this.linkNodeToFunc();
 
         // establish watcher if requested using the @watcher decorator
-        let func = this.func as (...args: any) => any;
+        let func = this.func as RenderMethodType;
         if (func[symRenderWatcher])
             this.actFunc = this.funcWatcher = createWatcher( func, this.updateFromWatcher, this.funcThisArg, this);
         else
@@ -148,17 +124,7 @@ export class FuncProxyVN extends VN
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-		return this.actFunc( ...this.args);
-	}
-
-
-
-	// Determines whether the update of this node from the given node is possible. The newVN
-	// parameter is guaranteed to point to a VN of the same type as this node.
-	public isUpdatePossible( newVN: FuncProxyVN): boolean
-	{
-		// update is possible if it is the same function object and the same thisArg property
-		return this.func === newVN.func && this.funcThisArg === newVN.funcThisArg;
+		return this.actFunc( this.arg);
 	}
 
 
@@ -169,18 +135,31 @@ export class FuncProxyVN extends VN
 	// should be updated (that is, this node's render method should be called).
 	public update( newVN: FuncProxyVN): boolean
 	{
-		// remeber the new value of the key property (even if it is the same)
+		// remember the new value of the key property (even if it is the same)
 		this.key = newVN.key;
 
-		// take arguments from the new node; the function itself and "thisArg" remain the same.
-		this.args = newVN.args;
-
-        // clear the flag
-        this.renderRequired = false;
-
-		// indicate that it is necessary to update the sub-nodes. The commitUpdate
-		// method should also be called - but only to clear the renderRequired flag.
-		return true;
+        // we allow any FuncProxyVN update; however, if the method of the object to
+        // which this method belongs are different, we unmount the old
+        if (this.func === newVN.func && this.funcThisArg === newVN.funcThisArg)
+        {
+            // we need to re-render only if the arguments are the same.
+            if (this.arg !== newVN.arg)
+            {
+                this.arg = newVN.arg;
+                return true;
+            }
+            else
+                return false;
+        }
+        else
+        {
+            this.unmount();
+            this.func = newVN.func;
+            this.funcThisArg = newVN.funcThisArg;
+            this.arg = newVN.arg;
+            this.mount();
+            return true;
+        }
 	}
 
 
@@ -189,7 +168,6 @@ export class FuncProxyVN extends VN
     // is changed.
     private updateFromWatcher(): void
 	{
-		this.renderRequired = true;
 		this.requestUpdate();
 	}
 
@@ -218,39 +196,42 @@ export class FuncProxyVN extends VN
 
 
 
-	public static findVN( func: (...args: any) => any, funcThisArg: any, key?: any): FuncProxyVN
+	public static findVN( func: RenderMethodType, funcThisArg: any, key?: any): FuncProxyVN
 	{
+        /// #if DEBUG
+            if (!funcThisArg)
+            {
+                console.error("FuncProxVN.findVN was called with undefined funcThisArg");
+                return undefined;
+            }
+        /// #endif
+
 		let mapFuncsToNodes: Map<Function,FuncProxyVN> = funcThisArg[symFuncsToNodes];
 		return mapFuncsToNodes && mapFuncsToNodes.get( func);
 	}
 
 
 
-	public static update( func: (...args: any) => any, funcThisArg?: any, key?: any, args?: any[]): void
+	public static update( func: RenderMethodType, funcThisArg?: any, key?: any): void
 	{
 		// find the node
 		let vn = FuncProxyVN.findVN( func, funcThisArg, key);
 		if (!vn)
 			return;
 
-		vn.args = args || [];
-		vn.renderRequired = true;
 		vn.requestUpdate();
 	}
 
 
 
 	// Original rendering function
-	private func: (...args: any) => any;
+	private func: RenderMethodType;
 
 	// Object to be used as "this" when invoking the function.
 	private funcThisArg: any;
 
 	// Optional arguments to be passed to the function.
-	private args: any[];
-
-	// Flag indicating whether the node should be re-rendered; that is, the function should be called.
-	private renderRequired: boolean;
+	private arg: any;
 
     // Watcher function wrapping the original function. The watcher will notice any trigger objects
     // being read during the original function execution and will request update thus triggerring
@@ -259,7 +240,7 @@ export class FuncProxyVN extends VN
 
     // Actual function to be invoked during the rendering - it can be either the original func or
     // the watcher.
-	private actFunc: (...args: any) => any;
+	private actFunc: RenderMethodType;
 }
 
 

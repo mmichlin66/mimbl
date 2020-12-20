@@ -196,7 +196,7 @@ export class ElmVN extends VN implements IElmVN
                     setRef( this.ref, this.ownDN);
             }
 
-            // remeber the new value of the key, updateStartegy and creator property (even if the
+            // remember the new value of the key, updateStartegy and creator property (even if the
             // values are the same)
             this.props = newVN.props;
             this.key = newVN.key;
