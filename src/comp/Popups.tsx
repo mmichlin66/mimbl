@@ -900,7 +900,7 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
 	}
 
     @mim.watcher
-    public render(): void
+    public render(): any
     {
         return <div keydown={this.onButtonKeyDown}>
             {this.renderCaption}
@@ -910,7 +910,7 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
     }
 
     @mim.watcher
-    public renderCaption(): void
+    public renderCaption(): any
     {
         // have to specify touch-action "none" - otherwise, pointer events are canceled by the browser
         return <div class={this.captionClassName} pointerdown={this.onCaptionPointerDown} style={{touchAction: "none"}}>
@@ -919,7 +919,7 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
     }
 
     @mim.watcher
-    public renderBody(): void
+    public renderBody(): any
     {
         return <div class={this.bodyClassName}>
             {this.content}
@@ -927,7 +927,7 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
     }
 
     @mim.watcher
-    public renderButtons(): void
+    public renderButtons(): any
     {
         return <div class={this.buttonBarClassName}>
             {Array.from( this.buttons.values()).map( info =>

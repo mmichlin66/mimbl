@@ -1,5 +1,5 @@
 ﻿import {IErrorHandlingService} from "../api/mim"
-import {VN, DN, requestNodeUpdate} from "../internal"
+import {VN, DN} from "../internal"
 
 /// #if USE_STATS
 	import {StatsCategory} from "../utils/Stats"
@@ -42,7 +42,7 @@ export class RootVN extends VN implements IErrorHandlingService
 	public setContent( content: any, sync: boolean): void
 	{
 		this.content = content;
-		requestNodeUpdate( this);
+		this.requestUpdate();
 	}
 
 
@@ -107,7 +107,7 @@ export class RootVN extends VN implements IErrorHandlingService
 	{
 		// clear the error and request to be updated
 		this.error = false;
-		requestNodeUpdate( this);
+		this.requestUpdate();
 	}
 
 
@@ -116,7 +116,7 @@ export class RootVN extends VN implements IErrorHandlingService
 	public reportError( err: any, path: string[]): void
 	{
 		this.handleError( err, path);
-		requestNodeUpdate( this);
+		this.requestUpdate();
 	}
 
 
@@ -129,7 +129,7 @@ export class RootVN extends VN implements IErrorHandlingService
 		if (this.thrownPromises.size === 0)
 		{
 			this.waiting = false;
-			requestNodeUpdate( this);
+			this.requestUpdate();
 		}
 	}
 

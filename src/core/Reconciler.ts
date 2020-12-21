@@ -9,7 +9,6 @@ import {
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
-import { ex } from "mimcss";
 /// #endif
 
 
@@ -17,12 +16,6 @@ import { ex } from "mimcss";
 // the same node more than once - which can happen if the node's requestUpdate method is called
 // more than once during a single run (e.g. during event processing).
 let s_vnsScheduledForUpdate = new Set<VN>();
-
-// Map of virtual nodes corresponding to element whose properties should be updated on the next
-// UI cycle without re-rendering the element's children. The value is the object containing the
-// properties to be added, updated or removed. To indicate that the property should be removed,
-// its value should be undefined.
-let s_elmPropsScheduledForUpdate = new Map<ElmVN,any>();
 
 // Map of functions that have been scheduled to be called upon a new animation frame before
 // components scheduled for update are updated. The keys in this map are the original functions and
@@ -199,28 +192,6 @@ export function requestNodeUpdate( vn: VN): void
 
 
 
-// Schedules an update of the element properties without re-rendering of its children.
-export function requestElmPropsUpdate( vn: ElmVN, props: any): void
-{
-	if (!vn.anchorDN)
-		console.warn( `Update requested for virtual node '${getVNPath(vn).join("->")}' that doesn't have anchor DOM node`)
-
-    let existingProps = s_elmPropsScheduledForUpdate.get( vn);
-    if (existingProps)
-        Object.assign( existingProps, props);
-    else
-    {
-        s_elmPropsScheduledForUpdate.set( vn, props);
-
-        // the update is scheduled in the next tick unless the request is made during a
-        // "before update" function execution.
-        if (s_schedulerState !== SchedulerState.BeforeUpdate)
-            requestFrameIfNeeded();
-    }
-}
-
-
-
 // Schedules to call the given function either before or after all the scheduled components
 // have been updated.
 export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean,
@@ -313,6 +284,14 @@ function onScheduledFrame(): void
 // Reconciler main entrance point
 function performMimbleTick(): void
 {
+    // we can be invoked after callbacks and we might not have anything to do.
+    if (s_callsScheduledBeforeUpdate.size === 0 &&
+        s_vnsScheduledForUpdate.size === 0 &&
+        s_callsScheduledAfterUpdate.size === 0)
+    {
+        return;
+    }
+
     // clear a scheduled frame (if any). This can happen if we were invoked from the callback
     // wrapper while a frame has been previously scheduled.
     if (s_scheduledFrameHandle !== 0)
@@ -355,16 +334,6 @@ function performMimbleTick(): void
 		performUpdate( vnsScheduledForUpdate);
 	}
 
-	if (s_elmPropsScheduledForUpdate.size > 0)
-	{
-		// remember the internal set of nodes and re-create it so that it is ready for new
-		// update requests. Arrange scheduled nodes by their nesting depths and perform updates.
-		s_schedulerState = SchedulerState.Update;
-		let elmPropsScheduledForUpdate = s_elmPropsScheduledForUpdate;
-		s_elmPropsScheduledForUpdate = new Map<ElmVN,any>();
-		performElmPropsUpdate( elmPropsScheduledForUpdate);
-	}
-
 	// call functions scheduled to be invoked after updating components
 	if (s_callsScheduledAfterUpdate.size > 0)
 	{
@@ -375,7 +344,7 @@ function performMimbleTick(): void
 	}
 
     /// #if USE_STATS
-        if (!statsAlreadyExisted)
+        if (!statsAlreadyExisted && DetailedStats.stats)
         {
             DetailedStats.stats.stop( true);
             DetailedStats.stats = null;
@@ -419,14 +388,25 @@ function performUpdate( vnsScheduledForUpdate: Set<VN>): void
         {
             try
             {
-                // clear the flag that update has been requested for the node
-                vn.updateRequested = false;
+                // first perform partial update if requested
+                if (vn.partialUpdateRequested)
+                {
+                    vn.partialUpdateRequested = false;
+                    vn.performPartialUpdate();
+                }
 
-                // if the component was already updated in this cycle, don't update it again
-                if (vn.lastUpdateTick === s_currentTick)
-                    continue;
+                // then perform normal update if requested
+                if (vn.updateRequested)
+                {
+                    // clear the flag that update has been requested for the node
+                    vn.updateRequested = false;
 
-                updateNode( {oldVN: vn});
+                    // if the component was already updated in this cycle, don't update it again
+                    if (vn.lastUpdateTick === s_currentTick)
+                        continue;
+
+                    updateNode( {oldVN: vn});
+                }
             }
             catch( err)
             {
@@ -436,28 +416,12 @@ function performUpdate( vnsScheduledForUpdate: Set<VN>): void
                 if (errorService)
                     errorService.reportError( err, s_currentVN ? getVNPath( s_currentVN) : null);
                 else
-                    console.error( "BUG: updateVirtual threw exception but StdErrorHandling service was not found.", err);
+                    console.error( "BUG: updateNode threw exception but StdErrorHandling service was not found.", err);
             }
 
             trackCurrentVN( null);
         }
 	}
-}
-
-
-
-// Performs rendering phase for all components scheduled for update and recursively for their
-// sub-nodes where necessary. Returns array of VNDisp structures for each updated node.
-function performElmPropsUpdate( elmPropsScheduledForUpdate: Map<ElmVN,any>): void
-{
-    elmPropsScheduledForUpdate.forEach( (props, vn) =>
-    {
-        // it can happen that we encounter already unmounted virtual nodes - ignore them
-        if (!vn.anchorDN)
-            return;
-
-        vn.updatePropsOnly( props);
-    })
 }
 
 

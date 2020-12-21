@@ -41,7 +41,18 @@ export class TextVN extends VN implements ITextVN
 
 
 
-	// Creates and returns DOM node corresponding to this virtual node.
+	/**
+     * Requests update of the text.
+     */
+    requestTextUpdate( text: string): void
+    {
+        this.textToUpdate = text;
+        this.requestPartialUpdate();
+    }
+
+
+
+    // Creates and returns DOM node corresponding to this virtual node.
 	public mount(): void
 	{
 		/// #if USE_STATS
@@ -69,18 +80,41 @@ export class TextVN extends VN implements ITextVN
 	// should be updated (that is, this node's render method should be called).
 	public update( newVN: TextVN): boolean
 	{
-		// text nodes don't have sub-nodes
         if (this.text !== newVN.text)
         {
             this.ownDN.nodeValue = this.text = newVN.text;
 
-		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Updated);
-		/// #endif
+            /// #if USE_STATS
+                DetailedStats.stats.log( StatsCategory.Text, StatsAction.Updated);
+            /// #endif
         }
 
+		// text nodes don't have sub-nodes
 		return false;
-	}
+    }
+
+
+
+    // This method is called if the node requested a "partial" update. Different types of virtual
+    // nodes can keep different data for the partial updates; for example, ElmVN can keep new
+    // element properties that can be updated without re-rendering its children.
+    public performPartialUpdate(): void
+    {
+        if (this.text !== this.textToUpdate)
+        {
+            this.ownDN.nodeValue = this.text = this.textToUpdate;
+            this.textToUpdate = undefined;
+
+            /// #if USE_STATS
+                DetailedStats.stats.log( StatsCategory.Text, StatsAction.Updated);
+            /// #endif
+        }
+    }
+
+
+
+    // Text to update the node using the partial update mechanism
+    private textToUpdate: string;
 }
 
 

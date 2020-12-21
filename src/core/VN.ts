@@ -86,39 +86,12 @@ export abstract class VN implements IVNode
 	// component if both the component and its parent are updated in the same cycle.
 	public lastUpdateTick: number;
 
-
-
-	// // Initializes the node by passing the parent node to it. After this, the node knows its
-	// // place in the hierarchy and gets access to the root of it - the RootVN object.
-	// public init( parent: VN, creator: IComponent): void
-	// {
-	// 	this.parent = parent;
-	// 	this.depth = this.parent ? this.parent.depth + 1 : 0;
-	// 	this.creator = creator;
-	// }
-
-
-
-	// // Cleans up the node object before it is released.
-	// public term(): void
-	// {
-	// 	// // remove information about any published and subscribed services
-	// 	// if (this.publishedServices !== undefined)
-	// 	// {
-	// 	// 	this.publishedServices.forEach( (service, id) => notifyServiceUnpublished( id, this));
-	// 	// 	// this.publishedServices.clear();
-	// 	// }
-
-	// 	// if (this.subscribedServices !== undefined)
-	// 	// {
-	// 	// 	this.subscribedServices.forEach( (info, id) => notifyServiceUnsubscribed( id, this));
-	// 	// 	// this.subscribedServices.clear();
-	// 	// }
-
-	// 	// this.subNodes = undefined;
-	// 	// this.creator = undefined;
-    //     // this.parent = undefined;
-	// }
+    // Flag indicating thata partial update has been requested but not yet performed. This flag is
+    // different from the updateRequested since it controls node-type-specific "partial" updates,
+    // which are treated by the rconciler by calling the performPartialUpdate method. Different
+    // virtual node types can support different kinds of partial updates; for example, the ElmVN
+    // allows updating the element properties without re-rendering its children.
+	public partialUpdateRequested: boolean;
 
 
 
@@ -172,6 +145,11 @@ export abstract class VN implements IVNode
 	// and/or its sub-nodes. The render method will be called after this method returns.
 	public handleError?( err: any, path: string[]): void;
 
+    // This method is called if the node requested a "partial" update. Different types of virtual
+    // nodes can keep different data for the partial updates; for example, ElmVN can keep new
+    // element properties that can be updated without re-rendering its children.
+	public performPartialUpdate?(): void;
+
 
 
     /** Determines whether the node is currently mounted */
@@ -186,6 +164,18 @@ export abstract class VN implements IVNode
 		{
 			requestNodeUpdate( this);
 			this.updateRequested = true;
+		}
+	}
+
+
+
+	// Schedules an update for this node.
+	public requestPartialUpdate(): void
+	{
+		if (!this.partialUpdateRequested)
+		{
+			requestNodeUpdate( this);
+			this.partialUpdateRequested = true;
 		}
 	}
 

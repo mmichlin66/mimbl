@@ -1,6 +1,6 @@
 ﻿import {Styleset, IIDRule, ClassPropType} from "mimcss"
 import {
-    PropType, EventSlot, mountRoot, unmountRoot, FuncProxyVN,
+    PropType, EventSlot, mountRoot, unmountRoot, FuncProxyVN, TextVN,
     createNodesFromJSX, wrapCallbackWithVN, registerElmProp
 } from "../internal";
 
@@ -396,8 +396,8 @@ import * as svg from "./SvgTypes";
  */
 export namespace JSX
 {
-	// // tslint:disable-next-line:no-empty-interface
-	// export interface Element extends IVNode[] {}
+	// tslint:disable-next-line:no-empty-interface
+	export type Element = any;
 
 	// tslint:disable-next-line:no-empty-interface
 	export interface ElementClass extends IComponent {}
@@ -1137,10 +1137,27 @@ export interface IElmVN<T extends Element = Element> extends IVNode
 export interface ITextVN extends IVNode
 {
 	/** Text of the node. */
-	text: string;
+	readonly text: string;
 
 	/** Text DOM node. */
-	textNode: Text;
+	readonly textNode: Text;
+
+	/**
+     * Requests update of the text.
+     */
+	requestTextUpdate( text: string): void;
+}
+
+
+
+/**
+ * Creates text virtual node, whcih can be used to update the text without re-rendering parent
+ * element.
+ * @param text Text to initialize the text node
+ */
+export function createTextVN( text: string): ITextVN
+{
+    return new TextVN( text);
 }
 
 

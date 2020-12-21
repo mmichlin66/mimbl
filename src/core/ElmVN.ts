@@ -1,9 +1,10 @@
 ﻿import {
-    IElmVN, setRef, EventFuncType, UpdateStrategy, RefPropType, ICustomAttributeHandler, IElementProps, ElmVNRef
+    IElmVN, setRef, EventFuncType, UpdateStrategy, RefPropType, ICustomAttributeHandler,
+    IElementProps, ElmVNRef
 } from "../api/mim"
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo,
-    AttrPropInfo, EventPropInfo, getElmPropInfo, setElmProp, removeElmProp, updateElmProp, requestElmPropsUpdate
+    AttrPropInfo, EventPropInfo, getElmPropInfo, setElmProp, removeElmProp, updateElmProp
 } from "../internal"
 
 /// #if USE_STATS
@@ -83,7 +84,13 @@ export class ElmVN extends VN implements IElmVN
             return;
         }
 
-        requestElmPropsUpdate( this, props);
+        if (this.partialPropsToUpdate)
+            Object.assign( props)
+        else
+        {
+            this.partialPropsToUpdate = props;
+            this.requestPartialUpdate();
+        }
     }
 
 
@@ -175,8 +182,8 @@ export class ElmVN extends VN implements IElmVN
 		if (this.customAttrs)
 			this.removeCustomAttrs();
 
-		// // clean up
-        // this.children = null;
+		// clean up
+        this.children = null;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Deleted);
@@ -255,6 +262,20 @@ export class ElmVN extends VN implements IElmVN
 
 
 
+    // This method is called if the node requested a "partial" update. Different types of virtual
+    // nodes can keep different data for the partial updates; for example, ElmVN can keep new
+    // element properties that can be updated without re-rendering its children.
+    public performPartialUpdate(): void
+    {
+        if (this.partialPropsToUpdate)
+        {
+            this.updatePropsOnly( this.partialPropsToUpdate)
+            this.partialPropsToUpdate = undefined;
+        }
+    }
+
+
+
     // Updates properties of this node from the given object containing new properties values. This
     // method is invoked if only properties should be updated without re-rendering the children.
 	public updatePropsOnly( props: any): void
@@ -280,7 +301,7 @@ export class ElmVN extends VN implements IElmVN
                 this.updateEventOnly( propName, propInfo as EventPropInfo, propVal);
             else if (propType === PropType.CustomAttr)
                 this.updateCustomAttrOnly( propName, propInfo as CustomAttrPropInfo, propVal);
-            else // if (propType === PropType.BuiltIn)
+            else // if (propType === PropType.Framework)
             {
                 if (propName === "key")
                     this.key = propVal;
@@ -806,7 +827,7 @@ export class ElmVN extends VN implements IElmVN
 	private children: any[];
 
 	// Reference to the element that is specified as a "ref" property.
-	private ref: RefPropType<any>;
+	private ref: RefPropType;
 
 	// Reference to the virtual node that is specified as a "vnref" property.
 	private vnref: ElmVNRef;
@@ -820,7 +841,11 @@ export class ElmVN extends VN implements IElmVN
 
 	// Object that serves as a map between names of custom element properties and their respective
 	// handler objects and values.
-	private customAttrs: { [name: string]: CustomAttrRunTimeData };
+    private customAttrs: { [name: string]: CustomAttrRunTimeData };
+
+    // properties that were specified in the requestPropsUpdate call. This allows updating the
+    // element's properties without re-rendering its children.
+    private partialPropsToUpdate: any;
 }
 
 
