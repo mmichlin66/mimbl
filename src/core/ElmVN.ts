@@ -1,9 +1,9 @@
 ﻿import {
-    IElmVN, setRef, EventFuncType, UpdateStrategy, RefPropType, ICustomAttributeHandler, IElementProps
+    IElmVN, setRef, EventFuncType, UpdateStrategy, RefPropType, ICustomAttributeHandler, IElementProps, ElmVNRef
 } from "../api/mim"
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo,
-    AttrPropInfo, EventPropInfo, getElmPropInfo, setElmProp, removeElmProp, updateElmProp
+    AttrPropInfo, EventPropInfo, getElmPropInfo, setElmProp, removeElmProp, updateElmProp, requestElmPropsUpdate
 } from "../internal"
 
 /// #if USE_STATS
@@ -34,7 +34,7 @@ export class ElmVN extends VN implements IElmVN
 
 
 
-	constructor( tagName: string, props: IElementProps<any>, children: any[])
+	constructor( tagName: string, props: IElementProps, children: any[])
 	{
 		super();
 
@@ -67,6 +67,24 @@ export class ElmVN extends VN implements IElmVN
 
 		return name;
 	}
+
+
+
+	/**
+     * Requests update of the element properties without re-rendering of its children.
+     */
+    requestPropsUpdate( props: IElementProps): void
+    {
+        if (!props)
+        {
+            /// #if DEBUG
+                console.error("IElmVN.requestPropsUpdate called with null");
+            /// #endif
+            return;
+        }
+
+        requestElmPropsUpdate( this, props);
+    }
 
 
 
@@ -120,6 +138,9 @@ export class ElmVN extends VN implements IElmVN
             // set the value of the reference (if specified)
             if (this.ref)
                 setRef( this.ref, this.ownDN);
+
+            if (this.vnref)
+                this.vnref.vn = this;
         }
 
 		/// #if USE_STATS
@@ -139,6 +160,9 @@ export class ElmVN extends VN implements IElmVN
 		if (this.ref)
 			setRef( this.ref, undefined, this.ownDN);
 
+		if (this.vnref)
+			this.vnref = undefined;
+
 		/// #if REMOVE_EVENT_LISTENERS
 			// remove listeners. Since modern browsers don't leak when listeners are not
 			// explicitly removed, we do it under the REMOVE_EVENT_LISTENERS macro (that is, we
@@ -149,7 +173,7 @@ export class ElmVN extends VN implements IElmVN
 
 		// terminate custom property handlers
 		if (this.customAttrs)
-			this.removeCustomAttrs( true);
+			this.removeCustomAttrs();
 
 		// // clean up
         // this.children = null;
@@ -172,13 +196,14 @@ export class ElmVN extends VN implements IElmVN
 
 
 
-	// Updated this node from the given node. This method is invoked only if update
+	// Updates this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node. The returned value indicates whether children
 	// should be updated (that is, this node's render method should be called).
 	public update( newVN: ElmVN): boolean
 	{
-		// commitUpdate method should be called if new props are different from the current ones
+        // we need to update attributes and events only if the new props are different from the
+        // current ones
         if (!s_deepCompare( this.props, newVN.props, 3))
         {
             if (newVN.props)
@@ -192,8 +217,20 @@ export class ElmVN extends VN implements IElmVN
 
                 // if reference is now specified, set it now; note that we already determined that
                 // the reference object is different.
-                if (this.ref !== undefined)
+                if (this.ref)
                     setRef( this.ref, this.ownDN);
+            }
+
+            // if virtual node reference specification changed then set or unset it as necessary
+            if (newVN.vnref !== this.vnref)
+            {
+                // remember the new reference specification
+                this.vnref = newVN.vnref;
+
+                // if reference is now specified, set it now; note that we already determined that
+                // the reference object is different.
+                if (this.vnref)
+                    this.vnref.vn = this;
             }
 
             // remember the new value of the key, updateStartegy and creator property (even if the
@@ -218,13 +255,73 @@ export class ElmVN extends VN implements IElmVN
 
 
 
+    // Updates properties of this node from the given object containing new properties values. This
+    // method is invoked if only properties should be updated without re-rendering the children.
+	public updatePropsOnly( props: any): void
+	{
+        // loop over all properties
+        for( let propName in props)
+		{
+            // ignore properties with values undefined, null and false
+            let propVal = props[propName];
+
+
+            // get information about the property and determine its type.
+            let propInfo = getElmPropInfo( propName);
+            let propType = propInfo
+                ? propInfo.type
+                : typeof propVal === "function" || typeof propVal === "object"
+                    ? PropType.Event
+                    : PropType.Attr;
+
+            if (propType === PropType.Attr)
+                this.updateAttrOnly( propName, propInfo as AttrPropInfo, propVal);
+            else if (propType === PropType.Event)
+                this.updateEventOnly( propName, propInfo as EventPropInfo, propVal);
+            else if (propType === PropType.CustomAttr)
+                this.updateCustomAttrOnly( propName, propInfo as CustomAttrPropInfo, propVal);
+            else // if (propType === PropType.BuiltIn)
+            {
+                if (propName === "key")
+                    this.key = propVal;
+                else if (propName === "ref")
+                {
+                    if (propVal !== this.ref)
+                    {
+                        // remember the new reference specification
+                        this.ref = propVal;
+
+                        // if reference is now specified, set it now; note that we already determined that
+                        // the reference object is different.
+                        if (propVal)
+                            setRef( propVal, this.ownDN);
+                    }
+                }
+                else if (propName === "vnref")
+                {
+                    if (propVal !== this.vnref)
+                    {
+                        // remember the new reference specification
+                        this.vnref = propVal;
+
+                        // if reference is now specified, set it now; note that we already determined that
+                        // the reference object is different.
+                        if (propVal)
+                            propVal.vn = this;
+                    }
+                }
+                else if (propName === "updateStrategy")
+                    this.updateStrategy = propVal;
+            }
+		}
+	}
+
+
+
 	// Goes over the original properties and puts them into the buckets of attributes, event
 	// listeners and custom attributes.
 	private parseProps( props: any): void
 	{
-        // remember built-in properties
-        this.ref = props.ref;
-        this.updateStrategy = props.updateStrategy;
 
         // loop over all properties ignoring the built-ins
         for( let propName in props)
@@ -233,8 +330,7 @@ export class ElmVN extends VN implements IElmVN
 			let propVal = props[propName];
 			if (propVal != null && propVal !== false)
 			{
-				// get information about the property and determine its type (regular attribute, event
-				// or custom attribute).
+				// get information about the property and determine its type.
 				let propInfo = getElmPropInfo( propName);
                 let propType = propInfo
                     ? propInfo.type
@@ -251,16 +347,25 @@ export class ElmVN extends VN implements IElmVN
 				}
 				else if (propType === PropType.Event)
 				{
-					let eventInfo = getPropAsEventRunTimeData( propInfo, propVal);
-					if (eventInfo)
+					let rtd = getPropAsEventRunTimeData( propInfo, propVal);
+					if (rtd)
 					{
 						if (!this.events)
 							this.events = {};
 
-                        this.events[propName] = eventInfo;
+                        this.events[propName] = rtd;
 					}
 				}
-				else if (propType === PropType.CustomAttr)
+                else if (propType === PropType.Framework)
+                {
+                    if (propName === "ref")
+                        this.ref = propVal;
+                    else if (propName === "vnref")
+                        this.vnref = propVal;
+                    else if (propName === "updateStrategy")
+                        this.updateStrategy = propVal;
+                }
+				else // if (propType === PropType.CustomAttr)
 				{
 					if (!this.customAttrs)
 						this.customAttrs = {};
@@ -309,7 +414,7 @@ export class ElmVN extends VN implements IElmVN
 				{
 					// if the new property with the given name has a different value, remmeber this
 					// value and set it to the attribute in the element
-					updateElmProp( elm, name, oldRTD.info, oldRTD.val, newRTD.val);
+                    updateElmProp( elm, name, oldRTD.info, oldRTD.val, newRTD.val);
 				}
 			}
 		}
@@ -328,6 +433,41 @@ export class ElmVN extends VN implements IElmVN
 		}
 
 		this.attrs = newAttrs;
+	}
+
+
+
+    // Adds, updates or removes the given DOM attribute of this Element. This method is invoked
+    // when the properties of the element are updated as a result of requestPropsUpdate call; that
+    // is when only the properties that should be added, updated or removed were specified and
+    // there is no need to re-render the element's children
+	private updateAttrOnly( name: string, info: AttrPropInfo, val: any ): void
+	{
+        let oldAttr = this.attrs && this.attrs[name];
+        if (val == null || val === false)
+        {
+            if (oldAttr)
+            {
+                removeElmProp( this.ownDN as Element, name, info)
+                delete this.attrs[name];
+            }
+        }
+        else
+        {
+            if (oldAttr)
+            {
+                updateElmProp( this.ownDN as Element, name, info, oldAttr.val, val)
+                oldAttr.val = val;
+            }
+            else
+            {
+                setElmProp( this.ownDN as Element, name, info, val);
+                if (!this.attrs)
+                    this.attrs = {};
+
+                this.attrs[name] = { info, val }
+            }
+        }
 	}
 
 
@@ -451,13 +591,49 @@ export class ElmVN extends VN implements IElmVN
 
 
 
+    // Adds, updates or removes the given event handler of this Element. This method is invoked
+    // when the properties of the element are updated as a result of requestPropsUpdate call; that
+    // is when only the properties that should be added, updated or removed were specified and
+    // there is no need to re-render the element's children
+	private updateEventOnly( name: string, info: EventPropInfo, val: any ): void
+	{
+        let oldEvent = this.events && this.events[name];
+        let newEvent = val != null && getPropAsEventRunTimeData( info, val);
+        if (!newEvent)
+        {
+            if (oldEvent)
+            {
+                this.removeEvent( name, oldEvent);
+                delete this.events[name];
+            }
+        }
+        else
+        {
+            if (oldEvent)
+            {
+                this.updateEvent( name, oldEvent, newEvent)
+                this.events[name] = newEvent;
+            }
+            else
+            {
+                this.addEvent( name, newEvent);
+                if (!this.events)
+                    this.events = {};
+
+                this.events[name] = newEvent;
+            }
+        }
+	}
+
+
+
 	// Returns a wrapper function that will be used as an event listener. The wrapper is bound to
 	// the instance of ElmVN and thus can intercept exceptions and process them using the standard
 	// error service. Unless the original callback is already a bound function, it will be called
 	// with "this" set to either the "event.that" object or, if the latter is undefined, to the
 	// "creator" object, which is the class-based component that created the element i its render
 	// method.
-	private createEventWrapper( event: EventRunTimeData): EventFuncType<Event>
+	private createEventWrapper( event: EventRunTimeData): EventFuncType
 	{
 		return this.wrapCallback( event.orgFunc, event.that ? event.that : this.creator);
 	}
@@ -470,46 +646,59 @@ export class ElmVN extends VN implements IElmVN
 		// create and initialize custom property handlers
 		for( let name in this.customAttrs)
 		{
-			let customAttr = this.customAttrs[name];
-
-			// create custom property handler. If we cannot create the handler, remove the property
-			// from our object.
-			try
-			{
-				customAttr.handler = new customAttr.info.handlerClass( this, customAttr.val, name);
-			}
-			catch( err)
-			{
-				console.error( `Error creating handler for custom attribute '${name}': ${err.message}`);
+            let customAttr = this.customAttrs[name];
+            if (!this.addCustomAttr( name, customAttr))
 				delete this.customAttrs[name];
-				continue;
-			}
 		}
+	}
+
+
+
+	// Creates custom attribute.
+	private addCustomAttr( name: string, customAttr: CustomAttrRunTimeData): boolean
+	{
+        // create custom property handler. If we cannot create the handler, remove the property
+        // from our object.
+        try
+        {
+            customAttr.handler = new customAttr.info.handlerClass( this, customAttr.val, name);
+            return true;
+        }
+        catch( err)
+        {
+            console.error( `Error creating handler for custom attribute '${name}': ${err.message}`);
+            return false;
+        }
 	}
 
 
 
 	// Destroys custom attributes of this element.
-	private removeCustomAttrs( isRemoval: boolean): void
+	private removeCustomAttrs(): void
 	{
-		for( let name in this.customAttrs)
-		{
-			let customAttr = this.customAttrs[name];
-			try
-			{
-				customAttr.handler.terminate( isRemoval);
-			}
-			catch( err)
-			{
-				console.error( `Error terminating handler for custom attribute '${name}': ${err.message}`);
-			}
-		}
+        for( let name in this.customAttrs)
+            this.removeCustomAttr( name, this.customAttrs[name], true)
+	}
+
+
+
+	// Destroys custom attributes of this element.
+	private removeCustomAttr( name: string, customAttr: CustomAttrRunTimeData, isRemoval: boolean): void
+	{
+        try
+        {
+            customAttr.handler.terminate( isRemoval);
+        }
+        catch( err)
+        {
+            console.error( `Error terminating handler for custom attribute '${name}': ${err.message}`);
+        }
 	}
 
 
 
 	// Updates custom attributes of this node.
-	private updateCustomAttrs( newCustomAttrs: { [name: string]: CystomAttrRunTimeData }): void
+	private updateCustomAttrs( newCustomAttrs: { [name: string]: CustomAttrRunTimeData }): void
 	{
 		let oldCustomAttrs = this.customAttrs;
 
@@ -521,31 +710,12 @@ export class ElmVN extends VN implements IElmVN
 			{
 				const oldCustomAttr = oldCustomAttrs[name];
 				const newCustomAttr = newCustomAttrs ? newCustomAttrs[name] : undefined;
-				if (!newCustomAttr)
-				{
-					// if there is no new property with the given name, remove the old property and
-					// terminate its handler
-					try
-					{
-						oldCustomAttr.handler.terminate( false);
-					}
-					catch( err)
-					{
-						console.error( `Error terminating handler for custom attribute '${name}': ${err.message}`);
-					}
-				}
+                if (!newCustomAttr)
+                    this.removeCustomAttr( name, oldCustomAttr, false);
 				else
 				{
-					// update the custom property and remember the new value
-					try
-					{
-						oldCustomAttr.handler.update( newCustomAttr.val);
-					}
-					catch( err)
-					{
-						console.error( `Error updating handler for custom attribute '${name}': ${err.message}`);
-					}
-
+                    // update the custom property and remember the new value
+                    this.updateCustomAttr( name, oldCustomAttr, newCustomAttr);
 					newCustomAttr.handler = oldCustomAttr.handler;
 				}
 			}
@@ -559,24 +729,65 @@ export class ElmVN extends VN implements IElmVN
 				if (oldCustomAttrs && (name in oldCustomAttrs))
 					continue;
 
-				let newCustomAttr = newCustomAttrs[name];
-
-				// create custom property handler. If we cannot create the handler, remove the property
-				// from our object.
-				try
-				{
-					newCustomAttr.handler = new newCustomAttr.info.handlerClass( this, newCustomAttr.val, name);
-				}
-				catch( err)
-				{
-					console.error( `Error creating handler for custom attribute '${name}': ${err.message}`);
+                let newCustomAttr = newCustomAttrs[name];
+                if (!this.addCustomAttr( name, newCustomAttr))
 					delete newCustomAttrs[name];
-					continue;
-				}
 			}
 		}
 
 		this.customAttrs = newCustomAttrs;
+	}
+
+
+
+	// Updates custom attributes of this node.
+	private updateCustomAttr( name: string, oldCustomAttr: CustomAttrRunTimeData, newCustomAttr: CustomAttrRunTimeData): void
+	{
+        // update the custom property and remember the new value
+        try
+        {
+            oldCustomAttr.handler.update( newCustomAttr.val);
+        }
+        catch( err)
+        {
+            console.error( `Error updating handler for custom attribute '${name}': ${err.message}`);
+        }
+	}
+
+
+
+    // Adds, updates or removes the given custom attribute of this Element. This method is invoked
+    // when the properties of the element are updated as a result of requestPropsUpdate call; that
+    // is when only the properties that should be added, updated or removed were specified and
+    // there is no need to re-render the element's children
+	private updateCustomAttrOnly( name: string, info: CustomAttrPropInfo, val: any ): void
+	{
+        let oldCustomAttr = this.customAttrs && this.customAttrs[name];
+        let newCustomAttr = val != null && { info, val, handler: undefined};
+        if (!newCustomAttr)
+        {
+            if (oldCustomAttr)
+            {
+                this.removeCustomAttr( name, oldCustomAttr, false)
+                delete this.customAttrs[name];
+            }
+        }
+        else
+        {
+            if (oldCustomAttr)
+            {
+                this.updateCustomAttr( name, oldCustomAttr, newCustomAttr)
+                oldCustomAttr.val = val;
+            }
+            else
+            {
+                this.addCustomAttr( name, newCustomAttr);
+                if (!this.customAttrs)
+                    this.customAttrs = {};
+
+                this.customAttrs[name] = newCustomAttr
+            }
+        }
 	}
 
 
@@ -594,10 +805,11 @@ export class ElmVN extends VN implements IElmVN
 	// Array of children objects.
 	private children: any[];
 
-	// Reference to the component that is specified as a "ref" property. Reference object is
-	// set when analyzing properties in the constructor and during update. Reference value is
-	// set during mount and unset during unmount. The ref property can be changed on update.
+	// Reference to the element that is specified as a "ref" property.
 	private ref: RefPropType<any>;
+
+	// Reference to the virtual node that is specified as a "vnref" property.
+	private vnref: ElmVNRef;
 
 	// Object that serves as a map between attribute names and their current values.
 	private attrs: { [name: string]: AttrRunTimeData };
@@ -608,7 +820,7 @@ export class ElmVN extends VN implements IElmVN
 
 	// Object that serves as a map between names of custom element properties and their respective
 	// handler objects and values.
-	private customAttrs: { [name: string]: CystomAttrRunTimeData };
+	private customAttrs: { [name: string]: CustomAttrRunTimeData };
 }
 
 
@@ -632,7 +844,7 @@ interface EventRunTimeData
 	info: EventPropInfo;
 
 	// Original event callback passed as the value of the event property in JSX
-	orgFunc: EventFuncType<any>;
+	orgFunc: EventFuncType;
 
 	// Object that will be referenced by "this" within the invoked function
 	that?: any;
@@ -645,13 +857,13 @@ interface EventRunTimeData
 	// handling service. The wrapper is marked optional because it is created only if a new
 	// event listener is added; that is, if during update, the event listener function is the
 	// same, there is no need to create new wrapper because the old one will be used.
-	wrapper?:  EventFuncType<Event>;
+	wrapper?:  EventFuncType;
 };
 
 
 
 // Type defining the information we keep about each custom property.
-interface CystomAttrRunTimeData
+interface CustomAttrRunTimeData
 {
 	// Information about this custom attribute - cannot be null
 	info: CustomAttrPropInfo;
@@ -670,18 +882,18 @@ interface CystomAttrRunTimeData
 function getPropAsEventRunTimeData( info: EventPropInfo, propVal: any): EventRunTimeData
 {
 	if (typeof propVal === "function")
-		return { info, orgFunc: propVal as EventFuncType<any> };
+		return { info, orgFunc: propVal as EventFuncType };
 	else if (Array.isArray(propVal))
 	{
 		if (propVal.length === 2)
 		{
 			if (typeof propVal[1] === "boolean")
-				return { info, orgFunc: propVal[0] as EventFuncType<any>, useCapture: propVal[1] as boolean };
+				return { info, orgFunc: propVal[0] as EventFuncType, useCapture: propVal[1] as boolean };
 			else
-				return { info, orgFunc: propVal[0] as EventFuncType<any>, that: propVal[1] };
+				return { info, orgFunc: propVal[0] as EventFuncType, that: propVal[1] };
 		}
 		else if (propVal.length === 3)
-			return { info, orgFunc: propVal[0] as EventFuncType<any>, that: propVal[1], useCapture: propVal[2] as boolean };
+			return { info, orgFunc: propVal[0] as EventFuncType, that: propVal[1], useCapture: propVal[2] as boolean };
 	}
 
 	// for all other type combinations the property is not treated as an event handler
@@ -700,7 +912,7 @@ let SvgNamespace: string = "http://www.w3.org/2000/svg";
 // The SvgElmInfo type defines information that can be specified for an SVG element. This
 // information can be of the following types:
 //	- string - actual name to use for the element. Some SVG elements have names that cannot be used
-//		in JX directly (e.g. because of hyphen like in "color-profile"). In this case the string
+//		in JSX directly (e.g. because of hyphen like in "color-profile"). In this case the string
 //		value will be the actual element name to put into HTML document, while JSX will be using
 //		a camel-formatted name (e.g. "colorProfile").
 //	- boolean - flag indicating that the element is "dual-purpose"; that is, element with this

@@ -22,7 +22,7 @@ export const enum PropType
      * Built-in attribute that is used internally by the Mimbl infrastructure and is not set
      * to the element.
      */
-	BuiltIn = 0,
+	Framework = 0,
 
 	/** Regular attributes set using Element.setAttribute */
 	Attr = 1,
@@ -124,10 +124,11 @@ export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
 // attributes is added to this object when the registerProperty method is called.
 let propInfos: {[P:string]: PropInfo} =
 {
-    // built-in attributes.
-    key: { type: PropType.BuiltIn },
-    ref: { type: PropType.BuiltIn },
-    updateStrategy: { type: PropType.BuiltIn },
+    // framework attributes.
+    key: { type: PropType.Framework },
+    ref: { type: PropType.Framework },
+    vnref: { type: PropType.Framework },
+    updateStrategy: { type: PropType.Framework },
 
     // attributes - only those attributes are listed that have non-trivial treatment or whose value
     // type is object or function. ID and class are present here because their value can be

@@ -194,12 +194,12 @@ export abstract class VN implements IVNode
 	/**
 	 * Schedules to call the given function before all the scheduled components have been updated.
 	 * @param func Function to be called.
-	 * @param that Object to be used as the "this" value when the function is called. This parameter
+	 * @param funcThisArg Object to be used as the "this" value when the function is called. This parameter
 	 *   is not needed if the function is already bound or it is an arrow function.
 	 */
-	public scheduleCallBeforeUpdate( func: ScheduledFuncType, that?: object): void
+	public scheduleCallBeforeUpdate( func: ScheduledFuncType, funcThisArg?: any): void
 	{
-		scheduleFuncCall( func, true, that, this);
+		scheduleFuncCall( func, true, funcThisArg, this);
 	}
 
 
@@ -207,12 +207,12 @@ export abstract class VN implements IVNode
 	/**
 	 * Schedules to call the given function before all the scheduled components have been updated.
 	 * @param func Function to be called.
-	 * @param that Object to be used as the "this" value when the function is called. This parameter
+	 * @param funcThisArg Object to be used as the "this" value when the function is called. This parameter
 	 *   is not needed if the function is already bound or it is an arrow function.
 	 */
-	public scheduleCallAfterUpdate( func: ScheduledFuncType, that?: object): void
+	public scheduleCallAfterUpdate( func: ScheduledFuncType, funcThisArg?: any): void
 	{
-		scheduleFuncCall( func, false, that, this);
+		scheduleFuncCall( func, false, funcThisArg, this);
 	}
 
 

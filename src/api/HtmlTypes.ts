@@ -29,7 +29,7 @@ export type InputTypePropType = "button" | "checkbox" | "color" | "date" | "date
 // that can be used on all HTML elements. This interface is needed for JSX type checking.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export interface IHtmlElementProps<TRef = HTMLElement> extends IElementProps<TRef>
+export interface IHtmlElementProps<TRef extends HTMLElement = HTMLElement> extends IElementProps<TRef>
 {
 	// standard attributes
 	accesskey?: string;

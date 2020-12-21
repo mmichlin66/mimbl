@@ -79,7 +79,7 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 *  2. Before the component is destroyed: null is passed as a parameter and the component must
 	 *    release the remembered object.
 	 */
-	vn?: IVNode;
+	vn?: IClassCompVN;
 
 	/** Returns the component's content that will be ultimately placed into the DOM tree. */
 	render(): any;
@@ -193,7 +193,7 @@ export type UpdateStrategy =
  * Type of event handler function for DOM events of type T.
  * @typeparam T DOM event type, e.g. MouseEvent
  */
-export type EventFuncType<T extends Event> = (e: T) => void;
+export type EventFuncType<T extends Event = Event> = (e: T) => void;
 
 /**
  * Tuple combining the event handler type and object that will be bound as "this" when the handler
@@ -256,13 +256,19 @@ export interface ICommonProps
  * The IElementProps interface defines standard properties (attributes and event listeners)
  * that can be used on all HTML and SVG elements.
  */
-export interface IElementProps<TRef,TChildren = any> extends ICommonProps
+export interface IElementProps<TRef extends Element = Element,TChildren = any> extends ICommonProps
 {
 	/**
 	 * Reference that will be set to the instance of the element after it is created (mounted). The
 	 * reference will be set to undefined after the element is unmounted.
 	 */
 	ref?: RefPropType<TRef>;
+
+	/**
+	 * Reference that will be set to the virtual node corresponding to the element after it is
+     * created (mounted). The reference will be set to undefined after the element is unmounted.
+	 */
+	vnref?: ElmVNRef<TRef>;
 
 	/**
 	 * Update strategy object that determines different aspects of element behavior during updates.
@@ -728,6 +734,24 @@ export type ScheduledFuncType = () => void;
 
 
 /**
+ * The ElmVNRef class represents a reference to the element virtual node. Objects of this class
+ * can be created and passed to the `vnref` property of an element. After the element is rendered
+ * the object can be used to schedule updates to the element directly - that is, without updating
+ * the component that rendered the element. This, for example, can be used to update properties
+ * of the element without causing re-rendering of its children.
+ */
+export class ElmVNRef<T extends Element = Element>
+{
+	/** Reference to the virtual node corresponding to the element */
+	public vn: IElmVN<T>;
+
+	/** Get accessor for the element */
+	public get r(): T { return this.vn?.elm as T; }
+}
+
+
+
+/**
  * Defines event handler that is invoked when reference value changes.
  */
 export type RefFunc<T = any> = (newRef: T) => void;
@@ -933,12 +957,6 @@ export interface IVNode
      */
 	readonly index: number;
 
-	/** Reference to the next sibling node or undefined for the last sibling. */
-	readonly next?: IVNode;
-
-	/** Reference to the previous sibling node or undefined for the first sibling. */
-	readonly prev?: IVNode;
-
 	/** List of sub-nodes. */
 	readonly subNodes?: IVNode[];
 
@@ -949,11 +967,6 @@ export interface IVNode
 	 */
 	readonly name?: string;
 
-	// Flag indicating that update has been requested but not yet performed. This flag is needed
-	// to prevent trying to add the node to the global map every time the requestUpdate method
-	// is called.
-	readonly updateRequested: boolean;
-
 
 
 	/** This method is called by the component when it needs to be updated. */
@@ -962,18 +975,18 @@ export interface IVNode
 	/**
 	 * Schedules to call the given function before all the scheduled components have been updated.
 	 * @param func Function to be called.
-	 * @param that Object to be used as the "this" value when the function is called. This parameter
+	 * @param funcThisArg Object to be used as the "this" value when the function is called. This parameter
 	 *   is not needed if the function is already bound or it is an arrow function.
 	 */
-	scheduleCallBeforeUpdate( func: ScheduledFuncType, that?: object): void;
+	scheduleCallBeforeUpdate( func: ScheduledFuncType, funcThisArg?: any): void;
 
 	/**
 	 * Schedules to call the given function before all the scheduled components have been updated.
 	 * @param func Function to be called.
-	 * @param that Object to be used as the "this" value when the function is called. This parameter
+	 * @param funcThisArg Object to be used as the "this" value when the function is called. This parameter
 	 *   is not needed if the function is already bound or it is an arrow function.
 	 */
-	scheduleCallAfterUpdate( func: ScheduledFuncType, that?: object): void;
+	scheduleCallAfterUpdate( func: ScheduledFuncType, funcThisArg?: any): void;
 
 
 
@@ -1079,7 +1092,7 @@ export interface IClassCompVN extends IVNode
 /**
  * The IManagedCompVN interface represents a virtual node for a JSX-based component.
  */
-export interface IManagedCompVN extends IVNode
+export interface IManagedCompVN extends IClassCompVN
 {
 	/** Gets the component class. */
 	readonly compClass: IComponentClass;
@@ -1099,7 +1112,7 @@ export interface IIndependentCompVN extends IClassCompVN
 /**
  *  The IElmVN interface represents a virtual node for a DOM element.
  */
-export interface IElmVN extends IVNode
+export interface IElmVN<T extends Element = Element> extends IVNode
 {
 	/** Gets the DOM element name. */
 	readonly elmName: string;
@@ -1109,6 +1122,11 @@ export interface IElmVN extends IVNode
 
 	/** Gets the DOM element object. */
 	readonly elm: Element;
+
+	/**
+     * Requests update of the element properties without re-rendering of its children.
+     */
+	requestPropsUpdate( props: IElementProps<T>): void;
 }
 
 
@@ -1229,7 +1247,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * is undefined in the component's costructor but will be defined before the call to the
 	 * (optional) willMount method.
 	 */
-	public vn: IVNode;
+	public vn: IClassCompVN;
 
 	constructor( props?: CompProps<TProps,TChildren>)
 	{
@@ -1276,30 +1294,30 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * Schedules the given function to be called before any components scheduled to be updated in
 	 * the Mimbl tick are updated.
 	 * @param func Function to be called
-	 * @param that Object that will be used as "this" value when the function is called. If this
+	 * @param funcThisArg Object that will be used as "this" value when the function is called. If this
 	 *   parameter is undefined, the component instance will be used (which allows scheduling
 	 *   regular unbound components' methods). This parameter will be ignored if the function
 	 *   is already bound or is an arrow function.
 	 */
-	protected callMeBeforeUpdate( func: ScheduledFuncType, that?: object): void
+	protected callMeBeforeUpdate( func: ScheduledFuncType, funcThisArg?: any): void
 	{
 		if (this.vn)
-			this.vn.scheduleCallBeforeUpdate( func, that ? that : this);
+			this.vn.scheduleCallBeforeUpdate( func, funcThisArg ? funcThisArg : this);
 	}
 
 	/**
 	 * Schedules the given function to be called after all components scheduled to be updated in
 	 * the Mimbl tick have already been updated.
 	 * @param func Function to be called
-	 * @param that Object that will be used as "this" value when the function is called. If this
+	 * @param funcThisArg Object that will be used as "this" value when the function is called. If this
 	 *   parameter is undefined, the component instance will be used (which allows scheduling
 	 *   regular unbound components' methods). This parameter will be ignored if the the function
 	 *   is already bound or is an arrow function.
 	 */
-	protected callMeAfterUpdate( func: ScheduledFuncType, that?: object): void
+	protected callMeAfterUpdate( func: ScheduledFuncType, funcThisArg?: any): void
 	{
 		if (this.vn)
-			this.vn.scheduleCallAfterUpdate( func, that ? that : this);
+			this.vn.scheduleCallAfterUpdate( func, funcThisArg ? funcThisArg : this);
 	}
 
 	/**
@@ -1559,7 +1577,7 @@ export function updatable( target, name: string)
             {
                 this[attrName] = val;
                 let vn: IVNode = this.vn;
-                if (vn && !vn.updateRequested)
+                if (vn)
                     this.vn.requestUpdate();
             }
         },

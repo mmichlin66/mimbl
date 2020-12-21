@@ -1,6 +1,6 @@
 ﻿import {
     ScheduledFuncType, IComponent, IVNode, Fragment, FuncProxy,
-    FuncProxyProps, PromiseProxy, IComponentClass, FuncCompType
+    PromiseProxy, IComponentClass, FuncCompType
 } from "../api/mim"
 import {
     VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN,
@@ -9,17 +9,20 @@ import {
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
+import { ex } from "mimcss";
 /// #endif
 
 
-// Map of nodes that should be updated on the next UI cycle. We use Map in order to not include
+// Set of nodes that should be updated on the next UI cycle. We use Set in order to not include
 // the same node more than once - which can happen if the node's requestUpdate method is called
-// more than once during a single run (e.g. during event processing). The value mapped to the
-// node determines the operation to be performed:
-//	- undefined - the node will be updated
-//	- null - the node will be deleted from its parent
-//	- anything else - the node will be replaced with this new content
+// more than once during a single run (e.g. during event processing).
 let s_vnsScheduledForUpdate = new Set<VN>();
+
+// Map of virtual nodes corresponding to element whose properties should be updated on the next
+// UI cycle without re-rendering the element's children. The value is the object containing the
+// properties to be added, updated or removed. To indicate that the property should be removed,
+// its value should be undefined.
+let s_elmPropsScheduledForUpdate = new Map<ElmVN,any>();
 
 // Map of functions that have been scheduled to be called upon a new animation frame before
 // components scheduled for update are updated. The keys in this map are the original functions and
@@ -196,6 +199,68 @@ export function requestNodeUpdate( vn: VN): void
 
 
 
+// Schedules an update of the element properties without re-rendering of its children.
+export function requestElmPropsUpdate( vn: ElmVN, props: any): void
+{
+	if (!vn.anchorDN)
+		console.warn( `Update requested for virtual node '${getVNPath(vn).join("->")}' that doesn't have anchor DOM node`)
+
+    let existingProps = s_elmPropsScheduledForUpdate.get( vn);
+    if (existingProps)
+        Object.assign( existingProps, props);
+    else
+    {
+        s_elmPropsScheduledForUpdate.set( vn, props);
+
+        // the update is scheduled in the next tick unless the request is made during a
+        // "before update" function execution.
+        if (s_schedulerState !== SchedulerState.BeforeUpdate)
+            requestFrameIfNeeded();
+    }
+}
+
+
+
+// Schedules to call the given function either before or after all the scheduled components
+// have been updated.
+export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean,
+    funcThisArg?: object, vn?: IVNode): void
+{
+	/// #if DEBUG
+	if (!func)
+	{
+		console.error( "Trying to schedule undefined function for update");
+		return;
+	}
+	/// #endif
+
+	if (beforeUpdate)
+	{
+		if (!s_callsScheduledBeforeUpdate.has( func))
+		{
+			s_callsScheduledBeforeUpdate.set( func, wrapCallbackWithVN( func, funcThisArg, vn));
+
+			// a "before update" function is always scheduled in the next frame even if the
+			// call is made from another "before update" function.
+			requestFrameIfNeeded();
+		}
+	}
+	else
+	{
+		if (!s_callsScheduledAfterUpdate.has( func))
+		{
+			s_callsScheduledAfterUpdate.set( func, wrapCallbackWithVN( func, funcThisArg, vn));
+
+			// an "after update" function is scheduled in the next cycle unless the request is made
+			// either from a "before update" function execution or during a node update.
+			if (s_schedulerState !== SchedulerState.BeforeUpdate && s_schedulerState !== SchedulerState.Update)
+				requestFrameIfNeeded();
+		}
+	}
+}
+
+
+
 // Adds the given node and related information into the internal structures so that it will be
 // updated during the next Mimbl tick.
 function addNodeToScheduler( vn: VN): void
@@ -218,46 +283,6 @@ function addNodeToScheduler( vn: VN): void
 
 		if (comp.afterUpdate)
 			s_callsScheduledAfterUpdate.set( comp.afterUpdate, wrapCallbackWithVN( comp.beforeUpdate, comp, vn));
-	}
-}
-
-
-
-// Schedules to call the given function either before or after all the scheduled components
-// have been updated.
-export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean,
-    thisArg?: object, vn?: IVNode): void
-{
-	/// #if DEBUG
-	if (!func)
-	{
-		console.error( "Trying to schedule undefined function for update");
-		return;
-	}
-	/// #endif
-
-	if (beforeUpdate)
-	{
-		if (!s_callsScheduledBeforeUpdate.has( func))
-		{
-			s_callsScheduledBeforeUpdate.set( func, wrapCallbackWithVN( func, thisArg, vn));
-
-			// a "before update" function is always scheduled in the next frame even if the
-			// call is made from another "before update" function.
-			requestFrameIfNeeded();
-		}
-	}
-	else
-	{
-		if (!s_callsScheduledAfterUpdate.has( func))
-		{
-			s_callsScheduledAfterUpdate.set( func, wrapCallbackWithVN( func, thisArg, vn));
-
-			// an "after update" function is scheduled in the next cycle unless the request is made
-			// either from a "before update" function execution or during a node update.
-			if (s_schedulerState !== SchedulerState.BeforeUpdate && s_schedulerState !== SchedulerState.Update)
-				requestFrameIfNeeded();
-		}
 	}
 }
 
@@ -299,6 +324,15 @@ function performMimbleTick(): void
 	// increment tick number.
 	s_currentTick++;
 
+    /// #if USE_STATS
+        let statsAlreadyExisted = DetailedStats.stats != null;
+        if (!statsAlreadyExisted)
+        {
+            DetailedStats.stats = new DetailedStats( `Mimbl tick ${s_currentTick}: `);
+            DetailedStats.stats.start();
+        }
+    /// #endif
+
 	// call functions scheduled to be invoked before updating components. If this function
 	// calls the requestUpdate method or schedules a function to be invoked after updates,
 	// they will be executed in this cycle. However, if it schedules a function to be invoked
@@ -313,29 +347,22 @@ function performMimbleTick(): void
 
 	if (s_vnsScheduledForUpdate.size > 0)
 	{
-        /// #if USE_STATS
-            let statsAlreadyExisted = DetailedStats.stats != null;
-            if (!statsAlreadyExisted)
-            {
-                DetailedStats.stats = new DetailedStats( `Mimbl tick ${s_currentTick}: `);
-                DetailedStats.stats.start();
-            }
-		/// #endif
-
 		// remember the internal set of nodes and re-create it so that it is ready for new
 		// update requests. Arrange scheduled nodes by their nesting depths and perform updates.
 		s_schedulerState = SchedulerState.Update;
 		let vnsScheduledForUpdate = s_vnsScheduledForUpdate;
 		s_vnsScheduledForUpdate = new Set<VN>();
 		performUpdate( vnsScheduledForUpdate);
+	}
 
-        /// #if USE_STATS
-            if (!statsAlreadyExisted)
-            {
-                DetailedStats.stats.stop( true);
-                DetailedStats.stats = null;
-            }
-		/// #endif
+	if (s_elmPropsScheduledForUpdate.size > 0)
+	{
+		// remember the internal set of nodes and re-create it so that it is ready for new
+		// update requests. Arrange scheduled nodes by their nesting depths and perform updates.
+		s_schedulerState = SchedulerState.Update;
+		let elmPropsScheduledForUpdate = s_elmPropsScheduledForUpdate;
+		s_elmPropsScheduledForUpdate = new Map<ElmVN,any>();
+		performElmPropsUpdate( elmPropsScheduledForUpdate);
 	}
 
 	// call functions scheduled to be invoked after updating components
@@ -346,6 +373,14 @@ function performMimbleTick(): void
 		s_callsScheduledAfterUpdate = new Map<ScheduledFuncType,ScheduledFuncType>();
 		callScheduledFunctions( callsScheduledAfterUpdate, false);
 	}
+
+    /// #if USE_STATS
+        if (!statsAlreadyExisted)
+        {
+            DetailedStats.stats.stop( true);
+            DetailedStats.stats = null;
+        }
+    /// #endif
 
 	s_schedulerState = SchedulerState.Idle;
 };
@@ -407,6 +442,22 @@ function performUpdate( vnsScheduledForUpdate: Set<VN>): void
             trackCurrentVN( null);
         }
 	}
+}
+
+
+
+// Performs rendering phase for all components scheduled for update and recursively for their
+// sub-nodes where necessary. Returns array of VNDisp structures for each updated node.
+function performElmPropsUpdate( elmPropsScheduledForUpdate: Map<ElmVN,any>): void
+{
+    elmPropsScheduledForUpdate.forEach( (props, vn) =>
+    {
+        // it can happen that we encounter already unmounted virtual nodes - ignore them
+        if (!vn.anchorDN)
+            return;
+
+        vn.updatePropsOnly( props);
+    })
 }
 
 
@@ -1424,7 +1475,7 @@ function createNodesFromContent( content: any, nodes?: VN[]): VN | VN[] | null
 		// if the component (this can only be an Instance component) is already attached to VN,
 		// return this existing VN; otherwise create a new one.
 		let vn = (content as IComponent).vn
-						? (content as IComponent).vn as VN
+						? (content as IComponent).vn as IVNode as VN
 						: new IndependentCompVN( content as IComponent);
         if (nodes)
             nodes.push( vn);
