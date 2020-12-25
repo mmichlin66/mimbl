@@ -12,12 +12,12 @@ export type DN = Node;
 
 
 
-/// #if USE_STATS
-    import {StatsCategory} from "../utils/Stats"
-/// #endif
-
 /// #if DEBUG
     let g_nextVNDebugID = 1;
+/// #endif
+
+/// #if USE_STATS
+    import {StatsCategory} from "../utils/Stats"
 /// #endif
 
 
@@ -93,6 +93,13 @@ export abstract class VN implements IVNode
     // allows updating the element properties without re-rendering its children.
 	public partialUpdateRequested: boolean;
 
+    // Number of times this node was mounted. It is possible to reuse virtual nodes during
+    // rendering. The clone method (if implemented by the node) will be called. If this method
+    // returns the same node (instead of creating a new one), the node can increment this
+    // reference count. When such node is unmounted, the sub-nodes will only unmounted if the
+    // reference count is 0 (or undefined).
+	public mountRefCount?: number;
+
 
 
 	///////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,6 +117,12 @@ export abstract class VN implements IVNode
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
 	public mount?(): void;
+
+    // // Creates a virtual node as a "clone" of this one. This method is invoked when an already
+    // // mounted node is returned during rendering. The method can either create a new virtual
+    // // node or it can mark the node in a special way and return the same instance. If this method
+    // // is not implemented, the same instance will be used.
+	// public clone?(): VN;
 
 	// Returns content that comprises the children of the node. If the node doesn't have
 	// sub-nodes, null should be returned. If this method is not implemented that means the node

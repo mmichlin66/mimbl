@@ -108,31 +108,44 @@ export class ElmVN extends VN implements IElmVN
     // corresponding to this virtual node.
 	public mount(): void
 	{
-        // create the element. If namespace is provided use it; otherwise, try to determine
-        // whether this is an SVG or HTML element
-        if (this.props?.xmlns)
+        // if the element already exists, this means that the node is being reused by different
+        // parents. That is OK as long as the node is "static"; that is, it doesn't have any
+        // dynamic behavior and its properties and children remain the same. In this case, we
+        // can clone the already created element.
+        if (this.ownDN)
         {
-            this.isSvg = this.props.xmlns.endsWith( "svg");
-            this.ownDN = document.createElementNS( this.props.xmlns, this.elmName);
+            // we don't clone the children (if any) because they will be cloned by our sub-nodes
+            this.ownDN = this.ownDN.cloneNode( false);
         }
         else
         {
-            // assume that names of all SVG elements are in the svgElmInfos object
-            let svgInfo = svgElmInfos[this.elmName];
-            this.isSvg = svgInfo === undefined
-                ? false
-                : svgInfo === false || this.anchorDN.namespaceURI.endsWith( "svg");
+            // create the element. If namespace is provided use it; otherwise, try to determine
+            // whether this is an SVG or HTML element
+            if (this.props?.xmlns)
+            {
+                this.isSvg = this.props.xmlns.endsWith( "svg");
+                this.ownDN = document.createElementNS( this.props.xmlns, this.elmName);
+            }
+            else
+            {
+                // assume that names of all SVG elements are in the svgElmInfos object
+                let svgInfo = svgElmInfos[this.elmName];
+                this.isSvg = svgInfo === undefined
+                    ? false
+                    : svgInfo === false || this.anchorDN.namespaceURI.endsWith( "svg");
 
-            this.ownDN = this.isSvg
-                ? document.createElementNS( SvgNamespace, getSvgElmName( svgInfo, this.elmName))
-                : document.createElement( this.elmName);
+                this.ownDN = this.isSvg
+                    ? document.createElementNS( SvgNamespace, getSvgElmName( svgInfo, this.elmName))
+                    : document.createElement( this.elmName);
+            }
+
+            // translate properties into attributes, events and custom attributes
+            if (this.props)
+                this.parseProps( this.props);
         }
 
-        // translate properties into attributes, events and custom attributes
         if (this.props)
         {
-            this.parseProps( this.props);
-
             if (this.attrs)
                 this.addAttrs();
 
@@ -142,7 +155,6 @@ export class ElmVN extends VN implements IElmVN
             if (this.customAttrs)
                 this.addCustomAttrs();
 
-            // set the value of the reference (if specified)
             if (this.ref)
                 setRef( this.ref, this.ownDN);
 
@@ -170,20 +182,13 @@ export class ElmVN extends VN implements IElmVN
 		if (this.vnref)
 			this.vnref = undefined;
 
-		/// #if REMOVE_EVENT_LISTENERS
-			// remove listeners. Since modern browsers don't leak when listeners are not
-			// explicitly removed, we do it under the REMOVE_EVENT_LISTENERS macro (that is, we
-			// normally don't do it.)
-			if (this.events)
-				this.removeEvents();
-		/// #endif
-
 		// terminate custom property handlers
 		if (this.customAttrs)
 			this.removeCustomAttrs();
 
 		// clean up
         this.children = null;
+        this.ownDN = null;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Deleted);
@@ -825,6 +830,9 @@ export class ElmVN extends VN implements IElmVN
 
 	// Array of children objects.
 	private children: any[];
+
+	// If this virtual node was cloned from another node, points to the original node.
+	public clonedFrom: ElmVN;
 
 	// Reference to the element that is specified as a "ref" property.
 	private ref: RefPropType;

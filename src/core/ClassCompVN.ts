@@ -71,8 +71,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         }
 
 		this.comp.vn = undefined;
-        this.comp = undefined;
-        this.actRender = undefined;
 
         /// #if USE_STATS
             DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);

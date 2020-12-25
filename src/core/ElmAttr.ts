@@ -200,16 +200,14 @@ export function getElmPropInfo( propName: string): PropInfo | undefined
 export function setElmProp( elm: Element, propName: string, info: AttrPropInfo | null, propVal: any): void
 {
     // get property info object
-    if (info === undefined)
+    if (!info)
         elm.setAttribute( propName, valToString( propVal));
     else
     {
         // get actual attribute name to use
-        let attrName = info.attrName;
-        if (attrName === undefined)
-            attrName = propName;
+        let attrName = info.attrName || propName;
 
-        if (info.set !== undefined)
+        if (info.set)
             info.set( elm, attrName, propVal);
         else
             elm.setAttribute( attrName, valToString( propVal));
@@ -228,7 +226,7 @@ export function setElmProp( elm: Element, propName: string, info: AttrPropInfo |
 export function updateElmProp( elm: Element, propName: string, info: AttrPropInfo | null, oldPropVal: any, newPropVal: any): boolean
 {
     // get property info object
-    if (info === undefined)
+    if (!info)
     {
         // if this is not a special case (property is not in our list) just compare them and
         // if they are different set the attribute to the new value.
@@ -250,7 +248,7 @@ export function updateElmProp( elm: Element, propName: string, info: AttrPropInf
     // the two values and if they are different use the new one as a value to update with.
     // Note that the neither old nor new values can be undefined or null.
     let updateVal: any;
-    if (info.diff !== undefined)
+    if (info.diff)
     {
         updateVal = info.diff( propName, oldPropVal, newPropVal);
 
@@ -264,22 +262,20 @@ export function updateElmProp( elm: Element, propName: string, info: AttrPropInf
         return false;
 
     // get actual attribute name to use
-    let attrName = info.attrName;
-    if (attrName === undefined)
-        attrName = propName;
+    let attrName = info.attrName || propName;
 
     // if update method is defined use it; otherwise, remove the old value and set the new one
-    if (info.update !== undefined)
+    if (info.update)
         info.update( elm, attrName, updateVal);
     else
     {
         // if remove method is defined, use it. Note that if remove method is not defined
         // we don't use elm.removeAttribute to save time (as the following info.set or
         // elm.setAttribute will override it anyway).
-        if (info.remove !== undefined && info.set === undefined)
+        if (info.remove && !info.set)
             info.remove( elm, attrName);
 
-        if (info.set !== undefined)
+        if (info.set)
             info.set( elm, attrName, updateVal);
         else
             elm.setAttribute( attrName, valToString( updateVal));
@@ -299,16 +295,14 @@ export function updateElmProp( elm: Element, propName: string, info: AttrPropInf
 export function removeElmProp( elm: Element, propName: string, info: AttrPropInfo | null): void
 {
     // get property info object
-    if (info === undefined)
+    if (!info)
         elm.removeAttribute( propName);
     else
     {
         // get actual attribute name to use
-        let attrName = info.attrName;
-        if (attrName === undefined)
-            attrName = propName;
+        let attrName = info.attrName || propName;
 
-        if (info.remove !== undefined)
+        if (info.remove)
             info.remove( elm, attrName);
         else
             elm.removeAttribute( attrName);

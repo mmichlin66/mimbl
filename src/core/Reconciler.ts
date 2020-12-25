@@ -1,6 +1,6 @@
 ﻿import {
     ScheduledFuncType, IComponent, IVNode, Fragment, FuncProxy,
-    PromiseProxy, IComponentClass, FuncCompType
+    PromiseProxy, IComponentClass, FuncCompType, IClassCompVN
 } from "../api/mim"
 import {
     VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN,
@@ -43,10 +43,10 @@ let s_currentTick: number = 0;
 // every time we recurse into sub-nodes and restored when we return back to the node. If
 // during creation or updating process an exception is thrown and is caught by some upper
 // level node, this value will still point at the node that caused the exception.
-export let s_currentVN: VN = null;
+let s_currentVN: VN = null;
 
 // Class-based component whose rendering tree is currently being processed.
-export let s_currentClassComp: IComponent = null;
+let s_currentClassComp: IComponent = null;
 
 
 
@@ -284,14 +284,6 @@ function onScheduledFrame(): void
 // Reconciler main entrance point
 function performMimbleTick(): void
 {
-    // we can be invoked after callbacks and we might not have anything to do.
-    if (s_callsScheduledBeforeUpdate.size === 0 &&
-        s_vnsScheduledForUpdate.size === 0 &&
-        s_callsScheduledAfterUpdate.size === 0)
-    {
-        return;
-    }
-
     // clear a scheduled frame (if any). This can happen if we were invoked from the callback
     // wrapper while a frame has been previously scheduled.
     if (s_scheduledFrameHandle !== 0)
@@ -299,18 +291,6 @@ function performMimbleTick(): void
 		cancelAnimationFrame( s_scheduledFrameHandle);
         s_scheduledFrameHandle = 0;
     }
-
-	// increment tick number.
-	s_currentTick++;
-
-    /// #if USE_STATS
-        let statsAlreadyExisted = DetailedStats.stats != null;
-        if (!statsAlreadyExisted)
-        {
-            DetailedStats.stats = new DetailedStats( `Mimbl tick ${s_currentTick}: `);
-            DetailedStats.stats.start();
-        }
-    /// #endif
 
 	// call functions scheduled to be invoked before updating components. If this function
 	// calls the requestUpdate method or schedules a function to be invoked after updates,
@@ -326,12 +306,32 @@ function performMimbleTick(): void
 
 	if (s_vnsScheduledForUpdate.size > 0)
 	{
+        // increment tick number.
+        s_currentTick++;
+
+        /// #if USE_STATS
+            let statsAlreadyExisted = DetailedStats.stats != null;
+            if (!statsAlreadyExisted)
+            {
+                DetailedStats.stats = new DetailedStats( `Mimbl tick ${s_currentTick}: `);
+                DetailedStats.stats.start();
+            }
+        /// #endif
+
 		// remember the internal set of nodes and re-create it so that it is ready for new
 		// update requests. Arrange scheduled nodes by their nesting depths and perform updates.
 		s_schedulerState = SchedulerState.Update;
 		let vnsScheduledForUpdate = s_vnsScheduledForUpdate;
 		s_vnsScheduledForUpdate = new Set<VN>();
 		performUpdate( vnsScheduledForUpdate);
+
+        /// #if USE_STATS
+            if (DetailedStats.stats && !statsAlreadyExisted)
+            {
+                DetailedStats.stats.stop( true);
+                DetailedStats.stats = null;
+            }
+        /// #endif
 	}
 
 	// call functions scheduled to be invoked after updating components
@@ -342,14 +342,6 @@ function performMimbleTick(): void
 		s_callsScheduledAfterUpdate = new Map<ScheduledFuncType,ScheduledFuncType>();
 		callScheduledFunctions( callsScheduledAfterUpdate, false);
 	}
-
-    /// #if USE_STATS
-        if (!statsAlreadyExisted && DetailedStats.stats)
-        {
-            DetailedStats.stats.stop( true);
-            DetailedStats.stats = null;
-        }
-    /// #endif
 
 	s_schedulerState = SchedulerState.Idle;
 };
@@ -446,7 +438,7 @@ function callScheduledFunctions( funcs: Map<ScheduledFuncType,ScheduledFuncType>
 
 // Recursively creates and renders this node and its sub-nodes. This method is invoked
 // when a node is first mounted. If an exception is thrown during the execution of this
-// method (which can be only from components' setSite or render methods),
+// method (which can be only from components' willMount or render methods),
 // the component is asked to handle the error. If the component handles the error, the
 // content returned from the error handling method is rendered; otherwise, the exception
 // is re-thrown. Thus, the exception is propagated up until it is handled by a node that
@@ -457,7 +449,19 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
     vn.parent = parent;
     vn.depth = parent ? parent.depth + 1 : 0;
     vn.creator = s_currentClassComp;
+
+    // if the node is already mounted, increment its reference count and move into the new
+    // position
+    if (vn.anchorDN)
+    {
+        vn.mountRefCount++;
+        vn.anchorDN = anchorDN;
+        moveNode( vn, anchorDN, beforeDN);
+        return;
+    }
+
 	vn.anchorDN = anchorDN;
+    vn.mountRefCount = 1;
 
     // call init() if the node implements it
     let fn: Function = vn.init;
@@ -554,14 +558,17 @@ function mountSubNodes( parentVN: VN, vns: VN[], anchorDN: DN, beforeDN: DN)
 // Recursively removes DOM nodes corresponding to this VN and its sub-nodes.
 function unmountNode( vn: VN, removeOwnNode: boolean)
 {
+    if (vn.mountRefCount && --vn.mountRefCount > 0)
+        return;
+
 	// get the DOM node before we call unmount, because unmount will clear it.
 	let ownDN = vn.ownDN;
 
     if (vn.subNodes)
 	{
         // DOM nodes of sub-nodes don't need to be removed if either the upper DOM node has
-        // already been removed or our own DOM node is going to be removed (true is only passed
-        // further if our parameter was true and we don't have own DN).
+        // already been removed or our own DOM node is removed (true is only passed further if
+        // our parameter was true and we don't have own DN).
 		for( let svn of vn.subNodes)
 			unmountNode( svn, removeOwnNode && !ownDN);
     }
@@ -577,14 +584,14 @@ function unmountNode( vn: VN, removeOwnNode: boolean)
     }
 
     // If the virtual node has its own DOM node, remove it from the DOM tree unless the
-    // removeOwnNode parameter is false, which means this node will be removed when the upper
+    // removeOwnNode parameter is false, which means this node is removed when the upper
     // node is removed.
     if (ownDN && removeOwnNode)
         (ownDN as any as ChildNode).remove();
 
     // mark the node as unmounted
-	// vn.term();
-    vn.ownDN = null;
+    // fn = vn.term;
+    // fn && fn.call(vn);
 	vn.anchorDN = null;
 }
 
@@ -602,7 +609,9 @@ function updateNode( disp: VNDisp): void
 	if (!vn.anchorDN)
 		return;
 
-	// keep track of the node that is being currently processed.
+    // keep track of the node that is being currently processed.
+    if (s_currentClassComp)
+        vn.creator = s_currentClassComp;
 	let prevVN = trackCurrentVN(vn);
 
     // we call the render method without try/catch. If it throws, the control goes to either the
@@ -722,16 +731,8 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
         parentVN.subNodes[i] = svn;
 
 		if (disp.action === VNDispAction.Insert)
-		{
-			// since we already destroyed old nodes designated to be replaced, the code is
-			// identical for Replace and Insert actions
 			mountNode( newVN, parentVN, anchorDN, beforeDN);
-
-            // if the virtual node defines a DOM node, it becomes the DOM node before which
-            // next components should be inserted/moved
-            beforeDN = getFirstDN( newVN) || beforeDN;
-        }
-		else    // if (disp.action === VNDispAction.Update)
+		else // if (disp.action === VNDispAction.Update)
 		{
 			if (oldVN !== newVN)
 			{
@@ -747,42 +748,40 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 			}
 
             // determine whether all the nodes under this VN should be moved.
-            if (i === oldVN.index)
-            {
-                // if the virtual node defines a DOM node, it becomes the DOM node before which
-                // next components should be inserted/moved
-                beforeDN = getFirstDN( oldVN) || beforeDN;
-            }
-            else
-            {
-                let subNodeDNs = getImmediateDNs( oldVN);
-                if (subNodeDNs.length > 0)
-                {
-                    // check whether the last of the DOM nodes already resides right before the needed node
-                    if (subNodeDNs[subNodeDNs.length - 1].nextSibling !== beforeDN)
-                    {
-                        for( let subNodeDN of subNodeDNs)
-                        {
-                            anchorDN.insertBefore( subNodeDN, beforeDN);
-
-                            /// #if USE_STATS
-                                DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Moved);
-                            /// #endif
-                        }
-
-                        /// #if USE_STATS
-                            DetailedStats.stats.log( oldVN.statsCategory, StatsAction.Moved);
-                        /// #endif
-                    }
-
-                    // the first of DOM nodes become the next beforeDN
-                    beforeDN = subNodeDNs[0];
-                }
-            }
+            if (i !== oldVN.index)
+                moveNode( oldVN, anchorDN, beforeDN);
 		}
+
+        // if the virtual node defines a DOM node, it becomes the DOM node before which
+        // next components should be inserted/moved
+        beforeDN = getFirstDN( svn) || beforeDN;
 
         svn.index = i;
 	}
+}
+
+
+
+// Moves the given virtual node  so that all its immediate DNs reside before the given DN.
+function moveNode( vn: VN, anchorDN: DN, beforeDN: DN): void
+{
+    // check whether the last of the DOM nodes already resides right before the needed node
+    let immediateDNs = getImmediateDNs( vn);
+    if (immediateDNs.length === 0 || immediateDNs[immediateDNs.length - 1].nextSibling === beforeDN)
+        return;
+
+    for( let immediateDN of immediateDNs)
+    {
+        anchorDN.insertBefore( immediateDN, beforeDN);
+
+        /// #if USE_STATS
+            DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Moved);
+        /// #endif
+    }
+
+    /// #if USE_STATS
+        DetailedStats.stats.log( vn.statsCategory, StatsAction.Moved);
+    /// #endif
 }
 
 
@@ -1326,7 +1325,7 @@ function getImmediateDNs( vn: VN): DN[]
 
 
 
-// Collects all DOM nodes that are immediate children of this virtual node (that is,
+// Collects all DOM nodes that are the immediate children of this virtual node (that is,
 // are NOT children of sub-nodes that have their own DOM node) into the given array.
 function collectImmediateDNs( vn: VN, arr: DN[]): void
 {
