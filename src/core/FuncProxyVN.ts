@@ -83,7 +83,7 @@ export class FuncProxyVN extends VN
         // establish watcher if requested using the @watcher decorator
         let func = this.func as RenderMethodType;
         if (func[symRenderWatcher])
-            this.actFunc = this.funcWatcher = createWatcher( func, this.updateFromWatcher, this.funcThisArg, this);
+            this.actFunc = this.funcWatcher = createWatcher( func, this.requestUpdate, this.funcThisArg, this);
         else
             this.actFunc = func.bind( this.funcThisArg);
 
@@ -160,15 +160,6 @@ export class FuncProxyVN extends VN
             this.mount();
             return true;
         }
-	}
-
-
-
-    // This method is invoked when a value of some trigger object being watched by the function
-    // is changed.
-    private updateFromWatcher(): void
-	{
-		this.requestUpdate();
 	}
 
 

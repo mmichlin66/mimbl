@@ -427,23 +427,39 @@ function callScheduledFunctions( funcs: Map<ScheduledFuncType,ScheduledFuncType>
 // content returned from the error handling method is rendered; otherwise, the exception
 // is re-thrown. Thus, the exception is propagated up until it is handled by a node that
 // handles it or up to the root node.
-function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
+function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
 {
-	// initialize the node
-    vn.parent = parent;
-
-    // if the node is already mounted, increment its reference count and move into the new
-    // position
+    // if the node is already mounted, call its clone method if implemented.
     if (vn.anchorDN)
     {
-        vn.mountRefCount++;
-        vn.anchorDN = anchorDN;
-        moveNode( vn, anchorDN, beforeDN);
-        return;
+        let clone = vn;
+        let fn = vn.clone;
+        if (fn)
+            clone = fn.call(vn);
+
+        if (clone === vn)
+        {
+            // if the clone method is not implemented or if it returns the same node, we move the
+            // node into the new position and indicate that we will not need to call unmount.
+            vn.ignoreUnmount = true;
+            vn.parent = parent;
+            vn.anchorDN = anchorDN;
+            moveNode( vn, anchorDN, beforeDN);
+            return vn;
+        }
+        else
+        {
+            // if the clone method returns a new node, we replace the old node in the parent's
+            // list of subnodes. Then we proceed with the mounting. We know that parent exists
+            // because this method is not called on the RootVN.
+            vn.parent.subNodes[vn.index] = clone;
+            vn = clone;
+        }
     }
 
+	// initialize the node
+    vn.parent = parent;
 	vn.anchorDN = anchorDN;
-    vn.mountRefCount = 1;
 
     // call init() if the node implements it
     let fn: Function = vn.init;
@@ -517,6 +533,8 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
     fn = vn.didMount;
     if (fn)
         fn.call(vn);
+
+    return vn;
 }
 
 
@@ -537,20 +555,14 @@ function mountSubNodes( parentVN: VN, vns: VN[], anchorDN: DN, beforeDN: DN)
 // Recursively removes DOM nodes corresponding to this VN and its sub-nodes.
 function unmountNode( vn: VN, removeOwnNode: boolean)
 {
-    if (vn.mountRefCount && --vn.mountRefCount > 0)
+    if (vn.ignoreUnmount)
+    {
+        vn.ignoreUnmount = false;
         return;
+    }
 
 	// get the DOM node before we call unmount, because unmount will clear it.
 	let ownDN = vn.ownDN;
-
-    if (vn.subNodes)
-	{
-        // DOM nodes of sub-nodes don't need to be removed if either the upper DOM node has
-        // already been removed or our own DOM node is removed (true is only passed further if
-        // our parameter was true and we don't have own DN).
-		for( let svn of vn.subNodes)
-			unmountNode( svn, removeOwnNode && !ownDN);
-    }
 
     // call unmount on our node - regardless whether it has its own DN or not
     let fn: Function = vn.unmount;
@@ -568,8 +580,21 @@ function unmountNode( vn: VN, removeOwnNode: boolean)
     if (ownDN && removeOwnNode)
         (ownDN as any as ChildNode).remove();
 
+    if (vn.subNodes)
+	{
+        // DOM nodes of sub-nodes don't need to be removed if either the upper DOM node has
+        // already been removed or our own DOM node is removed (true is only passed further if
+        // our parameter was true and we don't have own DN).
+		for( let svn of vn.subNodes)
+            unmountNode( svn, removeOwnNode && !ownDN);
+
+        vn.subNodes = null;
+    }
+
     // mark the node as unmounted
 	vn.anchorDN = null;
+    vn.parent = null;
+    vn.ownDN = null;
 }
 
 
@@ -751,15 +776,20 @@ function processNode( parentVN: VN, disp: VNDisp, index: number, anchorDN: DN, b
     let newVN = disp.newVN;
     let oldVN = disp.oldVN;
 
-    // for the Update operation, the new node becomes a sub-node; for the Insert operation
+    // for the Update operation, the old node becomes a sub-node; for the Insert operation
     // the new node become a sub-node.
-    let svn = disp.action === VNDispAction.Update ? oldVN : newVN;
-    parentVN.subNodes[index] = svn;
-
+    let svn: VN;
     if (disp.action === VNDispAction.Insert)
-        mountNode( newVN, parentVN, anchorDN, beforeDN);
+    {
+        parentVN.subNodes[index] = newVN;
+
+        // we must assign the index before calling mountNode because it may use it
+        newVN.index = index;
+        svn = mountNode( newVN, parentVN, anchorDN, beforeDN);
+    }
     else // if (disp.action === VNDispAction.Update)
     {
+        svn = parentVN.subNodes[index] = oldVN;
         if (oldVN !== newVN)
         {
             /// #if VERBOSE_NODE
@@ -774,9 +804,12 @@ function processNode( parentVN: VN, disp: VNDisp, index: number, anchorDN: DN, b
         // determine whether all the nodes under this VN should be moved.
         if (moveIfNeeded && index !== oldVN.index)
             moveNode( oldVN, anchorDN, beforeDN);
+
+        // we must assign the new index after the comparison above because otherwise the
+        // comparison will not work
+        svn.index = index;
     }
 
-    svn.index = index;
 
     // if the virtual node defines a DOM node, it becomes the DOM node before which
     // next components should be inserted/moved
@@ -1363,6 +1396,16 @@ function getVNPath( vn: VN): string[]
 
 
 
+// Creates an array of virtual nodes from the given content. Calls the createNodesFromContent and
+// if it returns a single node, wraps it in an array.
+function createVNChainFromContent( content: any): VN[] | null
+{
+    let retVal = createNodesFromContent( content);
+    return !retVal ? null : Array.isArray(retVal) ? retVal : [retVal];
+}
+
+
+
 // Creates either a single virtual node or an array of virtual nodes from the given content.
 // For all types of contents other than an array, the returned value is a single VN. If the input
 // content is an array, then a VN is created for each of the array elements. Since array elements
@@ -1445,16 +1488,6 @@ function createNodesFromContent( content: any, nodes?: VN[]): VN | VN[] | null
             return vn;
         }
     }
-}
-
-
-
-// Creates an array of virtual nodes from the given content. Calls the createNodesFromContent and
-// if it returns a single node, wraps it in an array.
-function createVNChainFromContent( content: any): VN[] | null
-{
-    let retVal = createNodesFromContent( content);
-    return !retVal ? null : Array.isArray(retVal) ? retVal : [retVal];
 }
 
 

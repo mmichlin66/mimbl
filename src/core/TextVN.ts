@@ -44,10 +44,13 @@ export class TextVN extends VN implements ITextVN
 	/**
      * Requests update of the text.
      */
-    requestTextUpdate( text: string): void
+    setText( text: string): void
     {
-        this.textToUpdate = text;
-        this.requestPartialUpdate();
+        if (text !== this.text)
+        {
+            this.text = text;
+            this.requestPartialUpdate();
+        }
     }
 
 
@@ -100,21 +103,12 @@ export class TextVN extends VN implements ITextVN
     // element properties that can be updated without re-rendering its children.
     public performPartialUpdate(): void
     {
-        if (this.text !== this.textToUpdate)
-        {
-            this.ownDN.nodeValue = this.text = this.textToUpdate;
-            this.textToUpdate = undefined;
+        this.ownDN.nodeValue = this.text;
 
-            /// #if USE_STATS
-                DetailedStats.stats.log( StatsCategory.Text, StatsAction.Updated);
-            /// #endif
-        }
+        /// #if USE_STATS
+            DetailedStats.stats.log( StatsCategory.Text, StatsAction.Updated);
+        /// #endif
     }
-
-
-
-    // Text to update the node using the partial update mechanism
-    private textToUpdate: string;
 }
 
 

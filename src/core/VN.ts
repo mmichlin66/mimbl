@@ -92,7 +92,7 @@ export abstract class VN implements IVNode
     // returns the same node (instead of creating a new one), the node can increment this
     // reference count. When such node is unmounted, the sub-nodes will only unmounted if the
     // reference count is 0 (or undefined).
-	public mountRefCount?: number;
+	public ignoreUnmount?: boolean;
 
 
 
@@ -112,11 +112,11 @@ export abstract class VN implements IVNode
     // corresponding to this virtual node.
 	public mount?(): void;
 
-    // // Creates a virtual node as a "clone" of this one. This method is invoked when an already
-    // // mounted node is returned during rendering. The method can either create a new virtual
-    // // node or it can mark the node in a special way and return the same instance. If this method
-    // // is not implemented, the same instance will be used.
-	// public clone?(): VN;
+    // Creates a virtual node as a "clone" of this one. This method is invoked when an already
+    // mounted node is returned during rendering. The method can either create a new virtual
+    // node or it can mark the node in a special way and return the same instance. If this method
+    // is not implemented, the same instance will be used.
+	public clone?(): VN;
 
 	// Returns content that comprises the children of the node. If the node doesn't have
 	// sub-nodes, null should be returned. If this method is not implemented that means the node

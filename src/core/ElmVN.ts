@@ -74,7 +74,7 @@ export class ElmVN extends VN implements IElmVN
 	/**
      * Requests update of the element properties without re-rendering of its children.
      */
-    requestPropsUpdate( props: IElementProps): void
+    setProps( props: IElementProps): void
     {
         if (!props)
         {
@@ -103,6 +103,17 @@ export class ElmVN extends VN implements IElmVN
 
 
 
+    // Creates a virtual node as a "clone" of this one. This method is invoked when an already
+    // mounted node is returned during rendering. The method can either create a new virtual
+    // node or it can mark the node in a special way and return the same instance. If this method
+    // is not implemented, the same instance will be used.
+    public clone(): VN
+    {
+        let newElmVN = new ElmVN( this.elmName, this.props, this.children);
+        newElmVN.clonedFrom = this;
+        return newElmVN;
+    }
+
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
@@ -112,10 +123,19 @@ export class ElmVN extends VN implements IElmVN
         // parents. That is OK as long as the node is "static"; that is, it doesn't have any
         // dynamic behavior and its properties and children remain the same. In this case, we
         // can clone the already created element.
-        if (this.ownDN)
+        let clone = this.clonedFrom;
+        if (clone && clone.ownDN)
         {
             // we don't clone the children (if any) because they will be cloned by our sub-nodes
-            this.ownDN = this.ownDN.cloneNode( false);
+            this.ownDN = clone.ownDN.cloneNode( false);
+
+            // copy information about attributes and events
+            this.attrs = clone.attrs;
+            this.events = clone.events;
+            this.customAttrs = clone.customAttrs;
+
+            // forget the fact that we were cloned
+            this.clonedFrom = null;
         }
         else
         {
@@ -141,26 +161,26 @@ export class ElmVN extends VN implements IElmVN
 
             // translate properties into attributes, events and custom attributes
             if (this.props)
+            {
                 this.parseProps( this.props);
+                if (this.attrs)
+                    this.addAttrs();
+            }
         }
 
-        if (this.props)
-        {
-            if (this.attrs)
-                this.addAttrs();
+        // note that if we were cloned we don't need to add attributes and if were not cloned we
+        // already added them. Now add events, custom attributes and refs.
+        if (this.events)
+            this.addEvents();
 
-            if (this.events)
-                this.addEvents();
+        if (this.customAttrs)
+            this.addCustomAttrs();
 
-            if (this.customAttrs)
-                this.addCustomAttrs();
+        if (this.ref)
+            setRef( this.ref, this.ownDN);
 
-            if (this.ref)
-                setRef( this.ref, this.ownDN);
-
-            if (this.vnref)
-                this.vnref.vn = this;
-        }
+        if (this.vnref)
+            this.vnref.vn = this;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Added);
@@ -188,7 +208,6 @@ export class ElmVN extends VN implements IElmVN
 
 		// clean up
         this.children = null;
-        this.ownDN = null;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Deleted);

@@ -948,6 +948,9 @@ export interface IVNode
 	/** Gets node's parent. This is undefined for the top-level (root) nodes. */
 	readonly parent?: IVNode;
 
+	/** Level of nesting at which the node resides relative to the root node. */
+	readonly depth?: number;
+
 	/** Component that created this node in its render method (or undefined). */
 	readonly creator?: IComponent;
 
@@ -1126,7 +1129,7 @@ export interface IElmVN<T extends Element = Element> extends IVNode
 	/**
      * Requests update of the element properties without re-rendering of its children.
      */
-	requestPropsUpdate( props: IElementProps<T>): void;
+	setProps( props: IElementProps<T>): void;
 }
 
 
@@ -1145,7 +1148,7 @@ export interface ITextVN extends IVNode
 	/**
      * Requests update of the text.
      */
-	requestTextUpdate( text: string): void;
+	setText( text: string): void;
 }
 
 
