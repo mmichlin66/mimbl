@@ -359,7 +359,7 @@ function performUpdate( vnsScheduledForUpdate: Set<VN>): void
     for( let index in vnsByDepth)
 	{
         let vns = vnsByDepth[index];
-        for( let vn of vns)
+        vns.forEach( vn =>
         {
             try
             {
@@ -377,11 +377,11 @@ function performUpdate( vnsScheduledForUpdate: Set<VN>): void
                     vn.updateRequested = false;
 
                     // if the component was already updated in this cycle, don't update it again
-                    if (vn.lastUpdateTick === s_currentTick)
-                        continue;
-
+                    if (vn.lastUpdateTick !== s_currentTick)
+                    {
                         s_currentVN = vn;
                         updateNodeChildren( {oldVN: vn});
+                    }
                 }
             }
             catch( err)
@@ -396,7 +396,7 @@ function performUpdate( vnsScheduledForUpdate: Set<VN>): void
             }
 
             s_currentVN = null;
-        }
+        });
 	}
 }
 
@@ -542,12 +542,11 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
 // Recursively creates DOM nodes for the sub-nodes of the given VN.
 function mountSubNodes( parentVN: VN, vns: VN[], anchorDN: DN, beforeDN: DN)
 {
-    let index = 0;
-    for( let vn of vns)
+    vns.forEach( (vn, i) =>
     {
-        vn.index = index++;
+        vn.index = i;
         mountNode( vn, parentVN, anchorDN, beforeDN);
-    }
+    });
 }
 
 
@@ -643,8 +642,7 @@ function updateNodeChildren( disp: VNDisp): void
 		// for( let svn of disp.subNodesToRemove)
 		// 	unmountNode( svn, !removeAll);
 
-		for( let svn of disp.subNodesToRemove)
-			unmountNode( svn, true);
+		disp.subNodesToRemove.forEach( svn => { unmountNode( svn, true) });
 	}
 
     if (!subNodes)
@@ -1107,14 +1105,14 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
     let oldKeyedMap = new Map<any,VN>();
     let oldUnkeyedList: VN[] = [];
     let key: any;
-    for( let oldVN of oldChain)
+    oldChain.forEach( oldVN =>
     {
         key = oldVN.key;
         if (key != null && !oldKeyedMap.has( key))
             oldKeyedMap.set( key, oldVN);
         else
             oldUnkeyedList.push( oldVN);
-    }
+    });
 
     // remember the length of the unkeyed list;
     let oldUnkeyedListLength = oldUnkeyedList.length;
@@ -1128,7 +1126,7 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
     let subDisp: VNDisp;
     let hasUpdates = false;
     let oldVN: VN;
-    for( let newVN of newChain)
+    newChain.forEach( newVN =>
     {
         // try to look up the old node by the new node's key if exists
         key = newVN.key;
@@ -1171,7 +1169,7 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
         }
 
         disp.subNodeDisps[subNodeIndex++] = subDisp;
-    }
+    });
 
     // old nodes remaining in the keyed map and in the unkeyed list will be removed
     if (oldKeyedMap.size > 0 || oldUnkeyedListIndex < oldUnkeyedListLength)
