@@ -63,7 +63,7 @@ export abstract class VN implements IVNode
 	 * Update strategy object that determines different aspects of node behavior
 	 * during updates.
 	 */
-	public updateStrategy: UpdateStrategy;
+	public updateStrategy?: UpdateStrategy;
 
 	// Returns DOM node corresponding to the virtual node itself (if any) and not to any of its
 	// sub-nodes.
@@ -102,11 +102,6 @@ export abstract class VN implements IVNode
 	//
 	///////////////////////////////////////////////////////////////////////////////////////////////
 
-    // Initializes internal stuctures of the virtual node before it is mounted. This method is used
-    // to let the node know that it is going to be mounted; however, the node doesn't need to
-    // create any DOM elements yet. This will be done during the mount() method.
-	public init?(): void;
-
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
@@ -122,10 +117,6 @@ export abstract class VN implements IVNode
 	// sub-nodes, null should be returned. If this method is not implemented that means the node
 	// never has children - for example text nodes.
 	public render?(): any;
-
-    // Notifies the virtual node that it was successfully mounted. This method is called after the
-    // content of node and all its sub-nodes is added to the DOM tree.
-	public didMount?(): void;
 
     // Clears internal structures of the virtual node. For nodes that have their own DOM nodes,
     // should only release the internally held reference to the DOM node - the actual removal of

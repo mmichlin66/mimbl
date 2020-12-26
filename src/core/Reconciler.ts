@@ -121,8 +121,6 @@ function CallbackWrapper(): any
 	// remember the current VN and set the current VN to be the VN from the "this" value. Note
 	// that this can be undefined if the wrapping was created without the VN context.
     let vn: VN = this;
-    let prevVN = s_currentVN;
-    s_currentVN = vn;
 
     let retVal: any;
     let [thisOrgCallback, orgCallback, dontDoMimblTick, ...rest] = arguments;
@@ -144,9 +142,6 @@ function CallbackWrapper(): any
 	{
         exitMutationScope();
         s_insideCallbackWrapper = false;
-
-        // restore previous current VN
-        s_currentVN = prevVN;
     }
 
     // If requested, schedule to perform Mimble tick at the end of the event loop.
@@ -461,14 +456,10 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
     vn.parent = parent;
 	vn.anchorDN = anchorDN;
 
-    // call init() if the node implements it
-    let fn: Function = vn.init;
-    fn && fn.call(vn);
-
 	/// #if VERBOSE_NODE
 		console.debug( `Calling mount() on node ${vn.name}`);
 	/// #endif
-    fn = vn.mount;
+    let fn = vn.mount;
 	fn && fn.call(vn);
 	let ownDN = vn.ownDN;
 
@@ -481,8 +472,8 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
         s_currentVN = vn;
 
         // we call the render method without try/catch
-        let subNodes = createVNChainFromContent( fn.call(vn));
-        if (subNodes)
+        vn.subNodes = createVNChainFromContent( fn.call(vn));
+        if (vn.subNodes)
         {
             // determine what nodes to use as anchor and "before" for the sub-nodes
             let newAnchorDN = ownDN ? ownDN : anchorDN;
@@ -492,12 +483,12 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
             // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
             // either the ancestor node that knows to handle errors or to the Mimbl tick loop.
             if (!vn.supportsErrorHandling)
-                mountSubNodes( vn, subNodes, newAnchorDN, newBeforeDN);
+                vn.subNodes.forEach( (svn, i) => { vn.index = i; mountNode( svn, vn, newAnchorDN, newBeforeDN); });
             else
             {
                 try
                 {
-                    mountSubNodes( vn, subNodes, newAnchorDN, newBeforeDN);
+                    vn.subNodes.forEach( (svn, i) => { vn.index = i; mountNode( svn, vn, newAnchorDN, newBeforeDN); });
                 }
                 catch( err)
                 {
@@ -509,14 +500,12 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
                     // content but we do it without try/catch this time; otherwise, we may end
                     // up in an infinite loop
                     vn.handleError( err, getVNPath( s_currentVN));
-                    subNodes = createVNChainFromContent( fn.call(vn));
-                    if (subNodes)
-                        mountSubNodes( vn, subNodes, newAnchorDN, newBeforeDN)
+                    vn.subNodes = createVNChainFromContent( fn.call(vn));
+                    if (vn.subNodes)
+                        vn.subNodes.forEach( (svn, i) => { vn.index = i; mountNode( svn, vn, newAnchorDN, newBeforeDN); });
                 }
             }
         }
-
-        vn.subNodes = subNodes;
 
         // restore pointer to the previous current node.
         s_currentVN = prevVN;
@@ -524,29 +513,13 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
 
 	// if we have our own DOM node, add it under the anchor node
 	if (ownDN)
-		vn.anchorDN.insertBefore( ownDN, beforeDN);
+		anchorDN.insertBefore( ownDN, beforeDN);
 
 	/// #if VERBOSE_NODE
 		console.debug( `Calling didMount() on node ${vn.name}`);
 	/// #endif
 
-    fn = vn.didMount;
-    if (fn)
-        fn.call(vn);
-
     return vn;
-}
-
-
-
-// Recursively creates DOM nodes for the sub-nodes of the given VN.
-function mountSubNodes( parentVN: VN, vns: VN[], anchorDN: DN, beforeDN: DN)
-{
-    vns.forEach( (vn, i) =>
-    {
-        vn.index = i;
-        mountNode( vn, parentVN, anchorDN, beforeDN);
-    });
 }
 
 
@@ -703,18 +676,13 @@ function updateNodeChildren( disp: VNDisp): void
 function updateSubNodes( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
 {
 	// re-create our current list of sub-nodes - we will populate it while updating them
-	parentVN.subNodes = disps ? new Array<VN>(disps.length) : undefined;
+	parentVN.subNodes = new Array<VN>(disps.length);
 
 	// perform updates and inserts by either groups or individual nodes.
     if (groups)
-    {
 		updateSubNodesByGroups( parentVN, disps, groups, anchorDN, beforeDN);
-        arrangeGroups( disps, groups, anchorDN, beforeDN);
-    }
-	else if (disps)
-	{
+	else
 		updateSubNodesByNodes( parentVN, disps, anchorDN, beforeDN);
-	}
 }
 
 
@@ -726,9 +694,7 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 	// node what node to use to insert or move it before. We go from the end of the list of
 	// new nodes and on each iteration we decide the value of the "beforeDN".
 	for( let i = disps.length - 1; i >= 0; i--)
-	{
         beforeDN = processNode( parentVN, disps[i], i, anchorDN, beforeDN, true);
-	}
 }
 
 
@@ -737,16 +703,15 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 // and on each iteration we decide the value of the "beforeDN".
 function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
 {
-	let currSubNodeIndex = disps.length - 1;
+    let currSubNodeIndex = disps.length - 1;
+    let currBeforeDN = beforeDN;
 	for( let i = groups.length - 1; i >= 0; i--)
 	{
 		let group = groups[i];
 
 		// first update every sub-node in the group and its sub-sub-nodes
 		for( let j = group.last; j >= group.first; j--)
-		{
-            beforeDN = processNode( parentVN, disps[j], currSubNodeIndex--, anchorDN, beforeDN, false);
-		}
+            currBeforeDN = processNode( parentVN, disps[j], currSubNodeIndex--, anchorDN, currBeforeDN, false);
 
 		// now that all nodes in the group have been updated or inserted, we can determine
 		// first and last DNs for the group
@@ -754,7 +719,38 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 
 		// if the group has at least one DN, its first DN becomes the node before which the next
 		// group of new nodes (if any) should be inserted.
-		beforeDN = group.firstDN || beforeDN;
+		currBeforeDN = group.firstDN || beforeDN;
+	}
+
+    // Arrange the groups in order as in the new sub-node list, moving them if necessary.
+	// We go from the last group to the second group in the list because as soon as we moved all
+	// groups except the first one into their right places, the first group will be automatically
+	// in the right place. We always have two groups (i and i-1), which allows us to understand
+	// whether we need to swap them. If we do we move the shorter group.
+    currBeforeDN = beforeDN;
+	for( let i = groups.length - 1; i > 0; i--)
+	{
+		let group = groups[i];
+		let prevGroup = groups[i-1];
+
+		// determine whether the group should move. We take the last node from the group
+		// and compare its DN's next sibling to the current "beforeDN".
+		if (group.lastDN != null)
+		{
+			if (group.lastDN.nextSibling !== currBeforeDN)
+			{
+				// if the current group now resides before the previous group, then that means
+				// that we are swapping two groups. In this case we want to move the shorter one.
+				if (group.lastDN.nextSibling === prevGroup.firstDN && group.count > prevGroup.count)
+					moveGroup( disps, prevGroup, anchorDN, group.firstDN);
+				else
+					moveGroup( disps, group, anchorDN, currBeforeDN);
+			}
+
+			// the group's first DN becomes the new beforeDN. Note that firstDN cannot be null
+			// because lastDN is not null
+			currBeforeDN = group.firstDN;
+		}
 	}
 }
 
@@ -779,10 +775,13 @@ function processNode( parentVN: VN, disp: VNDisp, index: number, anchorDN: DN, b
     let svn: VN;
     if (disp.action === VNDispAction.Insert)
     {
+        // we must assign the index and put the node in the list of sub-nodes before calling
+        // mountNode because it may use this info if the node is cloned
+        newVN.index = index;
         parentVN.subNodes[index] = newVN;
 
-        // we must assign the index before calling mountNode because it may use it
-        newVN.index = index;
+        // if mountNode clones the node, it puts the new node into the list of sub-nodes
+        // and returns it; otherwise, it returns the original node.
         svn = mountNode( newVN, parentVN, anchorDN, beforeDN);
     }
     else // if (disp.action === VNDispAction.Update)
@@ -840,38 +839,38 @@ function moveNode( vn: VN, anchorDN: DN, beforeDN: DN): void
 
 
 
-// Arrange the groups in order as in the new sub-node list, moving them if necessary.
-function arrangeGroups( disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
-{
-	// We go from the last group to the second group in the list because as soon as we moved all
-	// groups except the first one into their right places, the first group will be automatically
-	// in the right place. We always have two groups (i and i-1), which allows us to understand
-	// whether we need to swap them. If we do we move the shorter group.
-	for( let i = groups.length - 1; i > 0; i--)
-	{
-		let group = groups[i];
-		let prevGroup = groups[i-1];
+// // Arrange the groups in order as in the new sub-node list, moving them if necessary.
+// function arrangeGroups( disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
+// {
+// 	// We go from the last group to the second group in the list because as soon as we moved all
+// 	// groups except the first one into their right places, the first group will be automatically
+// 	// in the right place. We always have two groups (i and i-1), which allows us to understand
+// 	// whether we need to swap them. If we do we move the shorter group.
+// 	for( let i = groups.length - 1; i > 0; i--)
+// 	{
+// 		let group = groups[i];
+// 		let prevGroup = groups[i-1];
 
-		// determine whether the group should move. We take the last node from the group
-		// and compare its DN's next sibling to the current "beforeDN".
-		if (group.lastDN != null)
-		{
-			if (group.lastDN.nextSibling !== beforeDN)
-			{
-				// if the current group now resides before the previous group, then that means
-				// that we are swapping two groups. In this case we want to move the shorter one.
-				if (group.lastDN.nextSibling === prevGroup.firstDN && group.count > prevGroup.count)
-					moveGroup( disps, prevGroup, anchorDN, group.firstDN);
-				else
-					moveGroup( disps, group, anchorDN, beforeDN);
-			}
+// 		// determine whether the group should move. We take the last node from the group
+// 		// and compare its DN's next sibling to the current "beforeDN".
+// 		if (group.lastDN != null)
+// 		{
+// 			if (group.lastDN.nextSibling !== beforeDN)
+// 			{
+// 				// if the current group now resides before the previous group, then that means
+// 				// that we are swapping two groups. In this case we want to move the shorter one.
+// 				if (group.lastDN.nextSibling === prevGroup.firstDN && group.count > prevGroup.count)
+// 					moveGroup( disps, prevGroup, anchorDN, group.firstDN);
+// 				else
+// 					moveGroup( disps, group, anchorDN, beforeDN);
+// 			}
 
-			// the group's first DN becomes the new beforeDN. Note that firstDN cannot be null
-			// because lastDN is not null
-			beforeDN = group.firstDN;
-		}
-	}
-}
+// 			// the group's first DN becomes the new beforeDN. Note that firstDN cannot be null
+// 			// because lastDN is not null
+// 			beforeDN = group.firstDN;
+// 		}
+// 	}
+// }
 
 
 
@@ -1064,10 +1063,9 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
     // determine whether recycling of non-matching old keyed sub-nodes by non-matching new
     // keyed sub-nodes is allowed. If update strategy is not defined for the node, the
     // recycling is allowed.
-    let allowKeyedNodeRecycling = true;
-    let updateStrategy = disp.oldVN ? disp.oldVN.updateStrategy : undefined;
-    if (updateStrategy && updateStrategy.allowKeyedNodeRecycling !== undefined)
-        allowKeyedNodeRecycling = updateStrategy.allowKeyedNodeRecycling;
+    let allowKeyedNodeRecycling = disp.oldVN.updateStrategy?.allowKeyedNodeRecycling;
+    if (allowKeyedNodeRecycling === undefined)
+        allowKeyedNodeRecycling = true;
 
     // process the special case with a single sub-node in both old and new chains just
     // to avoid creating temporary structures
@@ -1076,11 +1074,9 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
         let oldVN = oldChain[0]
         let newVN = newChain[0];
         let subDisp: VNDisp = { newVN };
-        if (!oldVN)
-            subDisp.action = VNDispAction.Insert;
-        else if (oldVN === newVN ||
+        if (oldVN === newVN ||
             ((allowKeyedNodeRecycling || newVN.key === oldVN.key) && oldVN.constructor === newVN.constructor &&
-                (oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN))))
+                (!oldVN.isUpdatePossible || oldVN.isUpdatePossible( newVN))))
         {
             // old node can be updated with information from the new node
             subDisp.action = VNDispAction.Update;
@@ -1414,101 +1410,79 @@ function createNodesFromContent( content: any, nodes?: VN[]): VN | VN[] | null
 	{
 		// the comparison above covers both null and undefined
 		return null;
-	}
-    else if (content instanceof VN)
-    {
-        if (nodes)
-            nodes.push( content);
+    }
 
-        return content;
+    let vn: VN;
+    if (content instanceof VN)
+    {
+        vn = content;
     }
     else if (typeof content === "string")
 	{
-        if (content.length === 0)
+        if (!content)
             return null;
 
-        let vn = new TextVN( content);
-        if (nodes)
-            nodes.push( vn);
-
-        return vn;
+        vn = new TextVN( content);
     }
 	else if (typeof content.render === "function")
 	{
 		// if the component (this can only be an Instance component) is already attached to VN,
 		// return this existing VN; otherwise create a new one.
-		let vn = (content as IComponent).vn
+		vn = (content as IComponent).vn
 						? (content as IComponent).vn as IVNode as VN
 						: new IndependentCompVN( content as IComponent);
-        if (nodes)
-            nodes.push( vn);
-
-        return vn;
 	}
-    else if (Array.isArray( content))
-    {
-        if (content.length === 0)
-            return null;
-
-        if (!nodes)
-            nodes = [];
-
-        createNodesFromArray( content, nodes);
-        return nodes;
-    }
 	else if (content instanceof Promise)
 	{
-		let vn = new PromiseProxyVN( { promise: content});
-        if (nodes)
-            nodes.push( vn);
-
-        return vn;
+		vn = new PromiseProxyVN( { promise: content});
 	}
 	else if (typeof content === "function")
 	{
-        let vn = new FuncProxyVN( content);
-        if (nodes)
-            nodes.push( vn);
-
-        return vn;
+        vn = new FuncProxyVN( content);
 	}
+    else if (Array.isArray( content))
+    {
+        return content.length === 0 ? null : createNodesFromArray( content, nodes);
+    }
     else
     {
         let s = content.toString();
-        if (s.length === 0)
+        if (!s)
             return null;
-        else
-        {
-            let vn = new TextVN( s);
-            if (nodes)
-                nodes.push( vn);
 
-            return vn;
-        }
+        vn = new TextVN( s);
     }
+
+    if (nodes)
+        nodes.push( vn);
+
+    return vn;
 }
 
 
 
 // Creates array of virtual nodes from the given array of items.
-function createNodesFromArray( arr: any[], nodes: VN[]): void
+function createNodesFromArray( arr: any[], nodes?: VN[]): VN[] | null
 {
     /// #if DEBUG
     if (arr.length === 0)
     {
         console.error("createNodesFromArray was called with empty array");
-        return;
+        return null;
     }
     /// #endif
 
-	for( let item of arr)
-		createNodesFromContent( item, nodes);
+    if (!nodes)
+        nodes = [];
+
+    arr.forEach( item => { createNodesFromContent( item, nodes); });
+    return nodes.length > 0 ? nodes : null;
 }
 
 
 
 // Creates a chain of virtual nodes from the data provided by the TypeScript's JSX parser.
-export function createNodesFromJSX( tag: any, props: any, children: any[]): VN | VN[]
+export function createNodesFromJSX( tag: any, props: any, children: any[]): VN | VN[] | null
 {
 	if (typeof tag === "string")
 		return new ElmVN( tag, props, children);
@@ -1517,11 +1491,7 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
         if (children.length === 0)
             return null;
         else
-        {
-            let nodes: VN[] = [];
-            createNodesFromArray( children, nodes);
-            return nodes;
-        }
+            return createNodesFromArray( children);
     }
 	else if (tag === FuncProxy)
 	{
@@ -1529,7 +1499,7 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
             if (!props || !props.func)
             {
                 console.error("FuncProxy component doesn't have 'func' property");
-                return undefined;
+                return null;
             }
         /// #endif
 
@@ -1538,7 +1508,7 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
 	else if (tag === PromiseProxy)
 	{
 		if (!props || !props.promise)
-			return undefined;
+			return null;
 
 		return new PromiseProxyVN( props, children);
 	}

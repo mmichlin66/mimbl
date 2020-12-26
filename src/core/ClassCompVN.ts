@@ -27,15 +27,15 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
 
-	/**
-	 * Retrieves update strategy object that determines different aspects of node behavior
-	 * during updates.
-	 */
-	public get updateStrategy(): UpdateStrategy
-	{
-        let fn = this.comp.getUpdateStrategy;
-		return fn ? fn.call(this) : undefined;
-	}
+	// /**
+	//  * Retrieves update strategy object that determines different aspects of node behavior
+	//  * during updates.
+	//  */
+	// public get updateStrategy(): UpdateStrategy
+	// {
+    //     let fn = this.comp.getUpdateStrategy;
+	// 	return fn ? fn.call(this) : undefined;
+	// }
 
 
 
@@ -55,6 +55,13 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
             this.actRender = this.renderWatcher = createWatcher( render, this.requestUpdate, this.comp, this);
         else
             this.actRender = render.bind( this.comp);
+
+        if (this.comp.handleError)
+            this.supportsErrorHandling = true;
+
+        let fn = this.comp.getUpdateStrategy;
+        if (fn)
+            this.updateStrategy = fn.call(this);
     }
 
 
@@ -99,36 +106,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 		/// #endif
 
         return this.actRender();
-	}
-
-
-
-    // Notifies the virtual node that it was successfully mounted. This method is called after the
-    // content of node and all its sub-nodes is added to the DOM tree.
-    public didMount(): void
-    {
-        let fn = this.comp.didMount;
-        if (fn)
-        {
-            // need try/catch but only to log
-            try
-            {
-                fn.call( this.comp);
-            }
-            catch( err)
-            {
-                console.error( `Exception in didMount of component '${this.name}'`, err);
-            }
-        }
-    }
-
-
-
-	// Determines whether the node supports handling of errors; that is, exception thrown during
-	// rendering of the node itself and/or its sub-nodes.
-	public get supportsErrorHandling(): boolean
-	{
-		return this.comp.handleError !== undefined;
 	}
 
 

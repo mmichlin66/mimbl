@@ -81,34 +81,26 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 
 
 
-    // Initializes internal stuctures of the virtual node before it is mounted. This method is used
-    // to let the node know that it it is going to be mounted; however, the node doesn't need to
-    // create any DOM elements yet. This will be done during the mount() method.
-    public init?(): void
+	// Initializes internal stuctures of the virtual node. This method is called right after the
+    // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
+    // corresponding to this virtual node.
+	public mount(): void
     {
 		// create component instance
-		this.comp = new this.compClass( this.props);
-    }
+        this.comp = new this.compClass( this.props);
 
-
-    // Creates internal stuctures of the virtual node so that it is ready to produce children.
-	// This method is called right after the node has been constructed.
-	public willMount(): void
-	{
-        super.willMount();
+        super.mount();
 
         // set the reference value if specified
 		if (this.ref)
 			setRef( this.ref, this.comp);
-	}
+    }
 
 
 
-	// This method is called before the content of node and all its sub-nodes is removed from the
-	// DOM tree.
-	// This method is part of the render phase.
-	public willUnmount(): void
-	{
+    // Releases reference to the DOM node corresponding to this virtual node.
+    public unmount(): void
+    {
 		// unset the reference value if specified. We check whether the reference still points
 		// to our component before setting it to undefined. If the same Ref object is used for
 		// more than one components (and/or elements) it can happen that the reference is changed
@@ -116,8 +108,10 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 		if (this.ref)
 			setRef( this.ref, undefined, this.comp);
 
-        super.willUnmount();
-	}
+        super.unmount();
+
+        this.comp = null;
+    }
 
 
 
@@ -174,10 +168,6 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 	}
 
 
-
-	// Node's key. The derived classes set it based on their respective content. A key
-	// can be of any type.
-	public key: any;
 
 	// Properties that were passed to the component.
 	private props: any;

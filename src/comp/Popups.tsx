@@ -875,18 +875,14 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
             this.optionalStyles?.dialogButton, this.defaultStyles.dialogButton);
 
         this.vn.publishService( "dialog", this);
-	}
 
-    /**
-     * If derived classes override this method, they must call super.didMount()
-     */
-	public didMount(): void
-	{
         if (this.options?.defaultButton != null)
         {
-            let info = this.buttons.get( this.options?.defaultButton);
-            if (info)
-                info.elm.focus();
+            this.callMeAfterUpdate( () =>
+            {
+                let info = this.buttons.get( this.options?.defaultButton);
+                info && info.elm.focus();
+            })
         }
 	}
 

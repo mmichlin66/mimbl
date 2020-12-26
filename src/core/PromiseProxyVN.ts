@@ -50,10 +50,6 @@ export class PromiseProxyVN extends VN
 	/// #endif
 	; // ugly trick to not let the TypeScript compiler to strip the #endif comment
 
-	// Node's key. The derived classes set it based on their respective content. A key
-	// can be of any type.
-	public key: any;
-
 
 
 	// String representation of the virtual node. This is used mostly for tracing and error

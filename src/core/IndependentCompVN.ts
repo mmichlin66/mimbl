@@ -45,11 +45,8 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
         // we are here if the component instances are different; we need to prepare the old
         // instance for unmounting and the new one for mounting.
         this.unmount();
-
         this.comp = this.key = newVN.comp;
-
         this.mount();
-        this.didMount();
 
         return true;
 	}

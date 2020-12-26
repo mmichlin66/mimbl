@@ -837,13 +837,6 @@ export class ElmVN extends VN implements IElmVN
 
 
 
-	// Node's key. The derived classes set it based on their respective content. A key
-	// can be of any type.
-	public key: any;
-
-	// Optional UpdateStrategy object defining different aspects of node behavior during updates.
-	public updateStrategy: UpdateStrategy;
-
 	// Properties that were passed to the element.
 	private props: any;
 

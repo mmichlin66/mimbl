@@ -152,10 +152,6 @@ export class FuncVN extends VN
 
 	// Properties that were passed to the component, function or element.
 	private props: any;
-
-	// Node's key. The derived classes set it based on their respective content. A key
-	// can be of any type.
-	public key: any;
 }
 
 
