@@ -22,7 +22,6 @@ export class RootVN extends VN implements IErrorHandlingService
 		super();
 
 		this.anchorDN = anchorDN;
-        this.depth = 0;
 	};
 
 

@@ -245,7 +245,7 @@ export class ElmVN extends VN implements IElmVN
                     this.vnref.vn = this;
             }
 
-            // remember the new value of the key, updateStartegy and creator property (even if the
+            // remember the new value of the key and updateStartegyproperties (even if the
             // values are the same)
             this.props = newVN.props;
             this.key = newVN.key;
@@ -257,7 +257,7 @@ export class ElmVN extends VN implements IElmVN
         }
 
 		// render method should be called if either old or new node has children
-		let shouldRender = this.children && this.children.length > 0 || newVN.children && newVN.children.length > 0;
+		let shouldRender = this.children.length > 0 || newVN.children.length > 0;
 
 		// remember the new children for the next render
 		this.children = newVN.children;

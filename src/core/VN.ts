@@ -41,17 +41,11 @@ export abstract class VN implements IVNode
 	// Parent node. This is null for the top-level (root) nodes.
 	public parent: VN;
 
-	/** Component that created this node in its render method (or undefined). */
-	public creator: IComponent;
-
 	/**
      * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the
      * root nodes that don't have parents.
      */
 	public index: number;
-
-	// Level of nesting at which the node resides relative to the root node.
-	public depth: number;
 
 	// DOM node under which all content of this virtual node is rendered.
 	public anchorDN: DN;
@@ -170,7 +164,31 @@ export abstract class VN implements IVNode
 
 
 
-	// Schedules an update for this node.
+    /** Component that created this node in its render method (or undefined). */
+    public get creator(): IComponent
+    {
+        for( let p = this.parent; p; p = p.parent)
+        {
+            if ((p as any).comp)
+                return (p as any).comp;
+        }
+
+        return null;
+    }
+
+	// Level of nesting at which the node resides relative to the root node.
+	public get depth(): number
+    {
+        let depth = 0;
+        for( let p = this.parent; p; p = p.parent)
+            depth++;
+
+        return depth;
+    }
+
+
+
+    // Schedules an update for this node.
 	public requestUpdate(): void
 	{
 		if (!this.updateRequested)

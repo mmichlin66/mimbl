@@ -45,25 +45,6 @@ let s_currentTick: number = 0;
 // level node, this value will still point at the node that caused the exception.
 let s_currentVN: VN = null;
 
-// Class-based component whose rendering tree is currently being processed.
-let s_currentClassComp: IComponent = null;
-
-
-
-/**
- * Sets the given node as the current and if the node is for the component, set the current
- * component. Returns the virtual node that was previously the current one. As we recurse over
- * virtual nodes and sub-nodes, we call this function to have the s_currentVN and
- * s_currentClassComp variables to point to the node and component being currently processed.
- */
-function trackCurrentVN( vn: VN): VN
-{
-    let prevVN = s_currentVN;
-    s_currentVN = vn;
-    s_currentClassComp = !vn ? null : (vn as any).comp || vn.creator;
-    return prevVN;
-}
-
 
 
 // State of the scheduler indicating in what phase of the update cycle we currently reside.
@@ -140,7 +121,8 @@ function CallbackWrapper(): any
 	// remember the current VN and set the current VN to be the VN from the "this" value. Note
 	// that this can be undefined if the wrapping was created without the VN context.
     let vn: VN = this;
-    let prevVN = trackCurrentVN( vn);
+    let prevVN = s_currentVN;
+    s_currentVN = vn;
 
     let retVal: any;
     let [thisOrgCallback, orgCallback, dontDoMimblTick, ...rest] = arguments;
@@ -164,7 +146,7 @@ function CallbackWrapper(): any
         s_insideCallbackWrapper = false;
 
         // restore previous current VN
-        trackCurrentVN( prevVN);
+        s_currentVN = prevVN;
     }
 
     // If requested, schedule to perform Mimble tick at the end of the event loop.
@@ -366,9 +348,10 @@ function performUpdate( vnsScheduledForUpdate: Set<VN>): void
         if (!vn.anchorDN)
             return;
 
-		let arr = vnsByDepth[vn.depth];
+        let depth = vn.depth;
+		let arr = vnsByDepth[depth];
 		if (!arr)
-			vnsByDepth[vn.depth] = [vn];
+			vnsByDepth[depth] = [vn];
         else
 		    arr.push(vn);
 	});
@@ -397,7 +380,8 @@ function performUpdate( vnsScheduledForUpdate: Set<VN>): void
                     if (vn.lastUpdateTick === s_currentTick)
                         continue;
 
-                    updateNode( {oldVN: vn});
+                        s_currentVN = vn;
+                        updateNodeChildren( {oldVN: vn});
                 }
             }
             catch( err)
@@ -411,7 +395,7 @@ function performUpdate( vnsScheduledForUpdate: Set<VN>): void
                     console.error( "BUG: updateNode threw exception but StdErrorHandling service was not found.", err);
             }
 
-            trackCurrentVN( null);
+            s_currentVN = null;
         }
 	}
 }
@@ -447,8 +431,6 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
 {
 	// initialize the node
     vn.parent = parent;
-    vn.depth = parent ? parent.depth + 1 : 0;
-    vn.creator = s_currentClassComp;
 
     // if the node is already mounted, increment its reference count and move into the new
     // position
@@ -467,12 +449,6 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
     let fn: Function = vn.init;
     fn && fn.call(vn);
 
-    // keep track of the node that is being currently processed.
-    let prevVN = trackCurrentVN(vn);
-    // let prevVN = s_currentVN;
-    // s_currentVN = vn;
-    // s_currentClassComp = (vn as any).comp || s_currentClassComp;
-
 	/// #if VERBOSE_NODE
 		console.debug( `Calling mount() on node ${vn.name}`);
 	/// #endif
@@ -484,6 +460,10 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
     fn = vn.render;
 	if (fn)
 	{
+        // keep track of the node that is being currently processed.
+        let prevVN = s_currentVN;
+        s_currentVN = vn;
+
         // we call the render method without try/catch
         let subNodes = createVNChainFromContent( fn.call(vn));
         if (subNodes)
@@ -521,6 +501,9 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
         }
 
         vn.subNodes = subNodes;
+
+        // restore pointer to the previous current node.
+        s_currentVN = prevVN;
 	}
 
 	// if we have our own DOM node, add it under the anchor node
@@ -534,10 +517,6 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): void
     fn = vn.didMount;
     if (fn)
         fn.call(vn);
-
-
-    // restore pointer to the previous current node.
-    trackCurrentVN( prevVN);
 }
 
 
@@ -590,8 +569,6 @@ function unmountNode( vn: VN, removeOwnNode: boolean)
         (ownDN as any as ChildNode).remove();
 
     // mark the node as unmounted
-    // fn = vn.term;
-    // fn && fn.call(vn);
 	vn.anchorDN = null;
 }
 
@@ -602,17 +579,24 @@ function unmountNode( vn: VN, removeOwnNode: boolean)
 // the parent node was updated.
 function updateNode( disp: VNDisp): void
 {
-	let vn = disp.oldVN;
-
-	// it might happen that the node being updated was already deleted by its parent. Check
-	// for this situation and exit if this is the case
-	if (!vn.anchorDN)
-		return;
-
     // keep track of the node that is being currently processed.
-    if (s_currentClassComp)
-        vn.creator = s_currentClassComp;
-	let prevVN = trackCurrentVN(vn);
+    let prevVN = s_currentVN;
+    s_currentVN = disp.oldVN;
+
+    updateNodeChildren( disp);
+
+	// restore pointer to the currently being processed node after processing its sub-nodes
+	s_currentVN = prevVN;
+}
+
+
+
+// Recursively renders this node and updates its sub-nodes if necessary. This method is
+// invoked when a node is being updated either as a result of updateMe invocation or because
+// the parent node was updated.
+function updateNodeChildren( disp: VNDisp): void
+{
+	let vn = disp.oldVN;
 
     // we call the render method without try/catch. If it throws, the control goes to either the
     // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
@@ -676,7 +660,9 @@ function updateNode( disp: VNDisp): void
                 vn.handleError( err, getVNPath( s_currentVN));
                 subNodes = createVNChainFromContent( vn.render());
                 buildSubNodeDispositions( disp, subNodes);
-                if (subNodes)
+                if (!subNodes)
+                    vn.subNodes = null;
+                else
                     updateSubNodes( vn, disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
             }
         }
@@ -685,9 +671,6 @@ function updateNode( disp: VNDisp): void
     // indicate that the node was updated in this cycle - this will prevent it from
     // rendering again in this cycle.
     vn.lastUpdateTick = s_currentTick;
-
-	// restore pointer to the currently being processed node after processing its sub-nodes
-	trackCurrentVN( prevVN);
 }
 
 
@@ -721,43 +704,83 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 	// new nodes and on each iteration we decide the value of the "beforeDN".
 	for( let i = disps.length - 1; i >= 0; i--)
 	{
-		let disp = disps[i];
-		let newVN = disp.newVN;
-		let oldVN = disp.oldVN;
+        beforeDN = processNode( parentVN, disps[i], i, anchorDN, beforeDN, true);
+	}
+}
 
-		// for the Update operation, the new node becomes a sub-node; for the Insert operation
-		// the new node become a sub-node.
-		let svn = disp.action === VNDispAction.Update ? oldVN : newVN;
-        parentVN.subNodes[i] = svn;
 
-		if (disp.action === VNDispAction.Insert)
-			mountNode( newVN, parentVN, anchorDN, beforeDN);
-		else // if (disp.action === VNDispAction.Update)
+
+// Performs updates and inserts by groups. We go from the end of the list of update groups
+// and on each iteration we decide the value of the "beforeDN".
+function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
+{
+	let currSubNodeIndex = disps.length - 1;
+	for( let i = groups.length - 1; i >= 0; i--)
+	{
+		let group = groups[i];
+
+		// first update every sub-node in the group and its sub-sub-nodes
+		for( let j = group.last; j >= group.first; j--)
 		{
-			if (oldVN !== newVN)
-			{
-                let fn = oldVN.update;
-                if (fn)
-                {
-                    /// #if VERBOSE_NODE
-                        console.debug( `Calling update() on node ${oldVN.name}`);
-                    /// #endif
-                    if (fn.call( oldVN, newVN))
-                        updateNode( disp);
-                }
-			}
-
-            // determine whether all the nodes under this VN should be moved.
-            if (i !== oldVN.index)
-                moveNode( oldVN, anchorDN, beforeDN);
+            beforeDN = processNode( parentVN, disps[j], currSubNodeIndex--, anchorDN, beforeDN, false);
 		}
 
-        // if the virtual node defines a DOM node, it becomes the DOM node before which
-        // next components should be inserted/moved
-        beforeDN = getFirstDN( svn) || beforeDN;
+		// now that all nodes in the group have been updated or inserted, we can determine
+		// first and last DNs for the group
+		group.determineDNs();
 
-        svn.index = i;
+		// if the group has at least one DN, its first DN becomes the node before which the next
+		// group of new nodes (if any) should be inserted.
+		beforeDN = group.firstDN || beforeDN;
 	}
+}
+
+
+
+/**
+ * Updates or inserts the node pointed to by the given VNDisp structure.
+ * @param parentVN
+ * @param disp
+ * @param index
+ * @param anchorDN
+ * @param beforeDN
+ * @returns The new "beforeDN" value, which is the first DOM node vehind this virtual node
+ */
+function processNode( parentVN: VN, disp: VNDisp, index: number, anchorDN: DN, beforeDN: DN, moveIfNeeded?: boolean): DN
+{
+    let newVN = disp.newVN;
+    let oldVN = disp.oldVN;
+
+    // for the Update operation, the new node becomes a sub-node; for the Insert operation
+    // the new node become a sub-node.
+    let svn = disp.action === VNDispAction.Update ? oldVN : newVN;
+    parentVN.subNodes[index] = svn;
+
+    if (disp.action === VNDispAction.Insert)
+        mountNode( newVN, parentVN, anchorDN, beforeDN);
+    else // if (disp.action === VNDispAction.Update)
+    {
+        if (oldVN !== newVN)
+        {
+            /// #if VERBOSE_NODE
+                console.debug( `Calling update() on node ${oldVN.name}`);
+            /// #endif
+
+            // update method must exists for nodes with action Update
+            if (oldVN.update( newVN))
+                updateNode( disp);
+        }
+
+        // determine whether all the nodes under this VN should be moved.
+        if (moveIfNeeded && index !== oldVN.index)
+            moveNode( oldVN, anchorDN, beforeDN);
+    }
+
+    svn.index = index;
+
+    // if the virtual node defines a DOM node, it becomes the DOM node before which
+    // next components should be inserted/moved
+    return getFirstDN( svn) || beforeDN;
 }
 
 
@@ -782,70 +805,6 @@ function moveNode( vn: VN, anchorDN: DN, beforeDN: DN): void
     /// #if USE_STATS
         DetailedStats.stats.log( vn.statsCategory, StatsAction.Moved);
     /// #endif
-}
-
-
-
-// Performs updates and inserts by groups. We go from the end of the list of update groups
-// and on each iteration we decide the value of the "beforeDN".
-function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
-{
-	let currSubNodeIndex = disps.length - 1;
-	for( let i = groups.length - 1; i >= 0; i--)
-	{
-		let group = groups[i];
-
-		// first update every sub-node in the group and its sub-sub-nodes
-		for( let j = group.last; j >= group.first; j--)
-		{
-			let disp = disps[j];
-			let oldVN = disp.oldVN;
-            let newVN = disp.newVN;
-
-			// for the Update operation, the old node becomes a sub-node; for the Insert operation
-			// the new node become a sub-node.
-			let svn = group.action === VNDispAction.Update ? oldVN : newVN;
-			parentVN.subNodes[currSubNodeIndex] = svn;
-
-			if (group.action === VNDispAction.Insert)
-			{
-				mountNode( newVN, parentVN, anchorDN, beforeDN);
-
-				// if the new node defines a DOM node, it becomes the DOM node before which
-				// next components should be inserted/moved
-                beforeDN = getFirstDN( newVN) || beforeDN;
-			}
-			else    // if (disp.action === VNDispAction.Update)
-			{
-                if (oldVN !== newVN)
-                {
-                    let fn = oldVN.update;
-                    if (fn)
-                    {
-                        /// #if VERBOSE_NODE
-                            console.debug( `Calling update() on node ${oldVN.name}`);
-                        /// #endif
-                        if (fn.call( oldVN, newVN))
-                            updateNode( disp);
-                    }
-                }
-
-				// if the old node defines a DOM node, it becomes the DOM node before which
-				// next components should be inserted/moved
-                beforeDN = getFirstDN( oldVN) || beforeDN;
-			}
-
-            svn.index = currSubNodeIndex--;
-		}
-
-		// now that all nodes in the group have been updated or inserted, we can determine
-		// first and last DNs for the group
-		group.determineDNs();
-
-		// if the group has at least one DN, its first DN becomes the node before which the next
-		// group of new nodes (if any) should be inserted.
-		beforeDN = group.firstDN || beforeDN;
-	}
 }
 
 
@@ -1466,9 +1425,7 @@ function createNodesFromContent( content: any, nodes?: VN[]): VN | VN[] | null
 	}
 	else if (typeof content === "function")
 	{
-        // let vn = (s_currentClassComp && FuncProxyVN.findVN( content, s_currentClassComp)) ||
-        //             new FuncProxyVN( content, s_currentClassComp);
-        let vn = new FuncProxyVN( content, s_currentClassComp);
+        let vn = new FuncProxyVN( content);
         if (nodes)
             nodes.push( vn);
 
@@ -1537,8 +1494,6 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
     }
 	else if (tag === FuncProxy)
 	{
-        // let funcProxyProps = props as FuncProxyProps;
-
         /// #if DEBUG
             if (!props || !props.func)
             {
@@ -1547,22 +1502,7 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
             }
         /// #endif
 
-		// // check whether we already have a node linked to this function. If yes return it;
-		// // otherwise, create a new node.
-		// let vn = FuncProxyVN.findVN( funcProxyProps.func, funcProxyProps.funcThisArg || s_currentClassComp, funcProxyProps.key);
-		// if (!vn)
-		// 	return new FuncProxyVN( funcProxyProps.func, funcProxyProps.funcThisArg, funcProxyProps.key, funcProxyProps.args);
-		// else
-		// {
-		// 	// if the updateArgs property is true, we replace the arguments in the node; otherwise,
-		// 	// we ignore the arguments from the properties.
-		// 	if (funcProxyProps.replaceArgs)
-		// 		vn.replaceArgs( funcProxyProps.args);
-
-		// 	return vn;
-        // }
-
-        return new FuncProxyVN( props.func, props.funcThisArg || s_currentClassComp, props.arg, props.key);
+        return new FuncProxyVN( props.func, props.funcThisArg, props.arg, props.key);
 	}
 	else if (tag === PromiseProxy)
 	{
