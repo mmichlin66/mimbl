@@ -669,8 +669,54 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 	// perform DOM operations according to sub-node disposition. We need to decide for each
 	// node what node to use to insert or move it before. We go from the end of the list of
 	// new nodes and on each iteration we decide the value of the "beforeDN".
-	for( let i = disps.length - 1; i >= 0; i--)
-        beforeDN = processNode( parentVN, disps[i], i, anchorDN, beforeDN, true);
+    for( let i = disps.length - 1; i >= 0; i--)
+    {
+        let disp = disps[i];
+        let newVN = disp.newVN;
+        let oldVN = disp.oldVN;
+
+        // for the Update operation, the old node becomes a sub-node; for the Insert operation
+        // the new node become a sub-node.
+        let svn: VN;
+        if (disp.action === VNDispAction.Insert)
+        {
+            // we must assign the index and put the node in the list of sub-nodes before calling
+            // mountNode because it may use this info if the node is cloned
+            newVN.index = i;
+            parentVN.subNodes[i] = newVN;
+
+            // if mountNode clones the node, it puts the new node into the list of sub-nodes
+            // and returns it; otherwise, it returns the original node.
+            svn = mountNode( newVN, parentVN, anchorDN, beforeDN);
+        }
+        else // if (disp.action === VNDispAction.Update)
+        {
+            svn = parentVN.subNodes[i] = oldVN;
+            if (oldVN !== newVN)
+            {
+                /// #if VERBOSE_NODE
+                    console.debug( `Calling update() on node ${oldVN.name}`);
+                /// #endif
+
+                // update method must exists for nodes with action Update
+                if (oldVN.update( newVN))
+                    updateNodeChildren( disp);
+            }
+
+            // determine whether all the nodes under this VN should be moved.
+            if (i !== oldVN.index)
+                moveNode( oldVN, anchorDN, beforeDN);
+
+            // we must assign the new index after the comparison above because otherwise the
+            // comparison will not work
+            svn.index = i;
+        }
+
+
+        // if the virtual node defines a DOM node, it becomes the DOM node before which
+        // next components should be inserted/moved
+        beforeDN = getFirstDN( svn) || beforeDN;
+    }
 }
 
 
@@ -679,23 +725,62 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 // and on each iteration we decide the value of the "beforeDN".
 function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
 {
-    let currSubNodeIndex = disps.length - 1;
+    // let currSubNodeIndex = disps.length - 1;
     let currBeforeDN = beforeDN;
+    let disp: VNDisp;
+    let newVN: VN;
+    let oldVN: VN;
 	for( let i = groups.length - 1; i >= 0; i--)
 	{
 		let group = groups[i];
 
-		// first update every sub-node in the group and its sub-sub-nodes
-		for( let j = group.last; j >= group.first; j--)
-            currBeforeDN = processNode( parentVN, disps[j], currSubNodeIndex--, anchorDN, currBeforeDN, false);
+        if (group.action === VNDispAction.Insert)
+        {
+            // mount every sub-node in the group and its sub-sub-nodes
+            for( let j = group.first; j <= group.last; j++)
+            {
+                disp = disps[j];
+                newVN = disp.newVN;
+
+                // we must assign the index and put the node in the list of sub-nodes before calling
+                // mountNode because it may use this info if the node is cloned
+                newVN.index = j;
+                parentVN.subNodes[j] = newVN;
+                mountNode( newVN, parentVN, anchorDN, currBeforeDN);
+            }
+        }
+        else
+        {
+            // update every sub-node in the group and its sub-sub-nodes
+            for( let j = group.last; j >= group.first; j--)
+            {
+                disp = disps[j];
+                newVN = disp.newVN;
+                oldVN = disp.oldVN;
+
+                oldVN.index = j;
+                parentVN.subNodes[j] = oldVN;
+                if (oldVN !== newVN)
+                {
+                    /// #if VERBOSE_NODE
+                        console.debug( `Calling update() on node ${oldVN.name}`);
+                    /// #endif
+
+                    // update method must exists for nodes with action Update
+                    if (oldVN.update( newVN))
+                        updateNodeChildren( disp);
+                }
+            }
+        }
 
 		// now that all nodes in the group have been updated or inserted, we can determine
 		// first and last DNs for the group
-		group.determineDNs();
+		determineGroupDNs( group);
+		// group.determineDNs();
 
 		// if the group has at least one DN, its first DN becomes the node before which the next
-		// group of new nodes (if any) should be inserted.
-		currBeforeDN = group.firstDN || beforeDN;
+        // group of new nodes (if any) should be inserted.
+		currBeforeDN = group.firstDN || currBeforeDN;
 	}
 
     // Arrange the groups in order as in the new sub-node list, moving them if necessary.
@@ -728,65 +813,6 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 			currBeforeDN = group.firstDN;
 		}
 	}
-}
-
-
-
-/**
- * Updates or inserts the node pointed to by the given VNDisp structure.
- * @param parentVN
- * @param disp
- * @param index
- * @param anchorDN
- * @param beforeDN
- * @returns The new "beforeDN" value, which is the first DOM node vehind this virtual node
- */
-function processNode( parentVN: VN, disp: VNDisp, index: number, anchorDN: DN, beforeDN: DN, moveIfNeeded?: boolean): DN
-{
-    let newVN = disp.newVN;
-    let oldVN = disp.oldVN;
-
-    // for the Update operation, the old node becomes a sub-node; for the Insert operation
-    // the new node become a sub-node.
-    let svn: VN;
-    if (disp.action === VNDispAction.Insert)
-    {
-        // we must assign the index and put the node in the list of sub-nodes before calling
-        // mountNode because it may use this info if the node is cloned
-        newVN.index = index;
-        parentVN.subNodes[index] = newVN;
-
-        // if mountNode clones the node, it puts the new node into the list of sub-nodes
-        // and returns it; otherwise, it returns the original node.
-        svn = mountNode( newVN, parentVN, anchorDN, beforeDN);
-    }
-    else // if (disp.action === VNDispAction.Update)
-    {
-        svn = parentVN.subNodes[index] = oldVN;
-        if (oldVN !== newVN)
-        {
-            /// #if VERBOSE_NODE
-                console.debug( `Calling update() on node ${oldVN.name}`);
-            /// #endif
-
-            // update method must exists for nodes with action Update
-            if (oldVN.update( newVN))
-                updateNodeChildren( disp);
-        }
-
-        // determine whether all the nodes under this VN should be moved.
-        if (moveIfNeeded && index !== oldVN.index)
-            moveNode( oldVN, anchorDN, beforeDN);
-
-        // we must assign the new index after the comparison above because otherwise the
-        // comparison will not work
-        svn.index = index;
-    }
-
-
-    // if the virtual node defines a DOM node, it becomes the DOM node before which
-    // next components should be inserted/moved
-    return getFirstDN( svn) || beforeDN;
 }
 
 
@@ -867,67 +893,66 @@ const enum VNDispAction
  * sequence of sub-nodes. The group is described using indices of VNDisp objects in the
  * subNodeDisp field of the parent VNDisp object.
  */
-class VNDispGroup
+interface VNDispGroup
 {
 	/** parent VNDisp to which this group belongs */
-	public parentDisp: VNDisp;
+	parentDisp: VNDisp;
 
 	/** Action to be performed on the nodes in the group */
-	public action: VNDispAction;
+	action: VNDispAction;
 
 	/** Index of the first VNDisp in the group */
-	public first: number;
+	first: number;
 
 	/** Index of the last VNDisp in the group */
-	public last: number;
+	last?: number;
 
 	/** Number of nodes in the group. */
-	public get count(): number { return this.last - this.first + 1 };
+	count?: number;
 
 	/** First DOM node in the group - will be known after the nodes are physically updated */
-	public firstDN: DN;
+	firstDN?: DN;
 
 	/** First DOM node in the group - will be known after the nodes are physically updated */
-	public lastDN: DN;
+	lastDN?: DN;
+}
 
 
 
-	constructor( parentDisp: VNDisp, action: VNDispAction, first: number, last?: number)
-	{
-		this.parentDisp = parentDisp;
-		this.action = action;
-		this.first = first;
-		this.last = last;
-	}
+/**
+ * Determines first and last DOM nodes for the group. This method is invoked only after the
+ * nodes were phisically updated/inserted and we can obtain their DOM nodes.
+ */
+function determineGroupDNs( group: VNDispGroup)
+{
+    if (group.count === 1)
+    {
+        let vn = group.action === VNDispAction.Update
+            ? group.parentDisp.subNodeDisps[group.first].oldVN
+            : group.parentDisp.subNodeDisps[group.first].newVN;
 
+        group.firstDN = getFirstDN(vn);
+        group.lastDN = getLastDN( vn);
+    }
+    else
+    {
+        let disp: VNDisp;
+        for( let i = group.first; i <= group.last; i++)
+        {
+            disp = group.parentDisp.subNodeDisps[i];
+            group.firstDN = getFirstDN( group.action === VNDispAction.Update ? disp.oldVN : disp.newVN);
+            if (group.firstDN)
+                break;
+        }
 
-
-	/**
-	 * Determines first and last DOM nodes for the group. This method is invoked only after the
-	 * nodes were phisically updated/inserted and we can obtain their DOM nodes.
-	 */
-	public determineDNs()
-	{
-		let disp: VNDisp;
-		let vn: VN;
-		for( let i = this.first; i <= this.last; i++)
-		{
-			disp = this.parentDisp.subNodeDisps[i];
-			vn = this.action === VNDispAction.Update ? disp.oldVN : disp.newVN;
-			this.firstDN = getFirstDN( vn);
-			if (this.firstDN)
-				break;
-		}
-
-		for( let i = this.last; i >= this.first; i--)
-		{
-			disp = this.parentDisp.subNodeDisps[i];
-			vn = this.action === VNDispAction.Update ? disp.oldVN : disp.newVN;
-			this.lastDN = getLastDN( vn);
-			if (this.lastDN)
-				break;
-		}
-	}
+        for( let i = group.last; i >= group.first; i--)
+        {
+            disp = group.parentDisp.subNodeDisps[i];
+            group.lastDN = getLastDN( group.action === VNDispAction.Update ? disp.oldVN : disp.newVN);
+            if (group.lastDN)
+                break;
+        }
+    }
 }
 
 
@@ -1150,7 +1175,7 @@ function buildSubNodeGroups( disp: VNDisp): void
     /// #endif
 
     // create array of groups and create the first group starting from the first node
-    let group = new VNDispGroup( disp, subNodeDisps[0].action, 0);
+    let group: VNDispGroup = { parentDisp: disp, action: subNodeDisps[0].action, first: 0 };
     let subNodeGroups = [group];
 
     // loop over sub-nodes and on each iteration decide whether we need to open a new group
@@ -1169,7 +1194,10 @@ function buildSubNodeGroups( disp: VNDisp): void
             // the next iteration will open a new group. Note that we cannot be here for a node
             // that starts a new group because for such node disp.action === groupAction.
             group.last = i - 1;
-            group = new VNDispGroup( disp, action, i);
+            group.count = i - group.first;
+
+            // open new group
+            group = { parentDisp: disp, action, first: i };
             subNodeGroups.push( group);
         }
         else if (action === VNDispAction.Update)
@@ -1182,7 +1210,10 @@ function buildSubNodeGroups( disp: VNDisp): void
             {
                 // close the group with the current index.
                 group.last = i - 1;
-                group = new VNDispGroup( disp, action, i);
+                group.count = i - group.first;
+
+                // open new group
+                group = { parentDisp: disp, action, first: i };
                 subNodeGroups.push( group);
             }
         }
@@ -1192,8 +1223,11 @@ function buildSubNodeGroups( disp: VNDisp): void
     }
 
     // close the last group
-    if (group !== undefined)
+    if (group)
+    {
         group.last = count - 1;
+        group.count = count - group.first;
+    }
 
     disp.subNodeGroups = subNodeGroups;
 }
