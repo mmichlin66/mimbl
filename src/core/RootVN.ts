@@ -75,9 +75,8 @@ export class RootVN extends VN implements IErrorHandlingService
 
 
 
-	// This method is called after an exception was thrown during rendering of the node itself
-	// or its sub-nodes.
-	public handleError( err: any, path: string[]): void
+	// This method is called after an exception was thrown during rendering of the node's sub-nodes.
+	public handleError( err: any): void
 	{
 		if (err instanceof Promise)
 		{
@@ -89,7 +88,7 @@ export class RootVN extends VN implements IErrorHandlingService
 		}
 		else
 		{
-            console.error( `Unhandled error in component\n${path.join("\n")}\n`, err);
+            console.error( `Unhandled error\n`, err);
 			this.error = true;
 		}
 	}
@@ -107,9 +106,9 @@ export class RootVN extends VN implements IErrorHandlingService
 
 
 	// Informs that the given node has unsubscribed from a service with the given ID.
-	public reportError( err: any, path: string[]): void
+	public reportError( err: any): void
 	{
-		this.handleError( err, path);
+		this.handleError( err);
 		this.requestUpdate();
 	}
 

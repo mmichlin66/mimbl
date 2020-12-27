@@ -146,7 +146,7 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * component that threw the exception. This path is provided mostly for debugging and tracing
 	 * purposes.
 	 */
-	handleError?( err: any, path: string[]): void;
+	handleError?( err: any): void;
 
 	/**
 	 * Retrieves update strategy object that determines different aspects of component behavior
@@ -712,7 +712,7 @@ export interface IServiceDefinitions
 /**
  * The IErrorHandlingService interface represents a service that can be invoked when an error -
  * usually an exception - is encountered but cannot be handled locally. A component that implements
- * this service would normally remember the error and request to update itself,so that in its
+ * this service would normally remember the error and request to update itself, so that in its
  * render method it will present the error to the user.
  *
  * The IErrorHandlingService is implemented by the Root Virtual Node as a last resort for error
@@ -721,7 +721,7 @@ export interface IServiceDefinitions
  */
 export interface IErrorHandlingService
 {
-	reportError( err: any, path: string[]): void;
+	reportError( err: any): void;
 }
 
 

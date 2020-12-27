@@ -139,9 +139,9 @@ export abstract class VN implements IVNode
 	// doesn't support error handling.
 	public supportsErrorHandling?: boolean;
 
-	// This method is called after an exception was thrown during rendering of the node itself
-	// and/or its sub-nodes. The render method will be called after this method returns.
-	public handleError?( err: any, path: string[]): void;
+    // This method is called after an exception was thrown during rendering of the node's
+    // sub-nodes. The render method will be called after this method returns.
+	public handleError?( err: any): void;
 
     // This method is called if the node requested a "partial" update. Different types of virtual
     // nodes can keep different data for the partial updates; for example, ElmVN can keep new
@@ -309,6 +309,8 @@ export abstract class VN implements IVNode
 	// this ID. This method doesn't establish a subscription and only reflects the current state.
 	public getService( id: string, defaultService?: any, useSelf?: boolean): any
 	{
+        // not that only undefined return value serves as the indication that the service was not
+        // found. All other values including empty string, zero and false are valid service values.
 		let service = this.findService( id, useSelf);
 		return service !== undefined ? service : defaultService;
 	}
