@@ -1,6 +1,6 @@
 ﻿import {
-    IElmVN, setRef, EventFuncType, UpdateStrategy, RefPropType, ICustomAttributeHandler,
-    IElementProps, ElmVNRef
+    IElmVN, setRef, EventFuncType, RefPropType, ICustomAttributeHandler,
+    IElementProps, ElmVNRef, IComponent, EventPropType
 } from "../api/mim"
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo,
@@ -35,10 +35,11 @@ export class ElmVN extends VN implements IElmVN
 
 
 
-	constructor( tagName: string, props: IElementProps, children: any[])
+	constructor( creator: IComponent, tagName: string, props: IElementProps, children: any[])
 	{
 		super();
 
+		this.creator = creator;
 		this.elmName = tagName;
 		this.props = props;
 		this.children = children;
@@ -109,7 +110,7 @@ export class ElmVN extends VN implements IElmVN
     // is not implemented, the same instance will be used.
     public clone(): VN
     {
-        let newElmVN = new ElmVN( this.elmName, this.props, this.children);
+        let newElmVN = new ElmVN( this.creator, this.elmName, this.props, this.children);
         newElmVN.clonedFrom = this;
         return newElmVN;
     }
@@ -123,16 +124,16 @@ export class ElmVN extends VN implements IElmVN
         // parents. That is OK as long as the node is "static"; that is, it doesn't have any
         // dynamic behavior and its properties and children remain the same. In this case, we
         // can clone the already created element.
-        let clone = this.clonedFrom;
-        if (clone && clone.ownDN)
+        let clonedFrom = this.clonedFrom;
+        if (clonedFrom && clonedFrom.ownDN)
         {
             // we don't clone the children (if any) because they will be cloned by our sub-nodes
-            this.ownDN = clone.ownDN.cloneNode( false);
+            this.ownDN = clonedFrom.ownDN.cloneNode( false);
 
             // copy information about attributes and events
-            this.attrs = clone.attrs;
-            this.events = clone.events;
-            this.customAttrs = clone.customAttrs;
+            this.attrs = clonedFrom.attrs;
+            this.events = clonedFrom.events;
+            this.customAttrs = clonedFrom.customAttrs;
 
             // forget the fact that we were cloned
             this.clonedFrom = null;
@@ -302,7 +303,7 @@ export class ElmVN extends VN implements IElmVN
 
     // Updates properties of this node from the given object containing new properties values. This
     // method is invoked if only properties should be updated without re-rendering the children.
-	public updatePropsOnly( props: any): void
+	private updatePropsOnly( props: any): void
 	{
         // loop over all properties
         for( let propName in props)
@@ -392,7 +393,7 @@ export class ElmVN extends VN implements IElmVN
 				}
 				else if (propType === PropType.Event)
 				{
-					let rtd = getPropAsEventRunTimeData( propInfo, propVal);
+					let rtd = getPropAsEventRunTimeData( propInfo, propVal as EventPropType);
 					if (rtd)
 					{
 						if (!this.events)
@@ -643,7 +644,7 @@ export class ElmVN extends VN implements IElmVN
 	private updateEventOnly( name: string, info: EventPropInfo, val: any ): void
 	{
         let oldEvent = this.events && this.events[name];
-        let newEvent = val != null && getPropAsEventRunTimeData( info, val);
+        let newEvent = val != null && getPropAsEventRunTimeData( info, val as EventPropType);
         if (!newEvent)
         {
             if (oldEvent)
@@ -924,21 +925,21 @@ interface CustomAttrRunTimeData
 
 // Determines whether the given property value is of the type that is used for event handlers.
 // If yes, then returns EventRunTimeData object; otherwise, returns undefined.
-function getPropAsEventRunTimeData( info: EventPropInfo, propVal: any): EventRunTimeData
+function getPropAsEventRunTimeData( info: EventPropInfo, propVal: EventPropType): EventRunTimeData
 {
 	if (typeof propVal === "function")
-		return { info, orgFunc: propVal as EventFuncType };
+		return { info, orgFunc: propVal };
 	else if (Array.isArray(propVal))
 	{
 		if (propVal.length === 2)
 		{
 			if (typeof propVal[1] === "boolean")
-				return { info, orgFunc: propVal[0] as EventFuncType, useCapture: propVal[1] as boolean };
+				return { info, orgFunc: propVal[0], useCapture: propVal[1] as boolean };
 			else
-				return { info, orgFunc: propVal[0] as EventFuncType, that: propVal[1] };
+				return { info, orgFunc: propVal[0], that: propVal[1] };
 		}
 		else if (propVal.length === 3)
-			return { info, orgFunc: propVal[0] as EventFuncType, that: propVal[1], useCapture: propVal[2] as boolean };
+			return { info, orgFunc: propVal[0], that: propVal[1], useCapture: propVal[2] as boolean };
 	}
 
 	// for all other type combinations the property is not treated as an event handler

@@ -1,7 +1,7 @@
 ﻿import {Styleset, IIDRule, ClassPropType} from "mimcss"
 import {
     PropType, EventSlot, mountRoot, unmountRoot, FuncProxyVN, TextVN,
-    createNodesFromJSX, wrapCallbackWithVN, registerElmProp
+    s_jsx, wrapCallbackWithVN, registerElmProp
 } from "../internal";
 
 
@@ -221,7 +221,7 @@ export type EventFuncAndThisAndFlagType<T extends Event> = [EventFuncType<T>, ob
  * Union type that can be passed to an Element's event.
  * @typeparam T DOM event type, e.g. MouseEvent
  */
-export type EventPropType<T extends Event> = EventFuncType<T> | EventFuncAndThisType<T> |
+export type EventPropType<T extends Event = Event> = EventFuncType<T> | EventFuncAndThisType<T> |
 				EventFuncAndFlagType<T> | EventFuncAndThisAndFlagType<T>;
 
 /**
@@ -685,7 +685,7 @@ export namespace JSX
  */
 export function jsx( tag: any, props: any, ...children: any[]): any
 {
-	return createNodesFromJSX( tag, props, children);
+	return s_jsx( tag, props, children);
 }
 
 

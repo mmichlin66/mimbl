@@ -33,6 +33,9 @@ let s_scheduledFrameHandle: number = 0;
 // State of the scheduler.
 let s_schedulerState: SchedulerState = SchedulerState.Idle;
 
+// Handle of the animation frame request (in case it should be canceled).
+let s_currentClassComp: IComponent = null;
+
 // Number that serves as a unique ID of an update cycle. Each update cycle the root node
 // increments this number. Each node being updated in this cycle is assigned this number.
 // This helps prevent double-rendering of when both a component and its parent are
@@ -452,6 +455,10 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
 	fn && fn.call(vn);
 	let ownDN = vn.ownDN;
 
+    // if the node is a class component then set it as the current class component, which means
+    // it will be used as the "creator" for the rendered elements
+    s_currentClassComp = (vn as any as IClassCompVN).comp || vn.creator;
+
     // if the node doesn't implement render(), the node never has any sub-nodes (e.g. text nodes)
     fn = vn.render;
 	if (fn)
@@ -560,6 +567,10 @@ function updateNodeChildren( disp: VNDisp): void
 {
 	let vn = disp.oldVN;
     let ownDN = vn.ownDN;
+
+    // if the node is a class component then set it as the current class component, which means
+    // it will be used as the "creator" for the rendered elements
+    s_currentClassComp = (vn as any as IClassCompVN).comp || vn.creator;
 
     // we call the render method without try/catch. If it throws, the control goes to either the
     // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
@@ -1415,11 +1426,17 @@ function createNodesFromContent( content: any, nodes?: VN[]): VN | VN[] | null
 	}
 	else if (typeof content === "function")
 	{
-        vn = new FuncProxyVN( content);
+        vn = new FuncProxyVN( s_currentClassComp, content);
 	}
     else if (Array.isArray( content))
     {
-        return content.length === 0 ? null : createNodesFromArray( content, nodes);
+        return content.length > 1
+            ? createNodesFromArray( content, nodes)
+            : content.length === 1
+                ? createNodesFromContent(content[0], nodes)
+                : null;
+
+        // return content.length === 0 ? null : createNodesFromArray( content, nodes);
     }
 	else if (content instanceof Promise)
 	{
@@ -1463,13 +1480,17 @@ function createNodesFromArray( arr: any[], nodes?: VN[]): VN[] | null
 
 
 // Creates a chain of virtual nodes from the data provided by the TypeScript's JSX parser.
-export function createNodesFromJSX( tag: any, props: any, children: any[]): VN | VN[] | null
+export function s_jsx( tag: any, props: any, children: any[]): VN | VN[] | null
 {
 	if (typeof tag === "string")
-		return new ElmVN( tag, props, children);
+		return new ElmVN( s_currentClassComp, tag, props, children);
     else if (tag === Fragment)
     {
-        return children.length === 0 ? null : createNodesFromArray( children);
+        return children.length > 1
+            ? createNodesFromArray( children)
+            : children.length === 1
+                ? createNodesFromContent(children[0])
+                : null;
     }
 	else if (tag === FuncProxy)
 	{
@@ -1481,7 +1502,7 @@ export function createNodesFromJSX( tag: any, props: any, children: any[]): VN |
             }
         /// #endif
 
-        return new FuncProxyVN( props.func, props.funcThisArg, props.arg, props.key);
+        return new FuncProxyVN( s_currentClassComp, props.func, props.funcThisArg, props.arg, props.key);
 	}
 	else if (tag === PromiseProxy)
 	{

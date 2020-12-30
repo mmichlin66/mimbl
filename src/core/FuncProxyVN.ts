@@ -1,4 +1,4 @@
-﻿import {symRenderWatcher, RenderMethodType} from "../api/mim"
+﻿import {symRenderWatcher, RenderMethodType, IComponent} from "../api/mim"
 import {VN, createWatcher, IWatcher} from "../internal"
 
 /// #if USE_STATS
@@ -34,13 +34,14 @@ let symFuncsToNodes = Symbol( "symFuncsToNodes");
  */
 export class FuncProxyVN extends VN
 {
-	constructor( func: RenderMethodType, funcThisArg?: any, arg?: any, key?: any)
+	constructor( creator: IComponent, func: RenderMethodType, funcThisArg?: any, arg?: any, key?: any)
 	{
 		super();
 
         // remember data from the props. Note that if funcThisArg is undefined it will be changed
         // to the node's creator component upon mounting. If there is no key specified, the arg
         // will be used (which may also be unspecified)
+        this.creator = creator;
 		this.func = func;
 		this.funcThisArg = funcThisArg;
 		this.arg = arg;
@@ -164,8 +165,16 @@ export class FuncProxyVN extends VN
 
 
 
-	private linkNodeToFunc(): void
+    // We need to link our node to the function so that the static method findVN can work (this is
+    // used when the IComponent.updateMe(func) method is called). We keep a map of function
+    // objects to VNs using the symFuncsToNodes symbol. If the node has funcThisArg we use the
+    // symbol on this object; otherwise, we use the symbol on the FuncProxyVN class object - this
+    // used for static functions.
+    private linkNodeToFunc(): void
 	{
+        if (!this.funcThisArg)
+            return;
+
 		let mapFuncsToNodes: Map<Function,FuncProxyVN> = this.funcThisArg[symFuncsToNodes];
 		if (!mapFuncsToNodes)
 		{
@@ -178,8 +187,12 @@ export class FuncProxyVN extends VN
 
 
 
-	private unlinkNodeFromFunc(): void
+    // Unlink this node from the function - opposite of what linkNodeToFunc does.
+    private unlinkNodeFromFunc(): void
 	{
+        if (!this.funcThisArg)
+            return;
+
 		let mapFuncsToNodes: Map<Function,FuncProxyVN> = this.funcThisArg[symFuncsToNodes];
 		if (mapFuncsToNodes)
 			mapFuncsToNodes.delete( this.func);
@@ -187,7 +200,8 @@ export class FuncProxyVN extends VN
 
 
 
-	public static findVN( func: RenderMethodType, funcThisArg: any, key?: any): FuncProxyVN
+    // Tries to find the node linked to the given function using the linkNodeToFunction method.
+    private static findVN( func: RenderMethodType, funcThisArg: any, key?: any): FuncProxyVN
 	{
         /// #if DEBUG
             if (!funcThisArg)
@@ -196,6 +210,9 @@ export class FuncProxyVN extends VN
                 return undefined;
             }
         /// #endif
+
+        if (!funcThisArg)
+            return null;
 
 		let mapFuncsToNodes: Map<Function,FuncProxyVN> = funcThisArg[symFuncsToNodes];
 		return mapFuncsToNodes && mapFuncsToNodes.get( func);

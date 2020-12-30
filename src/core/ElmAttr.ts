@@ -156,6 +156,7 @@ let propInfos: {[P:string]: PropInfo} =
 
 /**
  * Helper function that converts the given value to string.
+ *   - strings are returned as is.
  *   - null and undefined are converted to an empty string.
  *   - arrays are converted by calling this function recursively on the elements and separating
  *     them with spaces.
@@ -164,12 +165,12 @@ let propInfos: {[P:string]: PropInfo} =
 
 function valToString( val: any): string
 {
-	if (val == null)
-		return "";
-	else if (typeof val === "string")
+	if (typeof val === "string")
 		return val;
 	else if (Array.isArray( val))
 		return val.map( item => valToString(item)).filter( item => !!item).join(" ");
+	else if (val == null)
+		return "";
 	else
 		return val.toString();
 }

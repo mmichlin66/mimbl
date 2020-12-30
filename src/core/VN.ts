@@ -41,6 +41,9 @@ export abstract class VN implements IVNode
 	// Parent node. This is null for the top-level (root) nodes.
 	public parent: VN;
 
+    /** Class component that created this node in its render method (or undefined). */
+    public creator: IComponent;
+
 	/**
      * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the
      * root nodes that don't have parents.
@@ -154,18 +157,6 @@ export abstract class VN implements IVNode
 	public get isMounted(): boolean { return !!this.anchorDN; }
 
 
-
-    /** Component that created this node in its render method (or undefined). */
-    public get creator(): IComponent
-    {
-        for( let p = this.parent; p; p = p.parent)
-        {
-            if ((p as any).comp)
-                return (p as any).comp;
-        }
-
-        return null;
-    }
 
 	// Level of nesting at which the node resides relative to the root node.
 	public get depth(): number
