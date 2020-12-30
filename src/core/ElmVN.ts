@@ -35,14 +35,14 @@ export class ElmVN extends VN implements IElmVN
 
 
 
-	constructor( creator: IComponent, tagName: string, props: IElementProps, children: any[])
+	constructor( creator: IComponent, tagName: string, props: IElementProps, subNodes: VN[])
 	{
 		super();
 
 		this.creator = creator;
 		this.elmName = tagName;
 		this.props = props;
-		this.children = children;
+		this.subNodes = subNodes;
 
         // get the key property. If key property was not specified, use id; if id was not
         // specified key will remain undefined.
@@ -96,11 +96,11 @@ export class ElmVN extends VN implements IElmVN
 
 
 
-	// Generates list of sub-nodes according to the current state
-	public render(): any
-	{
-		return this.children;
-	}
+	// // Generates list of sub-nodes according to the current state
+	// public render(): any
+	// {
+	// 	return this.children;
+	// }
 
 
 
@@ -110,7 +110,7 @@ export class ElmVN extends VN implements IElmVN
     // is not implemented, the same instance will be used.
     public clone(): VN
     {
-        let newElmVN = new ElmVN( this.creator, this.elmName, this.props, this.children);
+        let newElmVN = new ElmVN( this.creator, this.elmName, this.props, this.subNodes);
         newElmVN.clonedFrom = this;
         return newElmVN;
     }
@@ -207,8 +207,8 @@ export class ElmVN extends VN implements IElmVN
 		if (this.customAttrs)
 			this.removeCustomAttrs();
 
-		// clean up
-        this.children = null;
+		// // clean up
+        // this.children = null;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Deleted);
@@ -277,10 +277,10 @@ export class ElmVN extends VN implements IElmVN
         }
 
 		// render method should be called if either old or new node has children
-		let shouldRender = this.children.length > 0 || newVN.children.length > 0;
+		let shouldRender = this.subNodes != null || newVN.subNodes != null;
 
-		// remember the new children for the next render
-		this.children = newVN.children;
+		// // remember the new children for the next render
+		// this.subNodes = newVN.subNodes;
 
 		return shouldRender;
 	}
@@ -841,8 +841,8 @@ export class ElmVN extends VN implements IElmVN
 	// Properties that were passed to the element.
 	private props: any;
 
-	// Array of children objects.
-	private children: any[];
+	// // Array of children objects.
+	// private children: any[];
 
 	// If this virtual node was cloned from another node, points to the original node.
 	public clonedFrom: ElmVN;

@@ -1,6 +1,6 @@
 ﻿import {
     ScheduledFuncType, IComponent, IVNode, Fragment, FuncProxy,
-    PromiseProxy, IComponentClass, FuncCompType, IClassCompVN
+    PromiseProxy, IComponentClass, FuncCompType, IClassCompVN, Component
 } from "../api/mim"
 import {
     VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN,
@@ -370,7 +370,7 @@ function performUpdate( vnsScheduledForUpdate: Set<VN>): void
 
                     // if the component was already updated in this cycle, don't update it again
                     if (vn.lastUpdateTick !== s_currentTick)
-                        updateNodeChildren( {oldVN: vn});
+                        updateNodeChildren( {oldVN: vn, newVN: vn});
                 }
             }
             catch( err)
@@ -465,40 +465,42 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
 	{
         // we call the render method without try/catch
         vn.subNodes = createVNChainFromContent( fn.call(vn));
-        if (vn.subNodes)
+    }
+
+    // a node may have sub-nodes even if it doesn't implement the render method - e.g. ElmVN
+    if (vn.subNodes)
+    {
+        // determine what nodes to use as anchor and "before" for the sub-nodes
+        let newAnchorDN = ownDN ? ownDN : anchorDN;
+        let newBeforeDN = ownDN ? null : beforeDN;
+
+        // since we have sub-nodes, we need to create nodes for them and render. If our node
+        // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
+        // either the ancestor node that knows to handle errors or to the Mimbl tick loop.
+        if (!vn.supportsErrorHandling)
+            vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, newAnchorDN, newBeforeDN); });
+        else
         {
-            // determine what nodes to use as anchor and "before" for the sub-nodes
-            let newAnchorDN = ownDN ? ownDN : anchorDN;
-            let newBeforeDN = ownDN ? null : beforeDN;
-
-            // since we have sub-nodes, we need to create nodes for them and render. If our node
-            // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
-            // either the ancestor node that knows to handle errors or to the Mimbl tick loop.
-            if (!vn.supportsErrorHandling)
-                vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, newAnchorDN, newBeforeDN); });
-            else
+            try
             {
-                try
-                {
-                    vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, newAnchorDN, newBeforeDN); });
-                }
-                catch( err)
-                {
-                    /// #if VERBOSE_NODE
-                        console.debug( `Calling handleError() on node ${vn.name}. Error:`, err);
-                    /// #endif
+                vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, newAnchorDN, newBeforeDN); });
+            }
+            catch( err)
+            {
+                /// #if VERBOSE_NODE
+                    console.debug( `Calling handleError() on node ${vn.name}. Error:`, err);
+                /// #endif
 
-                    // let the node handle the error and re-render; then we render the new
-                    // content but we do it without try/catch this time; otherwise, we may end
-                    // up in an infinite loop
-                    vn.handleError( err);
-                    vn.subNodes = createVNChainFromContent( fn.call(vn));
-                    if (vn.subNodes)
-                        vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, newAnchorDN, newBeforeDN); });
-                }
+                // let the node handle the error and re-render; then we render the new
+                // content but we do it without try/catch this time; otherwise, we may end
+                // up in an infinite loop
+                vn.handleError( err);
+                vn.subNodes = createVNChainFromContent( fn.call(vn));
+                if (vn.subNodes)
+                    vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, newAnchorDN, newBeforeDN); });
             }
         }
-	}
+    }
 
 	// if we have our own DOM node, add it under the anchor node
 	if (ownDN)
@@ -565,16 +567,21 @@ function unmountNode( vn: VN, removeOwnNode: boolean)
 // the parent node was updated.
 function updateNodeChildren( disp: VNDisp): void
 {
-	let vn = disp.oldVN;
-    let ownDN = vn.ownDN;
+	let oldVN = disp.oldVN;
+    let ownDN = oldVN.ownDN;
 
     // if the node is a class component then set it as the current class component, which means
     // it will be used as the "creator" for the rendered elements
-    s_currentClassComp = (vn as any as IClassCompVN).comp || vn.creator;
+    s_currentClassComp = (oldVN as any as IClassCompVN).comp || oldVN.creator;
 
     // we call the render method without try/catch. If it throws, the control goes to either the
     // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
-    let newSubNodes = createVNChainFromContent( vn.render());
+    // The render method is invoked on the old node assuming that the old node already has the
+    // updated information from the new node. If, however, the old node doesn't have the render
+    // method, we get the sub-nodes from the new node. For eample, ElmVN doesn't have the render
+    // method but it has the sub-nodes filled in during the JSX operations.
+    let fn = oldVN.render;
+    let newSubNodes = fn ? createVNChainFromContent( fn.call( oldVN)) : disp.newVN.subNodes;
     buildSubNodeDispositions( disp, newSubNodes);
 
     // remove from DOM the old nodes designated to be removed (that is, those for which there
@@ -583,14 +590,14 @@ function updateNodeChildren( disp: VNDisp): void
     // references.
     if (disp.replaceAllSubNodes)
     {
-        if (vn.subNodes)
+        if (oldVN.subNodes)
         {
             // if we are removing all sub-nodes under an element, we can optimize by setting
             // innerHTML to null;
             if (ownDN)
                 (ownDN as Element).innerHTML = null;
 
-            vn.subNodes.forEach( svn => { unmountNode( svn, !ownDN) });
+            oldVN.subNodes.forEach( svn => { unmountNode( svn, !ownDN) });
         }
     }
 	else if (disp.subNodesToRemove)
@@ -599,53 +606,53 @@ function updateNodeChildren( disp: VNDisp): void
 	}
 
     if (!newSubNodes)
-        vn.subNodes = null;
+        oldVN.subNodes = null;
     else
     {
         // determine the anchor node to use when inserting new or moving existing sub-nodes. If
         // our node has its own DN, it will be the anchor for the sub-nodes; otherwise, our node's
         // anchor will be the anchor for the sub-nodes too.
-        let anchorDN = ownDN || vn.anchorDN;
+        let anchorDN = ownDN || oldVN.anchorDN;
 
         // if this virtual node doesn't define its own DOM node (true for components), we will
         // need to find a DOM node before which to start inserting new nodes. Null means
         // append to the end of the anchor node's children.
-        let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
+        let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( oldVN, anchorDN);
 
         // since we have sub-nodes, we need to create nodes for them and render. If our node
         // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
         // either the uncestor node that knows to handle errors or to the Mimbl tick loop.
-        if (!vn.supportsErrorHandling)
-            updateSubNodes( vn, disp, newSubNodes, anchorDN, beforeDN);
+        if (!oldVN.supportsErrorHandling)
+            updateSubNodes( oldVN, disp, newSubNodes, anchorDN, beforeDN);
         else
         {
             try
             {
-                updateSubNodes( vn, disp, newSubNodes, anchorDN, beforeDN);
+                updateSubNodes( oldVN, disp, newSubNodes, anchorDN, beforeDN);
             }
             catch( err)
             {
                 /// #if VERBOSE_NODE
-                    console.debug( `Calling handleError() on node ${vn.name}. Error`, err);
+                    console.debug( `Calling handleError() on node ${oldVN.name}. Error`, err);
                 /// #endif
 
                 // let the node handle its own error and re-render; then we render the new
                 // content but we do it without try/catch this time; otherwise, we may end
                 // up in an infinite loop
-                vn.handleError( err);
-                newSubNodes = createVNChainFromContent( vn.render());
+                oldVN.handleError( err);
+                newSubNodes = createVNChainFromContent( oldVN.render());
                 buildSubNodeDispositions( disp, newSubNodes);
                 if (!newSubNodes)
-                    vn.subNodes = null;
+                    oldVN.subNodes = null;
                 else
-                    updateSubNodes( vn, disp, newSubNodes, anchorDN, beforeDN);
+                    updateSubNodes( oldVN, disp, newSubNodes, anchorDN, beforeDN);
             }
         }
     }
 
     // indicate that the node was updated in this cycle - this will prevent it from
     // rendering again in this cycle.
-    vn.lastUpdateTick = s_currentTick;
+    oldVN.lastUpdateTick = s_currentTick;
 }
 
 
@@ -1412,11 +1419,7 @@ function createNodesFromContent( content: any, nodes?: VN[]): VN | VN[] | null
 
         vn = new TextVN( content);
     }
-    else if (content instanceof VN)
-    {
-        vn = content;
-    }
-	else if (typeof content.render === "function")
+	else if (content instanceof Component)
 	{
 		// if the component (this can only be an Instance component) is already attached to VN,
 		// return this existing VN; otherwise create a new one.
@@ -1442,6 +1445,10 @@ function createNodesFromContent( content: any, nodes?: VN[]): VN | VN[] | null
 	{
 		vn = new PromiseProxyVN( { promise: content});
 	}
+    else if (content instanceof VN)
+    {
+        vn = content;
+    }
     else
     {
         let s = content.toString();
@@ -1482,8 +1489,24 @@ function createNodesFromArray( arr: any[], nodes?: VN[]): VN[] | null
 // Creates a chain of virtual nodes from the data provided by the TypeScript's JSX parser.
 export function s_jsx( tag: any, props: any, children: any[]): VN | VN[] | null
 {
-	if (typeof tag === "string")
-		return new ElmVN( s_currentClassComp, tag, props, children);
+    if (typeof tag === "string")
+    {
+        if (children.length === 0)
+            return new ElmVN( s_currentClassComp, tag, props, null);
+        else
+        {
+            let subNodes: VN[] = [];
+            children.forEach( item =>
+            {
+                if (item instanceof VN)
+                    subNodes.push( item)
+                else
+                    createNodesFromContent( item, subNodes);
+            });
+
+            return new ElmVN( s_currentClassComp, tag, props, subNodes);
+        }
+    }
     else if (tag === Fragment)
     {
         return children.length > 1
