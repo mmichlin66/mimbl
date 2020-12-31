@@ -1,7 +1,7 @@
 ﻿import {Styleset, IIDRule, ClassPropType} from "mimcss"
 import {
     PropType, EventSlot, mountRoot, unmountRoot, FuncProxyVN, TextVN,
-    s_jsx, wrapCallbackWithVN, registerElmProp
+    wrapCallbackWithVN, registerElmProp, symJsxToVNs
 } from "../internal";
 
 
@@ -685,7 +685,7 @@ export namespace JSX
  */
 export function jsx( tag: any, props: any, ...children: any[]): any
 {
-	return s_jsx( tag, props, children);
+    return tag[symJsxToVNs]( props, children);
 }
 
 
@@ -1260,7 +1260,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * Component properties passed to the constructor. This is normally used only by managed
 	 * components and is usually undefined for independent coponents.
 	 */
-	public props: CompProps<TProps,TChildren>;
+	public readonly props: CompProps<TProps,TChildren>;
 
 	/**
 	 * Remembered virtual node object through which the component can request services. This

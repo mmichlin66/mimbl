@@ -159,7 +159,7 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 		// // working with it - especially if it doesn't implement the shouldUpdate method.
 		// Object.keys(this.props).forEach( key => delete this.props[key]);
         // Object.assign( this.props, newVN.props);
-        this.props = newVN.props;
+        this.comp.props = this.props = newVN.props;
 
 		// since the rendering produced by a function may depend on factors beyond properties,
 		// we always indicate that it is necessary to update the sub-nodes. The commitUpdate

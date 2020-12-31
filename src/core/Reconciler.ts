@@ -1393,76 +1393,22 @@ function getVNPath( vn: VN): string[]
 // if it returns a single node, wraps it in an array.
 function createVNChainFromContent( content: any): VN[] | null
 {
-    let retVal = createNodesFromContent( content);
-    return !retVal ? null : Array.isArray(retVal) ? retVal : [retVal];
-}
-
-
-
-// Creates either a single virtual node or an array of virtual nodes from the given content.
-// For all types of contents other than an array, the returned value is a single VN. If the input
-// content is an array, then a VN is created for each of the array elements. Since array elements
-// might also be arrays, the process is recursive.
-function createNodesFromContent( content: any, nodes?: VN[]): VN | VN[] | null
-{
-	if (content == null || content === false)
-	{
-		// the comparison above covers both null and undefined
-		return null;
-    }
-
-    let vn: VN;
-    if (typeof content === "string")
-	{
-        if (!content)
-            return null;
-
-        vn = new TextVN( content);
-    }
-	else if (content instanceof Component)
-	{
-		// if the component (this can only be an Instance component) is already attached to VN,
-		// return this existing VN; otherwise create a new one.
-		vn = (content as IComponent).vn
-						? (content as IComponent).vn as IVNode as VN
-						: new IndependentCompVN( content as IComponent);
-	}
-	else if (typeof content === "function")
-	{
-        vn = new FuncProxyVN( s_currentClassComp, content);
-	}
-    else if (Array.isArray( content))
-    {
-        return content.length > 1
-            ? createNodesFromArray( content, nodes)
-            : content.length === 1
-                ? createNodesFromContent(content[0], nodes)
-                : null;
-
-        // return content.length === 0 ? null : createNodesFromArray( content, nodes);
-    }
-	else if (content instanceof Promise)
-	{
-		vn = new PromiseProxyVN( { promise: content});
-	}
-    else if (content instanceof VN)
-    {
-        vn = content;
-    }
+    if (content == null)
+        return null;
     else
     {
-        let s = content.toString();
-        if (!s)
-            return null;
-
-        vn = new TextVN( s);
+        let retVal = content[symToVNs]();
+        return !retVal ? null : Array.isArray(retVal) ? retVal : [retVal];
     }
-
-    if (nodes)
-        nodes.push( vn);
-
-    return vn;
 }
+
+
+
+/**
+ * Symbol used to set a "toVNs" function to certain classes. This function converts the instances
+ * of these classes to a VN or an array of VNs.
+ */
+let symToVNs = Symbol();
 
 
 
@@ -1480,82 +1426,212 @@ function createNodesFromArray( arr: any[], nodes?: VN[]): VN[] | null
     if (!nodes)
         nodes = [];
 
-    arr.forEach( item => { createNodesFromContent( item, nodes); });
+    arr.forEach( item => { item == null ? null : item[symToVNs]( nodes); });
     return nodes.length > 0 ? nodes : null;
 }
 
 
 
-// Creates a chain of virtual nodes from the data provided by the TypeScript's JSX parser.
-export function s_jsx( tag: any, props: any, children: any[]): VN | VN[] | null
+// Add toVNs method to the String class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+(Boolean.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 {
-    if (typeof tag === "string")
-    {
-        if (children.length === 0)
-            return new ElmVN( s_currentClassComp, tag, props, null);
-        else
-        {
-            let subNodes: VN[] = [];
-            children.forEach( item =>
-            {
-                if (item instanceof VN)
-                    subNodes.push( item)
-                else
-                    createNodesFromContent( item, subNodes);
-            });
+    return null;
+    // if (this === false)
+    //     return null;
 
-            return new ElmVN( s_currentClassComp, tag, props, subNodes);
-        }
-    }
-    else if (tag === Fragment)
+    // let vn = new TextVN( "true");
+    // if (nodes)
+    //     nodes.push( vn);
+
+    // return vn;
+};
+
+
+
+// Add toVNs method to the String class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+(String.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+{
+    if (this.length === 0)
+        return null;
+
+    let vn = new TextVN( this);
+    if (nodes)
+        nodes.push( vn);
+
+    return vn;
+};
+
+
+
+// Add toVNs method to the Component class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+(Component.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+{
+    // if the component (this can only be an Instance component) is already attached to VN,
+    // return this existing VN; otherwise create a new one.
+    let vn = this.vn ? this.vn : new IndependentCompVN( this);
+    if (nodes)
+        nodes.push( vn);
+
+    return vn;
+};
+
+
+
+// Add toVNs method to the Function class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+(Function.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+{
+    let vn = new FuncProxyVN( s_currentClassComp, this);
+    if (nodes)
+        nodes.push( vn);
+
+    return vn;
+};
+
+
+
+// Add toVNs method to the Array class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+(Array.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+{
+    return this.length > 0 ? createNodesFromArray( this, nodes) : null;
+};
+
+
+
+// Add toVNs method to the VN class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+(VN.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+{
+    if (nodes)
+        nodes.push( this);
+
+    return this;
+};
+
+
+
+// Add toVNs method to the Promise class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+(Promise.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+{
+    let vn = new PromiseProxyVN( { promise: this});
+    if (nodes)
+        nodes.push( vn);
+
+    return vn;
+};
+
+
+
+// Add toVNs method to the Object class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+(Object.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+{
+    let s = this.toString();
+    if (!s)
+        return null;
+
+    let vn = new TextVN( s);
+    if (nodes)
+        nodes.push( vn);
+
+    return vn;
+};
+
+
+
+/**
+ * Symbol used to set a "jsxToVNs" function to certain classes. This function converts the instances
+ * of these classes to a VN or an array of VNs.
+ */
+export let symJsxToVNs = Symbol();
+
+
+
+// Add jsxToVNs method to the String class, which creates ElmVN with the given parameters. This
+// method is invoked by the JSX mechanism.
+(String.prototype as any)[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+{
+    if (children.length === 0)
+        return new ElmVN( s_currentClassComp, this, props, null);
+    else
     {
-        return children.length > 1
-            ? createNodesFromArray( children)
-            : children.length === 1
-                ? createNodesFromContent(children[0])
-                : null;
+        let subNodes: VN[] = [];
+        children.forEach( item =>
+        {
+            if (item instanceof VN)
+                subNodes.push( item)
+            else
+                item != null && item[symToVNs]( subNodes);
+        });
+
+        return new ElmVN( s_currentClassComp, this, props, subNodes);
     }
-	else if (tag === FuncProxy)
-	{
+};
+
+
+
+// Add jsxToVNs method to the Fragment class object. This method is invoked by the JSX mechanism.
+(Fragment as any)[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+{
+    return children.length > 0 ? createNodesFromArray( children) : null;
+};
+
+
+
+// Add jsxToVNs method to the FuncProxy class object. This method is invoked by the JSX mechanism.
+(FuncProxy as any)[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+{
         /// #if DEBUG
-            if (!props || !props.func)
-            {
-                console.error("FuncProxy component doesn't have 'func' property");
-                return null;
-            }
+        if (!props || !props.func)
+        {
+            console.error("FuncProxy component doesn't have 'func' property");
+            return null;
+        }
         /// #endif
 
         return new FuncProxyVN( s_currentClassComp, props.func, props.funcThisArg, props.arg, props.key);
-	}
-	else if (tag === PromiseProxy)
-	{
-		if (!props || !props.promise)
-			return null;
+};
 
-		return new PromiseProxyVN( props, children);
-	}
-	else if (typeof tag === "function")
-	{
-		// children parameter is always an array. A component can specify that its children are
-		// an array of a certain type, e.g. class A extends Component<{},T[]>. In this case
-		// there are two ways to specify children in JSX that would be accepted by the TypeScript
-		// compiler:
-		//	1) <A>{t1}{t2}</A>. In this case, children will be [t1, t2] (as expected by A).
-		//	2) <A>{[t1, t2]}</A>. In this case, children will be [[t1,t2]] (as NOT expected by A).
-		//		This looks like a TypeScript bug.
-		// The realChildren variable accommodates both cases.
-		let realChildren = children.length === 1 && Array.isArray( children[0]) ? children[0] : children;
-		if (typeof tag.prototype.render === "function")
-			return new ManagedCompVN( tag as IComponentClass, props, realChildren);
-		else
-			return new FuncVN( tag as FuncCompType, props, realChildren);
-	}
 
-	/// #if DEBUG
-	else
-		throw new Error( "Invalid tag in jsx processing function: " + tag);
-	/// #endif
-}
+
+// Add jsxToVNs method to the PromiseProxy class object. This method is invoked by the JSX mechanism.
+(PromiseProxy as any)[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+{
+    return props && props.promise ? new PromiseProxyVN( props, children) : null;
+};
+
+
+
+// Add jsxToVNs method to the Function class. This method is invoked by the JSX mechanism.
+(Function.prototype as any)[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+{
+    // children parameter is always an array. A component can specify that its children are
+    // an array of a certain type, e.g. class A extends Component<{},T[]>. In this case
+    // there are two ways to specify children in JSX that would be accepted by the TypeScript
+    // compiler:
+    //	1) <A>{t1}{t2}</A>. In this case, children will be [t1, t2] (as expected by A).
+    //	2) <A>{[t1, t2]}</A>. In this case, children will be [[t1,t2]] (as NOT expected by A).
+    //		This looks like a TypeScript bug.
+    // The realChildren variable accommodates both cases.
+    let realChildren = children.length === 1 && Array.isArray( children[0]) ? children[0] : children;
+    if (typeof this.prototype.render === "function")
+        return new ManagedCompVN( this as IComponentClass, props, realChildren);
+    else
+        return new FuncVN( this as FuncCompType, props, realChildren);
+};
+
+
+
+// Add jsxToVNs method to the Object class object. This method is invoked by the JSX mechanism.
+(Object.prototype as any)[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+{
+    throw new Error( "Invalid tag in jsx processing function: " + this);
+};
 
 
 
