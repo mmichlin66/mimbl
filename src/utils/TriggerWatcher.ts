@@ -337,7 +337,7 @@ class Watcher<T extends AnyAnyFunc = any>
     // "this" value to apply to responder function when calling it.
     private responderThis: any;
 
-    // Set of triggers currently being watched by this watcher. This memeber is used by the
+    // Set of triggers currently being watched by this watcher. This member is used by the
     // manager. It is essentially a storage, which is used instead of the manager having a
     // map of watchers to the sets of triggers. The purpose of knowing what triggers are used
     // by what watcher is to remove the watcher from all these triggers before the watched

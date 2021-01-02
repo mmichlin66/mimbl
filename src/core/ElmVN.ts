@@ -4,7 +4,7 @@
 } from "../api/mim"
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo,
-    AttrPropInfo, EventPropInfo, getElmPropInfo, setElmProp, removeElmProp, updateElmProp
+    AttrPropInfo, EventPropInfo, getElmPropInfo, setElmProp, removeElmProp, updateElmProp, wrapCallbackWithVN
 } from "../internal"
 
 /// #if USE_STATS
@@ -438,7 +438,7 @@ export class ElmVN extends VN implements IElmVN
 	// Updates DOM attributes of this Element.
 	private updateAttrs( newAttrs: { [name: string]: AttrRunTimeData }): void
 	{
-		// "cache" several memebers for faster access
+		// "cache" several members for faster access
 		let elm = this.ownDN as Element;
 		let oldAttrs = this.attrs;
 
@@ -529,10 +529,10 @@ export class ElmVN extends VN implements IElmVN
 
 	// Using the given property name and its value set the appropriate attribute(s) on the
 	// element. This method handles special cases of properties with non-trivial values.
-	private addEvent( name: string, event: EventRunTimeData): void
+	private addEvent( name: string, rtd: EventRunTimeData): void
 	{
-		event.wrapper = this.createEventWrapper( event);
-		this.ownDN.addEventListener( name, event.wrapper, event.useCapture);
+		rtd.wrapper = wrapCallbackWithVN( rtd.func, rtd.funcThis ? rtd.funcThis : this.creator, this);
+		this.ownDN.addEventListener( name, rtd.wrapper, rtd.useCapture);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Event, StatsAction.Added);
@@ -560,9 +560,9 @@ export class ElmVN extends VN implements IElmVN
 
 
 	// Removes the given event listener from the Element.
-	private removeEvent( name: string, event: EventRunTimeData): void
+	private removeEvent( name: string, rtd: EventRunTimeData): void
 	{
-		this.ownDN.removeEventListener( name, event.wrapper, event.useCapture);
+		this.ownDN.removeEventListener( name, rtd.wrapper, rtd.useCapture);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Event, StatsAction.Deleted);
@@ -571,7 +571,7 @@ export class ElmVN extends VN implements IElmVN
 
 
 
-	// Adds event listeners to the Element.
+	// Updates event listeners by comparing the old and the new ones.
 	private updateEvents( newEvents: { [name: string]: EventRunTimeData }): void
 	{
 		let oldEvents = this.events;
@@ -582,12 +582,12 @@ export class ElmVN extends VN implements IElmVN
 		{
 			for( let name in oldEvents)
 			{
-				let oldEvent = oldEvents[name];
-				let newEvent = newEvents ? newEvents[name] : undefined;
-				if (!newEvent)
-					this.removeEvent( name, oldEvent);
+				let oldRTD = oldEvents[name];
+				let newRTD = newEvents ? newEvents[name] : undefined;
+				if (!newRTD)
+					this.removeEvent( name, oldRTD);
 				else
-					this.updateEvent( name, oldEvent, newEvent);
+					this.updateEvent( name, oldRTD, newRTD);
 			}
 		}
 
@@ -603,6 +603,7 @@ export class ElmVN extends VN implements IElmVN
 			}
 		}
 
+        // remember the new listeners in our object
 		this.events = newEvents;
 	}
 
@@ -611,23 +612,23 @@ export class ElmVN extends VN implements IElmVN
 	// Determines whether the old and the new values of the event listener are different and sets
 	// the updated value. Returns true if update has been performed and false if no change has
 	// been detected.
-	private updateEvent( name: string, oldEvent: EventRunTimeData, newEvent: EventRunTimeData): void
+	private updateEvent( name: string, oldRTD: EventRunTimeData, newRTD: EventRunTimeData): void
 	{
 		// double-equal-sign for useCapture is on purpose, because useCapture can be undefined or boolean
-		if (oldEvent.orgFunc === newEvent.orgFunc &&
-			oldEvent.that === newEvent.that &&
-			oldEvent.useCapture == newEvent.useCapture)
+		if (oldRTD.func === newRTD.func &&
+			oldRTD.funcThis === newRTD.funcThis &&
+			oldRTD.useCapture == newRTD.useCapture)
 		{
-			newEvent.wrapper = oldEvent.wrapper;
+			newRTD.wrapper = oldRTD.wrapper;
 		}
 		else
 		{
 			// remove old event listener
-			this.ownDN.removeEventListener( name, oldEvent.wrapper, oldEvent.useCapture);
+			this.ownDN.removeEventListener( name, oldRTD.wrapper, oldRTD.useCapture);
 
 			// create new wrapper and add it as event listener
-			newEvent.wrapper = this.createEventWrapper( newEvent);
-			this.ownDN.addEventListener( name, newEvent.wrapper, newEvent.useCapture);
+            newRTD.wrapper = wrapCallbackWithVN( newRTD.func, newRTD.funcThis ? newRTD.funcThis : this.creator, this);
+			this.ownDN.addEventListener( name, newRTD.wrapper, newRTD.useCapture);
 
 			/// #if USE_STATS
 				DetailedStats.stats.log( StatsCategory.Event, StatsAction.Updated);
@@ -643,45 +644,32 @@ export class ElmVN extends VN implements IElmVN
     // there is no need to re-render the element's children
 	private updateEventOnly( name: string, info: EventPropInfo, val: any ): void
 	{
-        let oldEvent = this.events && this.events[name];
-        let newEvent = val != null && getPropAsEventRunTimeData( info, val as EventPropType);
-        if (!newEvent)
+        let oldRTD = this.events && this.events[name];
+        let newRTD = val != null && getPropAsEventRunTimeData( info, val as EventPropType);
+        if (!newRTD)
         {
-            if (oldEvent)
+            if (oldRTD)
             {
-                this.removeEvent( name, oldEvent);
+                this.removeEvent( name, oldRTD);
                 delete this.events[name];
             }
         }
         else
         {
-            if (oldEvent)
+            if (oldRTD)
             {
-                this.updateEvent( name, oldEvent, newEvent)
-                this.events[name] = newEvent;
+                this.updateEvent( name, oldRTD, newRTD)
+                this.events[name] = newRTD;
             }
             else
             {
-                this.addEvent( name, newEvent);
+                this.addEvent( name, newRTD);
                 if (!this.events)
                     this.events = {};
 
-                this.events[name] = newEvent;
+                this.events[name] = newRTD;
             }
         }
-	}
-
-
-
-	// Returns a wrapper function that will be used as an event listener. The wrapper is bound to
-	// the instance of ElmVN and thus can intercept exceptions and process them using the standard
-	// error service. Unless the original callback is already a bound function, it will be called
-	// with "this" set to either the "event.that" object or, if the latter is undefined, to the
-	// "creator" object, which is the class-based component that created the element i its render
-	// method.
-	private createEventWrapper( event: EventRunTimeData): EventFuncType
-	{
-		return this.wrapCallback( event.orgFunc, event.that ? event.that : this.creator);
 	}
 
 
@@ -890,10 +878,10 @@ interface EventRunTimeData
 	info: EventPropInfo;
 
 	// Original event callback passed as the value of the event property in JSX
-	orgFunc: EventFuncType;
+	func: EventFuncType;
 
 	// Object that will be referenced by "this" within the invoked function
-	that?: any;
+	funcThis?: any;
 
 	// Flag indicating whether this event should be used as Capturing (true) or Bubbling (false)
 	useCapture?: boolean;
@@ -928,18 +916,18 @@ interface CustomAttrRunTimeData
 function getPropAsEventRunTimeData( info: EventPropInfo, propVal: EventPropType): EventRunTimeData
 {
 	if (typeof propVal === "function")
-		return { info, orgFunc: propVal };
+		return { info, func: propVal };
 	else if (Array.isArray(propVal))
 	{
 		if (propVal.length === 2)
 		{
 			if (typeof propVal[1] === "boolean")
-				return { info, orgFunc: propVal[0], useCapture: propVal[1] as boolean };
+				return { info, func: propVal[0], useCapture: propVal[1] as boolean };
 			else
-				return { info, orgFunc: propVal[0], that: propVal[1] };
+				return { info, func: propVal[0], funcThis: propVal[1] };
 		}
 		else if (propVal.length === 3)
-			return { info, orgFunc: propVal[0], that: propVal[1], useCapture: propVal[2] as boolean };
+			return { info, func: propVal[0], funcThis: propVal[1], useCapture: propVal[2] as boolean };
 	}
 
 	// for all other type combinations the property is not treated as an event handler

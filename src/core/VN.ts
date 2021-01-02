@@ -1,7 +1,7 @@
 ﻿import {IComponent, ScheduledFuncType, RefPropType, setRef, IVNode, UpdateStrategy} from "../api/mim";
 import {
     notifyServiceUnpublished, notifyServiceUnsubscribed, requestNodeUpdate,
-    scheduleFuncCall, notifyServicePublished, notifyServiceSubscribed, wrapCallbackWithVN
+    scheduleFuncCall, notifyServicePublished, notifyServiceSubscribed
 } from "../internal";
 
 
@@ -90,11 +90,11 @@ export abstract class VN implements IVNode
     // allows updating the element properties without re-rendering its children.
 	public partialUpdateRequested: boolean;
 
-    // Number of times this node was mounted. It is possible to reuse virtual nodes during
-    // rendering. The clone method (if implemented by the node) will be called. If this method
-    // returns the same node (instead of creating a new one), the node can increment this
-    // reference count. When such node is unmounted, the sub-nodes will only unmounted if the
-    // reference count is 0 (or undefined).
+    // Flag indicating that the unmount method should not be called when destroying this node. It
+    // is possible to reuse virtual nodes during rendering. The clone method (if implemented by the
+    // node) will be called. If this method returns the same node (instead of creating a new one),
+    // the node can set this flag. When such node is unmounted, the sub-nodes will only be
+    // unmounted if this flag is false.
 	public ignoreUnmount?: boolean;
 
 
@@ -340,25 +340,6 @@ export abstract class VN implements IVNode
 			return;
 
 		setRef( info.ref, this.getService( id, info.defaultService));
-	}
-
-
-
-	/**
-	 * Creates a wrapper function with the same signature as the given callback so that if the original
-	 * callback throws an exception, it is processed by the Mimbl error handling mechanism so that the
-	 * exception bubles from this virtual node up the hierarchy until a node/component that knows
-	 * to handle errors is found.
-	 *
-	 * This function should be called by the code that is not part of any component but still has access
-	 * to the IVNode object; for example, custom attribute handlers. Components that derive from the
-	 * Component class should use the wrapCallback method of the Component class.
-	 *
-	 * @param callback
-	 */
-	public wrapCallback<T extends Function>( callback: T, thisCallback?: object, dontDoMimblTick?: boolean): T
-	{
-		return wrapCallbackWithVN( callback, thisCallback, this, dontDoMimblTick);
 	}
 
 

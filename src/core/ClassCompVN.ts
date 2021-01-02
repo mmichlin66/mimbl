@@ -1,6 +1,6 @@
-﻿import {IClassCompVN, IComponent, UpdateStrategy, symRenderWatcher} from "../api/mim"
+﻿import {IClassCompVN, IComponent, symRenderWatcher} from "../api/mim"
 import {createWatcher, IWatcher} from "../utils/TriggerWatcher"
-import {VN} from "../internal"
+import {VN, setCurrentClassComp} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -27,18 +27,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
 
-	// /**
-	//  * Retrieves update strategy object that determines different aspects of node behavior
-	//  * during updates.
-	//  */
-	// public get updateStrategy(): UpdateStrategy
-	// {
-    //     let fn = this.comp.getUpdateStrategy;
-	// 	return fn ? fn.call(this) : undefined;
-	// }
-
-
-
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
@@ -50,7 +38,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         this.willMount();
 
         // establish watcher if requested using the @watcher decorator
-        let render = this.comp.render as (...args: any) => any;
+        let render = this.comp.render;
         if (render[symRenderWatcher])
             this.actRender = this.renderWatcher = createWatcher( render, this.requestUpdate, this.comp, this);
         else
@@ -59,9 +47,8 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         if (this.comp.handleError)
             this.supportsErrorHandling = true;
 
-        let fn = this.comp.getUpdateStrategy;
-        if (fn)
-            this.updateStrategy = fn.call(this);
+        if (this.comp.getUpdateStrategy)
+            this.updateStrategy = this.comp.getUpdateStrategy();
     }
 
 
@@ -105,6 +92,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
+        setCurrentClassComp( this.comp);
         return this.actRender();
 	}
 
@@ -114,6 +102,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	// and/or its sub-nodes.
 	public handleError( err: any): void
 	{
+        setCurrentClassComp( this.comp);
 		this.comp.handleError( err);
 	}
 
@@ -125,8 +114,11 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	{
         // don't need try/catch because it will be caught up the chain
         let fn: Function = this.comp.willMount;
-		if (fn)
-			fn.call( this.comp);
+        if (fn)
+        {
+            setCurrentClassComp( this.comp);
+            fn.call( this.comp);
+        }
 
         /// #if USE_STATS
             DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);

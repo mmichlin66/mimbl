@@ -33,14 +33,22 @@ let s_scheduledFrameHandle: number = 0;
 // State of the scheduler.
 let s_schedulerState: SchedulerState = SchedulerState.Idle;
 
-// Handle of the animation frame request (in case it should be canceled).
-let s_currentClassComp: IComponent = null;
-
 // Number that serves as a unique ID of an update cycle. Each update cycle the root node
 // increments this number. Each node being updated in this cycle is assigned this number.
 // This helps prevent double-rendering of when both a component and its parent are
 // updated in the same cycle.
 let s_currentTick: number = 0;
+
+
+
+// Current object that is set as "creator" during rendering when instantiating certain virtual nodes.
+let s_currentClassComp: IComponent = null;
+
+// Sets the given object as the current "creator" object.
+export function setCurrentClassComp( comp: IComponent): void
+{
+    s_currentClassComp = comp;
+}
 
 
 
@@ -76,10 +84,10 @@ const enum SchedulerState
 export function wrapCallbackWithVN<T extends Function>( callback: T, thisCallback?: object,
     vn?: IVNode, dontDoMimblTick?: boolean): T
 {
-    // if "this" for the callback was not passed but vn was, check whether the vn is a component;
-    // if yes, use it as "this"; otherwise, use vn's creator component.
-    if (!thisCallback && vn)
-        thisCallback = (vn as any).comp != null ? (vn as any).comp : vn.creator;
+    // // if "this" for the callback was not passed but vn was, check whether the vn is a component;
+    // // if yes, use it as "this"; otherwise, use vn's creator component.
+    // if (!thisCallback && vn)
+    //     thisCallback = (vn as any).comp != null ? (vn as any).comp : vn.creator;
 
     return CallbackWrapper.bind( vn, thisCallback, callback, dontDoMimblTick);
 }
@@ -455,14 +463,10 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
 	fn && fn.call(vn);
 	let ownDN = vn.ownDN;
 
-    // if the node is a class component then set it as the current class component, which means
-    // it will be used as the "creator" for the rendered elements
-    s_currentClassComp = (vn as any as IClassCompVN).comp || vn.creator;
-
     // if the node doesn't implement render(), the node never has any sub-nodes (e.g. text nodes)
     fn = vn.render;
-	if (fn)
-	{
+    if (fn)
+    {
         // we call the render method without try/catch
         vn.subNodes = createVNChainFromContent( fn.call(vn));
     }
@@ -495,7 +499,10 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
                 // content but we do it without try/catch this time; otherwise, we may end
                 // up in an infinite loop
                 vn.handleError( err);
-                vn.subNodes = createVNChainFromContent( fn.call(vn));
+
+                if (fn)
+                    vn.subNodes = createVNChainFromContent( fn.call(vn));
+
                 if (vn.subNodes)
                     vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, newAnchorDN, newBeforeDN); });
             }
@@ -570,10 +577,6 @@ function updateNodeChildren( disp: VNDisp): void
 	let oldVN = disp.oldVN;
     let ownDN = oldVN.ownDN;
 
-    // if the node is a class component then set it as the current class component, which means
-    // it will be used as the "creator" for the rendered elements
-    s_currentClassComp = (oldVN as any as IClassCompVN).comp || oldVN.creator;
-
     // we call the render method without try/catch. If it throws, the control goes to either the
     // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
     // The render method is invoked on the old node assuming that the old node already has the
@@ -640,7 +643,7 @@ function updateNodeChildren( disp: VNDisp): void
                 // content but we do it without try/catch this time; otherwise, we may end
                 // up in an infinite loop
                 oldVN.handleError( err);
-                newSubNodes = createVNChainFromContent( oldVN.render());
+                newSubNodes = fn ? createVNChainFromContent( fn.call( oldVN)) : disp.newVN.subNodes;
                 buildSubNodeDispositions( disp, newSubNodes);
                 if (!newSubNodes)
                     oldVN.subNodes = null;

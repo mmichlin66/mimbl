@@ -1035,48 +1035,6 @@ export interface IVNode
 	 */
 	getService<K extends keyof IServiceDefinitions>( id: K, defaultService?: IServiceDefinitions[K],
 					useSelf?: boolean): IServiceDefinitions[K];
-
-
-
-	/**
-	 * Creates a wrapper function with the same signature as the given callback so that if the original
-	 * callback throws an exception, it is processed by the Mimbl error handling mechanism so that the
-	 * exception bubbles from this virtual node up the hierarchy until a node/component that knows to
-	 * handle errors is found.
-	 *
-	 * This function should be called by the code that is not part of any component but still has access
-	 * to the IVNode object; for example, custom attribute handlers. Components that derive from the
-	 * Component class should use the wrapCallback method of the Component class.
-	 *
-	 * Use this method before passing callbacks to document and window event handlers as well as
-	 * non-DOM objects that use callbacks, e.g. promises. For example:
-	 *
-	 * ```typescript
-	 *	class ResizeMonitor
-	 *	{
-	 *		private onWindowResize(e: Event): void {};
-	 *
-	 * 		wrapper: (e: Event): void;
-	 *
-	 * 		public startResizeMonitoring( vn: IVNode)
-	 *		{
-	 *			this.wrapper = vn.wrapCallback( this.onWindowResize, this);
-	 *			window.addEventListener( "resize", this.wrapper);
-	 *		}
-	 *
-	 * 		public stopResizeMonitoring()
-	 *		{
-	 *			window.removeEventListener( "resize", this.wrapper);
-	 *			this.wrapper = undefined;
-	 *		}
-	 *	}
-	 * ```
-	 *
-	 * @param callback Callback to be wrapped
-	 * @returns Function that has the same signature as the given callback and that should be used
-	 *     instead of the original callback
-	 */
-	wrapCallback<T extends Function>( callback: T, that?: object): T;
 }
 
 
@@ -1347,7 +1305,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * handle errors is found.
 	 *
 	 * Use this method before passing callbacks to document and window event handlers as well as
-	 * non-DOM objects that use callbacks, e.g. fetch, Promis, setTimeout, etc. For example:
+	 * non-DOM objects that use callbacks, e.g. fetch, Promise, setTimeout, etc. For example:
 	 *
 	 * ```typescript
 	 *	class ResizeMonitor extends mim.Component
@@ -1358,7 +1316,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 *
 	 * 		public startResizeMonitoring()
 	 *		{
-	 *			this.wrapper = vn.wrapCallback( this.onWindowResize);
+	 *			this.wrapper = this.wrapCallback( this.onWindowResize);
 	 *			window.addEventListener( "resize", this.wrapper);
 	 *		}
 	 *
@@ -1370,16 +1328,16 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 *	}
 	 * ```
 	 *
-	 * @param callback Method/function to be wrapped
-     * @param thisCallback Optional value of "this" to bind the callback to. If this parameter is
+	 * @param func Method/function to be wrapped
+     * @param funcThis Optional value of "this" to bind the callback to. If this parameter is
      * undefined, the component instance will be used. This parameter will be ignored if the the
      * function is already bound or is an arrow function.
 	 * @returns Function that has the same signature as the given callback and that should be used
 	 *     instead of the original callback
 	 */
-	protected wrapCallback<T extends Function>( callback: T, thisCallback?: object, dontDoMimblTick?: boolean): T
+	protected wrapCallback<T extends Function>( func: T, funcThis?: object, dontDoMimblTick?: boolean): T
 	{
-		return wrapCallbackWithVN( callback, thisCallback ? thisCallback : this, this.vn, dontDoMimblTick);
+		return wrapCallbackWithVN( func, funcThis ? funcThis : this, this.vn, dontDoMimblTick);
 	}
 }
 
