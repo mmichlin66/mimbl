@@ -159,11 +159,6 @@ export function requestNodeUpdate( vn: VN): void
     // the callback might schedule a tick using microtask. In this case, the animation frame
     // will be canceled.
     scheduleMimblTick( "af");
-
-	// // the update is scheduled in the next tick unless the request is made during a
-	// // "before update" function execution.
-	// if (s_schedulerState !== SchedulerState.BeforeUpdate)
-	// 	requestAnimationFrameIfNeeded();
 }
 
 
@@ -1061,9 +1056,7 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
     // determine whether recycling of non-matching old keyed sub-nodes by non-matching new
     // keyed sub-nodes is allowed. If update strategy is not defined for the node, the
     // recycling is allowed.
-    let allowKeyedNodeRecycling = disp.oldVN.updateStrategy?.allowKeyedNodeRecycling;
-    if (allowKeyedNodeRecycling === undefined)
-        allowKeyedNodeRecycling = true;
+    let allowKeyedNodeRecycling = !disp.oldVN.updateStrategy?.disableKeyedNodeRecycling;
 
     // process the special case with a single sub-node in both old and new chains just
     // to avoid creating temporary structures
