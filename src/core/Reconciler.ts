@@ -1,6 +1,6 @@
 ﻿import {
     ScheduledFuncType, IComponent, IVNode, Fragment, FuncProxy,
-    PromiseProxy, IComponentClass, FuncCompType, IClassCompVN, Component
+    PromiseProxy, IComponentClass, FuncCompType, IClassCompVN, Component, TickSchedulingType
 } from "../api/mim"
 import {
     VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN,
@@ -82,24 +82,15 @@ const enum SchedulerState
  * @returns The wrapper function that should be used instead of the original callback.
  */
 export function wrapCallbackWithVN<T extends Function>( callback: T, thisCallback?: object,
-    vn?: IVNode, dontDoMimblTick?: boolean): T
+    vn?: IVNode, schedulingType?: TickSchedulingType): T
 {
     // // if "this" for the callback was not passed but vn was, check whether the vn is a component;
     // // if yes, use it as "this"; otherwise, use vn's creator component.
     // if (!thisCallback && vn)
     //     thisCallback = (vn as any).comp != null ? (vn as any).comp : vn.creator;
 
-    return CallbackWrapper.bind( vn, thisCallback, callback, dontDoMimblTick);
+    return CallbackWrapper.bind( vn, thisCallback, callback, schedulingType);
 }
-
-
-
-/**
- * Flag thast is true while the callback wrapper is being executed. This is need to not schedule
- * animation frame from inside the wrapper because the Mimbl tick will be performed right after
- * the callback is done.
- */
-let s_insideCallbackWrapper = false;
 
 
 
@@ -128,12 +119,11 @@ function CallbackWrapper(): any
     let vn: VN = this;
 
     let retVal: any;
-    let [thisOrgCallback, orgCallback, dontDoMimblTick, ...rest] = arguments;
+    let [funcThisArg, func, schedulingType, ...rest] = arguments;
 	try
 	{
-        s_insideCallbackWrapper = true;
         enterMutationScope();
-		retVal = orgCallback.apply( thisOrgCallback, rest);
+		retVal = func.apply( funcThisArg, rest);
 	}
 	catch( err)
 	{
@@ -146,12 +136,11 @@ function CallbackWrapper(): any
 	finally
 	{
         exitMutationScope();
-        s_insideCallbackWrapper = false;
     }
 
-    // If requested, schedule to perform Mimble tick at the end of the event loop.
-    if (!dontDoMimblTick)
-        queueMicrotask( performMimbleTick);
+    // If requested, schedule to perform Mimble tick
+    if (schedulingType != null && schedulingType !== "no")
+        scheduleMimblTick( schedulingType);
 
     return retVal;
 }
@@ -166,10 +155,15 @@ export function requestNodeUpdate( vn: VN): void
 
     addNodeToScheduler( vn);
 
-	// the update is scheduled in the next tick unless the request is made during a
-	// "before update" function execution.
-	if (s_schedulerState !== SchedulerState.BeforeUpdate)
-		requestFrameIfNeeded();
+    // schedule Mimbl tick using animation frame. If this call comes from a wrapped callback,
+    // the callback might schedule a tick using microtask. In this case, the animation frame
+    // will be canceled.
+    scheduleMimblTick( "af");
+
+	// // the update is scheduled in the next tick unless the request is made during a
+	// // "before update" function execution.
+	// if (s_schedulerState !== SchedulerState.BeforeUpdate)
+	// 	requestAnimationFrameIfNeeded();
 }
 
 
@@ -177,7 +171,7 @@ export function requestNodeUpdate( vn: VN): void
 // Schedules to call the given function either before or after all the scheduled components
 // have been updated.
 export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean,
-    funcThisArg?: object, vn?: IVNode): void
+    funcThisArg?: any, vn?: IVNode): void
 {
 	/// #if DEBUG
 	if (!func)
@@ -195,7 +189,7 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 
 			// a "before update" function is always scheduled in the next frame even if the
 			// call is made from another "before update" function.
-			requestFrameIfNeeded();
+			requestAnimationFrameIfNeeded();
 		}
 	}
 	else
@@ -207,9 +201,25 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 			// an "after update" function is scheduled in the next cycle unless the request is made
 			// either from a "before update" function execution or during a node update.
 			if (s_schedulerState !== SchedulerState.BeforeUpdate && s_schedulerState !== SchedulerState.Update)
-				requestFrameIfNeeded();
+				requestAnimationFrameIfNeeded();
 		}
 	}
+}
+
+
+
+// Shedules a Mimbl tick according to the given type.
+function scheduleMimblTick( schedulingType: TickSchedulingType): void
+{
+    if (schedulingType === "mt")
+        queueMicrotask( performMimbleTick);
+    else if (schedulingType === "af")
+    {
+        // the update is scheduled in the next tick unless the request is made during a
+        // "before update" function execution.
+        if (s_schedulerState !== SchedulerState.BeforeUpdate)
+            requestAnimationFrameIfNeeded();
+    }
 }
 
 
@@ -243,16 +253,16 @@ function addNodeToScheduler( vn: VN): void
 
 // Determines whether the call to requestAnimationFrame should be made or the frame has already
 // been scheduled.
-function requestFrameIfNeeded(): void
+function requestAnimationFrameIfNeeded(): void
 {
-	if (!s_insideCallbackWrapper && s_scheduledFrameHandle === 0)
-		s_scheduledFrameHandle = requestAnimationFrame( onScheduledFrame);
+	if (s_scheduledFrameHandle === 0)
+		s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
 }
 
 
 
 // Callback that is called on a new UI cycle when there is a need to update UI components
-function onScheduledFrame(): void
+function onAnimationFrame(): void
 {
 	// clear the scheduled frame handle so that new update requests will
 	// schedule a new frame.

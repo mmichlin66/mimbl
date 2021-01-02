@@ -531,7 +531,7 @@ export class ElmVN extends VN implements IElmVN
 	// element. This method handles special cases of properties with non-trivial values.
 	private addEvent( name: string, rtd: EventRunTimeData): void
 	{
-		rtd.wrapper = wrapCallbackWithVN( rtd.func, rtd.funcThis ? rtd.funcThis : this.creator, this);
+		rtd.wrapper = wrapCallbackWithVN( rtd.func, rtd.funcThis ? rtd.funcThis : this.creator, this, "mt");
 		this.ownDN.addEventListener( name, rtd.wrapper, rtd.useCapture);
 
 		/// #if USE_STATS
@@ -627,7 +627,7 @@ export class ElmVN extends VN implements IElmVN
 			this.ownDN.removeEventListener( name, oldRTD.wrapper, oldRTD.useCapture);
 
 			// create new wrapper and add it as event listener
-            newRTD.wrapper = wrapCallbackWithVN( newRTD.func, newRTD.funcThis ? newRTD.funcThis : this.creator, this);
+            newRTD.wrapper = wrapCallbackWithVN( newRTD.func, newRTD.funcThis ? newRTD.funcThis : this.creator, this, "mt");
 			this.ownDN.addEventListener( name, newRTD.wrapper, newRTD.useCapture);
 
 			/// #if USE_STATS

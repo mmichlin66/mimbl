@@ -46,11 +46,6 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 				else
 					this.props[propName] = propVal;
 			}
-
-			// // if key property was not specified, use id; if id was not specified key will remain
-			// // undefined.
-			// if (this.key === undefined)
-			// 	this.key = props.id;
 		}
 
 		// remember children as part of props

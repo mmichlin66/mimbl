@@ -1204,6 +1204,21 @@ export function registerCustomEvent( eventName: string): void
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
+// The TickSchedulingType type defines possible ways of scheduling a Mimbl tick. The following
+// values are alowed:
+//   - "no" - no tick is scheduled.
+//   - "mt" - a microtask is scheduled.
+//   - "af" - an animation frame is scheduled.
+//   - number - a setTimeout is used with the gven number of milliseconds.
+//   - undefined or null - tick is scheduled using a method default for a given context.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+export type TickSchedulingType = "no" | "mt" | "af" | number | undefined | null;
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
 // Base component class.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1335,9 +1350,9 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * @returns Function that has the same signature as the given callback and that should be used
 	 *     instead of the original callback
 	 */
-	protected wrapCallback<T extends Function>( func: T, funcThis?: object, dontDoMimblTick?: boolean): T
+	protected wrapCallback<T extends Function>( func: T, funcThis?: object, schedulingType?: TickSchedulingType): T
 	{
-		return wrapCallbackWithVN( func, funcThis ? funcThis : this, this.vn, dontDoMimblTick);
+		return wrapCallbackWithVN( func, funcThis ? funcThis : this, this.vn, schedulingType);
 	}
 }
 
