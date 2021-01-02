@@ -1,5 +1,5 @@
 ﻿import {IErrorHandlingService} from "../api/mim"
-import {VN, DN} from "../internal"
+import {VN, DN, scheduleFuncCall} from "../internal"
 
 /// #if USE_STATS
 	import {StatsCategory} from "../utils/Stats"
@@ -187,7 +187,7 @@ export function unmountRoot( anchorDN: DN): void
 
 	// destruct the root node (asynchronously)
 	rootVN.setContent( null, false);
-	rootVN.scheduleCallAfterUpdate( () => rootVN.willUnmount() );
+    scheduleFuncCall( () => rootVN.willUnmount(), false);
 }
 
 

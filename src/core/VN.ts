@@ -194,32 +194,6 @@ export abstract class VN implements IVNode
 
 
 
-	/**
-	 * Schedules to call the given function before all the scheduled components have been updated.
-	 * @param func Function to be called.
-	 * @param funcThisArg Object to be used as the "this" value when the function is called. This parameter
-	 *   is not needed if the function is already bound or it is an arrow function.
-	 */
-	public scheduleCallBeforeUpdate( func: ScheduledFuncType, funcThisArg?: any): void
-	{
-		scheduleFuncCall( func, true, funcThisArg, this);
-	}
-
-
-
-	/**
-	 * Schedules to call the given function before all the scheduled components have been updated.
-	 * @param func Function to be called.
-	 * @param funcThisArg Object to be used as the "this" value when the function is called. This parameter
-	 *   is not needed if the function is already bound or it is an arrow function.
-	 */
-	public scheduleCallAfterUpdate( func: ScheduledFuncType, funcThisArg?: any): void
-	{
-		scheduleFuncCall( func, false, funcThisArg, this);
-	}
-
-
-
 	// Registers an object of any type as a service with the given ID that will be available for
 	// consumption by descendant nodes.
 	public publishService( id: string, service: any): void

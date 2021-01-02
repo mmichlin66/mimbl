@@ -4,7 +4,7 @@
 } from "../api/mim"
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo,
-    AttrPropInfo, EventPropInfo, getElmPropInfo, setElmProp, removeElmProp, updateElmProp, wrapCallbackWithVN
+    AttrPropInfo, EventPropInfo, getElmPropInfo, setElmProp, removeElmProp, updateElmProp, wrapCallback
 } from "../internal"
 
 /// #if USE_STATS
@@ -236,7 +236,7 @@ export class ElmVN extends VN implements IElmVN
 	{
         // we need to update attributes and events only if the new props are different from the
         // current ones
-        if (!s_deepCompare( this.props, newVN.props, 3))
+        if (this.creator !== newVN.creator || !s_deepCompare( this.props, newVN.props, 3))
         {
             if (newVN.props)
                 newVN.parseProps( newVN.props);
@@ -393,7 +393,7 @@ export class ElmVN extends VN implements IElmVN
 				}
 				else if (propType === PropType.Event)
 				{
-					let rtd = getPropAsEventRunTimeData( propInfo, propVal as EventPropType);
+					let rtd = this.getPropAsEventRunTimeData( propInfo, propVal as EventPropType);
 					if (rtd)
 					{
 						if (!this.events)
@@ -531,7 +531,7 @@ export class ElmVN extends VN implements IElmVN
 	// element. This method handles special cases of properties with non-trivial values.
 	private addEvent( name: string, rtd: EventRunTimeData): void
 	{
-		rtd.wrapper = wrapCallbackWithVN( rtd.func, rtd.funcThis ? rtd.funcThis : this.creator, this, "mt");
+		rtd.wrapper = wrapCallback( rtd.func, rtd.funcThisArg, this.creator, "mt");
 		this.ownDN.addEventListener( name, rtd.wrapper, rtd.useCapture);
 
 		/// #if USE_STATS
@@ -616,7 +616,7 @@ export class ElmVN extends VN implements IElmVN
 	{
 		// double-equal-sign for useCapture is on purpose, because useCapture can be undefined or boolean
 		if (oldRTD.func === newRTD.func &&
-			oldRTD.funcThis === newRTD.funcThis &&
+			oldRTD.funcThisArg === newRTD.funcThisArg &&
 			oldRTD.useCapture == newRTD.useCapture)
 		{
 			newRTD.wrapper = oldRTD.wrapper;
@@ -627,7 +627,7 @@ export class ElmVN extends VN implements IElmVN
 			this.ownDN.removeEventListener( name, oldRTD.wrapper, oldRTD.useCapture);
 
 			// create new wrapper and add it as event listener
-            newRTD.wrapper = wrapCallbackWithVN( newRTD.func, newRTD.funcThis ? newRTD.funcThis : this.creator, this, "mt");
+            newRTD.wrapper = wrapCallback( newRTD.func, newRTD.funcThisArg, this.creator, "mt");
 			this.ownDN.addEventListener( name, newRTD.wrapper, newRTD.useCapture);
 
 			/// #if USE_STATS
@@ -645,7 +645,7 @@ export class ElmVN extends VN implements IElmVN
 	private updateEventOnly( name: string, info: EventPropInfo, val: any ): void
 	{
         let oldRTD = this.events && this.events[name];
-        let newRTD = val != null && getPropAsEventRunTimeData( info, val as EventPropType);
+        let newRTD = val != null && this.getPropAsEventRunTimeData( info, val as EventPropType);
         if (!newRTD)
         {
             if (oldRTD)
@@ -671,6 +671,31 @@ export class ElmVN extends VN implements IElmVN
             }
         }
 	}
+
+
+
+    // Determines whether the given property value is of the type that is used for event handlers.
+    // If yes, then returns EventRunTimeData object; otherwise, returns undefined.
+    private getPropAsEventRunTimeData( info: EventPropInfo, propVal: EventPropType): EventRunTimeData
+    {
+        if (typeof propVal === "function")
+            return { info, func: propVal, funcThisArg: this.creator };
+        else if (Array.isArray(propVal))
+        {
+            if (propVal.length === 2)
+            {
+                if (typeof propVal[1] === "boolean")
+                    return { info, func: propVal[0], useCapture: propVal[1] as boolean, funcThisArg: this.creator };
+                else
+                    return { info, func: propVal[0], funcThisArg: propVal[1] ? propVal[1] : this.creator};
+            }
+            else if (propVal.length === 3)
+                return { info, func: propVal[0], funcThisArg: propVal[1] ? propVal[1] : this.creator, useCapture: propVal[2] as boolean };
+        }
+
+        // for all other type combinations the property is not treated as an event handler
+        return undefined;
+    }
 
 
 
@@ -881,7 +906,7 @@ interface EventRunTimeData
 	func: EventFuncType;
 
 	// Object that will be referenced by "this" within the invoked function
-	funcThis?: any;
+	funcThisArg?: any;
 
 	// Flag indicating whether this event should be used as Capturing (true) or Bubbling (false)
 	useCapture?: boolean;
@@ -908,31 +933,6 @@ interface CustomAttrRunTimeData
 	// Handler object that knows to deal with the property values
 	handler: ICustomAttributeHandler;
 };
-
-
-
-// Determines whether the given property value is of the type that is used for event handlers.
-// If yes, then returns EventRunTimeData object; otherwise, returns undefined.
-function getPropAsEventRunTimeData( info: EventPropInfo, propVal: EventPropType): EventRunTimeData
-{
-	if (typeof propVal === "function")
-		return { info, func: propVal };
-	else if (Array.isArray(propVal))
-	{
-		if (propVal.length === 2)
-		{
-			if (typeof propVal[1] === "boolean")
-				return { info, func: propVal[0], useCapture: propVal[1] as boolean };
-			else
-				return { info, func: propVal[0], funcThis: propVal[1] };
-		}
-		else if (propVal.length === 3)
-			return { info, func: propVal[0], funcThis: propVal[1], useCapture: propVal[2] as boolean };
-	}
-
-	// for all other type combinations the property is not treated as an event handler
-	return undefined;
-}
 
 
 

@@ -71,78 +71,65 @@ const enum SchedulerState
 
 
 /**
- * Wraps the given callback and returns a wrapper function which is executed in the context of the
- * given virtual node. The given "that" object will be the value of "this" when the callback is
- * executed. If the original callback throws an exception, it is processed by the Mimbl error
- * handling mechanism so that the exception bubles from this virtual node up the hierarchy until a
- * node/component that knows to handle errors is found.
- * @param callback Callback to be wrapped.
- * @param thisCallback Object that will be the value of "this" when the callback is executed.
- * @param vn Virtual node in whose context the callback will be executed.
+ * Wraps the given callback and returns a wrapper function which does the following things:
+ *   - Sets the given "creator" object as the current creator so that JSX execution can use it.
+ *   - Enters mutation scope for the duration of the callback execution
+ * @param func Callback to be wrapped.
+ * @param funcThisArg Object that will be the value of "this" when the callback is executed.
+ * @param creator Object that is set as the current creator to be used when JSX is parsed..
+ * @param schedulingType Type of scheduling a Mimbl tick.
  * @returns The wrapper function that should be used instead of the original callback.
  */
-export function wrapCallbackWithVN<T extends Function>( callback: T, thisCallback?: object,
-    vn?: IVNode, schedulingType?: TickSchedulingType): T
+export function wrapCallback<T extends Function>( func: T, funcThisArg: any,
+    creator: any, schedulingType: TickSchedulingType): T
 {
-    // // if "this" for the callback was not passed but vn was, check whether the vn is a component;
-    // // if yes, use it as "this"; otherwise, use vn's creator component.
-    // if (!thisCallback && vn)
-    //     thisCallback = (vn as any).comp != null ? (vn as any).comp : vn.creator;
-
-    return CallbackWrapper.bind( vn, thisCallback, callback, schedulingType);
+    // return CallbackWrapper.bind( { func, funcThisArg, creator, schedulingType });
+    return CallbackWrapper.bind( creator, func, funcThisArg, schedulingType);
 }
 
 
 
 /**
  * The CallbackWrapper function is used to wrap callbacks in order to have it executed in a Mimbl
- * context. The function is usually bound to a virtual node as "this" and to two parameters: the
- * object that will be the value of "this" when the original callback is executed and the original
- * callback itself. These two parameters are accessed as the first and second elements of the
- * `arguments` array). The rest of parameters in the `arguments` array are passed to the original
- * callback and the value returned by the callback is returned from the wrapper. Note that "this"
- * can be undefined if the function was scheduled without being in the context of any virtual node.
- *
- * The proper Mimbl context establishes the following:
- * - executes in a mutation scope, so that if any trigger valriable is changed during the execution
- *   of the callback, watchers will be only notified after the callback has finished its execution.
- * - If the wrapping has been done in the context of a virtual node (e.g. from a Mimbl component),
- *   the "current virtual node" and the "current component" are set to the node and component under
- *   which the callback was wrapped. This allows for proper JSX execution and for using the Mimbl
- *   error handling mechanism.
+ * context.
  *
  */
+// function CallbackWrapper( this: {func: Function, funcThisArg?: any, creator?: any, schedulingType: TickSchedulingType}): any
+// {
+//     let prevCreator = s_currentClassComp;
+//     s_currentClassComp = this.creator;
+//     enterMutationScope();
+
+//     try
+// 	{
+// 		let retVal = this.func.apply( this.funcThisArg, arguments);
+//         scheduleMimblTick( this.schedulingType);
+//         return retVal;
+// 	}
+// 	finally
+// 	{
+//         exitMutationScope();
+//         s_currentClassComp = prevCreator;
+//     }
+// }
 function CallbackWrapper(): any
 {
-	// remember the current VN and set the current VN to be the VN from the "this" value. Note
-	// that this can be undefined if the wrapping was created without the VN context.
-    let vn: VN = this;
+    let prevCreator = s_currentClassComp;
+    s_currentClassComp = this;
+    enterMutationScope();
 
-    let retVal: any;
-    let [funcThisArg, func, schedulingType, ...rest] = arguments;
-	try
+    try
 	{
-        enterMutationScope();
-		retVal = func.apply( funcThisArg, rest);
-	}
-	catch( err)
-	{
-        let errorService = vn?.getService( "StdErrorHandling");
-        if (errorService)
-            errorService.reportError( err, getVNPath( vn));
-        else
-            throw err;
+        let [func, funcThisArg, schedulingType, ...rest] = arguments;
+		let retVal = func.apply( funcThisArg, rest);
+        scheduleMimblTick( schedulingType);
+        return retVal;
 	}
 	finally
 	{
         exitMutationScope();
+        s_currentClassComp = prevCreator;
     }
-
-    // If requested, schedule to perform Mimble tick
-    if (schedulingType != null && schedulingType !== "no")
-        scheduleMimblTick( schedulingType);
-
-    return retVal;
 }
 
 
@@ -153,7 +140,25 @@ export function requestNodeUpdate( vn: VN): void
 	if (!vn.anchorDN)
 		console.warn( `Update requested for virtual node '${getVNPath(vn).join("->")}' that doesn't have anchor DOM node`)
 
-    addNodeToScheduler( vn);
+	// add this node to the map of nodes for which either update or replacement or
+	// deletion is scheduled. Note that a node will only be present once in the map no
+	// matter how many times it calls requestUpdate().
+	s_vnsScheduledForUpdate.add( vn);
+
+	// if this is a class-based component and it has beforeUpdate and/or afterUpdate methods
+	// implemented, schedule their executions. Note that the "beforeUpdate" method is not
+	// scheduled if the current scheduler state is BeforeUpdate. This is because the component
+	// will be updated in the current cycle and there is already no time to execute the "before
+	// update" method.
+	if (vn instanceof ClassCompVN)
+	{
+		let comp = vn.comp;
+		if (comp.beforeUpdate && s_schedulerState !== SchedulerState.BeforeUpdate)
+			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, wrapCallback( comp.beforeUpdate, comp, comp, "no"));
+
+		if (comp.afterUpdate)
+			s_callsScheduledAfterUpdate.set( comp.afterUpdate, wrapCallback( comp.beforeUpdate, comp, comp, "no"));
+	}
 
     // schedule Mimbl tick using animation frame. If this call comes from a wrapped callback,
     // the callback might schedule a tick using microtask. In this case, the animation frame
@@ -166,7 +171,7 @@ export function requestNodeUpdate( vn: VN): void
 // Schedules to call the given function either before or after all the scheduled components
 // have been updated.
 export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean,
-    funcThisArg?: any, vn?: IVNode): void
+    funcThisArg?: any, creator?: any): void
 {
 	/// #if DEBUG
 	if (!func)
@@ -180,7 +185,7 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 	{
 		if (!s_callsScheduledBeforeUpdate.has( func))
 		{
-			s_callsScheduledBeforeUpdate.set( func, wrapCallbackWithVN( func, funcThisArg, vn));
+			s_callsScheduledBeforeUpdate.set( func, wrapCallback( func, funcThisArg, creator, "no"));
 
 			// a "before update" function is always scheduled in the next frame even if the
 			// call is made from another "before update" function.
@@ -191,7 +196,7 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 	{
 		if (!s_callsScheduledAfterUpdate.has( func))
 		{
-			s_callsScheduledAfterUpdate.set( func, wrapCallbackWithVN( func, funcThisArg, vn));
+			s_callsScheduledAfterUpdate.set( func, wrapCallback( func, funcThisArg, creator, "no"));
 
 			// an "after update" function is scheduled in the next cycle unless the request is made
 			// either from a "before update" function execution or during a node update.
@@ -215,33 +220,6 @@ function scheduleMimblTick( schedulingType: TickSchedulingType): void
         if (s_schedulerState !== SchedulerState.BeforeUpdate)
             requestAnimationFrameIfNeeded();
     }
-}
-
-
-
-// Adds the given node and related information into the internal structures so that it will be
-// updated during the next Mimbl tick.
-function addNodeToScheduler( vn: VN): void
-{
-	// add this node to the map of nodes for which either update or replacement or
-	// deletion is scheduled. Note that a node will only be present once in the map no
-	// matter how many times it calls requestUpdate().
-	s_vnsScheduledForUpdate.add( vn);
-
-	// if this is a class-based component and it has beforeUpdate and/or afterUpdate methods
-	// implemented, schedule their executions. Note that the "beforeUpdate" method is not
-	// scheduled if the current scheduler state is BeforeUpdate. This is because the component
-	// will be updated in the current cycle and there is already no time to execute the "before
-	// update" method.
-	if (vn instanceof ClassCompVN)
-	{
-		let comp = vn.comp;
-		if (comp.beforeUpdate && s_schedulerState !== SchedulerState.BeforeUpdate)
-			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, wrapCallbackWithVN( comp.beforeUpdate, comp, vn));
-
-		if (comp.afterUpdate)
-			s_callsScheduledAfterUpdate.set( comp.afterUpdate, wrapCallbackWithVN( comp.beforeUpdate, comp, vn));
-	}
 }
 
 
@@ -383,7 +361,10 @@ function performUpdate( vnsScheduledForUpdate: Set<VN>): void
 
                     // if the component was already updated in this cycle, don't update it again
                     if (vn.lastUpdateTick !== s_currentTick)
+                    {
                         updateNodeChildren( {oldVN: vn, newVN: vn});
+                        s_currentClassComp = null;
+                    }
                 }
             }
             catch( err)

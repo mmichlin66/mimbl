@@ -1,7 +1,7 @@
 ﻿import {Styleset, IIDRule, ClassPropType} from "mimcss"
 import {
     PropType, EventSlot, mountRoot, unmountRoot, FuncProxyVN, TextVN,
-    wrapCallbackWithVN, registerElmProp, symJsxToVNs
+    wrapCallback, registerElmProp, symJsxToVNs, scheduleFuncCall
 } from "../internal";
 
 
@@ -975,22 +975,6 @@ export interface IVNode
 	/** This method is called by the component when it needs to be updated. */
 	requestUpdate(): void;
 
-	/**
-	 * Schedules to call the given function before all the scheduled components have been updated.
-	 * @param func Function to be called.
-	 * @param funcThisArg Object to be used as the "this" value when the function is called. This parameter
-	 *   is not needed if the function is already bound or it is an arrow function.
-	 */
-	scheduleCallBeforeUpdate( func: ScheduledFuncType, funcThisArg?: any): void;
-
-	/**
-	 * Schedules to call the given function before all the scheduled components have been updated.
-	 * @param func Function to be called.
-	 * @param funcThisArg Object to be used as the "this" value when the function is called. This parameter
-	 *   is not needed if the function is already bound or it is an arrow function.
-	 */
-	scheduleCallAfterUpdate( func: ScheduledFuncType, funcThisArg?: any): void;
-
 
 
 	/**
@@ -1210,11 +1194,10 @@ export function registerCustomEvent( eventName: string): void
 //   - "mt" - a microtask is scheduled.
 //   - "af" - an animation frame is scheduled.
 //   - number - a setTimeout is used with the gven number of milliseconds.
-//   - undefined or null - tick is scheduled using a method default for a given context.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-export type TickSchedulingType = "no" | "mt" | "af" | number | undefined | null;
+export type TickSchedulingType = "no" | "mt" | "af" | number;
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1294,8 +1277,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 */
 	protected callMeBeforeUpdate( func: ScheduledFuncType, funcThisArg?: any): void
 	{
-		if (this.vn)
-			this.vn.scheduleCallBeforeUpdate( func, funcThisArg ? funcThisArg : this);
+		scheduleFuncCall( func, true, funcThisArg ? funcThisArg : this, this);
 	}
 
 	/**
@@ -1309,8 +1291,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 */
 	protected callMeAfterUpdate( func: ScheduledFuncType, funcThisArg?: any): void
 	{
-		if (this.vn)
-			this.vn.scheduleCallAfterUpdate( func, funcThisArg ? funcThisArg : this);
+		scheduleFuncCall( func, false, funcThisArg ? funcThisArg : this, this);
 	}
 
 	/**
@@ -1344,15 +1325,18 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * ```
 	 *
 	 * @param func Method/function to be wrapped
-     * @param funcThis Optional value of "this" to bind the callback to. If this parameter is
+     * @param funcThisArg Optional value of "this" to bind the callback to. If this parameter is
      * undefined, the component instance will be used. This parameter will be ignored if the the
      * function is already bound or is an arrow function.
+	 * @param schedulingType Type determining whether and how a Mimbl tick should be scheduled
+     * after callback invocation.
 	 * @returns Function that has the same signature as the given callback and that should be used
 	 *     instead of the original callback
 	 */
-	protected wrapCallback<T extends Function>( func: T, funcThis?: object, schedulingType?: TickSchedulingType): T
+    protected wrapCallback<T extends Function>( func: T, funcThisArg: any = undefined,
+        schedulingType: TickSchedulingType = "no"): T
 	{
-		return wrapCallbackWithVN( func, funcThis ? funcThis : this, this.vn, schedulingType);
+		return wrapCallback( func, funcThisArg ? funcThisArg : this, this, schedulingType);
 	}
 }
 
