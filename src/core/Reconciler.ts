@@ -413,11 +413,8 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
     // if the node is already mounted, call its clone method if implemented.
     if (vn.anchorDN)
     {
-        let clone = vn;
         let fn = vn.clone;
-        if (fn)
-            clone = fn.call(vn);
-
+        let clone = fn ? fn.call(vn) : vn;
         if (clone === vn)
         {
             // if the clone method is not implemented or if it returns the same node, we move the
@@ -433,7 +430,7 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
             // if the clone method returns a new node, we replace the old node in the parent's
             // list of subnodes. Then we proceed with the mounting. We know that parent exists
             // because this method is not called on the RootVN.
-            vn.parent.subNodes[vn.index] = clone;
+            parent.subNodes[vn.index] = clone;
             vn = clone;
         }
     }
@@ -561,6 +558,7 @@ function unmountNode( vn: VN, removeOwnNode: boolean)
 function updateNodeChildren( disp: VNDisp): void
 {
 	let oldVN = disp.oldVN;
+	let newVN = disp.newVN;
     let ownDN = oldVN.ownDN;
 
     // we call the render method without try/catch. If it throws, the control goes to either the
@@ -569,8 +567,8 @@ function updateNodeChildren( disp: VNDisp): void
     // updated information from the new node. If, however, the old node doesn't have the render
     // method, we get the sub-nodes from the new node. For eample, ElmVN doesn't have the render
     // method but it has the sub-nodes filled in during the JSX operations.
-    let fn = oldVN.render;
-    let newSubNodes = fn ? createVNChainFromContent( fn.call( oldVN)) : disp.newVN.subNodes;
+    let fn: Function = oldVN.render;
+    let newSubNodes = fn ? createVNChainFromContent( fn.call( oldVN)) : newVN.subNodes;
     buildSubNodeDispositions( disp, newSubNodes);
 
     // remove from DOM the old nodes designated to be removed (that is, those for which there
@@ -629,7 +627,7 @@ function updateNodeChildren( disp: VNDisp): void
                 // content but we do it without try/catch this time; otherwise, we may end
                 // up in an infinite loop
                 oldVN.handleError( err);
-                newSubNodes = fn ? createVNChainFromContent( fn.call( oldVN)) : disp.newVN.subNodes;
+                newSubNodes = fn ? createVNChainFromContent( fn.call( oldVN)) : newVN.subNodes;
                 buildSubNodeDispositions( disp, newSubNodes);
                 if (!newSubNodes)
                     oldVN.subNodes = null;
@@ -637,6 +635,13 @@ function updateNodeChildren( disp: VNDisp): void
                     updateSubNodes( oldVN, disp, newSubNodes, anchorDN, beforeDN);
             }
         }
+    }
+
+    if (oldVN !== newVN)
+    {
+        // notify the new component that it will replace the old component.
+        fn = newVN.didUpdate;
+        fn && fn.call( oldVN);
     }
 
     // indicate that the node was updated in this cycle - this will prevent it from
@@ -1078,17 +1083,47 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
             oldUnkeyedList.push( oldVN);
     });
 
-    // remember the length of the unkeyed list;
-    let oldUnkeyedListLength = oldUnkeyedList.length;
-
     // prepare array for VNDisp objects for new nodes
     disp.subNodeDisps = new Array( newLen);
+    let subNodesToRemove: VN[] = [];
+    let hasUpdates = allowKeyedNodeRecycling
+        ? reconcileWithRecycling( newChain, oldKeyedMap, oldUnkeyedList, disp.subNodeDisps, subNodesToRemove)
+        : reconcileWithoutRecycling( newChain, oldKeyedMap, oldUnkeyedList, disp.subNodeDisps, subNodesToRemove);
+
+    // if we don't have any updates, this means that all old nodes should be deleted and all new
+    // nodes should be inserted.
+    if (!hasUpdates)
+    {
+        disp.replaceAllSubNodes = true;
+        disp.subNodeDisps = null;
+    }
+    else
+    {
+        if (subNodesToRemove.length > 0)
+            disp.subNodesToRemove = subNodesToRemove;
+
+        if (newLen > NO_GROUP_THRESHOLD)
+            buildSubNodeGroups( disp);
+    }
+}
+
+
+
+/**
+ * Reconciles new and old nodes without recycling non-matching keyed nodes.
+ */
+function reconcileWithoutRecycling( newChain: VN[], oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[],
+    subNodeDisps: VNDisp[], subNodesToRemove: VN[]): boolean
+{
+    // remember the length of the unkeyed list;
+    let oldUnkeyedListLength = oldUnkeyedList.length;
 
     // loop over new nodes and determine which ones should be updated, inserted or deleted
     let oldUnkeyedListIndex = 0;
     let subDisp: VNDisp;
     let hasUpdates = false;
     let oldVN: VN;
+    let key: any;
     newChain.forEach( (newVN, subNodeIndex) =>
     {
         // try to look up the old node by the new node's key if exists
@@ -1106,14 +1141,14 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
 
         // if we have old nodes in the unkeyed list and either the new node doesn't have key or
         // recyclining keyed nodes is allowed, use the next old unkeyed node
-        if (!oldVN && (allowKeyedNodeRecycling || !key) && oldUnkeyedListIndex != oldUnkeyedListLength)
+        if (!oldVN && !key && oldUnkeyedListIndex != oldUnkeyedListLength)
             oldVN = oldUnkeyedList[oldUnkeyedListIndex++];
 
         subDisp = { newVN };
         if (!oldVN)
             subDisp.action = VNDispAction.Insert;
         else if (oldVN === newVN ||
-            ((allowKeyedNodeRecycling || key === oldVN.key) && oldVN.constructor === newVN.constructor &&
+            (key === oldVN.key && oldVN.constructor === newVN.constructor &&
                 (oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN))))
         {
             // old node can be updated with information from the new node
@@ -1126,38 +1161,135 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
             // old node cannot be updated, so the new node will be inserted and the old node will
             // be removed
             subDisp.action = VNDispAction.Insert;
-            if (!disp.subNodesToRemove)
-                disp.subNodesToRemove = [];
-
-            disp.subNodesToRemove.push( oldVN);
+            subNodesToRemove.push( oldVN);
         }
 
-        disp.subNodeDisps[subNodeIndex] = subDisp;
+        subNodeDisps[subNodeIndex] = subDisp;
     });
 
-    // if we don't have any updates, this means that all old nodes should be deleted and all new
-    // nodes should be inserted.
-    if (!hasUpdates)
-    {
-        disp.replaceAllSubNodes = true;
-        disp.subNodeDisps = null;
-    }
-    else
+    if (hasUpdates)
     {
         // old nodes remaining in the keyed map and in the unkeyed list will be removed
-        if (oldKeyedMap.size > 0 || oldUnkeyedListIndex < oldUnkeyedListLength)
-        {
-            if (!disp.subNodesToRemove)
-                disp.subNodesToRemove = [];
+        oldKeyedMap.forEach( oldVN => subNodesToRemove.push( oldVN));
+        for( let i = oldUnkeyedListIndex; i < oldUnkeyedListLength; i++)
+            subNodesToRemove.push( oldUnkeyedList[i]);
+    }
 
-            oldKeyedMap.forEach( oldVN => disp.subNodesToRemove.push( oldVN));
-            for( let i = oldUnkeyedListIndex; i < oldUnkeyedListLength; i++)
-                disp.subNodesToRemove.push( oldUnkeyedList[i]);
+    return hasUpdates;
+}
+
+
+
+/**
+ * Reconciles new and old nodes with recycling non-matching keyed nodes.
+ */
+function reconcileWithRecycling( newChain: VN[], oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[],
+    subNodeDisps: VNDisp[], subNodesToRemove: VN[]): boolean
+{
+    // remember the length of the unkeyed list;
+    let oldUnkeyedListLength = oldUnkeyedList.length;
+
+    // loop over new nodes and determine which ones should be updated, inserted or deleted
+    let oldUnkeyedListIndex = 0;
+    let subDisp: VNDisp;
+    let hasUpdates = false;
+    let oldVN: VN;
+    let key: any;
+
+    // the array of unmatched disps will point to the VNDisp objects already in the subNodesDisps
+    let unmatchedDisps: VNDisp[] = [];
+    newChain.forEach( (newVN, subNodeIndex) =>
+    {
+        // try to look up the old node by the new node's key if exists
+        key = newVN.key;
+        oldVN = null;
+        if (key != null)
+        {
+            oldVN = oldKeyedMap.get( key);
+
+            // if we find the old node by the key, remove it from the map; after the
+            // reconciliation, all old nodes remaining in this map will be marked for removal.
+            if (oldVN)
+                oldKeyedMap.delete( key);
         }
 
-        if (newLen > NO_GROUP_THRESHOLD)
-            buildSubNodeGroups( disp);
+        // if we have old nodes in the unkeyed list and either the new node doesn't have key or
+        // recyclining keyed nodes is allowed, use the next old unkeyed node
+        if (!oldVN && oldUnkeyedListIndex != oldUnkeyedListLength)
+            oldVN = oldUnkeyedList[oldUnkeyedListIndex++];
+
+        subDisp = { newVN };
+        if (!oldVN)
+        {
+            // temporarily set the action to Insert but put the unmatched disp aside so that we can
+            // later try to reconcile it with an unmatched old VN
+            subDisp.action = VNDispAction.Insert;
+            unmatchedDisps.push( subDisp);
+        }
+        else if (oldVN === newVN ||
+            (oldVN.constructor === newVN.constructor &&
+                (oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN))))
+        {
+            // old node can be updated with information from the new node
+            subDisp.action = VNDispAction.Update;
+            subDisp.oldVN = oldVN;
+            hasUpdates = true;
+        }
+        else
+        {
+            // old node cannot be updated, so the new node will be inserted and the old node will
+            // be removed
+            subDisp.action = VNDispAction.Insert;
+            subNodesToRemove.push( oldVN);
+        }
+
+        subNodeDisps[subNodeIndex] = subDisp;
+    });
+
+    // if we have unmatched new nodes and the map of old keyed nodes is not empty, try using the
+    // old nodes for updates
+    if (oldKeyedMap.size > 0)
+    {
+        let unmatchedDispsLength = unmatchedDisps.length;
+        let unmatchedDispsIndex = 0;
+        let newVN: VN;
+        oldKeyedMap.forEach( oldVN =>
+        {
+            subDisp = unmatchedDispsIndex < unmatchedDispsLength ? unmatchedDisps[unmatchedDispsIndex++] : null;
+            if (!subDisp)
+                subNodesToRemove.push( oldVN);
+            else
+            {
+                newVN = subDisp.newVN;
+                if (oldVN === newVN ||
+                    (oldVN.constructor === newVN.constructor &&
+                        (oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN))))
+                {
+                    // old node can be updated with information from the new node
+                    subDisp.action = VNDispAction.Update;
+                    subDisp.oldVN = oldVN;
+                    hasUpdates = true;
+                }
+                else
+                {
+                    // old node cannot be updated, so it will be removed (the action on the subDisp is already Insert)
+                    subNodesToRemove.push( oldVN);
+                }
+            }
+        });
+
+        oldKeyedMap.clear();
     }
+
+    if (hasUpdates)
+    {
+        // old nodes remaining in the keyed map and in the unkeyed list will be removed
+        // oldKeyedMap.forEach( oldVN => subNodesToRemove.push( oldVN));
+        for( let i = oldUnkeyedListIndex; i < oldUnkeyedListLength; i++)
+            subNodesToRemove.push( oldUnkeyedList[i]);
+    }
+
+    return hasUpdates;
 }
 
 

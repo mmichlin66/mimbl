@@ -99,6 +99,12 @@ export interface IComponent<TProps = {}, TChildren = any>
     didMount?(): void;
 
     /**
+     * Notifies the component that it replaced the given old component. This allows the new
+     * component to copy whatever internal state it needs from the old component.
+     */
+    didReplace?( oldComp: IComponent<TProps, TChildren>): void;
+
+    /**
 	 * Notifies that the component's content is going to be removed from the DOM tree. After
 	 * this method returns the component is destroyed.
 	 */

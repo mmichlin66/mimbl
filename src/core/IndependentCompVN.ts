@@ -32,6 +32,16 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 
 
 
+	// Determines whether the update of this node from the given node is possible. The newVN
+	// parameter is guaranteed to point to a VN of the same type as this node.
+	public isUpdatePossible( newVN: IndependentCompVN): boolean
+	{
+		// update is possible if the component class is the same
+		return this.comp.constructor === newVN.comp.constructor;
+	}
+
+
+
 	// Updated this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node. The returned value indicates whether children
@@ -45,11 +55,30 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
         // we are here if the component instances are different; we need to prepare the old
         // instance for unmounting and the new one for mounting.
         this.unmount();
+        this.oldComp = this.comp;
         this.comp = this.key = newVN.comp;
         this.mount();
 
         return true;
 	}
+
+
+
+    // Notifies this node that it's children have been updated.
+	public didUpdate(): void
+	{
+        if (this.oldComp)
+        {
+            let fn = this.comp.didReplace;
+            fn && fn.call( this.comp, this.oldComp);
+            this.oldComp = undefined;
+        }
+	}
+
+
+    // if the node is recycled for a different component, this field keeps the old component
+    // until the didUpdate method is called.
+    private oldComp: IComponent;
 }
 
 

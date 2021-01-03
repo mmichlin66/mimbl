@@ -137,6 +137,11 @@ export abstract class VN implements IVNode
 	// should be updated (that is, this node's render method should be called).
 	public update?( newVN: VN): boolean;
 
+    /**
+     * Notifies this node that it's children have been updated.
+     */
+    public didUpdate?(): void;
+
 	// Determines whether the node supports handling of errors; that is, exception thrown during
 	// rendering of the node itself and/or its sub-nodes. If this method is not implemented the node
 	// doesn't support error handling.

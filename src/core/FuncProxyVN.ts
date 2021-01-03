@@ -1,5 +1,5 @@
 ﻿import {symRenderWatcher, RenderMethodType, IComponent} from "../api/mim"
-import {VN, createWatcher, IWatcher} from "../internal"
+import {VN, createWatcher, IWatcher, setCurrentClassComp} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -125,6 +125,7 @@ export class FuncProxyVN extends VN
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
+        setCurrentClassComp( this.creator);
 		return this.actFunc( this.arg);
 	}
 
