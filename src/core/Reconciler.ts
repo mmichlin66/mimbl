@@ -80,10 +80,9 @@ const enum SchedulerState
  * @param schedulingType Type of scheduling a Mimbl tick.
  * @returns The wrapper function that should be used instead of the original callback.
  */
-export function wrapCallback<T extends Function>( func: T, funcThisArg: any,
-    creator: any, schedulingType: TickSchedulingType): T
+export function wrapCallback<T extends Function>( func: T, funcThisArg?: any,
+    creator?: any, schedulingType?: TickSchedulingType): T
 {
-    // return CallbackWrapper.bind( { func, funcThisArg, creator, schedulingType });
     return CallbackWrapper.bind( creator, func, funcThisArg, schedulingType);
 }
 
@@ -92,44 +91,44 @@ export function wrapCallback<T extends Function>( func: T, funcThisArg: any,
 /**
  * The CallbackWrapper function is used to wrap callbacks in order to have it executed in a Mimbl
  * context.
- *
  */
-// function CallbackWrapper( this: {func: Function, funcThisArg?: any, creator?: any, schedulingType: TickSchedulingType}): any
-// {
-//     let prevCreator = s_currentClassComp;
-//     s_currentClassComp = this.creator;
-//     enterMutationScope();
-
-//     try
-// 	{
-// 		let retVal = this.func.apply( this.funcThisArg, arguments);
-//         scheduleMimblTick( this.schedulingType);
-//         return retVal;
-// 	}
-// 	finally
-// 	{
-//         exitMutationScope();
-//         s_currentClassComp = prevCreator;
-//     }
-// }
 function CallbackWrapper(): any
 {
+    // the "this" is the object to be used as the "current creator", so remember the current
+    // creator and set the new one
     let prevCreator = s_currentClassComp;
     s_currentClassComp = this;
+
+    // we don't want the triggers encountered during the callback execution to cuse the watchers
+    // to run immediately, so we enter mutation scope
     enterMutationScope();
 
+    let retVal: any, func: Function, funcThisArg: any, schedulingType: TickSchedulingType, rest: any[];
+    [func, funcThisArg, schedulingType, ...rest] = arguments;
     try
 	{
-        let [func, funcThisArg, schedulingType, ...rest] = arguments;
-		let retVal = func.apply( funcThisArg, rest);
-        scheduleMimblTick( schedulingType);
-        return retVal;
+		retVal = func.apply( funcThisArg, rest);
 	}
 	finally
 	{
+        // exit mutation scope and set the previous current object even if the callback threw
+        // an exception
         exitMutationScope();
         s_currentClassComp = prevCreator;
     }
+
+    // schedule a Mimbl tick if instructed to do so
+    if (schedulingType !== undefined)
+    {
+        if (schedulingType === "t")
+            queueMicrotask( performMimbleTick);
+        else if (schedulingType === "a")
+            requestAnimationFrameIfNeeded();
+        else if (schedulingType === "s")
+            performMimbleTick();
+    }
+
+    return retVal;
 }
 
 
@@ -154,16 +153,18 @@ export function requestNodeUpdate( vn: VN): void
 	{
 		let comp = vn.comp;
 		if (comp.beforeUpdate && s_schedulerState !== SchedulerState.BeforeUpdate)
-			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, wrapCallback( comp.beforeUpdate, comp, comp, "no"));
+			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, wrapCallback( comp.beforeUpdate, comp, comp));
 
 		if (comp.afterUpdate)
-			s_callsScheduledAfterUpdate.set( comp.afterUpdate, wrapCallback( comp.beforeUpdate, comp, comp, "no"));
+			s_callsScheduledAfterUpdate.set( comp.afterUpdate, wrapCallback( comp.beforeUpdate, comp, comp));
 	}
 
-    // schedule Mimbl tick using animation frame. If this call comes from a wrapped callback,
-    // the callback might schedule a tick using microtask. In this case, the animation frame
-    // will be canceled.
-    scheduleMimblTick( "af");
+    // schedule Mimbl tick using animation frame. If this call comes from a wrapped callback, the
+    // callback might schedule a tick using microtask. In this case, the animation frame will be
+    // canceled. The update is scheduled in the next tick unless the request is made during a
+    // "before update" function execution.
+    if (s_schedulerState !== SchedulerState.BeforeUpdate)
+        requestAnimationFrameIfNeeded();
 }
 
 
@@ -185,7 +186,7 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 	{
 		if (!s_callsScheduledBeforeUpdate.has( func))
 		{
-			s_callsScheduledBeforeUpdate.set( func, wrapCallback( func, funcThisArg, creator, "no"));
+			s_callsScheduledBeforeUpdate.set( func, wrapCallback( func, funcThisArg, creator));
 
 			// a "before update" function is always scheduled in the next frame even if the
 			// call is made from another "before update" function.
@@ -196,7 +197,7 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 	{
 		if (!s_callsScheduledAfterUpdate.has( func))
 		{
-			s_callsScheduledAfterUpdate.set( func, wrapCallback( func, funcThisArg, creator, "no"));
+			s_callsScheduledAfterUpdate.set( func, wrapCallback( func, funcThisArg, creator));
 
 			// an "after update" function is scheduled in the next cycle unless the request is made
 			// either from a "before update" function execution or during a node update.
@@ -204,22 +205,6 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 				requestAnimationFrameIfNeeded();
 		}
 	}
-}
-
-
-
-// Shedules a Mimbl tick according to the given type.
-function scheduleMimblTick( schedulingType: TickSchedulingType): void
-{
-    if (schedulingType === "mt")
-        queueMicrotask( performMimbleTick);
-    else if (schedulingType === "af")
-    {
-        // the update is scheduled in the next tick unless the request is made during a
-        // "before update" function execution.
-        if (s_schedulerState !== SchedulerState.BeforeUpdate)
-            requestAnimationFrameIfNeeded();
-    }
 }
 
 

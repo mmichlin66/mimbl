@@ -202,33 +202,43 @@ export type UpdateStrategy =
 export type EventFuncType<T extends Event = Event> = (e: T) => void;
 
 /**
- * Tuple combining the event handler type and object that will be bound as "this" when the handler
- * is invoked.
+ * Tuple containing parameters of event handler in the following order:
+ *   - Event handler function.
+ *   - Object that will be referenced by "this" within the event handler function.
+ *   - Type of scheduling the Mimbl tick after the event handler function returns.
+ *   - Object that will be set as "current creator" for JSX parsing during the event handler
+ *     function execution.
+ *   - Flag indicating whether this event should be used as Capturing (true) or Bubbling (false).
+ *
  * @typeparam T DOM event type, e.g. MouseEvent
  */
-export type EventFuncAndThisType<T extends Event> = [EventFuncType<T>, object];
+export type EventArrayType<T extends Event> = [EventFuncType<T>, any, TickSchedulingType, any, boolean];
 
-/**
- * Tuple combining the event handler type and the Boolean flag indicating whether the event
- * handler should be attached to the capture (true) or to the bubble (false) phase.
- * @typeparam T DOM event type, e.g. MouseEvent
- */
-export type EventFuncAndFlagType<T extends Event> = [EventFuncType<T>, boolean];
+// Type defining the information we keep about each event listener
+export type EventObjectType<T extends Event> =
+{
+	// Event handler function
+	func: EventFuncType<T>;
 
-/**
- * Tuple combining the event handler type, object that will be bound as "this" when the handler
- * is invoked and the Boolean flag indicating whether the event handler should be attached to the
- * capture (true) or to the bubble (false) phase.
- * @typeparam T DOM event type, e.g. MouseEvent
- */
-export type EventFuncAndThisAndFlagType<T extends Event> = [EventFuncType<T>, object, boolean];
+	// Object that will be referenced by "this" within the event handler function
+	funcThisArg?: any;
+
+	// Type of scheduling the Mimbl tick after the event handler function returns
+	schedulingType?: TickSchedulingType;
+
+    // Object that will be set as "current creator" for JSX parsing during the event handler
+    // function execution
+	creator?: any;
+
+	// Flag indicating whether this event should be used as Capturing (true) or Bubbling (false)
+	useCapture?: boolean;
+};
 
 /**
  * Union type that can be passed to an Element's event.
  * @typeparam T DOM event type, e.g. MouseEvent
  */
-export type EventPropType<T extends Event = Event> = EventFuncType<T> | EventFuncAndThisType<T> |
-				EventFuncAndFlagType<T> | EventFuncAndThisAndFlagType<T>;
+export type EventPropType<T extends Event = Event> = EventFuncType<T> | EventArrayType<T> | EventObjectType<T>;
 
 /**
  * Type for defining the id property of HTML elements
@@ -1196,14 +1206,15 @@ export function registerCustomEvent( eventName: string): void
 //
 // The TickSchedulingType type defines possible ways of scheduling a Mimbl tick. The following
 // values are alowed:
-//   - "no" - no tick is scheduled.
-//   - "mt" - a microtask is scheduled.
-//   - "af" - an animation frame is scheduled.
+//   - undefined - no tick is scheduled.
+//   - "t" - a microtask is scheduled.
+//   - "a" - an animation frame is scheduled.
+//   - "s" - the update is performed right away in a synchronous manner
 //   - number - a setTimeout is used with the gven number of milliseconds.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-export type TickSchedulingType = "no" | "mt" | "af" | number;
+export type TickSchedulingType = "s" | "t" | "a" | undefined;
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1339,8 +1350,8 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * @returns Function that has the same signature as the given callback and that should be used
 	 *     instead of the original callback
 	 */
-    protected wrapCallback<T extends Function>( func: T, funcThisArg: any = undefined,
-        schedulingType: TickSchedulingType = "no"): T
+    protected wrapCallback<T extends Function>( func: T, funcThisArg?: any,
+        schedulingType?: TickSchedulingType): T
 	{
 		return wrapCallback( func, funcThisArg ? funcThisArg : this, this, schedulingType);
 	}

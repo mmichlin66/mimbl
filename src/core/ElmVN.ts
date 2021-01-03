@@ -1,6 +1,6 @@
 ﻿import {
     IElmVN, setRef, EventFuncType, RefPropType, ICustomAttributeHandler,
-    IElementProps, ElmVNRef, IComponent, EventPropType
+    IElementProps, ElmVNRef, IComponent, EventPropType, TickSchedulingType
 } from "../api/mim"
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo,
@@ -376,7 +376,11 @@ export class ElmVN extends VN implements IElmVN
 			let propVal = props[propName];
 			if (propVal != null && propVal !== false)
 			{
-				// get information about the property and determine its type.
+                // get information about the property and determine its type. If the property is
+                // not explicitly registered (in ElmAttr) and the type of the property is either
+                // function or object (including array), then it is considered to be an event.
+                // Therefore, all regular attributes that can accept objects or arrays or functions
+                // must be explicitly registered.
 				let propInfo = getElmPropInfo( propName);
                 let propType = propInfo
                     ? propInfo.type
@@ -393,7 +397,7 @@ export class ElmVN extends VN implements IElmVN
 				}
 				else if (propType === PropType.Event)
 				{
-					let rtd = this.getPropAsEventRunTimeData( propInfo, propVal as EventPropType);
+					let rtd = this.getEventRTD( propInfo, propVal as EventPropType);
 					if (rtd)
 					{
 						if (!this.events)
@@ -531,7 +535,7 @@ export class ElmVN extends VN implements IElmVN
 	// element. This method handles special cases of properties with non-trivial values.
 	private addEvent( name: string, rtd: EventRunTimeData): void
 	{
-		rtd.wrapper = wrapCallback( rtd.func, rtd.funcThisArg, this.creator, "mt");
+		rtd.wrapper = wrapCallback( rtd.func, rtd.funcThisArg, rtd.creator, rtd.schedulingType);
 		this.ownDN.addEventListener( name, rtd.wrapper, rtd.useCapture);
 
 		/// #if USE_STATS
@@ -627,7 +631,7 @@ export class ElmVN extends VN implements IElmVN
 			this.ownDN.removeEventListener( name, oldRTD.wrapper, oldRTD.useCapture);
 
 			// create new wrapper and add it as event listener
-            newRTD.wrapper = wrapCallback( newRTD.func, newRTD.funcThisArg, this.creator, "mt");
+            newRTD.wrapper = wrapCallback( newRTD.func, newRTD.funcThisArg, newRTD.creator, newRTD.schedulingType);
 			this.ownDN.addEventListener( name, newRTD.wrapper, newRTD.useCapture);
 
 			/// #if USE_STATS
@@ -645,7 +649,7 @@ export class ElmVN extends VN implements IElmVN
 	private updateEventOnly( name: string, info: EventPropInfo, val: any ): void
 	{
         let oldRTD = this.events && this.events[name];
-        let newRTD = val != null && this.getPropAsEventRunTimeData( info, val as EventPropType);
+        let newRTD = val != null && this.getEventRTD( info, val as EventPropType);
         if (!newRTD)
         {
             if (oldRTD)
@@ -676,25 +680,26 @@ export class ElmVN extends VN implements IElmVN
 
     // Determines whether the given property value is of the type that is used for event handlers.
     // If yes, then returns EventRunTimeData object; otherwise, returns undefined.
-    private getPropAsEventRunTimeData( info: EventPropInfo, propVal: EventPropType): EventRunTimeData
+    private getEventRTD( info: EventPropInfo, propVal: EventPropType): EventRunTimeData
     {
         if (typeof propVal === "function")
-            return { info, func: propVal, funcThisArg: this.creator };
+            return { func: propVal, funcThisArg: this.creator, schedulingType: info ? info.schedulingType : undefined, creator: this.creator };
         else if (Array.isArray(propVal))
-        {
-            if (propVal.length === 2)
-            {
-                if (typeof propVal[1] === "boolean")
-                    return { info, func: propVal[0], useCapture: propVal[1] as boolean, funcThisArg: this.creator };
-                else
-                    return { info, func: propVal[0], funcThisArg: propVal[1] ? propVal[1] : this.creator};
-            }
-            else if (propVal.length === 3)
-                return { info, func: propVal[0], funcThisArg: propVal[1] ? propVal[1] : this.creator, useCapture: propVal[2] as boolean };
-        }
-
-        // for all other type combinations the property is not treated as an event handler
-        return undefined;
+            return {
+                func: propVal[0],
+                funcThisArg: propVal[1] ? propVal[1] : this.creator,
+                schedulingType: propVal[2] ? propVal[2] : info ? info.schedulingType : undefined,
+                creator: propVal[3] ? propVal[3] : this.creator,
+                useCapture: propVal[4]
+            };
+        else
+            return {
+                func: propVal.func,
+                funcThisArg: propVal.funcThisArg ? propVal.funcThisArg : this.creator,
+                schedulingType: propVal.schedulingType ? propVal.schedulingType : info ? info.schedulingType : undefined,
+                creator: propVal.creator ? propVal.creator : this.creator,
+                useCapture: propVal.useCapture
+            };
     }
 
 
@@ -899,14 +904,18 @@ interface AttrRunTimeData
 // Type defining the information we keep about each event listener
 interface EventRunTimeData
 {
-	// Information about this event - can be null
-	info: EventPropInfo;
-
-	// Original event callback passed as the value of the event property in JSX
+	// Original event handler function passed as the value of the event property in JSX
 	func: EventFuncType;
 
-	// Object that will be referenced by "this" within the invoked function
+	// Object that will be referenced by "this" within the event handler function
 	funcThisArg?: any;
+
+    // Object that will be set as "current creator" for JSX parsing during the event handler
+    // function execution
+	creator?: any;
+
+	// Type of scheduling the Mimbl tick after the event handler function returns
+	schedulingType?: TickSchedulingType;
 
 	// Flag indicating whether this event should be used as Capturing (true) or Bubbling (false)
 	useCapture?: boolean;

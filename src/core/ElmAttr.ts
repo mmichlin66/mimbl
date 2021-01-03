@@ -2,7 +2,7 @@
     Styleset, setElementStyle, SchedulerType, diffStylesets, StringStyleset, setElementStringStyle,
     MediaQuery, mediaQueryToString
 } from "mimcss"
-import {ICustomAttributeHandlerClass} from "../api/mim"
+import {ICustomAttributeHandlerClass, TickSchedulingType} from "../api/mim"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats";
@@ -93,6 +93,9 @@ export interface AttrPropInfo extends PropInfoBase
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export interface EventPropInfo extends PropInfoBase
 {
+	// Type of scheduling the Mimbl tick after the event handler function returns
+	schedulingType?: TickSchedulingType;
+
 	// Flag indicating whether the event bubbles. If the event doesn't bubble, the event handler
 	// must be set on the element itself; otherwise, the event handler can be set on the root
 	// anchor element, which allows having a single event handler registered for many elements,
@@ -143,7 +146,7 @@ let propInfos: {[P:string]: PropInfo} =
     defaultChecked: { type: PropType.Attr, set: setCheckedProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
 
     // frequently used events for speeding up the lookup
-    click: { type: PropType.Event },
+    click: { type: PropType.Event, schedulingType: "t" },
 
     // // events
     // mouseenter: { type: PropType.Event, isBubbling: false },
