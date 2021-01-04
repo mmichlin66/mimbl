@@ -847,12 +847,6 @@ class NonSlotContainerHandler implements ProxyHandler<any>
         return Reflect.getOwnPropertyDescriptor( target, prop);
     }
 
-    enumerate( target: any): PropertyKey[]
-    {
-        this.trigger.notifyRead();
-        return Array.from( Reflect.enumerate( target));
-    }
-
     ownKeys( target: any): PropertyKey[]
     {
         this.trigger.notifyRead();

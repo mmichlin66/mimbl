@@ -12,8 +12,7 @@ import * as mim from "../api/mim"
 import * as css from "mimcss"
 import {PromiseEx, createPromiseEx} from "../api/UtilAPI";
 import {trigger} from "../internal";
-import { MultiEventSlot, createMultiEventSlot } from "../utils/EventSlot";
-import { computed } from "../utils/TriggerWatcher";
+import {MultiEventSlot, createMultiEventSlot} from "../utils/EventSlot";
 
 
 

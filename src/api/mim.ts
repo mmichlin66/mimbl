@@ -912,9 +912,6 @@ class RefProxyHandler implements ProxyHandler<any>
     public getOwnPropertyDescriptor( target: any, prop: PropertyKey): PropertyDescriptor | undefined
         { return Reflect.getOwnPropertyDescriptor( this.obj, prop); }
 
-    public enumerate( target: any): PropertyKey[]
-        { return Array.from( Reflect.enumerate( this.enumerate)); }
-
     public ownKeys( target: any): PropertyKey[]
         { return Reflect.ownKeys( this.obj); }
 
