@@ -1,7 +1,7 @@
 ﻿import {Styleset, IIDRule, ClassPropType} from "mimcss"
 import {
     PropType, EventSlot, mountRoot, unmountRoot, FuncProxyVN, TextVN,
-    wrapCallback, registerElmProp, symJsxToVNs, scheduleFuncCall
+    wrapCallback, registerElmProp, symJsxToVNs, scheduleFuncCall, ElmRef
 } from "../internal";
 
 
@@ -272,19 +272,13 @@ export interface ICommonProps
  * The IElementProps interface defines standard properties (attributes and event listeners)
  * that can be used on all HTML and SVG elements.
  */
-export interface IElementProps<TRef extends Element = Element,TChildren = any> extends ICommonProps
+export interface IElementProps<TRef extends Element = Element, TChildren = any> extends ICommonProps
 {
 	/**
 	 * Reference that will be set to the instance of the element after it is created (mounted). The
 	 * reference will be set to undefined after the element is unmounted.
 	 */
-	ref?: RefPropType<TRef>;
-
-	/**
-	 * Reference that will be set to the virtual node corresponding to the element after it is
-     * created (mounted). The reference will be set to undefined after the element is unmounted.
-	 */
-	vnref?: ElmVNRef<TRef>;
+	ref?: IElmRef<TRef>;
 
 	/**
 	 * Update strategy object that determines different aspects of element behavior during updates.
@@ -750,19 +744,32 @@ export type ScheduledFuncType = () => void;
 
 
 /**
- * The ElmVNRef class represents a reference to the element virtual node. Objects of this class
- * can be created and passed to the `vnref` property of an element. After the element is rendered
+ * The IElmRef interface represents a reference to the element virtual node. Such objects
+ * can be created and passed to the `ref` property of an element. After the element is rendered
  * the object can be used to schedule updates to the element directly - that is, without updating
  * the component that rendered the element. This, for example, can be used to update properties
  * of the element without causing re-rendering of its children.
  */
-export class ElmVNRef<T extends Element = Element>
+export interface IElmRef<T extends Element = Element>
 {
 	/** Reference to the virtual node corresponding to the element */
-	public vn: IElmVN<T>;
+	readonly vn: IElmVN<T>;
 
-	/** Get accessor for the element */
-	public get r(): T { return this.vn?.elm as T; }
+	/** Reference to the element itself */
+	readonly elm: T;
+}
+
+/**
+ * Defines event handler that is invoked when reference value changes.
+ */
+export type ElmRefFunc<T extends Element = Element> = (vn: IElmVN<T>, elm: T) => void;
+
+/**
+ * Creates an object that serves as a reference to the element and its virtual node.
+ */
+export function createElmRef<T extends Element>( listener?: ElmRefFunc<T>): IElmRef<T>
+{
+    return new ElmRef<T>( listener);
 }
 
 

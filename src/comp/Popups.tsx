@@ -880,7 +880,7 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
             this.callMeAfterUpdate( () =>
             {
                 let info = this.buttons.get( this.options?.defaultButton);
-                info && info.elm.focus();
+                info && info.ref.elm.focus();
             })
         }
 	}
@@ -926,7 +926,7 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
     {
         return <div class={this.buttonBarClassName}>
             {Array.from( this.buttons.values()).map( info =>
-                <button id={info.btn.id} ref={info.elm} class={this.buttonClassName} click={() => this.onButtonClicked(info)}>
+                <button id={info.btn.id} ref={info.ref} class={this.buttonClassName} click={() => this.onButtonClicked(info)}>
                     {info.btn.content}
                 </button>
             )}
@@ -1009,13 +1009,14 @@ class DialogButtonInfo
         this.btn = btn;
         this.disabled = btn.disabled;
         this.tabIndex = tabIndex;
+        this.ref = mim.createElmRef();
     }
 
     /** Input information about the button. */
     btn: IDialogButton;
 
     /** Refernce to the button element. */
-    @mim.ref elm: HTMLButtonElement;
+    ref: mim.IElmRef<HTMLButtonElement>;
 
     /** Tab index to use for the button the button. */
     tabIndex: number;

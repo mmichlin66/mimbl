@@ -1,10 +1,10 @@
 ﻿import {
-    IElmVN, setRef, EventFuncType, RefPropType, ICustomAttributeHandler,
-    IElementProps, ElmVNRef, IComponent, EventPropType, TickSchedulingType
+    IElmVN, EventFuncType, ICustomAttributeHandler, IElementProps, IElmRef, IComponent,
+    EventPropType, TickSchedulingType, RefFunc, ElmRefFunc
 } from "../api/mim"
 import {
-    VN, s_deepCompare, PropType, CustomAttrPropInfo,
-    AttrPropInfo, EventPropInfo, getElmPropInfo, setElmProp, removeElmProp, updateElmProp, wrapCallback
+    VN, s_deepCompare, PropType, CustomAttrPropInfo, AttrPropInfo, EventPropInfo,
+    getElmPropInfo, setElmProp, removeElmProp, updateElmProp, wrapCallback, EventSlot
 } from "../internal"
 
 /// #if USE_STATS
@@ -13,19 +13,20 @@ import {
 
 
 
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Represents a DOM element created using JSX.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class ElmVN extends VN implements IElmVN
+export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 {
 	// Tag name of an Element.
 	public elmName: string;
 
 	// Instance of an Element. The instance is created when the node is rendered for the first
 	// time.
-	public get elm(): Element { return this.ownDN as Element }
+	public get elm(): T { return this.ownDN; }
 
 	// Flag indicating whether the Element is SVG (as opposed to HTLM). There are some SVG
 	// elements that have the same name as regular elements (e.g. <a>). Therefore, in order to
@@ -96,14 +97,6 @@ export class ElmVN extends VN implements IElmVN
 
 
 
-	// // Generates list of sub-nodes according to the current state
-	// public render(): any
-	// {
-	// 	return this.children;
-	// }
-
-
-
     // Creates a virtual node as a "clone" of this one. This method is invoked when an already
     // mounted node is returned during rendering. The method can either create a new virtual
     // node or it can mark the node in a special way and return the same instance. If this method
@@ -128,7 +121,7 @@ export class ElmVN extends VN implements IElmVN
         if (clonedFrom && clonedFrom.ownDN)
         {
             // we don't clone the children (if any) because they will be cloned by our sub-nodes
-            this.ownDN = clonedFrom.ownDN.cloneNode( false);
+            this.ownDN = clonedFrom.ownDN.cloneNode( false) as T;
 
             // copy information about attributes and events
             this.attrs = clonedFrom.attrs;
@@ -145,7 +138,7 @@ export class ElmVN extends VN implements IElmVN
             if (this.props?.xmlns)
             {
                 this.isSvg = this.props.xmlns.endsWith( "svg");
-                this.ownDN = document.createElementNS( this.props.xmlns, this.elmName);
+                this.ownDN = document.createElementNS( this.props.xmlns, this.elmName) as any as T;
             }
             else
             {
@@ -156,8 +149,8 @@ export class ElmVN extends VN implements IElmVN
                     : svgInfo === false || this.anchorDN.namespaceURI.endsWith( "svg");
 
                 this.ownDN = this.isSvg
-                    ? document.createElementNS( SvgNamespace, getSvgElmName( svgInfo, this.elmName))
-                    : document.createElement( this.elmName);
+                    ? document.createElementNS( SvgNamespace, getSvgElmName( svgInfo, this.elmName)) as T
+                    : document.createElement( this.elmName) as any as T;
             }
 
             // translate properties into attributes, events and custom attributes
@@ -178,10 +171,7 @@ export class ElmVN extends VN implements IElmVN
             this.addCustomAttrs();
 
         if (this.ref)
-            setRef( this.ref, this.ownDN);
-
-        if (this.vnref)
-            this.vnref.vn = this;
+            this.ref.vn = this;
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Added);
@@ -194,14 +184,11 @@ export class ElmVN extends VN implements IElmVN
 	public unmount(): void
 	{
 		// unset the reference value if specified. We check whether the reference still points
-		// to our element before setting it to undefined. If the same Ref object is used for
+		// to our element before setting it to undefined. If the same ElmRef object is used for
 		// more than one element (and/or components) it can happen that the reference is changed
 		// before our element is unmounted.
-		if (this.ref)
-			setRef( this.ref, undefined, this.ownDN);
-
-		if (this.vnref)
-			this.vnref = undefined;
+        if (this.ref && this.ref.vn === this)
+            this.ref.vn = undefined;
 
 		// terminate custom property handlers
 		if (this.customAttrs)
@@ -250,19 +237,7 @@ export class ElmVN extends VN implements IElmVN
                 // if reference is now specified, set it now; note that we already determined that
                 // the reference object is different.
                 if (this.ref)
-                    setRef( this.ref, this.ownDN);
-            }
-
-            // if virtual node reference specification changed then set or unset it as necessary
-            if (newVN.vnref !== this.vnref)
-            {
-                // remember the new reference specification
-                this.vnref = newVN.vnref;
-
-                // if reference is now specified, set it now; note that we already determined that
-                // the reference object is different.
-                if (this.vnref)
-                    this.vnref.vn = this;
+                    this.ref.vn = this;
             }
 
             // remember the new value of the key and updateStartegyproperties (even if the
@@ -340,20 +315,7 @@ export class ElmVN extends VN implements IElmVN
                         // if reference is now specified, set it now; note that we already determined that
                         // the reference object is different.
                         if (propVal)
-                            setRef( propVal, this.ownDN);
-                    }
-                }
-                else if (propName === "vnref")
-                {
-                    if (propVal !== this.vnref)
-                    {
-                        // remember the new reference specification
-                        this.vnref = propVal;
-
-                        // if reference is now specified, set it now; note that we already determined that
-                        // the reference object is different.
-                        if (propVal)
-                            propVal.vn = this;
+                            this.ref.vn = this;
                     }
                 }
                 else if (propName === "updateStrategy")
@@ -410,8 +372,6 @@ export class ElmVN extends VN implements IElmVN
                 {
                     if (propName === "ref")
                         this.ref = propVal;
-                    else if (propName === "vnref")
-                        this.vnref = propVal;
                     else if (propName === "updateStrategy")
                         this.updateStrategy = propVal;
                 }
@@ -433,7 +393,7 @@ export class ElmVN extends VN implements IElmVN
 		for( let name in this.attrs)
 		{
 			let rtd = this.attrs[name];
-			setElmProp( this.ownDN as Element, name, rtd.info, rtd.val);
+			setElmProp( this.ownDN, name, rtd.info, rtd.val);
 		}
 	}
 
@@ -443,7 +403,7 @@ export class ElmVN extends VN implements IElmVN
 	private updateAttrs( newAttrs: { [name: string]: AttrRunTimeData }): void
 	{
 		// "cache" several members for faster access
-		let elm = this.ownDN as Element;
+		let elm = this.ownDN;
 		let oldAttrs = this.attrs;
 
 		// loop over existing attributes, remove those that are not found among the new ones and
@@ -498,7 +458,7 @@ export class ElmVN extends VN implements IElmVN
         {
             if (oldAttr)
             {
-                removeElmProp( this.ownDN as Element, name, info)
+                removeElmProp( this.ownDN, name, info)
                 delete this.attrs[name];
             }
         }
@@ -506,12 +466,12 @@ export class ElmVN extends VN implements IElmVN
         {
             if (oldAttr)
             {
-                updateElmProp( this.ownDN as Element, name, info, oldAttr.val, val)
+                updateElmProp( this.ownDN, name, info, oldAttr.val, val)
                 oldAttr.val = val;
             }
             else
             {
-                setElmProp( this.ownDN as Element, name, info, val);
+                setElmProp( this.ownDN, name, info, val);
                 if (!this.attrs)
                     this.attrs = {};
 
@@ -859,17 +819,14 @@ export class ElmVN extends VN implements IElmVN
 	// Properties that were passed to the element.
 	private props: any;
 
-	// // Array of children objects.
-	// private children: any[];
-
 	// If this virtual node was cloned from another node, points to the original node.
 	public clonedFrom: ElmVN;
 
-	// Reference to the element that is specified as a "ref" property.
-	private ref: RefPropType;
+    // Redefine the ownDN property from VN to be of the Element type
+	public ownDN: T;
 
-	// Reference to the virtual node that is specified as a "vnref" property.
-	private vnref: ElmVNRef;
+    // Reference to the element that is specified as a "ref" property.
+	private ref: ElmRef;
 
 	// Object that serves as a map between attribute names and their current values.
 	private attrs: { [name: string]: AttrRunTimeData };
@@ -1062,6 +1019,57 @@ function getSvgElmName( info: SvgElmInfo, tagName: string): string | undefined
     return typeof info === "string" ? info as string : tagName;
 }
 
+
+
+// Symbol used to keep the referenced object inside the Ref class instance.
+let symRef = Symbol();
+
+/**
+ * The ElmVNRef class represents a reference to the element virtual node. Objects of this class
+ * can be created and passed to the `vnref` property of an element. After the element is rendered
+ * the object can be used to schedule updates to the element directly - that is, without updating
+ * the component that rendered the element. This, for example, can be used to update properties
+ * of the element without causing re-rendering of its children.
+ */
+export class ElmRef<T extends Element = Element> implements IElmRef<T>
+{
+	/** Event that is fired when the referenced value changes */
+	private event = new EventSlot<ElmRefFunc<T>>();
+
+	constructor( listener?: ElmRefFunc<T>)
+	{
+		if (listener !== undefined)
+			this.event.attach( listener);
+	}
+
+	/** Adds a callback that will be invoked when the value of the reference changes. */
+	public addListener( listener: ElmRefFunc<T>)
+	{
+		this.event.attach( listener);
+	}
+
+	/** Removes a callback that was added with addListener. */
+	public removeListener( listener: ElmRefFunc<T>)
+	{
+		this.event.detach( listener);
+	}
+
+	/** Get accessor for the referenced value */
+	public get vn(): ElmVN<T> { return this[symRef]; }
+
+	/** Set accessor for the referenced value */
+	public set vn( newRef: ElmVN<T>)
+	{
+		if (this[symRef] !== newRef)
+		{
+			this[symRef] = newRef;
+			this.event.fire( newRef, newRef?.elm);
+		}
+    }
+
+	/** Reference to the element itself */
+	public get elm(): T { return this[symRef]?.ownDN};
+}
 
 
 

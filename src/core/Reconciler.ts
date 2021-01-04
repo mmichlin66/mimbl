@@ -522,10 +522,10 @@ function unmountNode( vn: VN, removeOwnNode: boolean)
 	{
         // DOM nodes of sub-nodes don't need to be removed if either the upper DOM node has
         // already been removed or our own DOM node is removed (true is only passed further if
-        // our parameter was true and we don't have own DN).
-		for( let svn of vn.subNodes)
-            unmountNode( svn, removeOwnNode && !ownDN);
-
+        // our parameter was true and we don't have own DN). It can happen that if errors occur,
+        // some elements in the VN.subNodes array are left empty. The forEach function skips
+        // over empty slots.
+        vn.subNodes.forEach( svn => unmountNode( svn, removeOwnNode && !ownDN));
         vn.subNodes = null;
     }
 
