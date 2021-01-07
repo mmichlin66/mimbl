@@ -1,7 +1,7 @@
 ﻿import {Styleset, IIDRule, ClassPropType} from "mimcss"
 import {
     PropType, EventSlot, mountRoot, unmountRoot, FuncProxyVN, TextVN,
-    wrapCallback, registerElmProp, symJsxToVNs, scheduleFuncCall, ElmRef
+    wrapCallback, registerElmProp, symJsxToVNs, scheduleFuncCall
 } from "../internal";
 
 
@@ -212,7 +212,7 @@ export type EventFuncType<T extends Event = Event> = (e: T) => void;
  *
  * @typeparam T DOM event type, e.g. MouseEvent
  */
-export type EventArrayType<T extends Event> = [EventFuncType<T>, any, TickSchedulingType, any, boolean];
+export type EventArrayType<T extends Event> = [EventFuncType<T>, any?, TickSchedulingType?, any?, boolean?];
 
 // Type defining the information we keep about each event listener
 export type EventObjectType<T extends Event> =
@@ -278,7 +278,13 @@ export interface IElementProps<TRef extends Element = Element, TChildren = any> 
 	 * Reference that will be set to the instance of the element after it is created (mounted). The
 	 * reference will be set to undefined after the element is unmounted.
 	 */
-	ref?: IElmRef<TRef>;
+	ref?: RefPropType<TRef>;
+
+	/**
+	 * Reference that will be set to the instance of the element after it is created (mounted). The
+	 * reference will be set to undefined after the element is unmounted.
+	 */
+	vnref?: ElmRefPropType<TRef>;
 
 	/**
 	 * Update strategy object that determines different aspects of element behavior during updates.
@@ -744,37 +750,6 @@ export type ScheduledFuncType = () => void;
 
 
 /**
- * The IElmRef interface represents a reference to the element virtual node. Such objects
- * can be created and passed to the `ref` property of an element. After the element is rendered
- * the object can be used to schedule updates to the element directly - that is, without updating
- * the component that rendered the element. This, for example, can be used to update properties
- * of the element without causing re-rendering of its children.
- */
-export interface IElmRef<T extends Element = Element>
-{
-	/** Reference to the virtual node corresponding to the element */
-	readonly vn: IElmVN<T>;
-
-	/** Reference to the element itself */
-	readonly elm: T;
-}
-
-/**
- * Defines event handler that is invoked when reference value changes.
- */
-export type ElmRefFunc<T extends Element = Element> = (vn: IElmVN<T>, elm: T) => void;
-
-/**
- * Creates an object that serves as a reference to the element and its virtual node.
- */
-export function createElmRef<T extends Element>( listener?: ElmRefFunc<T>): IElmRef<T>
-{
-    return new ElmRef<T>( listener);
-}
-
-
-
-/**
  * Defines event handler that is invoked when reference value changes.
  */
 export type RefFunc<T = any> = (newRef: T) => void;
@@ -791,12 +766,15 @@ let symRef = Symbol("symRef");
 export class Ref<T = any>
 {
 	/** Event that is fired when the referenced value changes */
-	private changedEvent = new EventSlot<RefFunc<T>>();
+	private changedEvent: EventSlot<RefFunc<T>>;
 
 	constructor( listener?: RefFunc<T>, initialReferene?: T)
 	{
-		if (listener !== undefined)
-			this.changedEvent.attach( listener);
+        if (listener !== undefined)
+        {
+            this.changedEvent = new EventSlot<RefFunc<T>>();
+            this.changedEvent.attach( listener);
+        }
 
 		this[symRef] = initialReferene;
 	}
@@ -804,28 +782,62 @@ export class Ref<T = any>
 	/** Adds a callback that will be invoked when the value of the reference changes. */
 	public addListener( listener: RefFunc<T>)
 	{
-		this.changedEvent.attach( listener);
+        if (!this.changedEvent)
+            this.changedEvent = new EventSlot<RefFunc<T>>();
+
+            this.changedEvent.attach( listener);
 	}
 
 	/** Removes a callback that was added with addListener. */
 	public removeListener( listener: RefFunc<T>)
 	{
-		this.changedEvent.detach( listener);
+        if (this.changedEvent)
+		    this.changedEvent.detach( listener);
 	}
 
 	/** Get accessor for the reference value */
 	public get r(): T { return this[symRef]; }
 
 	/** Set accessor for the reference value */
-	public set r( newRef: T)
+	public set r( v: T)
 	{
-		if (this[symRef] !== newRef)
+		if (this[symRef] !== v)
 		{
-			this[symRef] = newRef;
-			this.changedEvent.fire( newRef);
+			this[symRef] = v;
+			if (this.changedEvent)
+		        this.changedEvent.fire( v);
 		}
 	}
 }
+
+
+
+/**
+ * The ElmRef class represents a reference to the element virtual node. Such objects
+ * can be created and passed to the `ref` property of an element. After the element is rendered
+ * the object can be used to schedule updates to the element directly - that is, without updating
+ * the component that rendered the element. This, for example, can be used to update properties
+ * of the element without causing re-rendering of its children.
+ */
+export class ElmRef<T extends Element = Element> extends Ref<IElmVN<T>> {}
+
+/**
+ * Defines event handler that is invoked when reference value changes.
+ */
+export type ElmRefFunc<T extends Element = Element> = RefFunc<IElmVN<T>>;
+
+
+
+/**
+ * Type of ref property that can be passed to JSX elements and components. This can be either the
+ * [[Ref]] class or [[RefFunc]] function.
+ */
+export type RefPropType<T = any> = T | Ref<T> | RefFunc<T>;
+
+/**
+ * Type of vnref property that can be passed to JSX elements.
+ */
+export type ElmRefPropType<T extends Element = Element> = RefPropType<IElmVN<T>>;
 
 
 
@@ -837,7 +849,7 @@ export class Ref<T = any>
  * class A extends Component
  * {
  *     @ref myDiv: HTMLDivElement;
- *     render() { return <div ref={myDiv}>Hello</div>; }
+ *     render() { return <div ref={this.myDiv}>Hello</div>; }
  * }
  * ```
  *
@@ -851,9 +863,8 @@ export function ref( target: any, name: string)
         let handler = obj[sym];
         if (!handler)
         {
-            handler = new RefProxyHandler();
+            obj[sym] = handler = new RefProxyHandler();
             handler.proxy = new Proxy( {}, handler);
-            obj[sym] = handler;
         }
 
         return handler;
@@ -923,14 +934,6 @@ class RefProxyHandler implements ProxyHandler<any>
         { return Reflect.ownKeys( this.obj); }
 
 }
-
-
-
-/**
- * Type of ref property that can be passed to JSX elements and components. This can be either the
- * [[Ref]] class or [[RefFunc]] function.
- */
-export type RefPropType<T = any> = T | Ref<T> | RefFunc<T>;
 
 
 

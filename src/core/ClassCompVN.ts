@@ -92,8 +92,10 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-        setCurrentClassComp( this.comp);
-        return this.actRender();
+        let prevCreator = setCurrentClassComp( this.comp);
+        let ret = this.actRender();
+        setCurrentClassComp( prevCreator);
+        return ret;
 	}
 
 
@@ -102,8 +104,9 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	// and/or its sub-nodes.
 	public handleError( err: any): void
 	{
-        setCurrentClassComp( this.comp);
+        let prevCreator = setCurrentClassComp( this.comp);
 		this.comp.handleError( err);
+        setCurrentClassComp( prevCreator);
 	}
 
 
@@ -116,8 +119,9 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         let fn: Function = this.comp.willMount;
         if (fn)
         {
-            setCurrentClassComp( this.comp);
+            let prevCreator = setCurrentClassComp( this.comp);
             fn.call( this.comp);
+            setCurrentClassComp( prevCreator);
         }
 
         /// #if USE_STATS
@@ -138,7 +142,9 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
             // need try/catch but only to log
             try
             {
+                let prevCreator = setCurrentClassComp( this.comp);
                 fn.call( this.comp);
+                setCurrentClassComp( prevCreator);
             }
             catch( err)
             {

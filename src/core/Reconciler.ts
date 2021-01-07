@@ -45,9 +45,11 @@ let s_currentTick: number = 0;
 let s_currentClassComp: IComponent = null;
 
 // Sets the given object as the current "creator" object.
-export function setCurrentClassComp( comp: IComponent): void
+export function setCurrentClassComp( comp: IComponent): IComponent
 {
+    let prevComp = s_currentClassComp;
     s_currentClassComp = comp;
+    return prevComp;
 }
 
 
@@ -1481,12 +1483,9 @@ function getNextDNUnderSameAnchorDN( vn: VN, anchorDN: DN): DN
 // Returns array of node names starting with this node and up until the top-level node.
 function getVNPath( vn: VN): string[]
 {
-	let depth = vn.depth;
-	let path = Array<string>( depth);
-	for( let i = 0, nvn: VN = vn; i < depth; i++, nvn = nvn.parent)
-	{
-		path[i] = nvn.name + (nvn.creator && nvn.creator.vn ? ` (created by ${nvn.creator.vn.name})` : "");
-	}
+	let path: string[] = [];
+	for( let currVN = vn; currVN; currVN = currVN.parent)
+		path.push( currVN.name);
 
 	return path;
 }

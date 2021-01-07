@@ -125,8 +125,10 @@ export class FuncProxyVN extends VN
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-        setCurrentClassComp( this.creator);
-		return this.actFunc( this.arg);
+        let prevCreator = setCurrentClassComp( this.creator);
+        let ret = this.actFunc( this.arg);
+        setCurrentClassComp( prevCreator);
+        return ret;
 	}
 
 
