@@ -97,6 +97,9 @@ export abstract class VN implements IVNode
     // unmounted if this flag is false.
 	public ignoreUnmount?: boolean;
 
+    // // Content that should become new sub-nodes of the node.
+	// public childrenToUpdate?: any;
+
 
 
 	///////////////////////////////////////////////////////////////////////////////////////////////

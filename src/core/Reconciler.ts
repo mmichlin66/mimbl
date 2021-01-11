@@ -1,10 +1,10 @@
 ﻿import {
-    ScheduledFuncType, IComponent, IVNode, Fragment, FuncProxy,
-    PromiseProxy, IComponentClass, FuncCompType, IClassCompVN, Component, TickSchedulingType
+    ScheduledFuncType, IComponent, Fragment, FuncProxy,
+    PromiseProxy, Component, TickSchedulingType
 } from "../api/mim"
 import {
     VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN,
-    FuncProxyVN, ManagedCompVN, FuncVN, enterMutationScope, exitMutationScope
+    FuncProxyVN, ManagedCompVN, enterMutationScope, exitMutationScope
 } from "../internal"
 
 /// #if USE_STATS
@@ -347,11 +347,11 @@ function performUpdate( vnsScheduledForUpdate: Set<VN>): void
                     vn.updateRequested = false;
 
                     // if the component was already updated in this cycle, don't update it again
-                    if (vn.lastUpdateTick !== s_currentTick)
-                    {
-                        updateNodeChildren( {oldVN: vn, newVN: vn});
-                        s_currentClassComp = null;
-                    }
+                    if (vn.lastUpdateTick === s_currentTick)
+                        return;
+
+                    updateNodeChildren( {oldVN: vn/*, newVN: vn*/});
+                    s_currentClassComp = null;
                 }
             }
             catch( err)
@@ -517,8 +517,12 @@ function unmountNode( vn: VN, removeOwnNode: boolean)
     // If the virtual node has its own DOM node, remove it from the DOM tree unless the
     // removeOwnNode parameter is false, which means this node is removed when the upper
     // node is removed.
-    if (ownDN && removeOwnNode)
-        (ownDN as any as ChildNode).remove();
+    if (ownDN)
+    {
+        vn.ownDN = null;
+        if (removeOwnNode)
+            (ownDN as any as ChildNode).remove();
+    }
 
     if (vn.subNodes)
 	{
@@ -527,14 +531,14 @@ function unmountNode( vn: VN, removeOwnNode: boolean)
         // our parameter was true and we don't have own DN). It can happen that if errors occur,
         // some elements in the VN.subNodes array are left empty. The forEach function skips
         // over empty slots.
-        vn.subNodes.forEach( svn => unmountNode( svn, removeOwnNode && !ownDN));
+        let removeSubNodeOwnNodes = removeOwnNode && !ownDN;
+        vn.subNodes.forEach( svn => unmountNode( svn, removeSubNodeOwnNodes));
         vn.subNodes = null;
     }
 
     // mark the node as unmounted
 	vn.anchorDN = null;
     vn.parent = null;
-    vn.ownDN = null;
 }
 
 
@@ -552,10 +556,22 @@ function updateNodeChildren( disp: VNDisp): void
     // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
     // The render method is invoked on the old node assuming that the old node already has the
     // updated information from the new node. If, however, the old node doesn't have the render
-    // method, we get the sub-nodes from the new node. For eample, ElmVN doesn't have the render
+    // method, we get the sub-nodes from the new node. For example, ElmVN doesn't have the render
     // method but it has the sub-nodes filled in during the JSX operations.
     let fn: Function = oldVN.render;
     let newSubNodes = fn ? createVNChainFromContent( fn.call( oldVN)) : newVN.subNodes;
+    // let newSubNodes: VN[];
+    // if (fn)
+    //     newSubNodes = createVNChainFromContent( fn.call( oldVN));
+    // else if (newVN)
+    //     newSubNodes = newVN.subNodes;
+    // else
+    // {
+    //     newSubNodes = createVNChainFromContent( oldVN.childrenToUpdate);
+    //     oldVN.childrenToUpdate = undefined;
+    // }
+
+    // reconcile old and new sub-node lists
     buildSubNodeDispositions( disp, newSubNodes);
 
     // remove from DOM the old nodes designated to be removed (that is, those for which there
@@ -567,9 +583,9 @@ function updateNodeChildren( disp: VNDisp): void
         if (oldVN.subNodes)
         {
             // if we are removing all sub-nodes under an element, we can optimize by setting
-            // innerHTML to null;
+            // textContent to null;
             if (ownDN)
-                (ownDN as Element).innerHTML = null;
+                (ownDN as Element).textContent = null;
 
             oldVN.subNodes.forEach( svn => { unmountNode( svn, !ownDN) });
         }
@@ -624,7 +640,7 @@ function updateNodeChildren( disp: VNDisp): void
         }
     }
 
-    if (oldVN !== newVN)
+    if (newVN && oldVN !== newVN)
     {
         // notify the new component that it will replace the old component.
         fn = newVN.didUpdate;
@@ -649,8 +665,12 @@ function updateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], anchorDN: DN, 
     }
     else
     {
-        // re-create our current list of sub-nodes - we will populate it while updating them
-        vn.subNodes = new Array<VN>(newSubNodes.length);
+        // re-create our current list of sub-nodes - we will populate it while updating them. If
+        // the number of nodes in the new list is the same as the previous number of nodes, we
+        // don't re-allocate the array. This can also help if there are old nodes that should not
+        // be changed
+        if (!vn.subNodes || vn.subNodes.length !== newSubNodes.length)
+            vn.subNodes = new Array<VN>(newSubNodes.length);
 
         // perform updates and inserts by either groups or individual nodes.
         if (disp.subNodeGroups)
@@ -665,6 +685,8 @@ function updateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], anchorDN: DN, 
 // Performs updates and inserts by individual nodes.
 function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, beforeDN: DN): void
 {
+    let parentSubNodes = parentVN.subNodes;
+
 	// perform DOM operations according to sub-node disposition. We need to decide for each
 	// node what node to use to insert or move it before. We go from the end of the list of
 	// new nodes and on each iteration we decide the value of the "beforeDN".
@@ -682,15 +704,15 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
             // we must assign the index and put the node in the list of sub-nodes before calling
             // mountNode because it may use this info if the node is cloned
             newVN.index = i;
-            parentVN.subNodes[i] = newVN;
+            parentSubNodes[i] = newVN;
 
             // if mountNode clones the node, it puts the new node into the list of sub-nodes
             // and returns it; otherwise, it returns the original node.
             svn = mountNode( newVN, parentVN, anchorDN, beforeDN);
         }
-        else // if (disp.action === VNDispAction.Update)
+        else // Update or NoChange
         {
-            svn = parentVN.subNodes[i] = oldVN;
+            svn = parentSubNodes[i] = oldVN;
             if (oldVN !== newVN)
             {
                 /// #if VERBOSE_NODE
@@ -724,19 +746,20 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 // and on each iteration we decide the value of the "beforeDN".
 function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
 {
-    // let currSubNodeIndex = disps.length - 1;
+    let parentSubNodes = parentVN.subNodes;
     let currBeforeDN = beforeDN;
     let disp: VNDisp;
     let newVN: VN;
     let oldVN: VN;
+    let group: VNDispGroup;
 	for( let i = groups.length - 1; i >= 0; i--)
 	{
-		let group = groups[i];
-
+        group = groups[i];
         if (group.action === VNDispAction.Insert)
         {
             // mount every sub-node in the group and its sub-sub-nodes
-            for( let j = group.first; j <= group.last; j++)
+            let groupLast = group.last;
+            for( let j = group.first; j <= groupLast; j++)
             {
                 disp = disps[j];
                 newVN = disp.newVN;
@@ -744,21 +767,22 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
                 // we must assign the index and put the node in the list of sub-nodes before calling
                 // mountNode because it may use this info if the node is cloned
                 newVN.index = j;
-                parentVN.subNodes[j] = newVN;
+                parentSubNodes[j] = newVN;
                 mountNode( newVN, parentVN, anchorDN, currBeforeDN);
             }
         }
-        else
+        else if (group.action === VNDispAction.Update)
         {
             // update every sub-node in the group and its sub-sub-nodes
-            for( let j = group.last; j >= group.first; j--)
+            let groupFirst = group.first;
+            for( let j = group.last; j >= groupFirst; j--)
             {
                 disp = disps[j];
                 newVN = disp.newVN;
                 oldVN = disp.oldVN;
 
                 oldVN.index = j;
-                parentVN.subNodes[j] = oldVN;
+                parentSubNodes[j] = oldVN;
                 if (oldVN !== newVN)
                 {
                     /// #if VERBOSE_NODE
@@ -771,11 +795,27 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
                 }
             }
         }
+        else // NoChange)
+        {
+            // we can have nodes already in place - we check it by testing whether the first node
+            // of the group is the same as the corresponding node in the old list of sub-nodes.
+            // If this is not true, we just place every sub-node in the group into the parent's
+            // sub-node array
+            let groupFirst = group.first;
+            if (parentSubNodes[groupFirst] !== disps[groupFirst].oldVN)
+            {
+                for( let j = group.last; j >= groupFirst; j--)
+                {
+                    oldVN = disps[j].oldVN;
+                    oldVN.index = j;
+                    parentSubNodes[j] = oldVN;
+                }
+            }
+        }
 
 		// now that all nodes in the group have been updated or inserted, we can determine
 		// first and last DNs for the group
 		determineGroupDNs( group);
-		// group.determineDNs();
 
 		// if the group has at least one DN, its first DN becomes the node before which the next
         // group of new nodes (if any) should be inserted.
@@ -879,10 +919,14 @@ const enum VNDispAction
 	Insert = 1,
 
 	/**
-	 * The new node should be used to update the old node. This value is also used for InstanceVN
-	 * nodes if the old and the new are the same node.
+	 * The new node should be used to update the old node.
 	 */
 	Update = 2,
+
+	/**
+	 * The new node is the same as the old node.
+	 */
+	NoChange = 3,
 }
 
 
@@ -1126,17 +1170,25 @@ function reconcileWithoutRecycling( newChain: VN[], oldKeyedMap: Map<any,VN>, ol
                 oldKeyedMap.delete( key);
         }
 
-        // if we have old nodes in the unkeyed list and either the new node doesn't have key or
-        // recyclining keyed nodes is allowed, use the next old unkeyed node
+        // if we have old nodes in the unkeyed list and the new node doesn't have key, use the
+        // next old unkeyed node
         if (!oldVN && !key && oldUnkeyedListIndex != oldUnkeyedListLength)
             oldVN = oldUnkeyedList[oldUnkeyedListIndex++];
 
         subDisp = { newVN };
         if (!oldVN)
             subDisp.action = VNDispAction.Insert;
-        else if (oldVN === newVN ||
-            (key === oldVN.key && oldVN.constructor === newVN.constructor &&
-                (oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN))))
+        else if (oldVN === newVN)
+        {
+            subDisp.action = VNDispAction.NoChange;
+            subDisp.oldVN = oldVN;
+
+            // we still need to indicate that "update" happens, so that the replaceAllSubNodes
+            // flag will not be set
+            hasUpdates = true;
+        }
+        else if (key === oldVN.key && oldVN.constructor === newVN.constructor &&
+                (oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN)))
         {
             // old node can be updated with information from the new node
             subDisp.action = VNDispAction.Update;
@@ -1200,8 +1252,7 @@ function reconcileWithRecycling( newChain: VN[], oldKeyedMap: Map<any,VN>, oldUn
                 oldKeyedMap.delete( key);
         }
 
-        // if we have old nodes in the unkeyed list and either the new node doesn't have key or
-        // recyclining keyed nodes is allowed, use the next old unkeyed node
+        // if we have old nodes in the unkeyed list, use the next old unkeyed node
         if (!oldVN && oldUnkeyedListIndex != oldUnkeyedListLength)
             oldVN = oldUnkeyedList[oldUnkeyedListIndex++];
 
@@ -1213,9 +1264,17 @@ function reconcileWithRecycling( newChain: VN[], oldKeyedMap: Map<any,VN>, oldUn
             subDisp.action = VNDispAction.Insert;
             unmatchedDisps.push( subDisp);
         }
-        else if (oldVN === newVN ||
-            (oldVN.constructor === newVN.constructor &&
-                (oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN))))
+        else if (oldVN === newVN)
+        {
+            subDisp.action = VNDispAction.NoChange;
+            subDisp.oldVN = oldVN;
+
+            // we still need to indicate that "update" happens, so that the replaceAllSubNodes
+            // flag will not be set
+            hasUpdates = true;
+        }
+        else if (oldVN.constructor === newVN.constructor &&
+                (oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN)))
         {
             // old node can be updated with information from the new node
             subDisp.action = VNDispAction.Update;
@@ -1248,9 +1307,17 @@ function reconcileWithRecycling( newChain: VN[], oldKeyedMap: Map<any,VN>, oldUn
             else
             {
                 newVN = subDisp.newVN;
-                if (oldVN === newVN ||
-                    (oldVN.constructor === newVN.constructor &&
-                        (oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN))))
+                if (oldVN === newVN)
+                {
+                    subDisp.action = VNDispAction.NoChange;
+                    subDisp.oldVN = oldVN;
+
+                    // we still need to indicate that "update" happens, so that the replaceAllSubNodes
+                    // flag will not be set
+                    hasUpdates = true;
+                }
+                else if (oldVN.constructor === newVN.constructor &&
+                        (oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN)))
                 {
                     // old node can be updated with information from the new node
                     subDisp.action = VNDispAction.Update;
@@ -1324,7 +1391,7 @@ function buildSubNodeGroups( disp: VNDisp): void
             group = { parentDisp: disp, action, first: i };
             subNodeGroups.push( group);
         }
-        else if (action === VNDispAction.Update)
+        else if (action !== VNDispAction.Insert)
         {
             // an "update" sub-node is out-of-order and should close the current group if the index
             // of its previous sibling + 1 isn't equal to the index of this sub-node.
@@ -1511,50 +1578,47 @@ function createVNChainFromContent( content: any): VN[] | null
  * Symbol used to set a "toVNs" function to certain classes. This function converts the instances
  * of these classes to a VN or an array of VNs.
  */
-let symToVNs = Symbol();
+export let symToVNs = Symbol();
 
 
 
-// Creates array of virtual nodes from the given array of items.
-function createNodesFromArray( arr: any[], nodes?: VN[]): VN[] | null
-{
-    /// #if DEBUG
-    if (arr.length === 0)
-    {
-        console.error("createNodesFromArray was called with empty array");
-        return null;
-    }
-    /// #endif
+// // Creates array of virtual nodes from the given array of items.
+// function createNodesFromArray( arr: any[], nodes?: VN[]): VN[] | null
+// {
+//     if (arr.length === 0)
+//         return null;
 
-    if (!nodes)
-        nodes = [];
+//     if (!nodes)
+//         nodes = [];
 
-    arr.forEach( item => { item == null ? null : item[symToVNs]( nodes); });
-    return nodes.length > 0 ? nodes : null;
-}
+//     arr.forEach( item =>
+//     {
+//         if (item != null)
+//         {
+//             if (item instanceof VN)
+//                 nodes.push( item)
+//             else
+//                 item[symToVNs]( nodes);
+//         }
+//     });
+
+//     return nodes.length > 0 ? nodes : null;
+// }
 
 
 
 // Add toVNs method to the String class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-(Boolean.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+Boolean.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 {
     return null;
-    // if (this === false)
-    //     return null;
-
-    // let vn = new TextVN( "true");
-    // if (nodes)
-    //     nodes.push( vn);
-
-    // return vn;
 };
 
 
 
 // Add toVNs method to the String class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-(String.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+String.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 {
     if (this.length === 0)
         return null;
@@ -1570,7 +1634,7 @@ function createNodesFromArray( arr: any[], nodes?: VN[]): VN[] | null
 
 // Add toVNs method to the Component class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-(Component.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+Component.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 {
     // if the component (this can only be an Instance component) is already attached to VN,
     // return this existing VN; otherwise create a new one.
@@ -1585,7 +1649,7 @@ function createNodesFromArray( arr: any[], nodes?: VN[]): VN[] | null
 
 // Add toVNs method to the Function class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-(Function.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+Function.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 {
     let vn = new FuncProxyVN( s_currentClassComp, this);
     if (nodes)
@@ -1598,9 +1662,28 @@ function createNodesFromArray( arr: any[], nodes?: VN[]): VN[] | null
 
 // Add toVNs method to the Array class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-(Array.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+Array.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 {
-    return this.length > 0 ? createNodesFromArray( this, nodes) : null;
+    if (this.length === 0)
+        return null;
+
+    if (!nodes)
+        nodes = [];
+
+    this.forEach( item =>
+    {
+        if (item != null)
+        {
+            if (item instanceof VN)
+                nodes.push( item)
+            else
+                item[symToVNs]( nodes);
+        }
+    });
+
+    return nodes.length > 0 ? nodes : null;
+
+    // return createNodesFromArray( this, nodes);
 };
 
 
@@ -1619,7 +1702,7 @@ function createNodesFromArray( arr: any[], nodes?: VN[]): VN[] | null
 
 // Add toVNs method to the Promise class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-(Promise.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+Promise.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 {
     let vn = new PromiseProxyVN( { promise: this});
     if (nodes)
@@ -1632,7 +1715,7 @@ function createNodesFromArray( arr: any[], nodes?: VN[]): VN[] | null
 
 // Add toVNs method to the Object class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-(Object.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+Object.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 {
     let s = this.toString();
     if (!s)
@@ -1657,84 +1740,115 @@ export let symJsxToVNs = Symbol();
 
 // Add jsxToVNs method to the String class, which creates ElmVN with the given parameters. This
 // method is invoked by the JSX mechanism.
-(String.prototype as any)[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+String.prototype[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
 {
     if (children.length === 0)
         return new ElmVN( s_currentClassComp, this, props, null);
-    else
+
+    let nodes: VN[] = [];
+    children.forEach( item =>
     {
-        let subNodes: VN[] = [];
-        children.forEach( item =>
+        if (item != null)
         {
             if (item instanceof VN)
-                subNodes.push( item)
+                nodes.push( item)
             else
-                item != null && item[symToVNs]( subNodes);
-        });
+                item[symToVNs]( nodes);
+        }
+    });
 
-        return new ElmVN( s_currentClassComp, this, props, subNodes);
-    }
+    return new ElmVN( s_currentClassComp, this, props, nodes.length > 0 ? nodes : null);
+
+    // return new ElmVN( s_currentClassComp, this, props, createNodesFromArray( children));
 };
 
 
 
 // Add jsxToVNs method to the Fragment class object. This method is invoked by the JSX mechanism.
-(Fragment as any)[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+Fragment[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
 {
-    return children.length > 0 ? createNodesFromArray( children) : null;
+    if (children.length === 0)
+        return new ElmVN( s_currentClassComp, this, props, null);
+
+    let nodes: VN[] = [];
+    children.forEach( item =>
+    {
+        if (item != null)
+        {
+            if (item instanceof VN)
+                nodes.push( item)
+            else
+                item[symToVNs]( nodes);
+        }
+    });
+
+    return nodes.length > 0 ? nodes : null;
+
+    // return createNodesFromArray( children);
 };
 
 
 
 // Add jsxToVNs method to the FuncProxy class object. This method is invoked by the JSX mechanism.
-(FuncProxy as any)[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+FuncProxy[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
 {
-        /// #if DEBUG
-        if (!props || !props.func)
-        {
-            console.error("FuncProxy component doesn't have 'func' property");
-            return null;
-        }
-        /// #endif
+    /// #if DEBUG
+    if (!props || !props.func)
+    {
+        console.error("FuncProxy component doesn't have 'func' property");
+        return null;
+    }
+    /// #endif
 
-        return new FuncProxyVN( s_currentClassComp, props.func, props.funcThisArg, props.arg, props.key);
+    return new FuncProxyVN( s_currentClassComp, props.func, props.funcThisArg, props.arg, props.key);
 };
 
 
 
 // Add jsxToVNs method to the PromiseProxy class object. This method is invoked by the JSX mechanism.
-(PromiseProxy as any)[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+PromiseProxy[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
 {
     return props && props.promise ? new PromiseProxyVN( props, children) : null;
 };
 
 
 
-// Add jsxToVNs method to the Function class. This method is invoked by the JSX mechanism.
-(Function.prototype as any)[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+// Add jsxToVNs method to the Component class object, which creates virtual node for managed
+// components. This method is invoked by the JSX mechanism.
+// The children parameter is always an array. A component can specify that its children are
+// an array of a certain type, e.g. class A extends Component<{},T[]>. In this case
+// there are two ways to specify children in JSX that would be accepted by the TypeScript
+// compiler:
+//	1) <A>{t1}{t2}</A>. In this case, children will be [t1, t2] (as expected by A).
+//	2) <A>{[t1, t2]}</A>. In this case, children will be [[t1,t2]] (as NOT expected by A).
+//		This looks like a TypeScript bug.
+// The realChildren variable accommodates both cases.
+Component[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
 {
-    // children parameter is always an array. A component can specify that its children are
-    // an array of a certain type, e.g. class A extends Component<{},T[]>. In this case
-    // there are two ways to specify children in JSX that would be accepted by the TypeScript
-    // compiler:
-    //	1) <A>{t1}{t2}</A>. In this case, children will be [t1, t2] (as expected by A).
-    //	2) <A>{[t1, t2]}</A>. In this case, children will be [[t1,t2]] (as NOT expected by A).
-    //		This looks like a TypeScript bug.
-    // The realChildren variable accommodates both cases.
-    let realChildren = children.length === 1 && Array.isArray( children[0]) ? children[0] : children;
-    if (typeof this.prototype.render === "function")
-        return new ManagedCompVN( this as IComponentClass, props, realChildren);
-    else
-        return new FuncVN( this as FuncCompType, props, realChildren);
+    return new ManagedCompVN( this, props,
+        children.length === 1 && Array.isArray( children[0]) ? children[0] : children);
 };
 
 
 
-// Add jsxToVNs method to the Object class object. This method is invoked by the JSX mechanism.
-(Object.prototype as any)[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+// Add jsxToVNs method to the Function class, which works for functional components. This method
+// is invoked by the JSX mechanism.
+Function.prototype[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
 {
-    throw new Error( "Invalid tag in jsx processing function: " + this);
+    // invoke the function right away. The return value is treated as rendered content. This way,
+    // the function runs under the current Mimbl context (e.g. creator object used as "this" for
+    // event handlers).
+    let content = this( props, children.length === 1 && Array.isArray( children[0]) ? children[0] : children);
+    return content && content[symToVNs]();
 };
+
+
+
+// // Add jsxToVNs method to the Object class object. This method is invoked by the JSX mechanism.
+// Object.prototype[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+// {
+//     throw new Error( "Invalid tag in jsx processing function: " + this);
+// };
 
 
 

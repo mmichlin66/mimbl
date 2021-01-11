@@ -4,7 +4,8 @@
 } from "../api/mim"
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo, AttrPropInfo, EventPropInfo,
-    getElmPropInfo, setElmProp, removeElmProp, updateElmProp, wrapCallback
+    getElmPropInfo, setElmProp, removeElmProp, updateElmProp, wrapCallback,
+    scheduleFuncCall, symToVNs
 } from "../internal"
 
 /// #if USE_STATS
@@ -76,15 +77,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	/**
      * Requests update of the element properties without re-rendering of its children.
      */
-    setProps( props: IElementProps): void
+    setProps( props: IElementProps<T>): void
     {
         if (!props)
-        {
-            /// #if DEBUG
-                console.error("IElmVN.requestPropsUpdate called with null");
-            /// #endif
             return;
-        }
 
         if (this.partialPropsToUpdate)
             Object.assign( props)
@@ -94,6 +90,23 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             this.requestPartialUpdate();
         }
     }
+
+
+
+	// /**
+    //  * Requests re-rendering of the element children without updating its properties.
+    //  */
+    // public setChildren( children: any): void
+    // {
+    //     // scheduleFuncCall( () =>
+    //     // {
+    //     //     this.subNodes = children && children[symToVNs]();
+    //     // },
+    //     // true, undefined, this.creator);
+
+    //     this.childrenToUpdate = children;
+    //     this.requestUpdate();
+    // }
 
 
 

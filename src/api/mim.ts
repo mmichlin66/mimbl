@@ -22,18 +22,6 @@ export type CompProps<TProps = {}, TChildren = any> = Readonly<TProps> &
 
 
 /**
- * Type of functions representing functional components.
- *
- * @typeparam TProps Type defining properties that can be passed to this functional component.
- *		Default type is an empty object (no properties).
- * @typeparam TChildren Type defining components, elements or other objects that can be used
- *		as children for this functional component. Default is `any`.
- */
-export type FuncCompType<TProps = {}, TChildren = any> = (props: CompProps<TProps,TChildren>) => any;
-
-
-
-/**
  * Interface that defines constructor signature for components.
  *
  * @typeparam TProps Type defining properties that can be passed to the class-based component
@@ -1095,6 +1083,11 @@ export interface IElmVN<T extends Element = Element> extends IVNode
      * Requests update of the element properties without re-rendering of its children.
      */
 	setProps( props: IElementProps<T>): void;
+
+	// /**
+    //  * Requests re-rendering of the element children without updating its properties.
+    //  */
+	// setChildren( children: any): void;
 }
 
 
