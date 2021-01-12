@@ -166,7 +166,7 @@ export function requestNodeUpdate( vn: VN): void
 			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, wrapCallback( comp.beforeUpdate, comp, comp));
 
 		if (comp.afterUpdate)
-			s_callsScheduledAfterUpdate.set( comp.afterUpdate, wrapCallback( comp.beforeUpdate, comp, comp));
+			s_callsScheduledAfterUpdate.set( comp.afterUpdate, wrapCallback( comp.afterUpdate, comp, comp));
 	}
 
     // schedule Mimbl tick using animation frame. If this call comes from a wrapped callback, the
@@ -200,7 +200,7 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 
 			// a "before update" function is always scheduled in the next frame even if the
 			// call is made from another "before update" function.
-            if (!s_scheduledFrameHandle && s_scheduledFrameHandle === 0)
+            if (!s_ignoreSchedulingRequest && s_scheduledFrameHandle === 0)
                 s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
 		}
 	}
@@ -212,7 +212,7 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 
 			// an "after update" function is scheduled in the next cycle unless the request is made
 			// either from a "before update" function execution or during a node update.
-            if (!s_scheduledFrameHandle && s_scheduledFrameHandle === 0  &&
+            if (!s_ignoreSchedulingRequest && s_scheduledFrameHandle === 0  &&
                 s_schedulerState !== SchedulerState.BeforeUpdate && s_schedulerState !== SchedulerState.Update)
             {
                 s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
@@ -304,77 +304,55 @@ function performMimbleTick(): void
 
 // Performs rendering phase for all components scheduled for update and recursively for their
 // sub-nodes where necessary. Returns array of VNDisp structures for each updated node.
-function performUpdate( vnsScheduledForUpdate: Set<VN>): void
+function performUpdate( vns: Set<VN>): void
 {
-    // Arranges the scheduled nodes by their nesting depths so that we update "upper" nodes before
-    // the lower ones. This can help avoid two conditions:
-    //	- rendering a child component twice: first because it called updateMe, and second
-    //		because its parent was also updated.
-    //	- unnecessary rendering a child component before it is removed by the parent
-    // We allocate contiguous array where indices correspond to depth. Each element in this
-    // array will either be undefined or contain an array of nodes at this depth.
-	let vnsByDepth: VN[][] = [];
-	vnsScheduledForUpdate.forEach( (vn: VN) =>
+	vns.forEach( (vn: VN) =>
 	{
         // it can happen that we encounter already unmounted virtual nodes - ignore them
         if (!vn.anchorDN)
             return;
 
-        let depth = vn.depth;
-		let arr = vnsByDepth[depth];
-		if (!arr)
-			vnsByDepth[depth] = [vn];
-        else
-		    arr.push(vn);
-	});
-
-    for( let index in vnsByDepth)
-	{
-        let vns = vnsByDepth[index];
-        vns.forEach( vn =>
+        try
         {
-            try
+            // first perform partial update if requested
+            if (vn.partialUpdateRequested)
             {
-                // first perform partial update if requested
-                if (vn.partialUpdateRequested)
+                vn.partialUpdateRequested = false;
+                let newVN = vn.performPartialUpdate();
+
+                // if partial update returned a VN we use it to update our node's sub-nodes
+                if (newVN)
                 {
-                    vn.partialUpdateRequested = false;
-                    let newVN = vn.performPartialUpdate();
-
-                    // if partial update returned a VN we use it to update our node's sub-nodes
-                    if (newVN)
-                    {
-                        updateNodeChildren( {oldVN: vn, newVN});
-                        s_currentClassComp = null;
-                    }
-                }
-
-                // then perform normal update if requested
-                if (vn.updateRequested)
-                {
-                    // clear the flag that update has been requested for the node
-                    vn.updateRequested = false;
-
-                    // if the component was already updated in this cycle, don't update it again
-                    if (vn.lastUpdateTick === s_currentTick)
-                        return;
-
-                    updateNodeChildren( {oldVN: vn, newVN: vn});
+                    updateNodeChildren( {oldVN: vn, newVN});
                     s_currentClassComp = null;
                 }
             }
-            catch( err)
+
+            // then perform normal update if requested
+            if (vn.updateRequested)
             {
-                // find the nearest error handling service. If nobody else, it is implemented
-                // by the RootVN object.
-                let errorService = vn.getService( "StdErrorHandling");
-                if (errorService)
-                    errorService.reportError( err);
-                else
-                    console.error( "BUG: updateNode threw exception but StdErrorHandling service was not found.", err);
+                // clear the flag that update has been requested for the node
+                vn.updateRequested = false;
+
+                // if the component was already updated in this cycle, don't update it again
+                if (vn.lastUpdateTick === s_currentTick)
+                    return;
+
+                updateNodeChildren( {oldVN: vn, newVN: vn});
+                s_currentClassComp = null;
             }
-        });
-	}
+        }
+        catch( err)
+        {
+            // find the nearest error handling service. If nobody else, it is implemented
+            // by the RootVN object.
+            let errorService = vn.getService( "StdErrorHandling");
+            if (errorService)
+                errorService.reportError( err);
+            else
+                console.error( "BUG: updateNode threw exception but StdErrorHandling service was not found.", err);
+        }
+    });
 }
 
 
@@ -558,7 +536,6 @@ function unmountNode( vn: VN, removeOwnNode: boolean)
 function updateNodeChildren( disp: VNDisp): void
 {
 	let oldVN = disp.oldVN;
-	let newVN = disp.newVN;
     let ownDN = oldVN.ownDN;
 
     // we call the render method without try/catch. If it throws, the control goes to either the
@@ -568,7 +545,7 @@ function updateNodeChildren( disp: VNDisp): void
     // method, we get the sub-nodes from the new node. For example, ElmVN doesn't have the render
     // method but it has the sub-nodes filled in during the JSX operations.
     let fn: Function = oldVN.render;
-    let newSubNodes = fn ? createVNChainFromContent( fn.call( oldVN)) : newVN.subNodes;
+    let newSubNodes = fn ? createVNChainFromContent( fn.call( oldVN)) : disp.newVN.subNodes;
     buildSubNodeDispositions( disp, newSubNodes);
 
     // remove from DOM the old nodes designated to be removed (that is, those for which there
@@ -627,7 +604,7 @@ function updateNodeChildren( disp: VNDisp): void
                 // content but we do it without try/catch this time; otherwise, we may end
                 // up in an infinite loop
                 oldVN.handleError( err);
-                newSubNodes = fn ? createVNChainFromContent( fn.call( oldVN)) : newVN.subNodes;
+                newSubNodes = fn ? createVNChainFromContent( fn.call( oldVN)) : disp.newVN.subNodes;
                 buildSubNodeDispositions( disp, newSubNodes);
                 if (!newSubNodes)
                     oldVN.subNodes = null;
@@ -640,8 +617,10 @@ function updateNodeChildren( disp: VNDisp): void
     // if (newVN && oldVN !== newVN)
     if (disp.action === VNDispAction.Update)
     {
-        // notify the new component that it will replace the old component.
-        fn = newVN.didUpdate;
+        // notify the new component that it replaced the old component. If components cache some
+        // JSX-produced nodes, this is the opportunity to copy them from the old to the new. This
+        // is because the old nodes are updated from the new ones and the new ones re discarded.
+        fn = disp.newVN.didUpdate;
         fn && fn.call( oldVN);
     }
 
@@ -671,8 +650,6 @@ function updateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], anchorDN: DN, 
             vn.subNodes = new Array<VN>(newSubNodes.length);
         else if (vn.subNodes.length > newSubNodes.length)
             vn.subNodes.splice( newSubNodes.length);
-        // if (!vn.subNodes || vn.subNodes.length !== newSubNodes.length)
-        //     vn.subNodes = new Array<VN>(newSubNodes.length);
 
         // perform updates and inserts by either groups or individual nodes.
         if (disp.subNodeGroups)
@@ -714,7 +691,7 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
         }
         else // Update or NoChange
         {
-            svn = parentSubNodes[i] = oldVN;
+            parentSubNodes[i] = svn = oldVN;
             if (oldVN !== newVN)
             {
                 /// #if VERBOSE_NODE
@@ -844,9 +821,9 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 				// that we are swapping two groups. In this case we want to move the shorter one.
                 let prevGroup = groups[i-1];
 				if (group.lastDN.nextSibling === prevGroup.firstDN && group.count > prevGroup.count)
-					moveGroup( disps, prevGroup, anchorDN, group.firstDN);
+					moveGroup( prevGroup, disps, anchorDN, group.firstDN);
 				else
-					moveGroup( disps, group, anchorDN, currBeforeDN);
+					moveGroup( group, disps, anchorDN, currBeforeDN);
 			}
 
 			// the group's first DN becomes the new beforeDN. Note that firstDN cannot be null
@@ -862,13 +839,13 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 function moveNode( vn: VN, anchorDN: DN, beforeDN: DN): void
 {
     // check whether the last of the DOM nodes already resides right before the needed node
-    let immediateDNs = getImmediateDNs( vn);
-    if (immediateDNs.length === 0 || immediateDNs[immediateDNs.length - 1].nextSibling === beforeDN)
+    let dns = getImmediateDNs( vn);
+    if (!dns || dns[dns.length - 1].nextSibling === beforeDN)
         return;
 
-    for( let immediateDN of immediateDNs)
+    for( let dn of dns)
     {
-        anchorDN.insertBefore( immediateDN, beforeDN);
+        anchorDN.insertBefore( dn, beforeDN);
 
         /// #if USE_STATS
             DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Moved);
@@ -883,27 +860,27 @@ function moveNode( vn: VN, anchorDN: DN, beforeDN: DN): void
 
 
 // Moves all the nodes in the given group before the given DOM node.
-function moveGroup( disps: VNDisp[], group: VNDispGroup, anchorDN: DN, beforeDN: DN): void
+function moveGroup( group: VNDispGroup, disps: VNDisp[], anchorDN: DN, beforeDN: DN): void
 {
-    let subNodeVN: VN;
-    let subNodeDNs: DN[];
-	for( let j = group.first; j <= group.last; j++)
+    let dns: DN[];
+    let useNewVN = group.action === VNDispAction.Insert;
+	for( let i = group.first; i <= group.last; i++)
 	{
-		subNodeVN = disps[j].oldVN || disps[j].newVN;
-		subNodeDNs = getImmediateDNs( subNodeVN);
-		for( let subNodeDN of subNodeDNs)
-		{
-			anchorDN.insertBefore( subNodeDN, beforeDN);
+        if (dns = getImmediateDNs( useNewVN ? disps[i].newVN : disps[i].oldVN))
+        {
+            for( let dn of dns)
+            {
+                anchorDN.insertBefore( dn, beforeDN);
 
-			/// #if USE_STATS
-				DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Moved);
-			/// #endif
-		}
+                /// #if USE_STATS
+                    DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Moved);
+                /// #endif
+            }
 
-		/// #if USE_STATS
-			DetailedStats.stats.log( subNodeVN.statsCategory, StatsAction.Moved);
-		/// #endif
-
+            /// #if USE_STATS
+                DetailedStats.stats.log( (useNewVN ? disps[i].newVN : disps[i].oldVN).statsCategory, StatsAction.Moved);
+            /// #endif
+        }
 	}
 }
 
@@ -966,71 +943,31 @@ interface VNDispGroup
 
 
 
-// /**
-//  * Determines first and last DOM nodes for the group. This method is invoked only after the
-//  * nodes were phisically updated/inserted and we can obtain their DOM nodes.
-//  */
-// function determineGroupDNs( group: VNDispGroup)
-// {
-//     if (group.count === 1)
-//     {
-//         let vn = group.action === VNDispAction.Update
-//             ? group.parentDisp.subNodeDisps[group.first].oldVN
-//             : group.parentDisp.subNodeDisps[group.first].newVN;
-
-//         group.firstDN = getFirstDN(vn);
-//         group.lastDN = getLastDN( vn);
-//     }
-//     else
-//     {
-//         let disp: VNDisp;
-//         for( let i = group.first; i <= group.last; i++)
-//         {
-//             disp = group.parentDisp.subNodeDisps[i];
-//             group.firstDN = getFirstDN( group.action === VNDispAction.Update ? disp.oldVN : disp.newVN);
-//             if (group.firstDN)
-//                 break;
-//         }
-
-//         for( let i = group.last; i >= group.first; i--)
-//         {
-//             disp = group.parentDisp.subNodeDisps[i];
-//             group.lastDN = getLastDN( group.action === VNDispAction.Update ? disp.oldVN : disp.newVN);
-//             if (group.lastDN)
-//                 break;
-//         }
-//     }
-// }
-
-
-
 /**
  * Determines first and last DOM nodes for the group. This method is invoked only after the
- * nodes were phisically updated/inserted and we can obtain their DOM nodes.
+ * nodes were physically updated/inserted and we can obtain their DOM nodes.
  */
 function determineGroupDNs( group: VNDispGroup, disps: VNDisp[])
 {
+    let useNewVN = group.action === VNDispAction.Insert;
     if (group.count === 1)
     {
-        let vn = disps[group.first].oldVN || disps[group.first].newVN;
+        let vn = useNewVN ? disps[group.first].newVN : disps[group.first].oldVN;
 
         group.firstDN = getFirstDN(vn);
         group.lastDN = getLastDN( vn);
     }
     else
     {
-        let disp: VNDisp;
         for( let i = group.first; i <= group.last; i++)
         {
-            disp = disps[i];
-            if (group.firstDN = getFirstDN( disp.oldVN || disp.newVN))
+            if (group.firstDN = getFirstDN( useNewVN ? disps[i].newVN : disps[i].oldVN))
                 break;
         }
 
         for( let i = group.last; i >= group.first; i--)
         {
-            disp = disps[i];
-            if (group.lastDN = getLastDN( disp.oldVN || disp.newVN))
+            if (group.lastDN = getLastDN( useNewVN ? disps[i].newVN : disps[i].oldVN))
                 break;
         }
     }
@@ -1473,8 +1410,7 @@ function getFirstDN( vn: VN): DN
 	let dn: DN;
 	for( let svn of vn.subNodes)
 	{
-		dn = getFirstDN( svn);
-		if (dn)
+		if (dn = getFirstDN( svn))
 			return dn;
 	}
 
@@ -1497,8 +1433,7 @@ function getLastDN( vn: VN): DN
 	let dn: DN;
 	for( let i = vn.subNodes.length - 1; i >= 0; i--)
 	{
-		dn = getLastDN( vn.subNodes[i]);
-		if (dn != null)
+		if (dn = getLastDN( vn.subNodes[i]))
 			return dn;
 	}
 
@@ -1507,13 +1442,19 @@ function getLastDN( vn: VN): DN
 
 
 
-// Returns the list of DOM nodes that are immediate children of this virtual node; that is,
-// are NOT children of sub-nodes that have their own DOM node. Never returns null.
-function getImmediateDNs( vn: VN): DN[]
+// Returns the list of DOM nodes that are immediate children of this virtual node; that is, are
+// NOT children of sub-nodes that have their own DOM node. May return null but never returns
+// empty array.
+function getImmediateDNs( vn: VN): DN[] | null
 {
+	if (vn.ownDN)
+        return [vn.ownDN];
+    else if (!vn.subNodes)
+        return null;
+
 	let arr: DN[] = [];
-	collectImmediateDNs( vn, arr);
-	return arr;
+    vn.subNodes.forEach( svn => collectImmediateDNs( svn, arr));
+	return arr.length === 0 ? null : arr;
 }
 
 
@@ -1525,10 +1466,7 @@ function collectImmediateDNs( vn: VN, arr: DN[]): void
 	if (vn.ownDN)
 		arr.push( vn.ownDN);
 	else if (vn.subNodes)
-	{
-		// recursively call this method on the sub-nodes from first to last
 		vn.subNodes.forEach( svn => collectImmediateDNs( svn, arr));
-	}
 }
 
 
