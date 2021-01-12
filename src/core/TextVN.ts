@@ -101,13 +101,15 @@ export class TextVN extends VN implements ITextVN
     // This method is called if the node requested a "partial" update. Different types of virtual
     // nodes can keep different data for the partial updates; for example, ElmVN can keep new
     // element properties that can be updated without re-rendering its children.
-    public performPartialUpdate(): void
+    public performPartialUpdate(): VN | null
     {
         this.ownDN.nodeValue = this.text;
 
         /// #if USE_STATS
             DetailedStats.stats.log( StatsCategory.Text, StatsAction.Updated);
         /// #endif
+
+        return null;
     }
 }
 

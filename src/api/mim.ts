@@ -969,7 +969,7 @@ export interface IVNode
      * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the
      * root nodes that don't have parents.
      */
-	readonly index: number;
+	readonly index?: number;
 
 	/** List of sub-nodes. */
 	readonly subNodes?: IVNode[];
@@ -1084,10 +1084,10 @@ export interface IElmVN<T extends Element = Element> extends IVNode
      */
 	setProps( props: IElementProps<T>): void;
 
-	// /**
-    //  * Requests re-rendering of the element children without updating its properties.
-    //  */
-	// setChildren( children: any): void;
+	/**
+     * Requests re-rendering of the element children without updating its properties.
+     */
+	setChildren( children: any): void;
 }
 
 

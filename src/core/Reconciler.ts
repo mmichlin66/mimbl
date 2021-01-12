@@ -39,6 +39,11 @@ let s_schedulerState: SchedulerState = SchedulerState.Idle;
 // updated in the same cycle.
 let s_currentTick: number = 0;
 
+// Flag indicating that the request to schedule an animation frame should be ignored. This flag is
+// set while inside the callback wrapper function if a Mimbl tick is going to happen right after
+// the callback finishes.
+let s_ignoreSchedulingRequest: boolean = false;
+
 
 
 // Current object that is set as "creator" during rendering when instantiating certain virtual nodes.
@@ -96,39 +101,42 @@ export function wrapCallback<T extends Function>( func: T, funcThisArg?: any,
  */
 function CallbackWrapper(): any
 {
-    // the "this" is the object to be used as the "current creator", so remember the current
+    // the "this" is the object to be used as the "creator", so remember the current
     // creator and set the new one
     let prevCreator = s_currentClassComp;
     s_currentClassComp = this;
 
-    // we don't want the triggers encountered during the callback execution to cuse the watchers
+    // we don't want the triggers encountered during the callback execution to cause the watchers
     // to run immediately, so we enter mutation scope
     enterMutationScope();
+
 
     let retVal: any, func: Function, funcThisArg: any, schedulingType: TickSchedulingType, rest: any[];
     [func, funcThisArg, schedulingType, ...rest] = arguments;
     try
 	{
+        // if some scheduling type is set (that is, we are going to schedule a Mimbl tick after
+        // the callback), we should ignore requests to schedule a tick made during the callback
+        // execution
+        if (schedulingType)
+            s_ignoreSchedulingRequest = true;
+
 		retVal = func.apply( funcThisArg, rest);
 	}
 	finally
 	{
-        // exit mutation scope and set the previous current object even if the callback threw
-        // an exception
         exitMutationScope();
+        s_ignoreSchedulingRequest = false;
         s_currentClassComp = prevCreator;
     }
 
     // schedule a Mimbl tick if instructed to do so
-    if (schedulingType !== undefined)
-    {
-        if (schedulingType === "t")
-            queueMicrotask( performMimbleTick);
-        else if (schedulingType === "a")
-            requestAnimationFrameIfNeeded();
-        else if (schedulingType === "s")
-            performMimbleTick();
-    }
+    if (schedulingType === "t")
+        queueMicrotask( performMimbleTick);
+    else if (schedulingType === "a")
+        s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
+    else if (schedulingType === "s")
+        performMimbleTick();
 
     return retVal;
 }
@@ -165,8 +173,8 @@ export function requestNodeUpdate( vn: VN): void
     // callback might schedule a tick using microtask. In this case, the animation frame will be
     // canceled. The update is scheduled in the next tick unless the request is made during a
     // "before update" function execution.
-    if (s_schedulerState !== SchedulerState.BeforeUpdate)
-        requestAnimationFrameIfNeeded();
+    if (!s_ignoreSchedulingRequest && s_scheduledFrameHandle === 0 && s_schedulerState !== SchedulerState.BeforeUpdate)
+        s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
 }
 
 
@@ -192,7 +200,8 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 
 			// a "before update" function is always scheduled in the next frame even if the
 			// call is made from another "before update" function.
-			requestAnimationFrameIfNeeded();
+            if (!s_scheduledFrameHandle && s_scheduledFrameHandle === 0)
+                s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
 		}
 	}
 	else
@@ -203,20 +212,13 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 
 			// an "after update" function is scheduled in the next cycle unless the request is made
 			// either from a "before update" function execution or during a node update.
-			if (s_schedulerState !== SchedulerState.BeforeUpdate && s_schedulerState !== SchedulerState.Update)
-				requestAnimationFrameIfNeeded();
+            if (!s_scheduledFrameHandle && s_scheduledFrameHandle === 0  &&
+                s_schedulerState !== SchedulerState.BeforeUpdate && s_schedulerState !== SchedulerState.Update)
+            {
+                s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
+            }
 		}
 	}
-}
-
-
-
-// Determines whether the call to requestAnimationFrame should be made or the frame has already
-// been scheduled.
-function requestAnimationFrameIfNeeded(): void
-{
-	if (s_scheduledFrameHandle === 0)
-		s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
 }
 
 
@@ -337,7 +339,14 @@ function performUpdate( vnsScheduledForUpdate: Set<VN>): void
                 if (vn.partialUpdateRequested)
                 {
                     vn.partialUpdateRequested = false;
-                    vn.performPartialUpdate();
+                    let newVN = vn.performPartialUpdate();
+
+                    // if partial update returned a VN we use it to update our node's sub-nodes
+                    if (newVN)
+                    {
+                        updateNodeChildren( {oldVN: vn, newVN});
+                        s_currentClassComp = null;
+                    }
                 }
 
                 // then perform normal update if requested
@@ -350,7 +359,7 @@ function performUpdate( vnsScheduledForUpdate: Set<VN>): void
                     if (vn.lastUpdateTick === s_currentTick)
                         return;
 
-                    updateNodeChildren( {oldVN: vn/*, newVN: vn*/});
+                    updateNodeChildren( {oldVN: vn, newVN: vn});
                     s_currentClassComp = null;
                 }
             }
@@ -560,18 +569,6 @@ function updateNodeChildren( disp: VNDisp): void
     // method but it has the sub-nodes filled in during the JSX operations.
     let fn: Function = oldVN.render;
     let newSubNodes = fn ? createVNChainFromContent( fn.call( oldVN)) : newVN.subNodes;
-    // let newSubNodes: VN[];
-    // if (fn)
-    //     newSubNodes = createVNChainFromContent( fn.call( oldVN));
-    // else if (newVN)
-    //     newSubNodes = newVN.subNodes;
-    // else
-    // {
-    //     newSubNodes = createVNChainFromContent( oldVN.childrenToUpdate);
-    //     oldVN.childrenToUpdate = undefined;
-    // }
-
-    // reconcile old and new sub-node lists
     buildSubNodeDispositions( disp, newSubNodes);
 
     // remove from DOM the old nodes designated to be removed (that is, those for which there
@@ -640,7 +637,8 @@ function updateNodeChildren( disp: VNDisp): void
         }
     }
 
-    if (newVN && oldVN !== newVN)
+    // if (newVN && oldVN !== newVN)
+    if (disp.action === VNDispAction.Update)
     {
         // notify the new component that it will replace the old component.
         fn = newVN.didUpdate;
@@ -669,8 +667,12 @@ function updateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], anchorDN: DN, 
         // the number of nodes in the new list is the same as the previous number of nodes, we
         // don't re-allocate the array. This can also help if there are old nodes that should not
         // be changed
-        if (!vn.subNodes || vn.subNodes.length !== newSubNodes.length)
+        if (!vn.subNodes)
             vn.subNodes = new Array<VN>(newSubNodes.length);
+        else if (vn.subNodes.length > newSubNodes.length)
+            vn.subNodes.splice( newSubNodes.length);
+        // if (!vn.subNodes || vn.subNodes.length !== newSubNodes.length)
+        //     vn.subNodes = new Array<VN>(newSubNodes.length);
 
         // perform updates and inserts by either groups or individual nodes.
         if (disp.subNodeGroups)
@@ -783,8 +785,8 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 
                 oldVN.index = j;
                 parentSubNodes[j] = oldVN;
-                if (oldVN !== newVN)
-                {
+                // if (oldVN !== newVN)
+                // {
                     /// #if VERBOSE_NODE
                         console.debug( `Calling update() on node ${oldVN.name}`);
                     /// #endif
@@ -792,7 +794,7 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
                     // update method must exists for nodes with action Update
                     if (oldVN.update( newVN))
                         updateNodeChildren( disp);
-                }
+                // }
             }
         }
         else // NoChange)
@@ -815,7 +817,7 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 
 		// now that all nodes in the group have been updated or inserted, we can determine
 		// first and last DNs for the group
-		determineGroupDNs( group);
+		determineGroupDNs( group, disps);
 
 		// if the group has at least one DN, its first DN becomes the node before which the next
         // group of new nodes (if any) should be inserted.
@@ -826,12 +828,11 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 	// We go from the last group to the second group in the list because as soon as we moved all
 	// groups except the first one into their right places, the first group will be automatically
 	// in the right place. We always have two groups (i and i-1), which allows us to understand
-	// whether we need to swap them. If we do we move the shorter group.
+	// whether we need to swap them. If we do we move the smaller group.
     currBeforeDN = beforeDN;
 	for( let i = groups.length - 1; i > 0; i--)
 	{
 		let group = groups[i];
-		let prevGroup = groups[i-1];
 
 		// determine whether the group should move. We take the last node from the group
 		// and compare its DN's next sibling to the current "beforeDN".
@@ -841,6 +842,7 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 			{
 				// if the current group now resides before the previous group, then that means
 				// that we are swapping two groups. In this case we want to move the shorter one.
+                let prevGroup = groups[i-1];
 				if (group.lastDN.nextSibling === prevGroup.firstDN && group.count > prevGroup.count)
 					moveGroup( disps, prevGroup, anchorDN, group.firstDN);
 				else
@@ -883,10 +885,12 @@ function moveNode( vn: VN, anchorDN: DN, beforeDN: DN): void
 // Moves all the nodes in the given group before the given DOM node.
 function moveGroup( disps: VNDisp[], group: VNDispGroup, anchorDN: DN, beforeDN: DN): void
 {
+    let subNodeVN: VN;
+    let subNodeDNs: DN[];
 	for( let j = group.first; j <= group.last; j++)
 	{
-		let subNodeVN = group.action === VNDispAction.Update ? disps[j].oldVN : disps[j].newVN;
-		let subNodeDNs = getImmediateDNs( subNodeVN);
+		subNodeVN = disps[j].oldVN || disps[j].newVN;
+		subNodeDNs = getImmediateDNs( subNodeVN);
 		for( let subNodeDN of subNodeDNs)
 		{
 			anchorDN.insertBefore( subNodeDN, beforeDN);
@@ -938,8 +942,8 @@ const enum VNDispAction
  */
 interface VNDispGroup
 {
-	/** parent VNDisp to which this group belongs */
-	parentDisp: VNDisp;
+	// /** parent VNDisp to which this group belongs */
+	// parentDisp: VNDisp;
 
 	/** Action to be performed on the nodes in the group */
 	action: VNDispAction;
@@ -962,17 +966,53 @@ interface VNDispGroup
 
 
 
+// /**
+//  * Determines first and last DOM nodes for the group. This method is invoked only after the
+//  * nodes were phisically updated/inserted and we can obtain their DOM nodes.
+//  */
+// function determineGroupDNs( group: VNDispGroup)
+// {
+//     if (group.count === 1)
+//     {
+//         let vn = group.action === VNDispAction.Update
+//             ? group.parentDisp.subNodeDisps[group.first].oldVN
+//             : group.parentDisp.subNodeDisps[group.first].newVN;
+
+//         group.firstDN = getFirstDN(vn);
+//         group.lastDN = getLastDN( vn);
+//     }
+//     else
+//     {
+//         let disp: VNDisp;
+//         for( let i = group.first; i <= group.last; i++)
+//         {
+//             disp = group.parentDisp.subNodeDisps[i];
+//             group.firstDN = getFirstDN( group.action === VNDispAction.Update ? disp.oldVN : disp.newVN);
+//             if (group.firstDN)
+//                 break;
+//         }
+
+//         for( let i = group.last; i >= group.first; i--)
+//         {
+//             disp = group.parentDisp.subNodeDisps[i];
+//             group.lastDN = getLastDN( group.action === VNDispAction.Update ? disp.oldVN : disp.newVN);
+//             if (group.lastDN)
+//                 break;
+//         }
+//     }
+// }
+
+
+
 /**
  * Determines first and last DOM nodes for the group. This method is invoked only after the
  * nodes were phisically updated/inserted and we can obtain their DOM nodes.
  */
-function determineGroupDNs( group: VNDispGroup)
+function determineGroupDNs( group: VNDispGroup, disps: VNDisp[])
 {
     if (group.count === 1)
     {
-        let vn = group.action === VNDispAction.Update
-            ? group.parentDisp.subNodeDisps[group.first].oldVN
-            : group.parentDisp.subNodeDisps[group.first].newVN;
+        let vn = disps[group.first].oldVN || disps[group.first].newVN;
 
         group.firstDN = getFirstDN(vn);
         group.lastDN = getLastDN( vn);
@@ -982,17 +1022,15 @@ function determineGroupDNs( group: VNDispGroup)
         let disp: VNDisp;
         for( let i = group.first; i <= group.last; i++)
         {
-            disp = group.parentDisp.subNodeDisps[i];
-            group.firstDN = getFirstDN( group.action === VNDispAction.Update ? disp.oldVN : disp.newVN);
-            if (group.firstDN)
+            disp = disps[i];
+            if (group.firstDN = getFirstDN( disp.oldVN || disp.newVN))
                 break;
         }
 
         for( let i = group.last; i >= group.first; i--)
         {
-            disp = group.parentDisp.subNodeDisps[i];
-            group.lastDN = getLastDN( group.action === VNDispAction.Update ? disp.oldVN : disp.newVN);
-            if (group.lastDN)
+            disp = disps[i];
+            if (group.lastDN = getLastDN( disp.oldVN || disp.newVN))
                 break;
         }
     }
@@ -1134,7 +1172,7 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
             disp.subNodesToRemove = subNodesToRemove;
 
         if (newLen > NO_GROUP_THRESHOLD)
-            buildSubNodeGroups( disp);
+            disp.subNodeGroups = buildSubNodeGroups( disp.subNodeDisps);
     }
 }
 
@@ -1352,11 +1390,10 @@ function reconcileWithRecycling( newChain: VN[], oldKeyedMap: Map<any,VN>, oldUn
  * From a flat list of new sub-nodes builds groups of consecutive nodes that should be either
  * updated or inserted.
  */
-function buildSubNodeGroups( disp: VNDisp): void
+function buildSubNodeGroups( disps: VNDisp[]): VNDispGroup[]
 {
     // we are here only if we have some number of sub-node dispositions
-    let subNodeDisps = disp.subNodeDisps;
-    let count = subNodeDisps.length;
+    let count = disps.length;
 
     /// #if DEBUG
         // this method is not supposed to be called if the number of sub-nodes is less then
@@ -1366,19 +1403,19 @@ function buildSubNodeGroups( disp: VNDisp): void
     /// #endif
 
     // create array of groups and create the first group starting from the first node
-    let group: VNDispGroup = { parentDisp: disp, action: subNodeDisps[0].action, first: 0 };
+    let group: VNDispGroup = { action: disps[0].action, first: 0 };
     let subNodeGroups = [group];
 
     // loop over sub-nodes and on each iteration decide whether we need to open a new group
     // or put the current node into the existing group or close the existing group and open
     // a new one.
     let action: VNDispAction;
-    let subDisp: VNDisp;
+    let disp: VNDisp;
     let prevOldVN: VN;
     for( let i = 1; i < count; i++)
     {
-        subDisp = subNodeDisps[i];
-        action = subDisp.action;
+        disp = disps[i];
+        action = disp.action;
         if (action !== group.action)
         {
             // close the group with the previous index. Decrement the iterating index so that
@@ -1388,7 +1425,7 @@ function buildSubNodeGroups( disp: VNDisp): void
             group.count = i - group.first;
 
             // open new group
-            group = { parentDisp: disp, action, first: i };
+            group = { action, first: i };
             subNodeGroups.push( group);
         }
         else if (action !== VNDispAction.Insert)
@@ -1396,15 +1433,15 @@ function buildSubNodeGroups( disp: VNDisp): void
             // an "update" sub-node is out-of-order and should close the current group if the index
             // of its previous sibling + 1 isn't equal to the index of this sub-node.
             // The last node will close the last group after the loop.
-            prevOldVN = subNodeDisps[i-1].oldVN;
-            if (!prevOldVN || prevOldVN.index + 1 !== subDisp.oldVN.index)
+            prevOldVN = disps[i-1].oldVN;
+            if (!prevOldVN || prevOldVN.index + 1 !== disp.oldVN.index)
             {
                 // close the group with the current index.
                 group.last = i - 1;
                 group.count = i - group.first;
 
                 // open new group
-                group = { parentDisp: disp, action, first: i };
+                group = { action, first: i };
                 subNodeGroups.push( group);
             }
         }
@@ -1414,13 +1451,10 @@ function buildSubNodeGroups( disp: VNDisp): void
     }
 
     // close the last group
-    if (group)
-    {
-        group.last = count - 1;
-        group.count = count - group.first;
-    }
+    group.last = count - 1;
+    group.count = count - group.first;
 
-    disp.subNodeGroups = subNodeGroups;
+    return subNodeGroups;
 }
 
 
@@ -1582,31 +1616,6 @@ export let symToVNs = Symbol();
 
 
 
-// // Creates array of virtual nodes from the given array of items.
-// function createNodesFromArray( arr: any[], nodes?: VN[]): VN[] | null
-// {
-//     if (arr.length === 0)
-//         return null;
-
-//     if (!nodes)
-//         nodes = [];
-
-//     arr.forEach( item =>
-//     {
-//         if (item != null)
-//         {
-//             if (item instanceof VN)
-//                 nodes.push( item)
-//             else
-//                 item[symToVNs]( nodes);
-//         }
-//     });
-
-//     return nodes.length > 0 ? nodes : null;
-// }
-
-
-
 // Add toVNs method to the String class. This method is invoked to convert rendered content to
 // virtual node or nodes.
 Boolean.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
@@ -1682,8 +1691,6 @@ Array.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
     });
 
     return nodes.length > 0 ? nodes : null;
-
-    // return createNodesFromArray( this, nodes);
 };
 
 
@@ -1758,8 +1765,6 @@ String.prototype[symJsxToVNs] = function( props: any, children: any[]): VN | VN[
     });
 
     return new ElmVN( s_currentClassComp, this, props, nodes.length > 0 ? nodes : null);
-
-    // return new ElmVN( s_currentClassComp, this, props, createNodesFromArray( children));
 };
 
 
@@ -1783,8 +1788,6 @@ Fragment[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
     });
 
     return nodes.length > 0 ? nodes : null;
-
-    // return createNodesFromArray( children);
 };
 
 
@@ -1841,14 +1844,6 @@ Function.prototype[symJsxToVNs] = function( props: any, children: any[]): VN | V
     let content = this( props, children.length === 1 && Array.isArray( children[0]) ? children[0] : children);
     return content && content[symToVNs]();
 };
-
-
-
-// // Add jsxToVNs method to the Object class object. This method is invoked by the JSX mechanism.
-// Object.prototype[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
-// {
-//     throw new Error( "Invalid tag in jsx processing function: " + this);
-// };
 
 
 

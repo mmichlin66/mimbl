@@ -39,7 +39,7 @@ export abstract class VN implements IVNode
 	public abstract get name(): string;
 
 	// Parent node. This is null for the top-level (root) nodes.
-	public parent: VN;
+	public parent?: VN;
 
     /** Class component that created this node in its render method (or undefined). */
     public creator: IComponent;
@@ -60,7 +60,7 @@ export abstract class VN implements IVNode
 	public key?: any;
 
 	// List of sub-nodes - both keyed and unkeyed - defined only if there are some sub-nodes.
-	public subNodes: VN[];
+	public subNodes?: VN[];
 
 	/**
 	 * Update strategy object that determines different aspects of node behavior
@@ -70,7 +70,7 @@ export abstract class VN implements IVNode
 
 	// Returns DOM node corresponding to the virtual node itself (if any) and not to any of its
 	// sub-nodes.
-	public ownDN: DN;
+	public ownDN?: DN;
 
 	// Flag indicating that update has been requested but not yet performed. This flag is needed
 	// to prevent trying to add the node to the global map every time the requestUpdate method
@@ -157,7 +157,10 @@ export abstract class VN implements IVNode
     // This method is called if the node requested a "partial" update. Different types of virtual
     // nodes can keep different data for the partial updates; for example, ElmVN can keep new
     // element properties that can be updated without re-rendering its children.
-	public performPartialUpdate?(): void;
+    // The partial update can also lead to updating the children of the node. In this case, this
+    // method should return a new virtual node, whose sub-nodes will be reconciliated with the
+    // current sub-nodes.
+	public performPartialUpdate?(): VN | null;
 
 
 

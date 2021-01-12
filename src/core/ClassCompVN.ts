@@ -33,22 +33,34 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	public mount(): void
     {
         // connect the component to this virtual node
-        this.comp.vn = this;
+        let comp = this.comp;
+        comp.vn = this;
 
-        this.willMount();
+        // don't need try/catch because it will be caught up the chain
+        let fn: Function = comp.willMount;
+        if (fn)
+        {
+            let prevCreator = setCurrentClassComp( comp);
+            fn.call( comp);
+            setCurrentClassComp( prevCreator);
+        }
 
         // establish watcher if requested using the @watcher decorator
-        let render = this.comp.render;
+        let render = comp.render;
         if (render[symRenderWatcher])
-            this.actRender = this.renderWatcher = createWatcher( render, this.requestUpdate, this.comp, this);
+            this.actRender = this.renderWatcher = createWatcher( render, this.requestUpdate, comp, this);
         else
-            this.actRender = render.bind( this.comp);
+            this.actRender = render.bind( comp);
 
-        if (this.comp.handleError)
+        if (comp.handleError)
             this.supportsErrorHandling = true;
 
         if (this.comp.getUpdateStrategy)
-            this.updateStrategy = this.comp.getUpdateStrategy();
+            this.updateStrategy = comp.getUpdateStrategy();
+
+        /// #if USE_STATS
+            DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
+        /// #endif
     }
 
 
@@ -56,7 +68,22 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
     // Releases reference to the DOM node corresponding to this virtual node.
     public unmount(): void
     {
-        this.willUnmount();
+        let comp = this.comp;
+        let fn = comp.willUnmount;
+		if (fn)
+        {
+            // need try/catch but only to log
+            try
+            {
+                let prevCreator = setCurrentClassComp( comp);
+                fn.call( comp);
+                setCurrentClassComp( prevCreator);
+            }
+            catch( err)
+            {
+                console.error( `Exception in willUnmount of component '${this.name}'`, err);
+            }
+        }
 
         if (this.renderWatcher)
         {
@@ -64,7 +91,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
             this.renderWatcher = null;
         }
 
-		this.comp.vn = undefined;
+		comp.vn = undefined;
 
         /// #if USE_STATS
             DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
@@ -107,50 +134,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         let prevCreator = setCurrentClassComp( this.comp);
 		this.comp.handleError( err);
         setCurrentClassComp( prevCreator);
-	}
-
-
-
-	// Creates internal stuctures of the virtual node so that it is ready to produce children.
-	// This method is called right after the node has been constructed.
-	protected willMount(): void
-	{
-        // don't need try/catch because it will be caught up the chain
-        let fn: Function = this.comp.willMount;
-        if (fn)
-        {
-            let prevCreator = setCurrentClassComp( this.comp);
-            fn.call( this.comp);
-            setCurrentClassComp( prevCreator);
-        }
-
-        /// #if USE_STATS
-            DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
-        /// #endif
-	}
-
-
-
-	// This method is called before the content of node and all its sub-nodes is removed from the
-	// DOM tree.
-	// This method is part of the render phase.
-	protected willUnmount(): void
-	{
-        let fn = this.comp.willUnmount;
-		if (fn)
-        {
-            // need try/catch but only to log
-            try
-            {
-                let prevCreator = setCurrentClassComp( this.comp);
-                fn.call( this.comp);
-                setCurrentClassComp( prevCreator);
-            }
-            catch( err)
-            {
-                console.error( `Exception in willUnmount of component '${this.name}'`, err);
-            }
-        }
 	}
 
 

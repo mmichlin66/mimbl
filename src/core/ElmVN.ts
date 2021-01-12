@@ -82,31 +82,26 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         if (!props)
             return;
 
-        if (this.partialPropsToUpdate)
+        if (this.propsForPartialUpdate)
             Object.assign( props)
         else
         {
-            this.partialPropsToUpdate = props;
+            this.propsForPartialUpdate = props;
             this.requestPartialUpdate();
         }
     }
 
 
 
-	// /**
-    //  * Requests re-rendering of the element children without updating its properties.
-    //  */
-    // public setChildren( children: any): void
-    // {
-    //     // scheduleFuncCall( () =>
-    //     // {
-    //     //     this.subNodes = children && children[symToVNs]();
-    //     // },
-    //     // true, undefined, this.creator);
-
-    //     this.childrenToUpdate = children;
-    //     this.requestUpdate();
-    // }
+	/**
+     * Requests re-rendering of the element children without updating its properties.
+     */
+    public setChildren( children: any): void
+    {
+        this.areChildrenForPartialUpdateSet = true;
+        this.childrenForPartialUpdate = children;
+        this.requestPartialUpdate();
+    }
 
 
 
@@ -233,9 +228,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		if (this.customAttrs)
 			this.removeCustomAttrs();
 
-		// // clean up
-        // this.children = null;
-
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Deleted);
 		/// #endif
@@ -272,6 +264,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             {
                 // remember the new reference specification
                 this.ref = newVN.ref;
+                this.vnref = newVN.vnref;
 
                 // if reference is now specified, set it now; note that we already determined that
                 // the reference object is different.
@@ -306,9 +299,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		// render method should be called if either old or new node has children
 		let shouldRender = this.subNodes != null || newVN.subNodes != null;
 
-		// // remember the new children for the next render
-		// this.subNodes = newVN.subNodes;
-
 		return shouldRender;
 	}
 
@@ -317,13 +307,24 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     // This method is called if the node requested a "partial" update. Different types of virtual
     // nodes can keep different data for the partial updates; for example, ElmVN can keep new
     // element properties that can be updated without re-rendering its children.
-    public performPartialUpdate(): void
+    public performPartialUpdate(): VN | null
     {
-        if (this.partialPropsToUpdate)
+        let retVal: VN | null = null;
+        if (this.propsForPartialUpdate)
         {
-            this.updatePropsOnly( this.partialPropsToUpdate)
-            this.partialPropsToUpdate = undefined;
+            this.updatePropsOnly( this.propsForPartialUpdate)
+            this.propsForPartialUpdate = undefined;
         }
+
+        if (this.areChildrenForPartialUpdateSet)
+        {
+            retVal = new ElmVN( this.creator, this.elmName, null,
+                this.childrenForPartialUpdate && this.childrenForPartialUpdate[symToVNs]());
+            this.childrenForPartialUpdate = undefined;
+            this.areChildrenForPartialUpdateSet = false;
+        }
+
+        return retVal;
     }
 
 
@@ -909,9 +910,17 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// handler objects and values.
     private customAttrs: { [name: string]: CustomAttrRunTimeData };
 
-    // properties that were specified in the requestPropsUpdate call. This allows updating the
+    // Properties that were specified in the setProps call. This allows updating the
     // element's properties without re-rendering its children.
-    private partialPropsToUpdate: any;
+    private propsForPartialUpdate: any;
+
+    // Content that was specified in the setChildren call. This allows re-rendering the element's
+    // sub-nodes directly, without re-rendering the component that created the element.
+    private childrenForPartialUpdate: any;
+
+    // Flag specifying whether the children for directly updating sub-nodes were set. We need this
+    // flag because undefined or null are legitimate values for the "children".
+    private areChildrenForPartialUpdateSet: boolean;
 }
 
 
