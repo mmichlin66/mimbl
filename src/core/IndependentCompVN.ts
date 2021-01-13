@@ -83,3 +83,9 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 
 
 
+// Define methods/properties that are invoked during mounting/unmounting/updating and which don't
+// have or have trivial implementation so that lookup is faster.
+IndependentCompVN.prototype.ignoreUnmount = false;
+
+
+

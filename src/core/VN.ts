@@ -42,16 +42,16 @@ export abstract class VN implements IVNode
 	public parent?: VN;
 
     /** Class component that created this node in its render method (or undefined). */
-    public creator: IComponent;
+    public creator?: IComponent;
 
 	/**
      * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the
      * root nodes that don't have parents.
      */
-	public index: number;
+	public index?: number;
 
 	// DOM node under which all content of this virtual node is rendered.
-	public anchorDN: DN;
+	public anchorDN?: DN;
 
 	/**
 	 * Node's key. The derived classes set it based on their respective content. A key can be of
@@ -75,20 +75,14 @@ export abstract class VN implements IVNode
 	// Flag indicating that update has been requested but not yet performed. This flag is needed
 	// to prevent trying to add the node to the global map every time the requestUpdate method
 	// is called.
-	public updateRequested: boolean;
-
-	// "Tick number" during which the node was last updated. If this node's tick number equals
-	// the current tick number maintained by the root node, this indicates that this node was
-	// already updated in this update cycle. This helps prevent double-rendering of a
-	// component if both the component and its parent are updated in the same cycle.
-	public lastUpdateTick: number;
+	public updateRequested?: boolean;
 
     // Flag indicating thata partial update has been requested but not yet performed. This flag is
     // different from the updateRequested since it controls node-type-specific "partial" updates,
     // which are treated by the rconciler by calling the performPartialUpdate method. Different
     // virtual node types can support different kinds of partial updates; for example, the ElmVN
     // allows updating the element properties without re-rendering its children.
-	public partialUpdateRequested: boolean;
+	public partialUpdateRequested?: boolean;
 
     // Flag indicating that the unmount method should not be called when destroying this node. It
     // is possible to reuse virtual nodes during rendering. The clone method (if implemented by the
@@ -97,8 +91,11 @@ export abstract class VN implements IVNode
     // unmounted if this flag is false.
 	public ignoreUnmount?: boolean;
 
-    // // Content that should become new sub-nodes of the node.
-	// public childrenToUpdate?: any;
+	// "Tick number" during which the node was last updated. If this node's tick number equals
+	// the current tick number maintained by the root node, this indicates that this node was
+	// already updated in this update cycle. This helps prevent double-rendering of a
+	// component if both the component and its parent are updated in the same cycle.
+	public lastUpdateTick?: number;
 
 
 

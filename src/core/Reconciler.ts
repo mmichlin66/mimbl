@@ -420,7 +420,8 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
 	fn && fn.call(vn);
 	let ownDN = vn.ownDN;
 
-    // if the node doesn't implement render(), the node never has any sub-nodes (e.g. text nodes)
+    //  some nodes don't implement the render method; for example, TextVNs don't have any sub-nodes
+    // while ElmVNs have subNodes filed populated during JSX
     fn = vn.render;
     if (fn)
     {

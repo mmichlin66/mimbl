@@ -49,7 +49,7 @@ export class TextVN extends VN implements ITextVN
         if (text !== this.text)
         {
             this.text = text;
-            this.requestPartialUpdate();
+            super.requestPartialUpdate();
         }
     }
 
@@ -67,13 +67,13 @@ export class TextVN extends VN implements ITextVN
 
 
 
-    /// #if USE_STATS
-        // Cleans up the node object before it is released.
-        public unmount(): void
-        {
-            DetailedStats.stats.log( StatsCategory.Text, StatsAction.Deleted);
-        }
-    /// #endif
+/// #if USE_STATS
+    // Cleans up the node object before it is released.
+    unmount(): void
+    {
+        DetailedStats.stats.log( StatsCategory.Text, StatsAction.Deleted);
+    }
+/// #endif
 
 
 
@@ -112,5 +112,18 @@ export class TextVN extends VN implements ITextVN
         return null;
     }
 }
+
+
+// Define methods/properties that are invoked during mounting/unmounting/updating and which don't
+// have or have trivial implementation so that lookup is faster.
+
+/// #if !USE_STATS
+    TextVN.prototype.unmount = undefined;
+/// #endif
+
+TextVN.prototype.render = undefined;
+TextVN.prototype.isUpdatePossible = undefined; // this mens that update is always possible
+TextVN.prototype.didUpdate = undefined;
+TextVN.prototype.ignoreUnmount = false;
 
 

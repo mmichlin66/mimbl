@@ -925,6 +925,15 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 
+// Define methods/properties that are invoked during mounting/unmounting/updating and which don't
+// have or have trivial implementation so that lookup is faster.
+ElmVN.prototype.render = undefined;
+ElmVN.prototype.didUpdate = undefined;
+ElmVN.prototype.supportsErrorHandling = false;
+ElmVN.prototype.ignoreUnmount = false;
+
+
+
 // Type defining the information we keep about each regular attribute
 interface AttrRunTimeData
 {

@@ -175,3 +175,10 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 
 
 
+// Define methods/properties that are invoked during mounting/unmounting/updating and which don't
+// have or have trivial implementation so that lookup is faster.
+ManagedCompVN.prototype.didUpdate = undefined;
+ManagedCompVN.prototype.ignoreUnmount = false;
+
+
+
