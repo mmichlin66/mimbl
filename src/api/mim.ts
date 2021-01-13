@@ -1207,6 +1207,7 @@ export function registerCustomEvent( eventName: string): void
 // The TickSchedulingType type defines possible ways of scheduling a Mimbl tick. The following
 // values are alowed:
 //   - undefined - no tick is scheduled.
+//   - "n" - no tick is scheduled.
 //   - "t" - a microtask is scheduled.
 //   - "a" - an animation frame is scheduled.
 //   - "s" - the update is performed right away in a synchronous manner
@@ -1214,7 +1215,7 @@ export function registerCustomEvent( eventName: string): void
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-export type TickSchedulingType = "s" | "t" | "a" | undefined;
+export type TickSchedulingType = "n" | "s" | "t" | "a" | undefined;
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

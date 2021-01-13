@@ -118,8 +118,7 @@ function CallbackWrapper(): any
         // if some scheduling type is set (that is, we are going to schedule a Mimbl tick after
         // the callback), we should ignore requests to schedule a tick made during the callback
         // execution
-        if (schedulingType)
-            s_ignoreSchedulingRequest = true;
+        s_ignoreSchedulingRequest = schedulingType && schedulingType !== "n";
 
 		retVal = func.apply( funcThisArg, rest);
 	}
@@ -131,12 +130,19 @@ function CallbackWrapper(): any
     }
 
     // schedule a Mimbl tick if instructed to do so
-    if (schedulingType === "t")
-        queueMicrotask( performMimbleTick);
-    else if (schedulingType === "a")
-        s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
-    else if (schedulingType === "s")
-        performMimbleTick();
+    switch (schedulingType)
+    {
+        case "s":
+            performMimbleTick();
+            break;
+        case "t":
+            queueMicrotask( performMimbleTick);
+            break;
+        case "a":
+            if (s_scheduledFrameHandle === 0)
+                s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
+            break;
+    }
 
     return retVal;
 }
