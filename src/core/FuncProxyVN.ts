@@ -1,4 +1,4 @@
-﻿import {symRenderWatcher, RenderMethodType, IComponent} from "../api/mim"
+﻿import {symRenderNoWatcher, RenderMethodType, IComponent} from "../api/mim"
 import {VN, createWatcher, IWatcher, setCurrentClassComp} from "../internal"
 
 /// #if USE_STATS
@@ -81,12 +81,12 @@ export class FuncProxyVN extends VN
 
 		this.linkNodeToFunc();
 
-        // establish watcher if requested using the @watcher decorator
+        // establish watcher if not disabled using the @noWatcher decorator
         let func = this.func as RenderMethodType;
-        if (func[symRenderWatcher])
-            this.actFunc = this.funcWatcher = createWatcher( func, this.requestUpdate, this.funcThisArg, this);
-        else
+        if (func[symRenderNoWatcher])
             this.actFunc = func.bind( this.funcThisArg);
+        else
+            this.actFunc = this.funcWatcher = createWatcher( func, this.requestUpdate, this.funcThisArg, this);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);

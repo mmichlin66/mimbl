@@ -1,4 +1,4 @@
-﻿import {IClassCompVN, IComponent, symRenderWatcher} from "../api/mim"
+﻿import {IClassCompVN, IComponent, symRenderNoWatcher} from "../api/mim"
 import {createWatcher, IWatcher} from "../utils/TriggerWatcher"
 import {VN, setCurrentClassComp} from "../internal"
 
@@ -45,12 +45,12 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
             setCurrentClassComp( prevCreator);
         }
 
-        // establish watcher if requested using the @watcher decorator
+        // establish watcher if not disabled using the @noWatcher decorator
         let render = comp.render;
-        if (render[symRenderWatcher])
-            this.actRender = this.renderWatcher = createWatcher( render, this.requestUpdate, comp, this);
-        else
+        if (render[symRenderNoWatcher])
             this.actRender = render.bind( comp);
+        else
+            this.actRender = this.renderWatcher = createWatcher( render, this.requestUpdate, comp, this);
 
         if (comp.handleError)
             this.supportsErrorHandling = true;

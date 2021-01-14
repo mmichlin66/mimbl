@@ -419,7 +419,6 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
     /**
      * The render method simply returns the current content but it can be overridden by derived classes
      */
-    @mim.watcher
 	public render(): any
 	{
         return this.content;
@@ -894,7 +893,6 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
         super.willUnmount();
 	}
 
-    @mim.watcher
     public render(): any
     {
         return <div keydown={this.onButtonKeyDown}>
@@ -904,7 +902,6 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
         </div>
     }
 
-    @mim.watcher
     public renderCaption(): any
     {
         // have to specify touch-action "none" - otherwise, pointer events are canceled by the browser
@@ -913,7 +910,6 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
         </div>
     }
 
-    @mim.watcher
     public renderBody(): any
     {
         return <div class={this.bodyClassName}>
@@ -921,7 +917,6 @@ export class Dialog<TStyles extends IDialogStyles = IDialogStyles,
         </div>
     }
 
-    @mim.watcher
     public renderButtons(): any
     {
         return <div class={this.buttonBarClassName}>
@@ -1162,7 +1157,6 @@ export class MsgBox extends Dialog<MsgBoxStyles>
 
 
 
-    @mim.watcher
 	public renderBody(): any
 	{
         let { char, color } = this.getIconClassAndColor();
@@ -1372,7 +1366,6 @@ export class ProgressBox extends Dialog<ProgressBoxStyles>
 
 
 
-    @mim.watcher
 	public renderBody(): any
 	{
         // we are using this.optionalStyles because we explicitly pass our styles in the options

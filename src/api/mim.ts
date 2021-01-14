@@ -1542,19 +1542,19 @@ export function unmount( anchorDN: Node = null): void
 /**
  * Symbol that is attached to a render function to indicate that it should be wrapped in a watcher.
  */
-export let symRenderWatcher = Symbol("renderWatcher");
+export let symRenderNoWatcher = Symbol();
 
 /**
  * Decorator function for tagging a component's render function so that it will be wrapped in
  * a watcher.
  */
-export function watcher( target: any, name: string, propDescr: PropertyDescriptor)
+export function noWatcher( target: any, name: string, propDescr: PropertyDescriptor)
 {
     // propDesc.value is undefined for accessors and defined for functions
     if (!propDescr.value)
-        throw new Error("@watcher decorator can only be applied to methods.");
+        throw new Error("@noWatcher decorator can only be applied to methods.");
 
-    propDescr.value[symRenderWatcher] = true;
+    propDescr.value[symRenderNoWatcher] = true;
 }
 
 
