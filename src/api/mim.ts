@@ -5,9 +5,8 @@ import {
 } from "../internal";
 
 
-
 /**
- * Type used to define properties that can be passed to a class-based component.
+ * Type used to define properties that can be passed to a manged component.
  *
  * @typeparam TProps Type defining properties that can be passed to the functional or class-based
  * component with these properties. Default type is an empty object (no properties).
@@ -235,15 +234,6 @@ export type IDPropType = string | number | IIDRule;
 
 
 
-export type CrossoriginPropType = "anonymous" | "use-credentials";
-export type FormenctypePropType = "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain";
-export type FormmethodPropType = "get" | "post" | "dialog";
-export type FormtargetPropType = string | "_self" | "_blank" | "_parent"| "_top";
-export type ReferrerPolicyPropType = "no-referrer" | "no-referrer-when-downgrade" | "origin" |
-		"origin-when-cross-origin" | "unsafe-url";
-
-
-
 /**
  * The ICommonProps interface defines standard properties that can be used on all JSX elements -
  * intrinsic (HTML and SVG) as well as functional and class-based components.
@@ -253,6 +243,30 @@ export interface ICommonProps
 	/** Unique key that distinguishes this JSX element from its siblings. The key can be of any type. */
 	key?: any;
 }
+
+
+
+/**
+ * The IManagedCompProps interface adds to the ICommonProps the ability to obtain reference to
+ * the managed components via the ref property.
+ */
+export interface IManagedCompProps<T = any> extends ICommonProps
+{
+    // Reference that will be set to the instance of the component after it is mounted. The
+    // reference will be set to undefined after the component is unmounted.
+    readonly ref?: RefPropType<T>;
+}
+
+
+
+// Types for some common HTML and SVG properties
+export type CrossoriginPropType = "anonymous" | "use-credentials";
+export type FormenctypePropType = "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain";
+export type FormmethodPropType = "get" | "post" | "dialog";
+export type FormtargetPropType = string | "_self" | "_blank" | "_parent"| "_top";
+export type ReferrerPolicyPropType = "no-referrer" | "no-referrer-when-downgrade" | "origin" |
+		"origin-when-cross-origin" | "unsafe-url";
+export type DropzonePropType = "copy" | "move" | "link";
 
 
 
@@ -286,8 +300,8 @@ export interface IElementProps<TRef extends Element = Element, TChildren = any> 
     xmlns?: string;
 	class?: ClassPropType;
 	draggable?: boolean;
-	dropzone ?: "copy" | "move" | "link";
-	id?: string | number | IIDRule;
+	dropzone ?: DropzonePropType;
+	id?: IDPropType;
 	lang?: string;
 	role?: string;
 	style?: Styleset;
@@ -659,13 +673,9 @@ export namespace JSX
 	// Properties in this interface apply to intrinsic elements and to functional components.
 	export interface IntrinsicAttributes extends ICommonProps {}
 
+	// tslint:disable-next-line:no-empty-interface
 	// Properties in this interface apply to class-based components.
-	export interface IntrinsicClassAttributes<T> extends ICommonProps
-	{
-		// Reference that will be set to the instance of the component after it is mounted. The
-		// reference will be set to undefined after the component is unmounted.
-		ref?: RefPropType<T>;
-	}
+	export interface IntrinsicClassAttributes<T> extends IManagedCompProps<T> {}
 }
 
 
@@ -773,7 +783,7 @@ export class Ref<T = any>
         if (!this.changedEvent)
             this.changedEvent = new EventSlot<RefFunc<T>>();
 
-            this.changedEvent.attach( listener);
+        this.changedEvent.attach( listener);
 	}
 
 	/** Removes a callback that was added with addListener. */
@@ -820,7 +830,18 @@ export type ElmRefFunc<T extends Element = Element> = RefFunc<IElmVN<T>>;
  * Type of ref property that can be passed to JSX elements and components. This can be either the
  * [[Ref]] class or [[RefFunc]] function.
  */
-export type RefPropType<T = any> = T | Ref<T> | RefFunc<T>;
+export type RefType<T = any> = Ref<T> | RefFunc<T>;
+
+/**
+ * Type of ref property value. This can be either the [[Ref]] class or [[RefFunc]] function or the
+ * type itself.
+ */
+export type RefPropType<T = any> = T | RefType<T>;
+
+/**
+ * Type of the vnref property value.
+ */
+export type ElmRefType<T extends Element = Element> = RefType<IElmVN<T>>;
 
 /**
  * Type of vnref property that can be passed to JSX elements.
@@ -935,15 +956,12 @@ class RefProxyHandler implements ProxyHandler<any>
  * @param onlyIf An optional value to which to compare the current (old) value of the reference.
  * The new value will be set only if the old value equals the `onlyIf` value.
  */
-export function setRef<T>( ref: RefPropType<T>, val: T, onlyIf?: T): void
+export function setRef<T>( ref: RefType<T>, val: T, onlyIf?: T): void
 {
-	if (typeof ref === "object")
-	{
-		if (onlyIf === undefined || (ref as Ref).r === onlyIf)
-			(ref as Ref).r = val;
-	}
-	else if (typeof ref === "function")
-		(ref as RefFunc)(val);
+	if (typeof ref === "function")
+		ref(val);
+	else if (!onlyIf || ref.r === onlyIf)
+        ref.r = val;
 }
 
 
@@ -1540,12 +1558,13 @@ export function unmount( anchorDN: Node = null): void
 
 
 /**
- * Symbol that is attached to a render function to indicate that it should be wrapped in a watcher.
+ * Symbol that is attached to a render function to indicate that it should not be wrapped in a
+ * watcher.
  */
 export let symRenderNoWatcher = Symbol();
 
 /**
- * Decorator function for tagging a component's render function so that it will be wrapped in
+ * Decorator function for tagging a component's render function so that it will not be wrapped in
  * a watcher.
  */
 export function noWatcher( target: any, name: string, propDescr: PropertyDescriptor)

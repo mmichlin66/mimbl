@@ -1,11 +1,10 @@
 ﻿import {
-    IElmVN, EventFuncType, ICustomAttributeHandler, IElementProps, ElmRefPropType, IComponent,
-    EventPropType, TickSchedulingType, RefPropType, Ref, ElmRef
+    IElmVN, EventFuncType, ICustomAttributeHandler, IElementProps, IComponent,
+    EventPropType, TickSchedulingType, setRef, RefType, ElmRefType
 } from "../api/mim"
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo, AttrPropInfo, EventPropInfo,
-    getElmPropInfo, setElmProp, removeElmProp, updateElmProp, wrapCallback,
-    scheduleFuncCall, symToVNs
+    getElmPropInfo, setElmProp, removeElmProp, updateElmProp, wrapCallback, symToVNs
 } from "../internal"
 
 /// #if USE_STATS
@@ -179,20 +178,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             this.addCustomAttrs();
 
         if (this.ref)
-        {
-            if (typeof this.ref === "function")
-                this.ref( this.ownDN);
-            else
-                (this.ref as Ref<T>).r = this.ownDN;
-        }
+            setRef( this.ref, this.ownDN);
 
         if (this.vnref)
-        {
-            if (typeof this.vnref === "function")
-                this.vnref( this);
-            else
-                (this.vnref as ElmRef<T>).r = this;
-        }
+            setRef( this.vnref, this);
 
 		/// #if USE_STATS
 			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Added);
@@ -209,20 +198,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		// more than one element (and/or components) it can happen that the reference is changed
 		// before our element is unmounted.
         if (this.ref)
-        {
-            if (typeof this.ref === "function")
-                this.ref( undefined);
-            else if ((this.ref as Ref<T>).r === this.ownDN)
-                (this.ref as Ref<T>).r = undefined;
-        }
+            setRef( this.ref, undefined, this.ownDN);
 
         if (this.vnref)
-        {
-            if (typeof this.vnref === "function")
-                this.vnref( undefined);
-            else if ((this.vnref as ElmRef<T>).r === this)
-                (this.vnref as ElmRef<T>).r = undefined;
-        }
+            setRef( this.vnref, undefined, this);
 
 		// terminate custom property handlers
 		if (this.customAttrs)
@@ -269,20 +248,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 // if reference is now specified, set it now; note that we already determined that
                 // the reference object is different.
                 if (this.ref)
-                {
-                    if (typeof this.ref === "function")
-                        this.ref( this.ownDN);
-                    else
-                        (this.ref as Ref<T>).r = this.ownDN;
-                }
+                    setRef( this.ref, this.ownDN);
 
                 if (this.vnref)
-                {
-                    if (typeof this.vnref === "function")
-                        this.vnref( this);
-                    else
-                        (this.vnref as ElmRef<T>).r = this;
-                }
+                    setRef( this.vnref, this);
             }
 
             // remember the new value of the key and updateStartegyproperties (even if the
@@ -362,26 +331,20 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 {
                     if (propVal !== this.ref)
                     {
-                        // remember the new reference specification
+                        // if reference is now specified, set it now
                         this.ref = propVal;
-
-                        // if reference is now specified, set it now; note that we already determined that
-                        // the reference object is different.
-                        if (this.ref)
-                        {
-                            if (typeof this.ref === "function")
-                                this.ref( this.ownDN);
-                            else
-                                (this.ref as Ref<T>).r = this.ownDN;
-                        }
-
-                        if (this.vnref)
-                        {
-                            if (typeof this.vnref === "function")
-                                this.vnref( this);
-                            else
-                                (this.vnref as ElmRef<T>).r = this;
-                        }
+                        if (propVal)
+                            setRef( this.ref, this.ownDN);
+                    }
+                }
+                else if (propName === "vnref")
+                {
+                    if (propVal !== this.vnref)
+                    {
+                        // if reference is now specified, set it now
+                        this.vnref = propVal;
+                        if (propVal)
+                            setRef( this.vnref, this);
                     }
                 }
                 else if (propName === "updateStrategy")
@@ -894,10 +857,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	public ownDN: T;
 
     // Reference to the element that is specified as a "ref" property.
-	private ref: RefPropType<T>;
+	private ref: RefType<T>;
 
-    // Reference to the element that is specified as a "vnref" property.
-	private vnref: ElmRefPropType<T>;
+    // Reference to this virtual node that is specified as a "vnref" property.
+	private vnref: ElmRefType<T>;
 
 	// Object that serves as a map between attribute names and their current values.
 	private attrs: { [name: string]: AttrRunTimeData };

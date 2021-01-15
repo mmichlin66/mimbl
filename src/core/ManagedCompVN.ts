@@ -21,35 +21,18 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 
 		this.compClass = compClass;
 
-		// copy properties to our own object excluding framework-handled key and ref
-		this.props = {};
-		if (props)
+		// remember the props and remember the children as part of the props
+		if (!props)
+            this.props = {children};
+        else
 		{
-			for( let propName in props)
-			{
-				let propVal: any = props[propName];
-				if (propVal === undefined || propVal === null)
-				{
-					// ignore properties with values undefined and null
-					continue;
-				}
-				else if (propName === "key")
-				{
-					// remember key property but don't copy it to this.props object
-					this.key = propVal;
-				}
-				else if (propName === "ref")
-				{
-					// remember ref property but don't copy it to this.props object
-					this.ref = propVal;
-				}
-				else
-					this.props[propName] = propVal;
-			}
-		}
+            props.children = children;
+            this.props = props;
 
-		// remember children as part of props
-		this.props.children = children;
+            // get the key (if exists) because we will need id during update even before the
+            // component is mounted
+            this.key = props.key;
+		}
 	};
 
 
@@ -87,8 +70,19 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
         super.mount();
 
         // set the reference value if specified
-		if (this.ref)
-			setRef( this.ref, this.comp);
+        if (this.ref)
+        {
+            setRef( this.ref, this.comp);
+
+            // we delete the ref property from the props because it should not be available to
+            // the component
+            delete this.props.ref;
+        }
+
+        // we delete the key property from the props because it should not be available to
+        // the component
+        if (this.key != null)
+            delete this.props.key;
     }
 
 
@@ -140,25 +134,15 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 			if (this.ref)
 				setRef( this.ref, this.comp);
 		}
-		else if (!newVN.ref)
-		{
-			// we know that our reference is defined, so unset it
+		else if (this.ref)
 			setRef( this.ref, undefined, this.comp);
-		}
 
 		// remember the new value of the key property (even if it is the same)
 		this.key = newVN.key;
 
-		// // shallow copy the new properties from the other node to our object. This is needed
-		// // because the component got our props object in the constructor and will keep
-		// // working with it - especially if it doesn't implement the shouldUpdate method.
-		// Object.keys(this.props).forEach( key => delete this.props[key]);
-        // Object.assign( this.props, newVN.props);
+		// remember the new properties
         this.comp.props = this.props = newVN.props;
 
-		// since the rendering produced by a function may depend on factors beyond properties,
-		// we always indicate that it is necessary to update the sub-nodes. The commitUpdate
-		// method should NOT be called.
 		return shouldRender;
 	}
 
