@@ -75,22 +75,25 @@ export class RootVN extends VN implements IErrorHandlingService
 
 
 
-	// This method is called after an exception was thrown during rendering of the node's sub-nodes.
-	public handleError( err: any): void
-	{
+    // This method is called after an exception was thrown during rendering of the node's
+    // sub-nodes. The method returns the new content to display.
+    public handleError( err: any): any
+    {
 		if (err instanceof Promise)
 		{
 			let promise = err as Promise<any>;
 			this.thrownPromises.add( promise);
 			promise.then( () => { this.onPromiseFulfilled( promise); });
 			promise.catch( () => { this.onPromiseFulfilled( promise); });
-			this.waiting = true;
+            this.waiting = true;
 		}
 		else
 		{
             console.error( `Unhandled error\n`, err);
 			this.error = true;
-		}
+        }
+
+        return null;
 	}
 
 

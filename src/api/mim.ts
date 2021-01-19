@@ -1097,15 +1097,64 @@ export interface IElmVN<T extends Element = Element> extends IVNode
 	/** Gets the DOM element object. */
 	readonly elm: Element;
 
-	/**
+    /**
      * Requests update of the element properties without re-rendering of its children.
+     * @param props
      */
 	setProps( props: IElementProps<T>): void;
 
-	/**
-     * Requests re-rendering of the element children without updating its properties.
+    /**
+     * Updates the element's sub-nodes with the given content.
+     * @param children
      */
-	setChildren( children: any): void;
+    updateChildren( content: any): void;
+
+    /**
+     * Completely replaces the element's sub-nodes with the given content.
+     * @param children
+     */
+    setChildren( content?: any): void;
+
+    /**
+     * At the given index, removes a given number of sub-nodes and then inserts the new content.
+     * @param index
+     * @param countToDelete
+     * @param contentToInsert
+     * @param update Optional flag determining whether to reconcile or completely replace the
+     * sub-nodes being removed with the new content. The default is to replace.
+     */
+    spliceChildren( index: number, countToDelete?: number, contentToInsert?: any, update?: boolean): void;
+
+    /**
+     * Moves a range of sub-nodes to a new location.
+     * @param index
+     * @param count
+     * @param newIndex
+     */
+    moveChildren( index: number, count: number, newIndex: number): void;
+
+    /**
+     * Swaps two ranges of the element's sub-nodes. The ranges cannot intersect.
+     * @param index1
+     * @param count1
+     * @param index2
+     * @param count2
+     */
+    swapChildren( index1: number, count1: number, index2: number, count2: number): void;
+
+    /**
+     * Removes the given number of nodes from the start and/or the end of the list of sub-nodes.
+     * @param startCount
+     * @param endCount
+     */
+    trimChildren( startCount: number, endCount: number): void;
+
+    /**
+     * Adds the given content at the start and/or at the end of the existing children.
+     * @param startContent
+     * @param endContent
+     */
+    growChildren( startContent?: any, endContent?: any): void;
 }
 
 

@@ -4,7 +4,8 @@
 } from "../api/mim"
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo, AttrPropInfo, EventPropInfo,
-    getElmPropInfo, setElmProp, removeElmProp, updateElmProp, wrapCallback, symToVNs
+    getElmPropInfo, setElmProp, removeElmProp, updateElmProp, wrapCallback, symToVNs,
+    ChildrenUpdateOperation
 } from "../internal"
 
 /// #if USE_STATS
@@ -73,16 +74,17 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 
-	/**
+    /**
      * Requests update of the element properties without re-rendering of its children.
+     * @param props
      */
-    setProps( props: IElementProps<T>): void
+	setProps( props: IElementProps<T>): void
     {
         if (!props)
             return;
 
         if (this.propsForPartialUpdate)
-            Object.assign( props)
+            Object.assign( this.propsForPartialUpdate, props)
         else
         {
             this.propsForPartialUpdate = props;
@@ -90,16 +92,76 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         }
     }
 
-
-
-	/**
-     * Requests re-rendering of the element children without updating its properties.
+    /**
+     * Updates the element's sub-nodes with the given content.
+     * @param children
      */
-    public setChildren( children: any): void
+    updateChildren( content: any): void
     {
-        this.areChildrenForPartialUpdateSet = true;
-        this.childrenForPartialUpdate = children;
-        this.requestPartialUpdate();
+        this.requestUpdate( {op: ChildrenUpdateOperation.Update, content});
+    }
+
+    /**
+     * Completely replaces the element's sub-nodes with the given content.
+     * @param children
+     */
+    setChildren( content?: any): void
+    {
+        this.requestUpdate( {op: ChildrenUpdateOperation.Set, content});
+    }
+
+    /**
+     * At the given index, removes a given number of sub-nodes and then inserts the new content.
+     * @param index
+     * @param countToDelete
+     * @param contentToInsert
+     */
+    spliceChildren( index: number, countToDelete?: number, contentToInsert?: any, update?: boolean): void
+    {
+        this.requestUpdate( {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert, update});
+    }
+
+    /**
+     * Moves a range of sub-nodes to a new location.
+     * @param index
+     * @param count
+     * @param newIndex
+     */
+    moveChildren( index: number, count: number, newIndex: number): void
+    {
+        this.requestUpdate( {op: ChildrenUpdateOperation.Move, index, count, newIndex});
+    }
+
+    /**
+     * Swapw two ranges of the element's sub-nodes. The ranges cannot intersect.
+     * @param index1
+     * @param count1
+     * @param index2
+     * @param count2
+     */
+    swapChildren( index1: number, count1: number, index2: number, count2: number): void
+    {
+        this.requestUpdate( {op: ChildrenUpdateOperation.Swap, index1, count1, index2, count2});
+    }
+
+    /**
+     * Removes the given number of nodes from the start and/or the end of the list of sub-nodes.
+     * @param startCount
+     * @param endCount
+     */
+    trimChildren( startCount: number, endCount: number): void
+    {
+        this.requestUpdate( {op: ChildrenUpdateOperation.Trim, startCount, endCount});
+    }
+
+    /**
+     * Adds the given content at the start and/or at the end of the existing children.
+     * @param startContent
+     * @param endContent
+     */
+    growChildren( startContent?: any, endContent?: any): void
+    {
+        this.requestUpdate( {op: ChildrenUpdateOperation.Grow, startContent, endContent});
     }
 
 
@@ -276,24 +338,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     // This method is called if the node requested a "partial" update. Different types of virtual
     // nodes can keep different data for the partial updates; for example, ElmVN can keep new
     // element properties that can be updated without re-rendering its children.
-    public performPartialUpdate(): VN | null
+    public performPartialUpdate(): void
     {
-        let retVal: VN | null = null;
-        if (this.propsForPartialUpdate)
-        {
-            this.updatePropsOnly( this.propsForPartialUpdate)
-            this.propsForPartialUpdate = undefined;
-        }
-
-        if (this.areChildrenForPartialUpdateSet)
-        {
-            retVal = new ElmVN( this.creator, this.elmName, null,
-                this.childrenForPartialUpdate && this.childrenForPartialUpdate[symToVNs]());
-            this.childrenForPartialUpdate = undefined;
-            this.areChildrenForPartialUpdateSet = false;
-        }
-
-        return retVal;
+        this.updatePropsOnly( this.propsForPartialUpdate)
+        this.propsForPartialUpdate = undefined;
     }
 
 
@@ -876,14 +924,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     // Properties that were specified in the setProps call. This allows updating the
     // element's properties without re-rendering its children.
     private propsForPartialUpdate: any;
-
-    // Content that was specified in the setChildren call. This allows re-rendering the element's
-    // sub-nodes directly, without re-rendering the component that created the element.
-    private childrenForPartialUpdate: any;
-
-    // Flag specifying whether the children for directly updating sub-nodes were set. We need this
-    // flag because undefined or null are legitimate values for the "children".
-    private areChildrenForPartialUpdateSet: boolean;
 }
 
 

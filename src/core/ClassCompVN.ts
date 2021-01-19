@@ -127,13 +127,16 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
 
-	// This method is called after an exception was thrown during rendering of the node itself
-	// and/or its sub-nodes.
-	public handleError( err: any): void
+    // This method is called after an exception was thrown during rendering of the node's
+    // sub-nodes. The method returns the new content to display.
+	public handleError( err: any): any
 	{
+        // we can safely call the component's handleError method because our method is only
+        // invoked if the component implements it.
         let prevCreator = setCurrentClassComp( this.comp);
-		this.comp.handleError( err);
+		let retVal = this.comp.handleError( err);
         setCurrentClassComp( prevCreator);
+        return retVal;
 	}
 
 

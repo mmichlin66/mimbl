@@ -148,16 +148,13 @@ export abstract class VN implements IVNode
 	public supportsErrorHandling?: boolean;
 
     // This method is called after an exception was thrown during rendering of the node's
-    // sub-nodes. The render method will be called after this method returns.
-	public handleError?( err: any): void;
+    // sub-nodes. The method returns the new content to display.
+	public handleError?( err: any): any;
 
     // This method is called if the node requested a "partial" update. Different types of virtual
     // nodes can keep different data for the partial updates; for example, ElmVN can keep new
     // element properties that can be updated without re-rendering its children.
-    // The partial update can also lead to updating the children of the node. In this case, this
-    // method should return a new virtual node, whose sub-nodes will be reconciliated with the
-    // current sub-nodes.
-	public performPartialUpdate?(): VN | null;
+	public performPartialUpdate?(): void;
 
 
 
@@ -179,11 +176,11 @@ export abstract class VN implements IVNode
 
 
     // Schedules an update for this node.
-	public requestUpdate(): void
+	public requestUpdate( req?: ChildrenUpdateRequest): void
 	{
 		if (!this.updateRequested)
 		{
-			requestNodeUpdate( this);
+			requestNodeUpdate( this, req);
 			this.updateRequested = true;
 		}
 	}
@@ -337,6 +334,142 @@ export abstract class VN implements IVNode
 	/// #endif
 
 }
+
+
+
+/**
+ * The UpdateOperation enumeration lists various operations of how the sub-nodes of a virtual
+ * node can be updated. When nodes request update they specify the operation and if needed provide
+ * operation specific parameters.
+ */
+export const enum ChildrenUpdateOperation
+{
+    /**
+     * The node's existing sub-nodes are reconciled with new content. The parameters contain the
+     * new content.
+     */
+    Update = 0,
+
+    /**
+     * The new content is replacing existing children. No parameters are required. The existing
+     * sub-nodes are unmounted and the new sub-nodes are mounted (no updates are performed).
+     */
+    Set = 1,
+
+    /**
+     * A range of existing sub-nodes is removed and the new ones added. The parameters contain the
+     * new content that is used to generate the new list of sub-nodes and, optionally, a range of
+     * indices defining the sub-nodes that are replaced. An additional flag determines whether the
+     * existing nodes are unmounted or updates are allowed.
+     */
+    Splice = 2,
+
+    /**
+     * A range of existing sub-nodes is moved to a new location. The parameters contain the index
+     * and the length of the range and the index of the new location. The new index cannot be
+     * within the range.
+     */
+    Move = 3,
+
+    /**
+     * Two ranges of existing sub-nodes change their locations. The parameters contain the indices
+     * and the lengths of the two ranges. The ranges cannot intersect.
+     */
+    Swap = 4,
+
+    /**
+     * Some sub-nodes are removed from the start and the end of the list. The parameters contain
+     * the number of nodes to remove from the start and the number of nodes to remove from the end.
+     * If only single number is give it is used for both the start and the end.
+     */
+    Trim = 5,
+
+    /**
+     * Some sub-nodes are added at the start and the end of the list. The parameters contain
+     * the content to add at the start and the content to add at the end.
+     */
+    Grow = 6,
+}
+
+
+
+/** Parameters for the Set request */
+export type UpdateRequest = {
+    op: ChildrenUpdateOperation.Update;
+    content?: any;
+}
+
+
+
+/** Parameters for the Set request */
+export type SetRequest = {
+    op: ChildrenUpdateOperation.Set;
+    content?: any;
+}
+
+
+
+/** Parameters for the Splice request */
+export type SpliceRequest = {
+    op: ChildrenUpdateOperation.Splice;
+
+    // Index at which splicing starts
+    index: number;
+
+    // Number of sub-nodes to be deleted (or updated)
+    countToDelete?: number;
+
+    // New content to insert (or update the old sub-nodes)
+    contentToInsert?: any;
+
+    // Flag indicating whether the old sub-nodes are unmounted or are allowed to be updated
+    update?: boolean;
+}
+
+
+
+/** Parameters for the Move request */
+export type MoveRequest = {
+    op: ChildrenUpdateOperation.Move;
+    index: number;
+    count: number;
+    newIndex: number;
+}
+
+
+
+/** Parameters for the Swap request */
+export type SwapRequest = {
+    op: ChildrenUpdateOperation.Swap;
+    index1: number;
+    count1: number;
+    index2: number
+    count2: number;
+}
+
+
+
+/** Parameters for the Trim request */
+export type TrimRequest = {
+    op: ChildrenUpdateOperation.Trim;
+    startCount: number;
+    endCount: number;
+}
+
+
+
+/** Parameters for the Grow request */
+export type GrowRequest = {
+    op: ChildrenUpdateOperation.Grow;
+    startContent?: any;
+    endContent?: any;
+}
+
+
+
+/** Parameters for the Grow request */
+export type ChildrenUpdateRequest = UpdateRequest | SetRequest | SpliceRequest | MoveRequest |
+    SwapRequest | TrimRequest | GrowRequest;
 
 
 
