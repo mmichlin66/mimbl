@@ -1,5 +1,6 @@
 ﻿import {
-    ScheduledFuncType, Component, Fragment, FuncProxy, PromiseProxy, CallbackWrappingParams
+    ScheduledFuncType, Component, Fragment, FuncProxy, PromiseProxy, CallbackWrappingParams,
+    TickSchedulingType
 } from "../api/mim"
 import {
     VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN, FuncProxyVN,
@@ -132,7 +133,7 @@ function CallbackWrapper(): any
     // if some scheduling type is set (that is, we are going to schedule a Mimbl tick after
     // the callback), we should ignore requests to schedule a tick made during the callback
     // execution
-    s_ignoreSchedulingRequest = params.schedulingType && params.schedulingType !== "n";
+    s_ignoreSchedulingRequest = !!params.schedulingType;
 
     // params.arg will be available inside the callback via the getCurrentCallbackArg call.
     s_currentCallbackArg = params.arg;
@@ -153,13 +154,13 @@ function CallbackWrapper(): any
     // schedule a Mimbl tick if instructed to do so
     switch (params.schedulingType)
     {
-        case "s":
+        case TickSchedulingType.Sync:
             performMimbleTick();
             break;
-        case "t":
+        case TickSchedulingType.Microtask:
             queueMicrotask( performMimbleTick);
             break;
-        case "a":
+        case TickSchedulingType.AnimationFrame:
             if (s_scheduledFrameHandle === 0)
                 s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
             break;

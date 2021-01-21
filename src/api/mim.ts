@@ -1291,18 +1291,24 @@ export function registerCustomEvent( eventName: string): void
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// The TickSchedulingType type defines possible ways of scheduling a Mimbl tick. The following
-// values are alowed:
-//   - undefined - no tick is scheduled.
-//   - "n" - no tick is scheduled.
-//   - "t" - a microtask is scheduled.
-//   - "a" - an animation frame is scheduled.
-//   - "s" - the update is performed right away in a synchronous manner
-//   - number - a setTimeout is used with the gven number of milliseconds.
+// The TickSchedulingType type defines possible ways of scheduling a Mimbl tick.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-export type TickSchedulingType = "n" | "s" | "t" | "a" | undefined;
+export const enum TickSchedulingType
+{
+    /** No tick is scheduled */
+    None = 0,
+
+    /** The tick is executed right away in a synchronous manner */
+    Sync,
+
+    /** A microtask is scheduled for executing the tick */
+    Microtask,
+
+    /** An animation frame is scheduled for executing the tick */
+    AnimationFrame,
+}
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

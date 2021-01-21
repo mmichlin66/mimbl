@@ -146,7 +146,7 @@ let propInfos: {[P:string]: PropInfo} =
     defaultChecked: { type: PropType.Attr, set: setCheckedProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
 
     // frequently used events for speeding up the lookup
-    click: { type: PropType.Event, schedulingType: "t" },
+    click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },
 
     // // events
     // mouseenter: { type: PropType.Event, isBubbling: false },
