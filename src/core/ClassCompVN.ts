@@ -1,4 +1,4 @@
-﻿import {IClassCompVN, IComponent, symRenderNoWatcher} from "../api/mim"
+﻿import {IClassCompVN, Component, symRenderNoWatcher} from "../api/mim"
 import {createWatcher, IWatcher} from "../utils/TriggerWatcher"
 import {VN, setCurrentClassComp} from "../internal"
 
@@ -17,7 +17,7 @@ import {VN, setCurrentClassComp} from "../internal"
 export abstract class ClassCompVN extends VN implements IClassCompVN
 {
 	// Component instance.
-	public comp: IComponent;
+	public comp: Component;
 
 
 

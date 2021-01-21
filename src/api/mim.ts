@@ -1,7 +1,7 @@
 ﻿import {Styleset, IIDRule, ClassPropType} from "mimcss"
 import {
     PropType, EventSlot, mountRoot, unmountRoot, FuncProxyVN, TextVN,
-    wrapCallback, registerElmProp, symJsxToVNs, scheduleFuncCall
+    s_wrapCallback, registerElmProp, symJsxToVNs, scheduleFuncCall, s_getCallbackArg
 } from "../internal";
 
 
@@ -30,7 +30,7 @@ export type CompProps<TProps = {}, TChildren = any> = Readonly<TProps> &
  */
 export interface IComponentClass<TProps = {}, TChildren = any>
 {
-	new( props?: TProps): IComponent<TProps,TChildren>;
+	new( props?: TProps): Component<TProps,TChildren>;
 	render(): any;
 }
 
@@ -50,7 +50,7 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * Component properties passed to the constructor. For managed components, the properties
 	 * are updated when the component's parent is updated.
 	 */
-	props?: CompProps<TProps,TChildren>;
+	readonly props?: CompProps<TProps,TChildren>;
 
 	/**
 	 * Components can define display name for tracing purposes; if they don't the default name
@@ -135,11 +135,9 @@ export interface IComponent<TProps = {}, TChildren = any>
      * components can handle the error, the entire tree will be unmounted.
 	 * @param err An exception that was thrown during the component's own rendering or rendering
 	 * of one of its descendants.
-	 * @param path An array of names of components and elements from the mounted root to the
-	 * component that threw the exception. This path is provided mostly for debugging and tracing
-	 * purposes.
+	 * @returns New content to be displayed for the component.
 	 */
-	handleError?( err: any): void;
+	handleError?( err: any): any;
 
 	/**
 	 * Retrieves update strategy object that determines different aspects of component behavior
@@ -178,6 +176,54 @@ export type UpdateStrategy =
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
+// Definitions of types used for wrapping callback functions so that they can be invoked in the
+// Mimbl context.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/** Type defining the information that can be supplied for a callback to be wrapped */
+export interface CallbackWrappingParams<T extends Function = Function>
+{
+	// Event handler function
+	func: T;
+
+	// Object that will be referenced by "this" within the event handler function
+	funcThisArg?: any;
+
+	// Argument that can be retrieved from within the callback using the getCallbackArg function.
+	arg?: any;
+
+	// Type of scheduling the Mimbl tick after the event handler function returns. The defaul
+	schedulingType?: TickSchedulingType;
+
+    // Object that will be set as "current creator" for JSX parsing during the event handler
+    // function execution
+	creator?: any;
+};
+
+/**
+ * Wraps the given callback and returns a function with identical signature.
+ * @param params
+ */
+export function wrapCallback<T extends Function>( params?: CallbackWrappingParams<T>): T
+{
+    return s_wrapCallback<T>( params);
+}
+
+/**
+ * Retrieves the argumnet that was passed when a callback was wrapped. This function can only be
+ * called from the callback itself while it is executing.
+ */
+export function getCallbackArg(): any
+{
+    return s_getCallbackArg();
+}
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
 // Definitions of property types used by HTML and SVG elements.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -188,35 +234,9 @@ export type UpdateStrategy =
  */
 export type EventFuncType<T extends Event = Event> = (e: T) => void;
 
-/**
- * Tuple containing parameters of event handler in the following order:
- *   - Event handler function.
- *   - Object that will be referenced by "this" within the event handler function.
- *   - Type of scheduling the Mimbl tick after the event handler function returns.
- *   - Object that will be set as "current creator" for JSX parsing during the event handler
- *     function execution.
- *   - Flag indicating whether this event should be used as Capturing (true) or Bubbling (false).
- *
- * @typeparam T DOM event type, e.g. MouseEvent
- */
-export type EventArrayType<T extends Event> = [EventFuncType<T>, any?, TickSchedulingType?, any?, boolean?];
-
-// Type defining the information we keep about each event listener
-export type EventObjectType<T extends Event> =
+/** Type defining the information that can be supplied for an event listener */
+export interface EventObjectType<T extends Event> extends CallbackWrappingParams<EventFuncType<T>>
 {
-	// Event handler function
-	func: EventFuncType<T>;
-
-	// Object that will be referenced by "this" within the event handler function
-	funcThisArg?: any;
-
-	// Type of scheduling the Mimbl tick after the event handler function returns
-	schedulingType?: TickSchedulingType;
-
-    // Object that will be set as "current creator" for JSX parsing during the event handler
-    // function execution
-	creator?: any;
-
 	// Flag indicating whether this event should be used as Capturing (true) or Bubbling (false)
 	useCapture?: boolean;
 };
@@ -225,7 +245,7 @@ export type EventObjectType<T extends Event> =
  * Union type that can be passed to an Element's event.
  * @typeparam T DOM event type, e.g. MouseEvent
  */
-export type EventPropType<T extends Event = Event> = EventFuncType<T> | EventArrayType<T> | EventObjectType<T>;
+export type EventPropType<T extends Event = Event> = EventFuncType<T> | EventObjectType<T>;
 
 /**
  * Type for defining the id property of HTML elements
@@ -418,7 +438,7 @@ export namespace JSX
 	export type Element = any;
 
 	// tslint:disable-next-line:no-empty-interface
-	export interface ElementClass extends IComponent {}
+	export interface ElementClass extends Component {}
 
 	export interface ElementAttributesProperty { props: {} }
 
@@ -1295,13 +1315,13 @@ export type TickSchedulingType = "n" | "s" | "t" | "a" | undefined;
  * Base class for components. Components that derive from this class must implement the render
  * method.
  */
-export abstract class Component<TProps = {}, TChildren = any> implements IComponent<TProps,TChildren>
+export abstract class Component<TProps = {}, TChildren = any>
 {
 	/**
 	 * Component properties passed to the constructor. This is normally used only by managed
 	 * components and is usually undefined for independent coponents.
 	 */
-	public readonly props: CompProps<TProps,TChildren>;
+	public props: CompProps<TProps,TChildren>;
 
 	/**
 	 * Remembered virtual node object through which the component can request services. This
@@ -1322,7 +1342,19 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
      */
 	public abstract render(): any;
 
-	/**
+    // Declare the methods that are invoked during component lifecicle.
+	displayName?: string;
+    willMount?(): void;
+    didMount?(): void;
+    didReplace?( oldComp: IComponent<TProps, TChildren>): void;
+	willUnmount?(): void;
+	beforeUpdate?(): void;
+	afterUpdate?(): void;
+	shouldUpdate?( newProps: CompProps<TProps,TChildren>): boolean;
+	handleError?( err: any): any;
+	getUpdateStrategy?(): UpdateStrategy;
+
+    /**
      * Determines whether the component is currently mounted. If a component has asynchronous
      * functionality (e.g. fetching data from a server), component's code may be executed after
      * it was alrady unmounted. This property allows the component to handle this situation.
@@ -1421,9 +1453,21 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
     protected wrapCallback<T extends Function>( func: T, funcThisArg?: any,
         schedulingType?: TickSchedulingType): T
 	{
-		return wrapCallback( func, funcThisArg ? funcThisArg : this, this, schedulingType);
+		return s_wrapCallback( {func, funcThisArg: funcThisArg ? funcThisArg : this, creator: this, schedulingType});
 	}
 }
+
+// Make the methods that are invoked during component lifecicle undefined so that lookup is faster.
+Component.prototype.displayName = undefined;
+Component.prototype.willMount = undefined;
+Component.prototype.didMount = undefined;
+Component.prototype.didReplace = undefined;
+Component.prototype.willUnmount = undefined;
+Component.prototype.beforeUpdate = undefined;
+Component.prototype.afterUpdate = undefined;
+Component.prototype.shouldUpdate = undefined;
+Component.prototype.handleError = undefined;
+Component.prototype.getUpdateStrategy = undefined;
 
 
 

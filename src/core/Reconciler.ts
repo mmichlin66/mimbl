@@ -1,5 +1,5 @@
 ﻿import {
-    ScheduledFuncType, IComponent, Fragment, FuncProxy, PromiseProxy, Component, TickSchedulingType
+    ScheduledFuncType, Component, Fragment, FuncProxy, PromiseProxy, CallbackWrappingParams
 } from "../api/mim"
 import {
     VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN, FuncProxyVN,
@@ -48,14 +48,26 @@ let s_ignoreSchedulingRequest: boolean = false;
 
 
 // Current object that is set as "creator" during rendering when instantiating certain virtual nodes.
-let s_currentClassComp: IComponent = null;
+let s_currentClassComp: Component = null;
 
 // Sets the given object as the current "creator" object.
-export function setCurrentClassComp( comp: IComponent): IComponent
+export function setCurrentClassComp( comp: Component): Component
 {
     let prevComp = s_currentClassComp;
     s_currentClassComp = comp;
     return prevComp;
+}
+
+
+
+// Parameter that was passed when a callback was wrapped and which is set during the callback execution.
+let s_currentCallbackArg: any;
+
+// Retrieves the argumnet that was passed when a callback was wrapped. This function can only be called
+// from the callback itself while it is executing.
+export function s_getCallbackArg(): any
+{
+    return s_currentCallbackArg;
 }
 
 
@@ -81,17 +93,22 @@ const enum SchedulerState
 /**
  * Wraps the given callback and returns a wrapper function which does the following things:
  *   - Sets the given "creator" object as the current creator so that JSX execution can use it.
- *   - Enters mutation scope for the duration of the callback execution
+ *   - Sets "current callback argument" to the one passed when the callback was wrapped.
+ *   - Enters mutation scope for the duration of the callback execution.
  * @param func Callback to be wrapped.
  * @param funcThisArg Object that will be the value of "this" when the callback is executed.
  * @param creator Object that is set as the current creator to be used when JSX is parsed..
  * @param schedulingType Type of scheduling a Mimbl tick.
  * @returns The wrapper function that should be used instead of the original callback.
  */
-export function wrapCallback<T extends Function>( func: T, funcThisArg?: any,
-    creator?: any, schedulingType?: TickSchedulingType): T
+// export function s_wrapCallback<T extends Function>( func: T, funcThisArg?: any,
+//     creator?: any, schedulingType?: TickSchedulingType): T
+// {
+//     return CallbackWrapper.bind( creator, func, funcThisArg, schedulingType);
+// }
+export function s_wrapCallback<T extends Function>( params: CallbackWrappingParams<T>): T
 {
-    return CallbackWrapper.bind( creator, func, funcThisArg, schedulingType);
+    return CallbackWrapper.bind( params);
 }
 
 
@@ -102,36 +119,39 @@ export function wrapCallback<T extends Function>( func: T, funcThisArg?: any,
  */
 function CallbackWrapper(): any
 {
-    // the "this" is the object to be used as the "creator", so remember the current
-    // creator and set the new one
+    let params = this as CallbackWrappingParams<Function>;
+
+    // remember the current creator and set the new one
     let prevCreator = s_currentClassComp;
-    s_currentClassComp = this;
+    s_currentClassComp = params.creator;
 
     // we don't want the triggers encountered during the callback execution to cause the watchers
     // to run immediately, so we enter mutation scope
     enterMutationScope();
 
+    // if some scheduling type is set (that is, we are going to schedule a Mimbl tick after
+    // the callback), we should ignore requests to schedule a tick made during the callback
+    // execution
+    s_ignoreSchedulingRequest = params.schedulingType && params.schedulingType !== "n";
 
-    let retVal: any, func: Function, funcThisArg: any, schedulingType: TickSchedulingType, rest: any[];
-    [func, funcThisArg, schedulingType, ...rest] = arguments;
+    // params.arg will be available inside the callback via the getCurrentCallbackArg call.
+    s_currentCallbackArg = params.arg;
+
+    let retVal: any;
     try
 	{
-        // if some scheduling type is set (that is, we are going to schedule a Mimbl tick after
-        // the callback), we should ignore requests to schedule a tick made during the callback
-        // execution
-        s_ignoreSchedulingRequest = schedulingType && schedulingType !== "n";
-
-		retVal = func.apply( funcThisArg, rest);
+		retVal = params.func.apply( params.funcThisArg, arguments);
 	}
 	finally
 	{
         exitMutationScope();
+        s_currentCallbackArg = undefined;
         s_ignoreSchedulingRequest = false;
         s_currentClassComp = prevCreator;
     }
 
     // schedule a Mimbl tick if instructed to do so
-    switch (schedulingType)
+    switch (params.schedulingType)
     {
         case "s":
             performMimbleTick();
@@ -147,6 +167,60 @@ function CallbackWrapper(): any
 
     return retVal;
 }
+
+
+
+// /**
+//  * The CallbackWrapper function is used to wrap callbacks in order to have it executed in a Mimbl
+//  * context.
+//  */
+// function CallbackWrapper(): any
+// {
+//     // the "this" is the object to be used as the "creator", so remember the current
+//     // creator and set the new one
+//     let prevCreator = s_currentClassComp;
+//     s_currentClassComp = this;
+
+//     // we don't want the triggers encountered during the callback execution to cause the watchers
+//     // to run immediately, so we enter mutation scope
+//     enterMutationScope();
+
+
+//     let retVal: any, func: Function, funcThisArg: any, schedulingType: TickSchedulingType, rest: any[];
+//     [func, funcThisArg, schedulingType, ...rest] = arguments;
+//     try
+// 	{
+//         // if some scheduling type is set (that is, we are going to schedule a Mimbl tick after
+//         // the callback), we should ignore requests to schedule a tick made during the callback
+//         // execution
+//         s_ignoreSchedulingRequest = schedulingType && schedulingType !== "n";
+
+// 		retVal = func.apply( funcThisArg, rest);
+// 	}
+// 	finally
+// 	{
+//         exitMutationScope();
+//         s_ignoreSchedulingRequest = false;
+//         s_currentClassComp = prevCreator;
+//     }
+
+//     // schedule a Mimbl tick if instructed to do so
+//     switch (schedulingType)
+//     {
+//         case "s":
+//             performMimbleTick();
+//             break;
+//         case "t":
+//             queueMicrotask( performMimbleTick);
+//             break;
+//         case "a":
+//             if (s_scheduledFrameHandle === 0)
+//                 s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
+//             break;
+//     }
+
+//     return retVal;
+// }
 
 
 
@@ -170,10 +244,10 @@ export function requestNodeUpdate( vn: VN, req?: ChildrenUpdateRequest): void
 	{
 		let comp = vn.comp;
 		if (comp.beforeUpdate && s_schedulerState !== SchedulerState.BeforeUpdate)
-			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, wrapCallback( comp.beforeUpdate, comp, comp));
+			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, s_wrapCallback( {func: comp.beforeUpdate, funcThisArg: comp, creator: comp}));
 
 		if (comp.afterUpdate)
-			s_callsScheduledAfterUpdate.set( comp.afterUpdate, wrapCallback( comp.afterUpdate, comp, comp));
+			s_callsScheduledAfterUpdate.set( comp.afterUpdate, s_wrapCallback( {func: comp.afterUpdate, funcThisArg: comp, creator: comp}));
 	}
 
     // schedule Mimbl tick using animation frame. If this call comes from a wrapped callback, the
@@ -203,7 +277,7 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 	{
 		if (!s_callsScheduledBeforeUpdate.has( func))
 		{
-			s_callsScheduledBeforeUpdate.set( func, wrapCallback( func, funcThisArg, creator));
+			s_callsScheduledBeforeUpdate.set( func, s_wrapCallback( {func, funcThisArg, creator}));
 
 			// a "before update" function is always scheduled in the next frame even if the
 			// call is made from another "before update" function.
@@ -215,7 +289,7 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 	{
 		if (!s_callsScheduledAfterUpdate.has( func))
 		{
-			s_callsScheduledAfterUpdate.set( func, wrapCallback( func, funcThisArg, creator));
+			s_callsScheduledAfterUpdate.set( func, s_wrapCallback( {func, funcThisArg, creator}));
 
 			// an "after update" function is scheduled in the next cycle unless the request is made
 			// either from a "before update" function execution or during a node update.
