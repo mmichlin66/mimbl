@@ -1151,7 +1151,7 @@ export interface IElmVN<T extends Element = Element> extends IVNode
      * @param count
      * @param newIndex
      */
-    moveChildren( index: number, count: number, newIndex: number): void;
+    moveChildren( index: number, count: number, shift: number): void;
 
     /**
      * Swaps two ranges of the element's sub-nodes. The ranges cannot intersect.

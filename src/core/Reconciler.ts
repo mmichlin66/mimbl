@@ -555,23 +555,81 @@ function spliceNodeChildren( vn: VN, req: SpliceRequest): void
     // insert new nodes into the old list at the given index
     oldSubNodes.splice( index, countToDelete, ...newSubNodes);
 
-    // mount new nodes
+    // determine the node before which the new nodes should be mounted
     let ownDN = vn.ownDN;
     let anchorDN = ownDN ? ownDN : vn.anchorDN;
-    let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
+    let beforeDN = index + newSubNodes.length < oldSubNodes.length
+        ? getFirstDN( oldSubNodes[index + newSubNodes.length])
+        : ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
+
+    // mount new nodes
     let stopIndex = index + newSubNodes.length;
     for( let i = index; i < stopIndex; i++)
     {
-        oldSubNodes[i].index = index;
+        oldSubNodes[i].index = i;
         mountNode( oldSubNodes[i], vn, anchorDN, beforeDN);
     }
 }
 
+// function a()
+// {
+//     let obj = { i: 1, c: 2};
+//     b( obj);
+// }
+
+// function b( {i,c}: { i:number, c:number})
+// {
+//     console.log( i, c);
+// }
 
 
-// Moves a range of sub-nodes to a new location.
+// Moves a range of sub-nodes to a new location. Moving a region to a new index is the same as
+// swapping two adjacent regions - the region being moved and the region from either the new index
+// to the beginning of the first region or the end of the first region to the new index.
 function moveNodeChildren( vn: VN, req: MoveRequest): void
 {
+    if (req.shift  === 0 || req.count === 0)
+        return;
+
+    let oldSubNodes = vn.subNodes;
+    let oldLen = oldSubNodes ? oldSubNodes.length : 0;
+    if (oldLen < 2)
+    {
+        /// #if DEBUG
+            console.error( `Cannot perform move children operation when less than two children exist`);
+        /// #endif
+
+        return;
+    }
+
+    // we will use 1 for the range residing lower in the list
+    let index1: number, count1: number, index2: number, count2: number;
+    if (req.shift < 0)
+    {
+        index1 = req.index + req.shift;
+        count1 = -req.shift;
+        index2 = req.index;
+        count2 = req.count;
+    }
+    else
+    {
+        index1 = req.index;
+        count1 = req.count;
+        index2 = index1 + count1;
+        count2 = req.shift;
+    }
+
+    // validate request parameters
+    if (index1 < 0 || index2 + count2 > oldLen)
+    {
+        /// #if DEBUG
+            console.error( `Cannot move children - range/shift parameters are incorrect`, req);
+        /// #endif
+
+        return;
+    }
+
+    swapNodeChildren( vn, { index1, count1, index2, count2 })
 }
 
 
@@ -732,6 +790,40 @@ function moveDOMRange( vn: VN, subNodes: VN[], index: number, count: number, ind
 // Removes the given number of nodes from the start and/or the end of the list of sub-nodes.
 function trimNodeChildren( vn: VN, req: TrimRequest): void
 {
+    let oldSubNodes = vn.subNodes;
+    if (!oldSubNodes)
+        return;
+
+    let startCount = req.startCount;
+    let endCount = req.endCount;
+    if (startCount < 0 || endCount < 0)
+        return;
+
+    let oldLen = oldSubNodes.length;
+    if (startCount + endCount >= oldLen)
+    {
+        oldSubNodes.forEach( svn => unmountNode( svn, true));
+        vn.subNodes = null;
+        return;
+    }
+
+    // trim at start
+    if (startCount > 0)
+    {
+        for( let i = 0; i < startCount; i++)
+            unmountNode( oldSubNodes[i], true);
+    }
+
+    // trim at end
+    if (endCount > 0)
+    {
+        for( let i = 0; i < endCount; i++)
+            unmountNode( oldSubNodes[oldLen - i - 1], true);
+    }
+
+    // extract only remaining nodes and change their indices
+    vn.subNodes = oldSubNodes.slice( startCount, oldLen - endCount);
+    vn.subNodes.forEach( (svn, i) => { svn.index = i });
 }
 
 
@@ -767,12 +859,17 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
     if (newEndSubNodes)
         newSubNodes = newSubNodes.concat( newEndSubNodes);
 
+    vn.subNodes = newSubNodes;
 
     // mount new sub-nodes at the start
     if (newStartSubNodes)
     {
         let beforeDN = getFirstDN( oldSubNodes[0]);
         newStartSubNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
+
+        // change indices of the old nodes
+        let startIndex = newStartSubNodes.length;
+        oldSubNodes.forEach( (svn, i) => { svn.index = startIndex + i });
     }
 
     // mount new sub-nodes at the end
@@ -2141,6 +2238,8 @@ String.prototype[symJsxToVNs] = function( props: any, children: any[]): VN | VN[
     if (children.length === 0)
         return new ElmVN( s_currentClassComp, this, props, null);
 
+    // if we have children we process them right away so that we can create ElmVN with  list
+    // of sub-nodes.
     let nodes: VN[] = [];
     children.forEach( item =>
     {

@@ -410,7 +410,8 @@ export type SetRequest = {
 
 
 /** Parameters for the Splice request */
-export type SpliceRequest = {
+export type SpliceRequest =
+{
     op: ChildrenUpdateOperation.Splice;
 
     // Index at which splicing starts
@@ -429,18 +430,26 @@ export type SpliceRequest = {
 
 
 /** Parameters for the Move request */
-export type MoveRequest = {
+export type MoveRequest =
+{
     op: ChildrenUpdateOperation.Move;
+
+    /** Starting index of the region being moved */
     index: number;
+
+    /** Number of nodes in the region being moved */
     count: number;
-    newIndex: number;
+
+    /** Positive or negative distance of the move */
+    shift: number;
 }
 
 
 
 /** Parameters for the Swap request */
-export type SwapRequest = {
-    op: ChildrenUpdateOperation.Swap;
+export type SwapRequest =
+{
+    op?: ChildrenUpdateOperation.Swap;
     index1: number;
     count1: number;
     index2: number
@@ -450,7 +459,8 @@ export type SwapRequest = {
 
 
 /** Parameters for the Trim request */
-export type TrimRequest = {
+export type TrimRequest =
+{
     op: ChildrenUpdateOperation.Trim;
     startCount: number;
     endCount: number;
@@ -459,7 +469,8 @@ export type TrimRequest = {
 
 
 /** Parameters for the Grow request */
-export type GrowRequest = {
+export type GrowRequest =
+{
     op: ChildrenUpdateOperation.Grow;
     startContent?: any;
     endContent?: any;

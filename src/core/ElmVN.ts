@@ -125,11 +125,11 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      * Moves a range of sub-nodes to a new location.
      * @param index
      * @param count
-     * @param newIndex
+     * @param shift
      */
-    moveChildren( index: number, count: number, newIndex: number): void
+    moveChildren( index: number, count: number, shift: number): void
     {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Move, index, count, newIndex});
+        this.requestUpdate( {op: ChildrenUpdateOperation.Move, index, count, shift});
     }
 
     /**
