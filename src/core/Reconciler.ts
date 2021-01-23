@@ -6,7 +6,7 @@ import {
     VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN, FuncProxyVN,
     ManagedCompVN, enterMutationScope, exitMutationScope, ChildrenUpdateRequest,
     ChildrenUpdateOperation, GrowRequest, MoveRequest, SetRequest, SpliceRequest, SwapRequest,
-    TrimRequest, UpdateRequest
+    TrimRequest, UpdateRequest, SliceRequest
 } from "../internal"
 
 /// #if USE_STATS
@@ -171,65 +171,16 @@ function CallbackWrapper(): any
 
 
 
-// /**
-//  * The CallbackWrapper function is used to wrap callbacks in order to have it executed in a Mimbl
-//  * context.
-//  */
-// function CallbackWrapper(): any
-// {
-//     // the "this" is the object to be used as the "creator", so remember the current
-//     // creator and set the new one
-//     let prevCreator = s_currentClassComp;
-//     s_currentClassComp = this;
-
-//     // we don't want the triggers encountered during the callback execution to cause the watchers
-//     // to run immediately, so we enter mutation scope
-//     enterMutationScope();
-
-
-//     let retVal: any, func: Function, funcThisArg: any, schedulingType: TickSchedulingType, rest: any[];
-//     [func, funcThisArg, schedulingType, ...rest] = arguments;
-//     try
-// 	{
-//         // if some scheduling type is set (that is, we are going to schedule a Mimbl tick after
-//         // the callback), we should ignore requests to schedule a tick made during the callback
-//         // execution
-//         s_ignoreSchedulingRequest = schedulingType && schedulingType !== "n";
-
-// 		retVal = func.apply( funcThisArg, rest);
-// 	}
-// 	finally
-// 	{
-//         exitMutationScope();
-//         s_ignoreSchedulingRequest = false;
-//         s_currentClassComp = prevCreator;
-//     }
-
-//     // schedule a Mimbl tick if instructed to do so
-//     switch (schedulingType)
-//     {
-//         case "s":
-//             performMimbleTick();
-//             break;
-//         case "t":
-//             queueMicrotask( performMimbleTick);
-//             break;
-//         case "a":
-//             if (s_scheduledFrameHandle === 0)
-//                 s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
-//             break;
-//     }
-
-//     return retVal;
-// }
-
-
-
 // Schedules an update for the given node.
 export function requestNodeUpdate( vn: VN, req?: ChildrenUpdateRequest): void
 {
-	if (!vn.anchorDN)
-		console.warn( `Update requested for virtual node '${getVNPath(vn).join("->")}' that is not mounted`)
+    /// #if DEBUG
+        if (!vn.anchorDN)
+        {
+            console.warn( `Update requested for virtual node '${getVNPath(vn).join("->")}' that is not mounted`)
+            return;
+        }
+    /// #endif
 
 	// add this node to the map of nodes for which either update or replacement or
 	// deletion is scheduled. Note that a node will only be present once in the map no
@@ -394,53 +345,24 @@ function performUpdate( vns: Map<VN,any>): void
         if (!vn.anchorDN)
             return;
 
-        try
+        // first perform partial update if requested
+        if (vn.partialUpdateRequested)
         {
-            // first perform partial update if requested
-            if (vn.partialUpdateRequested)
-            {
-                vn.partialUpdateRequested = false;
-                vn.performPartialUpdate();
-            }
-
-            // then perform normal update if requested
-            if (vn.updateRequested)
-            {
-                // clear the flag that update has been requested for the node
-                vn.updateRequested = false;
-
-                // if the component was already updated in this cycle, don't update it again
-                if (vn.lastUpdateTick === s_currentTick)
-                    return;
-
-                if (!req)
-                    rerenderNode( {oldVN: vn});
-                else
-                {
-                    switch( req.op)
-                    {
-                        case ChildrenUpdateOperation.Update: updateNodeChildren( vn, req); break;
-                        case ChildrenUpdateOperation.Set: setNodeChildren( vn, req); break;
-                        case ChildrenUpdateOperation.Splice: spliceNodeChildren( vn, req); break;
-                        case ChildrenUpdateOperation.Move: moveNodeChildren( vn, req); break;
-                        case ChildrenUpdateOperation.Swap: swapNodeChildren( vn, req); break;
-                        case ChildrenUpdateOperation.Trim: trimNodeChildren( vn, req); break;
-                        case ChildrenUpdateOperation.Grow: growNodeChildren( vn, req); break;
-                    }
-                }
-
-                s_currentClassComp = null;
-            }
+            vn.partialUpdateRequested = false;
+            vn.performPartialUpdate();
         }
-        catch( err)
+
+        // then perform normal update if requested
+        if (vn.updateRequested)
         {
-            // find the nearest error handling service. If nobody else, it is implemented
-            // by the RootVN object.
-            let errorService = vn.getService( "StdErrorHandling");
-            if (errorService)
-                errorService.reportError( err);
-            else
-                console.error( "BUG: updateNode threw exception but StdErrorHandling service was not found.", err);
+            // clear the flag that update has been requested for the node
+            vn.updateRequested = false;
+
+            // if the component was already updated in this cycle, don't update it again
+            if (vn.lastUpdateTick === s_currentTick)
+                return;
+
+            performChildrenOp( vn, req);
         }
     });
 }
@@ -461,6 +383,49 @@ function callScheduledFunctions( funcs: Map<ScheduledFuncType,ScheduledFuncType>
 			console.error( `Exception while invoking function ${beforeUpdate ? "before" : "after"} updating components\n`, err);
 		}
 	});
+}
+
+
+
+// Performs rendering phase for all components scheduled for update and recursively for their
+// sub-nodes where necessary. Returns array of VNDisp structures for each updated node.
+export function performChildrenOp( vn: VN, req: ChildrenUpdateRequest)
+{
+    // it can happen that we encounter already unmounted virtual nodes - ignore them
+    if (!vn.anchorDN)
+        return;
+
+    try
+    {
+        if (!req)
+            rerenderNode( {oldVN: vn});
+        else
+        {
+            switch( req.op)
+            {
+                case ChildrenUpdateOperation.Update: updateNodeChildren( vn, req); break;
+                case ChildrenUpdateOperation.Set: setNodeChildren( vn, req); break;
+                case ChildrenUpdateOperation.Slice: sliceNodeChildren( vn, req); break;
+                case ChildrenUpdateOperation.Splice: spliceNodeChildren( vn, req); break;
+                case ChildrenUpdateOperation.Move: moveNodeChildren( vn, req); break;
+                case ChildrenUpdateOperation.Swap: swapNodeChildren( vn, req); break;
+                case ChildrenUpdateOperation.Trim: trimNodeChildren( vn, req); break;
+                case ChildrenUpdateOperation.Grow: growNodeChildren( vn, req); break;
+            }
+        }
+
+        s_currentClassComp = null;
+    }
+    catch( err)
+    {
+        // find the nearest error handling service. If nobody else, it is implemented
+        // by the RootVN object.
+        let errorService = vn.getService( "StdErrorHandling");
+        if (errorService)
+            errorService.reportError( err);
+        else
+            console.error( "BUG: updateNode threw exception but StdErrorHandling service was not found.", err);
+    }
 }
 
 
@@ -514,6 +479,40 @@ function setNodeChildren( vn: VN, req: SetRequest): void
         let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
         vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
     }
+}
+
+
+
+// At the given index, removes a given number of sub-nodes and then inserts the new content.
+function sliceNodeChildren( vn: VN, req: SliceRequest): void
+{
+    let oldSubNodes = vn.subNodes;
+    if (!oldSubNodes)
+        return;
+
+    let oldLen = oldSubNodes.length;
+    let startIndex = req.startIndex;
+    let endIndex = req.endIndex ? Math.min( req.endIndex, oldLen) : oldLen;
+    if (startIndex < 0 || endIndex <= startIndex || endIndex - startIndex === oldLen)
+        return;
+
+    // trim at start
+    if (startIndex > 0)
+    {
+        for( let i = 0; i < startIndex; i++)
+            unmountNode( oldSubNodes[i], true);
+    }
+
+    // trim at end
+    if (endIndex < oldLen)
+    {
+        for( let i = endIndex; i < oldLen; i++)
+            unmountNode( oldSubNodes[i], true);
+    }
+
+    // extract only remaining nodes and change their indices
+    vn.subNodes = oldSubNodes.slice( startIndex, endIndex);
+    vn.subNodes.forEach( (svn, i) => { svn.index = i });
 }
 
 

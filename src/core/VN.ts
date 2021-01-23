@@ -357,45 +357,50 @@ export const enum ChildrenUpdateOperation
     Set = 1,
 
     /**
+     * Retains the given range of the sub-nodes unmounting the sub-nodes outside the given range.
+     */
+    Slice = 2,
+
+    /**
      * A range of existing sub-nodes is removed and the new ones added. The parameters contain the
      * new content that is used to generate the new list of sub-nodes and, optionally, a range of
      * indices defining the sub-nodes that are replaced. An additional flag determines whether the
      * existing nodes are unmounted or updates are allowed.
      */
-    Splice = 2,
+    Splice = 3,
 
     /**
      * A range of existing sub-nodes is moved to a new location. The parameters contain the index
      * and the length of the range and the index of the new location. The new index cannot be
      * within the range.
      */
-    Move = 3,
+    Move = 4,
 
     /**
      * Two ranges of existing sub-nodes change their locations. The parameters contain the indices
      * and the lengths of the two ranges. The ranges cannot intersect.
      */
-    Swap = 4,
+    Swap = 5,
+
+    /**
+     * Some sub-nodes are added at the start and the end of the list. The parameters contain
+     * the content to add at the start and the content to add at the end.
+     */
+    Grow = 7,
 
     /**
      * Some sub-nodes are removed from the start and the end of the list. The parameters contain
      * the number of nodes to remove from the start and the number of nodes to remove from the end.
      * If only single number is give it is used for both the start and the end.
      */
-    Trim = 5,
-
-    /**
-     * Some sub-nodes are added at the start and the end of the list. The parameters contain
-     * the content to add at the start and the content to add at the end.
-     */
-    Grow = 6,
+    Trim = 6,
 }
 
 
 
 /** Parameters for the Set request */
 export type UpdateRequest = {
-    op: ChildrenUpdateOperation.Update;
+    op?: ChildrenUpdateOperation.Update;
     content?: any;
 }
 
@@ -403,8 +408,22 @@ export type UpdateRequest = {
 
 /** Parameters for the Set request */
 export type SetRequest = {
-    op: ChildrenUpdateOperation.Set;
+    op?: ChildrenUpdateOperation.Set;
     content?: any;
+}
+
+
+
+/** Parameters for the Slice request */
+export type SliceRequest =
+{
+    op?: ChildrenUpdateOperation.Slice;
+
+    // Index of the first sub-node in the range
+    startIndex: number;
+
+    // Index after the last sub-node in the range
+    endIndex?: number;
 }
 
 
@@ -412,7 +431,7 @@ export type SetRequest = {
 /** Parameters for the Splice request */
 export type SpliceRequest =
 {
-    op: ChildrenUpdateOperation.Splice;
+    op?: ChildrenUpdateOperation.Splice;
 
     // Index at which splicing starts
     index: number;
@@ -432,7 +451,7 @@ export type SpliceRequest =
 /** Parameters for the Move request */
 export type MoveRequest =
 {
-    op: ChildrenUpdateOperation.Move;
+    op?: ChildrenUpdateOperation.Move;
 
     /** Starting index of the region being moved */
     index: number;
@@ -461,7 +480,7 @@ export type SwapRequest =
 /** Parameters for the Trim request */
 export type TrimRequest =
 {
-    op: ChildrenUpdateOperation.Trim;
+    op?: ChildrenUpdateOperation.Trim;
     startCount: number;
     endCount: number;
 }
@@ -471,7 +490,7 @@ export type TrimRequest =
 /** Parameters for the Grow request */
 export type GrowRequest =
 {
-    op: ChildrenUpdateOperation.Grow;
+    op?: ChildrenUpdateOperation.Grow;
     startContent?: any;
     endContent?: any;
 }
@@ -479,8 +498,8 @@ export type GrowRequest =
 
 
 /** Parameters for the Grow request */
-export type ChildrenUpdateRequest = UpdateRequest | SetRequest | SpliceRequest | MoveRequest |
-    SwapRequest | TrimRequest | GrowRequest;
+export type ChildrenUpdateRequest = UpdateRequest | SetRequest | SliceRequest | SpliceRequest |
+    MoveRequest | SwapRequest | TrimRequest | GrowRequest;
 
 
 

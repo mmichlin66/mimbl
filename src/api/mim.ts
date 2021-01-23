@@ -1124,16 +1124,29 @@ export interface IElmVN<T extends Element = Element> extends IVNode
 	setProps( props: IElementProps<T>): void;
 
     /**
-     * Updates the element's sub-nodes with the given content.
+     * Updates the element's sub-nodes with the given content. This method engages the regular
+     * reconciliation mechanism, which tries to update the existing sub-nodes by the new sub-nodes
+     * and unmounting only those that cannot be updated.
      * @param children
      */
     updateChildren( content: any): void;
 
     /**
-     * Completely replaces the element's sub-nodes with the given content.
+     * Completely replaces the element's sub-nodes with the given content. This method unmounts all
+     * existing sub-nodes without trying to see whether they can be updated by the new sub-nodes.
      * @param children
      */
     setChildren( content?: any): void;
+
+    /**
+     * Retains the given range of the sub-nodes unmounting the sub-nodes outside this range. This
+     * method operates similar to the Array.prototype.slice method.
+     * @param startIndex Index of the first sub-node in the range
+     * @param endIndex (optional) Index of the sub-node after the last sub-node in the range. If
+     * this parameter is zero or undefined or greater than the length of the sub-nodes array, the
+     * range will include all sub-nodes from the startIndex to the end of the array.
+     */
+    sliceChildren( startIndex: number, endIndex?: number): void;
 
     /**
      * At the given index, removes a given number of sub-nodes and then inserts the new content.
@@ -1147,9 +1160,9 @@ export interface IElmVN<T extends Element = Element> extends IVNode
 
     /**
      * Moves a range of sub-nodes to a new location.
-     * @param index
-     * @param count
-     * @param newIndex
+     * @param index Starting index of the range.
+     * @param count Number of sub-nodes in the range.
+     * @param shift Positive or negative number of positions the range will be moved.
      */
     moveChildren( index: number, count: number, shift: number): void;
 

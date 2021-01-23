@@ -111,6 +111,18 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     }
 
     /**
+     * Retains the given range of the sub-nodes unmounting the sub-nodes outside the given range.
+     * @param startIndex Index of the first sub-node in the range
+     * @param endIndex (optional) Index of the sub-node after the last sub-node in the range. If
+     * this parameter is zero or undefined or greater than the length of the sub-nodes array, the
+     * range will include all sub-nodes from the startIndex to the end of the array.
+     */
+    sliceChildren( startIndex: number, endIndex?: number): void
+    {
+        this.requestUpdate( {op: ChildrenUpdateOperation.Slice, startIndex, endIndex});
+    }
+
+    /**
      * At the given index, removes a given number of sub-nodes and then inserts the new content.
      * @param index
      * @param countToDelete
