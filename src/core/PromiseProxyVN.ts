@@ -74,7 +74,7 @@ export class PromiseProxyVN extends VN
         this.watchPromise();
 
 		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
+			DetailedStats.log( StatsCategory.Comp, StatsAction.Added);
 		/// #endif
 	}
 
@@ -84,7 +84,7 @@ export class PromiseProxyVN extends VN
         // Cleans up the node object before it is released.
         public unmount(): void
         {
-            DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
+            DetailedStats.log( StatsCategory.Comp, StatsAction.Deleted);
         }
     /// #endif
 
@@ -94,7 +94,7 @@ export class PromiseProxyVN extends VN
 	public render(): any
 	{
 		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
+			DetailedStats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
 		return this.content;

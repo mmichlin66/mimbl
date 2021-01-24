@@ -32,7 +32,7 @@ export enum StatsAction
 
 
 // Storage for a number of each action under a category.
-export class CategoryStats
+class CategoryStats
 {
 	added: number = 0;
 	deleted: number = 0;
@@ -50,25 +50,60 @@ export class CategoryStats
 
 export class DetailedStats
 {
-	name: string;
-	startTime: number;
-	duration: number;
-	comp: CategoryStats = new CategoryStats();
-	elm: CategoryStats = new CategoryStats();
-	text: CategoryStats = new CategoryStats();
-	attr: CategoryStats = new CategoryStats();
-	event: CategoryStats = new CategoryStats();
+	public static start( name: string)
+	{
+        if (!DetailedStats.instance)
+        {
+            DetailedStats.instance = new DetailedStats( name);
+            DetailedStats.instance.start();
+        }
+	}
 
 
 
-	constructor( name: string)
+	public static stop( printSummary: boolean = true)
+	{
+        if (DetailedStats.instance)
+        {
+            DetailedStats.instance.stop( printSummary);
+            DetailedStats.instance = null;
+        }
+	}
+
+
+
+	// increments the number of times the given action was performed on an entity of a given
+	// category. If the entity is a DOM entity (as opposed to a component), then the DOM
+	// total number is also incremented.
+    public static log( category: StatsCategory, action: StatsAction): void
+    {
+        DetailedStats.instance?.log( category, action);
+    }
+
+
+
+    private static instance: DetailedStats;
+
+
+	private name: string;
+	private startTime: number;
+	private duration: number;
+	private comp: CategoryStats = new CategoryStats();
+	private elm: CategoryStats = new CategoryStats();
+	private text: CategoryStats = new CategoryStats();
+	private attr: CategoryStats = new CategoryStats();
+	private event: CategoryStats = new CategoryStats();
+
+
+
+	private constructor( name: string)
 	{
 		this.name = name;
 	}
 
 
 
-	public start()
+	private start()
 	{
 		this.duration = 0.0;
 		this.startTime = performance.now();
@@ -76,7 +111,7 @@ export class DetailedStats
 
 
 
-	public stop( printSummary: boolean = true)
+	private stop( printSummary: boolean = true)
 	{
 		this.duration = performance.now() - this.startTime;
 
@@ -86,10 +121,10 @@ export class DetailedStats
 
 
 
-	// increments thenumber of times the given action was performed on an entity of a given
+	// increments the number of times the given action was performed on an entity of a given
 	// category. If the entity is a DOM entity (as opposed to a component), then the DOM
 	// total number is also incremented.
-	public log( category: StatsCategory, action: StatsAction): void
+	private log( category: StatsCategory, action: StatsAction): void
 	{
 		let categoryStats: CategoryStats;
 		switch( category)
@@ -115,7 +150,7 @@ export class DetailedStats
 
 
 	// Returns textual representation of the statistics.
-	public toString(): string
+	private toString(): string
 	{
 		return `${this.name} ${this.duration.toFixed(2)}ms ` +
 				this.getCompString() + this.getElmString() + this.getTextString() +
@@ -125,7 +160,7 @@ export class DetailedStats
 
 
 	// Returns textual representation of the component statistics.
-	public getCompString(): string
+	private getCompString(): string
 	{
 		if (!this.comp.hasSomeData())
 			return "";
@@ -142,7 +177,7 @@ export class DetailedStats
 
 
 	// Returns textual representation of the element statistics.
-	public getElmString(): string
+	private getElmString(): string
 	{
 		if (!this.elm.hasSomeData())
 			return "";
@@ -158,7 +193,7 @@ export class DetailedStats
 
 
 	// Returns textual representation of the text node statistics.
-	public getTextString(): string
+	private getTextString(): string
 	{
 		if (!this.text.hasSomeData())
 			return "";
@@ -175,7 +210,7 @@ export class DetailedStats
 
 
 	// Returns textual representation of the attribute statistics.
-	public getAttrString(): string
+	private getAttrString(): string
 	{
 		if (!this.attr.hasSomeData())
 			return "";
@@ -191,7 +226,7 @@ export class DetailedStats
 
 
 	// Returns textual representation of the attribute statistics.
-	public getEventString(): string
+	private getEventString(): string
 	{
 		if (!this.event.hasSomeData())
 			return "";

@@ -89,7 +89,7 @@ export class FuncProxyVN extends VN
             this.actFunc = this.funcWatcher = createWatcher( func, this.requestUpdate, this.funcThisArg, this);
 
 		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
+			DetailedStats.log( StatsCategory.Comp, StatsAction.Added);
 		/// #endif
 	}
 
@@ -108,7 +108,7 @@ export class FuncProxyVN extends VN
         this.actFunc = undefined;
 
 		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
+			DetailedStats.log( StatsCategory.Comp, StatsAction.Deleted);
 		/// #endif
     }
 
@@ -122,7 +122,7 @@ export class FuncProxyVN extends VN
 		/// #endif
 
 		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
+			DetailedStats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
         let prevCreator = setCurrentClassComp( this.creator);

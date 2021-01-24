@@ -1,4 +1,4 @@
-﻿import {ITextVN} from "../api/mim"
+﻿import {ITextVN, TickSchedulingType} from "../api/mim"
 import {VN} from "../internal"
 
 /// #if USE_STATS
@@ -44,11 +44,16 @@ export class TextVN extends VN implements ITextVN
 	/**
      * Requests update of the text.
      */
-    setText( text: string): void
+    setText( text: string, schedulingType?: TickSchedulingType): void
     {
-        if (text !== this.text)
+        if (text === this.text)
+            return;
+
+        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+            this.ownDN.nodeValue = this.text = text;
+        else
         {
-            this.text = text;
+            this.textForPartialUpdate = text;
             super.requestPartialUpdate();
         }
     }
@@ -59,7 +64,7 @@ export class TextVN extends VN implements ITextVN
 	public mount(): void
 	{
 		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Text, StatsAction.Added);
+			DetailedStats.log( StatsCategory.Text, StatsAction.Added);
 		/// #endif
 
 		this.ownDN = document.createTextNode( this.text);
@@ -71,7 +76,7 @@ export class TextVN extends VN implements ITextVN
     // Cleans up the node object before it is released.
     unmount(): void
     {
-        DetailedStats.stats.log( StatsCategory.Text, StatsAction.Deleted);
+        DetailedStats.log( StatsCategory.Text, StatsAction.Deleted);
     }
 /// #endif
 
@@ -88,7 +93,7 @@ export class TextVN extends VN implements ITextVN
             this.ownDN.nodeValue = this.text = newVN.text;
 
             /// #if USE_STATS
-                DetailedStats.stats.log( StatsCategory.Text, StatsAction.Updated);
+                DetailedStats.log( StatsCategory.Text, StatsAction.Updated);
             /// #endif
         }
 
@@ -103,12 +108,18 @@ export class TextVN extends VN implements ITextVN
     // element properties that can be updated without re-rendering its children.
     public performPartialUpdate(): void
     {
-        this.ownDN.nodeValue = this.text;
+        this.ownDN.nodeValue = this.text = this.textForPartialUpdate;
+        this.textForPartialUpdate = undefined;
 
         /// #if USE_STATS
-            DetailedStats.stats.log( StatsCategory.Text, StatsAction.Updated);
+            DetailedStats.log( StatsCategory.Text, StatsAction.Updated);
         /// #endif
     }
+
+
+
+    // Text waiting for the partial update operation
+    private textForPartialUpdate: string;
 }
 
 

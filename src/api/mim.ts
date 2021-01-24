@@ -1121,7 +1121,7 @@ export interface IElmVN<T extends Element = Element> extends IVNode
      * Requests update of the element properties without re-rendering of its children.
      * @param props
      */
-	setProps( props: IElementProps<T>): void;
+	setProps( props: IElementProps<T>, schedulingType?: TickSchedulingType): void;
 
     /**
      * Updates the element's sub-nodes with the given content. This method engages the regular
@@ -1129,14 +1129,14 @@ export interface IElmVN<T extends Element = Element> extends IVNode
      * and unmounting only those that cannot be updated.
      * @param children
      */
-    updateChildren( content: any): void;
+    updateChildren( content: any, schedulingType?: TickSchedulingType): void;
 
     /**
      * Completely replaces the element's sub-nodes with the given content. This method unmounts all
      * existing sub-nodes without trying to see whether they can be updated by the new sub-nodes.
      * @param children
      */
-    setChildren( content?: any): void;
+    setChildren( content?: any, schedulingType?: TickSchedulingType): void;
 
     /**
      * Retains the given range of the sub-nodes unmounting the sub-nodes outside this range. This
@@ -1146,7 +1146,7 @@ export interface IElmVN<T extends Element = Element> extends IVNode
      * this parameter is zero or undefined or greater than the length of the sub-nodes array, the
      * range will include all sub-nodes from the startIndex to the end of the array.
      */
-    sliceChildren( startIndex: number, endIndex?: number): void;
+    sliceChildren( startIndex: number, endIndex?: number, schedulingType?: TickSchedulingType): void;
 
     /**
      * At the given index, removes a given number of sub-nodes and then inserts the new content.
@@ -1156,7 +1156,7 @@ export interface IElmVN<T extends Element = Element> extends IVNode
      * @param update Optional flag determining whether to reconcile or completely replace the
      * sub-nodes being removed with the new content. The default is to replace.
      */
-    spliceChildren( index: number, countToDelete?: number, contentToInsert?: any, update?: boolean): void;
+    spliceChildren( index: number, countToDelete?: number, contentToInsert?: any, update?: boolean, schedulingType?: TickSchedulingType): void;
 
     /**
      * Moves a range of sub-nodes to a new location.
@@ -1164,7 +1164,7 @@ export interface IElmVN<T extends Element = Element> extends IVNode
      * @param count Number of sub-nodes in the range.
      * @param shift Positive or negative number of positions the range will be moved.
      */
-    moveChildren( index: number, count: number, shift: number): void;
+    moveChildren( index: number, count: number, shift: number, schedulingType?: TickSchedulingType): void;
 
     /**
      * Swaps two ranges of the element's sub-nodes. The ranges cannot intersect.
@@ -1173,21 +1173,21 @@ export interface IElmVN<T extends Element = Element> extends IVNode
      * @param index2
      * @param count2
      */
-    swapChildren( index1: number, count1: number, index2: number, count2: number): void;
+    swapChildren( index1: number, count1: number, index2: number, count2: number, schedulingType?: TickSchedulingType): void;
 
     /**
      * Removes the given number of nodes from the start and/or the end of the list of sub-nodes.
      * @param startCount
      * @param endCount
      */
-    trimChildren( startCount: number, endCount: number): void;
+    trimChildren( startCount: number, endCount: number, schedulingType?: TickSchedulingType): void;
 
     /**
      * Adds the given content at the start and/or at the end of the existing children.
      * @param startContent
      * @param endContent
      */
-    growChildren( startContent?: any, endContent?: any): void;
+    growChildren( startContent?: any, endContent?: any, schedulingType?: TickSchedulingType): void;
 }
 
 
@@ -1206,13 +1206,13 @@ export interface ITextVN extends IVNode
 	/**
      * Requests update of the text.
      */
-	setText( text: string): void;
+	setText( text: string, schedulingType?: TickSchedulingType): void;
 }
 
 
 
 /**
- * Creates text virtual node, whcih can be used to update the text without re-rendering parent
+ * Creates text virtual node, which can be used to update the text without re-rendering parent
  * element.
  * @param text Text to initialize the text node
  */
@@ -1311,7 +1311,7 @@ export function registerCustomEvent( eventName: string): void
 export const enum TickSchedulingType
 {
     /** No tick is scheduled */
-    None = 0,
+    None = 1,
 
     /** The tick is executed right away in a synchronous manner */
     Sync,

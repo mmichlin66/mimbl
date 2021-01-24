@@ -59,7 +59,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
             this.updateStrategy = comp.getUpdateStrategy();
 
         /// #if USE_STATS
-            DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Added);
+            DetailedStats.log( StatsCategory.Comp, StatsAction.Added);
         /// #endif
     }
 
@@ -94,7 +94,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 		comp.vn = undefined;
 
         /// #if USE_STATS
-            DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Deleted);
+            DetailedStats.log( StatsCategory.Comp, StatsAction.Deleted);
         /// #endif
     }
 
@@ -116,7 +116,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 		/// #endif
 
 		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Comp, StatsAction.Rendered);
+			DetailedStats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
         let prevCreator = setCurrentClassComp( this.comp);

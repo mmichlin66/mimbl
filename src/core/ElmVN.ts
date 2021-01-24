@@ -1,11 +1,11 @@
 ﻿import {
     IElmVN, EventFuncType, ICustomAttributeHandler, IElementProps, Component,
-    EventPropType, setRef, RefType, ElmRefType, CallbackWrappingParams
+    EventPropType, setRef, RefType, ElmRefType, CallbackWrappingParams, TickSchedulingType
 } from "../api/mim"
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo, AttrPropInfo, EventPropInfo,
     getElmPropInfo, setElmProp, removeElmProp, updateElmProp, s_wrapCallback,
-    ChildrenUpdateOperation
+    ChildrenUpdateOperation, syncUpdate
 } from "../internal"
 
 /// #if USE_STATS
@@ -78,7 +78,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      * Requests update of the element properties without re-rendering of its children.
      * @param props
      */
-	setProps( props: IElementProps<T>): void
+	public setProps( props: IElementProps<T>, schedulingType?: TickSchedulingType): void
     {
         if (!props)
             return;
@@ -86,28 +86,36 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         if (this.propsForPartialUpdate)
             Object.assign( this.propsForPartialUpdate, props)
         else
-        {
             this.propsForPartialUpdate = props;
+
+        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+            this.updatePropsOnly( this.propsForPartialUpdate)
+        else
             this.requestPartialUpdate();
-        }
     }
 
     /**
      * Updates the element's sub-nodes with the given content.
      * @param children
      */
-    updateChildren( content: any): void
+    public updateChildren( content: any, schedulingType?: TickSchedulingType): void
     {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Update, content});
+        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+            syncUpdate( this, {op: ChildrenUpdateOperation.Update, content});
+        else
+            this.requestUpdate( {op: ChildrenUpdateOperation.Update, content});
     }
 
     /**
      * Completely replaces the element's sub-nodes with the given content.
      * @param children
      */
-    setChildren( content?: any): void
+    public setChildren( content?: any, schedulingType?: TickSchedulingType): void
     {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Set, content});
+        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+            syncUpdate( this, {op: ChildrenUpdateOperation.Set, content});
+        else
+            this.requestUpdate( {op: ChildrenUpdateOperation.Set, content});
     }
 
     /**
@@ -117,9 +125,12 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      * this parameter is zero or undefined or greater than the length of the sub-nodes array, the
      * range will include all sub-nodes from the startIndex to the end of the array.
      */
-    sliceChildren( startIndex: number, endIndex?: number): void
+    public sliceChildren( startIndex: number, endIndex?: number, schedulingType?: TickSchedulingType): void
     {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Slice, startIndex, endIndex});
+        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+            syncUpdate( this, {op: ChildrenUpdateOperation.Slice, startIndex, endIndex});
+        else
+            this.requestUpdate( {op: ChildrenUpdateOperation.Slice, startIndex, endIndex});
     }
 
     /**
@@ -128,9 +139,12 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      * @param countToDelete
      * @param contentToInsert
      */
-    spliceChildren( index: number, countToDelete?: number, contentToInsert?: any, update?: boolean): void
+    public spliceChildren( index: number, countToDelete?: number, contentToInsert?: any, update?: boolean, schedulingType?: TickSchedulingType): void
     {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert, update});
+        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+            syncUpdate( this, {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert, update});
+        else
+            this.requestUpdate( {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert, update});
     }
 
     /**
@@ -139,9 +153,12 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      * @param count
      * @param shift
      */
-    moveChildren( index: number, count: number, shift: number): void
+    public moveChildren( index: number, count: number, shift: number, schedulingType?: TickSchedulingType): void
     {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Move, index, count, shift});
+        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+            syncUpdate( this, {op: ChildrenUpdateOperation.Move, index, count, shift});
+        else
+            this.requestUpdate( {op: ChildrenUpdateOperation.Move, index, count, shift});
     }
 
     /**
@@ -151,9 +168,12 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      * @param index2
      * @param count2
      */
-    swapChildren( index1: number, count1: number, index2: number, count2: number): void
+    public swapChildren( index1: number, count1: number, index2: number, count2: number, schedulingType?: TickSchedulingType): void
     {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Swap, index1, count1, index2, count2});
+        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+            syncUpdate( this, {op: ChildrenUpdateOperation.Swap, index1, count1, index2, count2});
+        else
+            this.requestUpdate( {op: ChildrenUpdateOperation.Swap, index1, count1, index2, count2});
     }
 
     /**
@@ -161,9 +181,12 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      * @param startCount
      * @param endCount
      */
-    trimChildren( startCount: number, endCount: number): void
+    public trimChildren( startCount: number, endCount: number, schedulingType?: TickSchedulingType): void
     {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Trim, startCount, endCount});
+        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+            syncUpdate( this, {op: ChildrenUpdateOperation.Trim, startCount, endCount});
+        else
+            this.requestUpdate( {op: ChildrenUpdateOperation.Trim, startCount, endCount});
     }
 
     /**
@@ -171,9 +194,12 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      * @param startContent
      * @param endContent
      */
-    growChildren( startContent?: any, endContent?: any): void
+    public growChildren( startContent?: any, endContent?: any, schedulingType?: TickSchedulingType): void
     {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Grow, startContent, endContent});
+        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+            syncUpdate( this, {op: ChildrenUpdateOperation.Grow, startContent, endContent});
+        else
+            this.requestUpdate( {op: ChildrenUpdateOperation.Grow, startContent, endContent});
     }
 
 
@@ -258,7 +284,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             setRef( this.vnref, this);
 
 		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Added);
+			DetailedStats.log( StatsCategory.Elm, StatsAction.Added);
 		/// #endif
 	}
 
@@ -282,7 +308,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 			this.removeCustomAttrs();
 
 		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Elm, StatsAction.Deleted);
+			DetailedStats.log( StatsCategory.Elm, StatsAction.Deleted);
 		/// #endif
 	}
 
@@ -590,7 +616,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		this.ownDN.addEventListener( name, rtd.wrapper, rtd.useCapture);
 
 		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Event, StatsAction.Added);
+			DetailedStats.log( StatsCategory.Event, StatsAction.Added);
 		/// #endif
 	}
 
@@ -620,7 +646,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		this.ownDN.removeEventListener( name, rtd.wrapper, rtd.useCapture);
 
 		/// #if USE_STATS
-			DetailedStats.stats.log( StatsCategory.Event, StatsAction.Deleted);
+			DetailedStats.log( StatsCategory.Event, StatsAction.Deleted);
 		/// #endif
 	}
 
@@ -687,7 +713,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 			this.ownDN.addEventListener( name, newRTD.wrapper, newRTD.useCapture);
 
 			/// #if USE_STATS
-				DetailedStats.stats.log( StatsCategory.Event, StatsAction.Updated);
+				DetailedStats.log( StatsCategory.Event, StatsAction.Updated);
 			/// #endif
 		}
 	}
@@ -736,14 +762,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     {
         if (typeof propVal === "function")
             return { func: propVal, funcThisArg: this.creator, schedulingType: info ? info.schedulingType : undefined, creator: this.creator };
-        // else if (Array.isArray(propVal))
-        //     return {
-        //         func: propVal[0],
-        //         funcThisArg: propVal[1] ? propVal[1] : this.creator,
-        //         schedulingType: propVal[2] ? propVal[2] : info ? info.schedulingType : undefined,
-        //         creator: propVal[3] ? propVal[3] : this.creator,
-        //         useCapture: propVal[4]
-        //     };
         else
             return {
                 func: propVal.func,

@@ -147,6 +147,14 @@ let propInfos: {[P:string]: PropInfo} =
 
     // frequently used events for speeding up the lookup
     click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },
+    mousemove: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+    mouseover: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+    pointermove: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+    pointerover: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+    input: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+    scroll: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+    touchmove: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+    wheel: { type: PropType.Event, schedulingType: TickSchedulingType.None },
 
     // // events
     // mouseenter: { type: PropType.Event, isBubbling: false },
@@ -218,7 +226,7 @@ export function setElmProp( elm: Element, propName: string, info: AttrPropInfo |
     }
 
     /// #if USE_STATS
-        DetailedStats.stats.log( StatsCategory.Attr, StatsAction.Added);
+        DetailedStats.log( StatsCategory.Attr, StatsAction.Added);
     /// #endif
 }
 
@@ -241,7 +249,7 @@ export function updateElmProp( elm: Element, propName: string, info: AttrPropInf
             elm.setAttribute( propName, valToString( newPropVal));
 
             /// #if USE_STATS
-                DetailedStats.stats.log( StatsCategory.Attr, StatsAction.Updated);
+                DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
             /// #endif
 
             return true;
@@ -286,7 +294,7 @@ export function updateElmProp( elm: Element, propName: string, info: AttrPropInf
     }
 
     /// #if USE_STATS
-        DetailedStats.stats.log( StatsCategory.Attr, StatsAction.Updated);
+        DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
     /// #endif
 
     // indicate that there was change in attribute value.
@@ -313,7 +321,7 @@ export function removeElmProp( elm: Element, propName: string, info: AttrPropInf
     }
 
     /// #if USE_STATS
-        DetailedStats.stats.log( StatsCategory.Attr, StatsAction.Deleted);
+        DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
     /// #endif
 }
 
