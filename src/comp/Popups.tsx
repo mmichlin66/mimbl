@@ -471,6 +471,7 @@ export class Popup<TStyles extends IPopupStyles = IPopupStyles,
 
         // remove the dialog element
         this.dlg.remove();
+        this.dlg = null;
     }
 
 	/**

@@ -303,7 +303,7 @@ export interface IElementProps<TRef extends Element = Element, TChildren = any> 
 	ref?: RefPropType<TRef>;
 
 	/**
-	 * Reference that will be set to the instance of the element after it is created (mounted). The
+	 * Reference that will be set to the element's virtual node after it is created (mounted). The
 	 * reference will be set to undefined after the element is unmounted.
 	 */
 	vnref?: ElmRefPropType<TRef>;

@@ -118,13 +118,11 @@ export function s_wrapCallback<T extends Function>( params: CallbackWrappingPara
  * The CallbackWrapper function is used to wrap callbacks in order to have it executed in a Mimbl
  * context.
  */
-function CallbackWrapper(): any
+function CallbackWrapper( this: CallbackWrappingParams<Function>): any
 {
-    let params = this as CallbackWrappingParams<Function>;
-
     // remember the current creator and set the new one
     let prevCreator = s_currentClassComp;
-    s_currentClassComp = params.creator;
+    s_currentClassComp = this.creator;
 
     // we don't want the triggers encountered during the callback execution to cause the watchers
     // to run immediately, so we enter mutation scope
@@ -133,16 +131,16 @@ function CallbackWrapper(): any
     // if some scheduling type is set (that is, we are going to schedule a Mimbl tick after
     // the callback), we should ignore requests to schedule a tick made during the callback
     // execution
-    let schedulingType = params.schedulingType || TickSchedulingType.Sync;
+    let schedulingType = this.schedulingType || TickSchedulingType.Sync;
     s_ignoreSchedulingRequest = schedulingType !== TickSchedulingType.None;
 
     // params.arg will be available inside the callback via the getCurrentCallbackArg call.
-    s_currentCallbackArg = params.arg;
+    s_currentCallbackArg = this.arg;
 
     let retVal: any;
     try
 	{
-		retVal = params.func.apply( params.funcThisArg, arguments);
+		retVal = this.func.apply( this.funcThisArg, arguments);
 	}
 	finally
 	{
