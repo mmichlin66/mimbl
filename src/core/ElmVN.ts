@@ -29,12 +29,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// time.
 	public get elm(): T { return this.ownDN; }
 
-	// Flag indicating whether the Element is SVG (as opposed to HTLM). There are some SVG
-	// elements that have the same name as regular elements (e.g. <a>). Therefore, in order to
-	// determine whether this is an SVG or not we need to check the namespaceURI of the parent
-	// (anchore) DOM node.
-	public isSvg: boolean;
-
 
 
 	constructor( creator: Component, tagName: string, props: IElementProps<T>, subNodes: VN[])
@@ -240,24 +234,43 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         }
         else
         {
-            // create the element. If namespace is provided use it; otherwise, try to determine
-            // whether this is an SVG or HTML element
-            if (this.props?.xmlns)
-            {
-                this.isSvg = this.props.xmlns.endsWith( "svg");
-                this.ownDN = document.createElementNS( this.props.xmlns, this.elmName) as any as T;
-            }
+            // create the element. If namespace is provided use it
+            let ns = this.props?.xmlns;
+            if (ns)
+                this.ownDN = document.createElementNS( ns, this.elmName) as any as T;
             else
             {
-                // assume that names of all SVG elements are in the svgElmInfos object
-                let svgInfo = svgElmInfos[this.elmName];
-                this.isSvg = svgInfo === undefined
-                    ? false
-                    : svgInfo === false || this.anchorDN.namespaceURI.endsWith( "svg");
+                // if the element is in the list use the provided namespace; otherwise, use the
+                // namespace of the anchor element.
+                let info = elmInfos[this.elmName];
+                if (typeof info === "number")
+                {
+                    switch( info)
+                    {
+                        case ENamespace.HTML:
+                            this.ownDN = document.createElement( this.elmName) as any as T;
+                            break;
+                        case ENamespace.SVG:
+                            this.ownDN = document.createElementNS( SvgNamespace, this.elmName) as T
+                            break;
+                        case ENamespace.MATHML:
+                            this.ownDN = document.createElementNS( MathNamespace, this.elmName) as T
+                            break;
+                    }
+                }
+                else if (!info)
+                    this.ownDN = document.createElementNS( (this.anchorDN as Element).namespaceURI, this.elmName) as T;
+                else
+                    this.ownDN = document.createElementNS( info.ns, info.name || this.elmName) as T;
 
-                this.ownDN = this.isSvg
-                    ? document.createElementNS( SvgNamespace, getSvgElmName( svgInfo, this.elmName)) as T
-                    : document.createElement( this.elmName) as any as T;
+                // // if the element is in the list use the provided namespace; otherwise, use the
+                // // namespace of the anchor element.
+                // let info = elmInfos[this.elmName];
+                // this.ownDN = info
+                //     ? info.ns
+                //         ? document.createElementNS( info.ns, info.name || this.elmName) as T
+                //         : document.createElement( this.elmName) as any as T
+                //     : document.createElementNS( (this.anchorDN as Element).namespaceURI, this.elmName) as T;
             }
 
             // translate properties into attributes, events and custom attributes
@@ -1012,121 +1025,44 @@ interface CustomAttrRunTimeData
 
 
 
-// Namespace used to create SVG elements.
+// Namespaces used to create elements.
+let HtmlNamespace: string = "http://www.w3.org/1999/xhtml";
 let SvgNamespace: string = "http://www.w3.org/2000/svg";
+let MathNamespace: string = "http://www.w3.org/1998/Math/MathML";
 
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// The SvgElmInfo type defines information that can be specified for an SVG element. This
-// information can be of the following types:
-//	- string - actual name to use for the element. Some SVG elements have names that cannot be used
-//		in JSX directly (e.g. because of hyphen like in "color-profile"). In this case the string
-//		value will be the actual element name to put into HTML document, while JSX will be using
-//		a camel-formatted name (e.g. "colorProfile").
-//	- boolean - flag indicating that the element is "dual-purpose"; that is, element with this
-//		name can be used as either HTML or SVG element.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-export type SvgElmInfo = string | boolean;
-
-
-
-// Object that maps SVG element names to SvgElmInfo.
-let svgElmInfos: {[elmName:string]: SvgElmInfo} =
+// Numeric indicators of namespaces that can be mapped to element names for speeding up the
+// decision on how to create elements
+const enum ENamespace
 {
-    svg: false,
-
-    a: true,
-    animate: false,
-    animateMotion: false,
-    animateTransform: false,
-
-    circle: false,
-    clipPath: false,
-    colorProfile: "color-profile",
-
-    defs: false,
-    desc: false,
-    discard: false,
-
-    ellipse: false,
-
-    feBlend: false,
-    feColorMatrix: false,
-    feComponentTransfer: false,
-    feComposite: false,
-    feConvolveMatrix: false,
-    feDiffuseLighting: false,
-    feDisplacementMap: false,
-    feDistantLight: false,
-    feDropShadow: false,
-    feFlood: false,
-    feFuncA: false,
-    feFuncB: false,
-    feFuncG: false,
-    feFuncR: false,
-    feGaussianBlur: false,
-    feImage: false,
-    feMerge: false,
-    feMergeNode: false,
-    feMorphology: false,
-    feOffset: false,
-    fePointLight: false,
-    feSpecularLighting: false,
-    feSpotLight: false,
-    feTile: false,
-    feTurbulence: false,
-    filter: false,
-    foreignObject: false,
-
-    g: false,
-
-    hatch: false,
-    hatchpath: false,
-
-    image: false,
-
-    line: false,
-    linearGradient: false,
-
-    marker: false,
-    mask: false,
-    metadata: false,
-    mpath: false,
-
-    path: false,
-    pattern: false,
-    polygon: false,
-    polyline: false,
-
-    radialGradient: false,
-    rect: false,
-
-    script: true,
-    set: false,
-    solidcolor: false,
-    stop: false,
-    style: true,
-    switch: false,
-    symbol: false,
-
-    text: false,
-    textPath: false,
-    title: true,
-    textSpan: false,
-
-    use: false,
-
-    view: false,
+    HTML = 1,
+    SVG = 2,
+    MATHML = 3,
 }
 
+// The ElmInfo type defines information that helps creating an element. This information can be
+// of the following types:
+//  - number - numeric indicator of the element namespce
+//  - object that contains namespace and optionally element's real name. Some non-HTML elements
+//    have names that cannot be used in JSX directly (e.g. because of hyphen like in
+//    "color-profile"). In this case, the string value will be the actual element name to put into
+//    the HTML document, while JSX will be using a camel-formatted name (e.g. "colorProfile").
+type ElmInfo = ENamespace | { ns: string, name?: string};
 
-// Returns the actual name to be used based on the information object and the tag name
-function getSvgElmName( info: SvgElmInfo, tagName: string): string | undefined
+// Object that maps element names to ElmInfo. Elements that are not in this map are created using
+// the anchor's namespace URI with the document.createElementNS() call. Note that there are some
+// elements that can be created under different namespaces, e.g <a> can be used under HTML and
+// SVG. These elements SHOULD NOT be in this map.
+let elmInfos: {[elmName:string]: ElmInfo} =
 {
-    return typeof info === "string" ? info as string : tagName;
+    div: ENamespace.HTML,
+    span: ENamespace.HTML,
+    tr: ENamespace.HTML,
+    td: ENamespace.HTML,
+
+    svg: ENamespace.SVG,
+    colorProfile: { ns: SvgNamespace, name: "color-profile" },
+
+    math: ENamespace.MATHML,
 }
 
 

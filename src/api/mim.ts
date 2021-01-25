@@ -1111,9 +1111,6 @@ export interface IElmVN<T extends Element = Element> extends IVNode
 	/** Gets the DOM element name. */
 	readonly elmName: string;
 
-	/** Gets the flag indicating whether this element is an SVG (as opposed to HTML). */
-	readonly isSvg: boolean;
-
 	/** Gets the DOM element object. */
 	readonly elm: Element;
 
