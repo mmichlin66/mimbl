@@ -539,9 +539,13 @@ function sliceNodeChildren( vn: VN, req: SliceRequest): void
     // if the range is empty/invalid unmount all sub-nodes
     if (endIndex <= startIndex)
     {
-        for( let i = 0; i < oldLen; i++)
-            unmountNode( oldSubNodes[i], true);
+        // if we are removing all sub-nodes under an element, we can optimize by setting
+        // textContent to null;
+        let ownDN = vn.ownDN;
+        if (ownDN)
+            (ownDN as Element).textContent = null;
 
+        oldSubNodes.forEach( svn => { unmountNode( svn, !ownDN) });
         vn.subNodes = null;
         return;
     }
@@ -619,18 +623,6 @@ function spliceNodeChildren( vn: VN, req: SpliceRequest): void
         mountNode( oldSubNodes[i], vn, anchorDN, beforeDN);
     }
 }
-
-// function a()
-// {
-//     let obj = { i: 1, c: 2};
-//     b( obj);
-// }
-
-// function b( {i,c}: { i:number, c:number})
-// {
-//     console.log( i, c);
-// }
-
 
 // Moves a range of sub-nodes to a new location. Moving a region to a new index is the same as
 // swapping two adjacent regions - the region being moved and the region from either the new index
@@ -851,7 +843,13 @@ function trimNodeChildren( vn: VN, req: TrimRequest): void
     let oldLen = oldSubNodes.length;
     if (startCount + endCount >= oldLen)
     {
-        oldSubNodes.forEach( svn => unmountNode( svn, true));
+        // if we are removing all sub-nodes under an element, we can optimize by setting
+        // textContent to null;
+        let ownDN = vn.ownDN;
+        if (ownDN)
+            (ownDN as Element).textContent = null;
+
+        oldSubNodes.forEach( svn => unmountNode( svn, !ownDN));
         vn.subNodes = null;
         return;
     }
