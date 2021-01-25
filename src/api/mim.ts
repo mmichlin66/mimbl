@@ -1021,11 +1021,6 @@ export interface IVNode
 
 
 
-	/** This method is called by the component when it needs to be updated. */
-	requestUpdate(): void;
-
-
-
 	/**
 	 * Registers an object of any type as a service with the given ID that will be available for
 	 * consumption by descendant components.
@@ -1078,7 +1073,10 @@ export interface IVNode
 export interface IClassCompVN extends IVNode
 {
 	/** Gets the component instance. */
-	readonly comp: IComponent;
+    readonly comp: IComponent;
+
+	/** This method is called by the component when it needs to be updated. */
+	requestUpdate(): void;
 }
 
 

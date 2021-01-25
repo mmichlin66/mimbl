@@ -32,6 +32,9 @@ let s_callsScheduledAfterUpdate = new Map<ScheduledFuncType,ScheduledFuncType>()
 // Handle of the animation frame request (in case it should be canceled).
 let s_scheduledFrameHandle: number = 0;
 
+// Flag indicating whether the Mimbl tick is scheduled to be executed in a microtask.
+let s_isMicrotaskScheduled = false;
+
 // State of the scheduler.
 let s_schedulerState: SchedulerState = SchedulerState.Idle;
 
@@ -151,35 +154,53 @@ function CallbackWrapper( this: CallbackWrappingParams<Function>): any
     }
 
     // schedule a Mimbl tick if instructed to do so
-    switch (schedulingType)
-    {
-        case TickSchedulingType.Sync:
-            performMimbleTick();
-            break;
-        case TickSchedulingType.Microtask:
-            queueMicrotask( performMimbleTick);
-            break;
-        case TickSchedulingType.AnimationFrame:
-            if (s_scheduledFrameHandle === 0)
-                s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
-            break;
-    }
+    if (schedulingType)
+        scheduleTick(schedulingType);
 
     return retVal;
 }
 
 
 
-// Schedules an update for the given node.
-export function requestNodeUpdate( vn: VN, req?: ChildrenUpdateRequest): void
+/**
+ * Schedule (or executes) Mimbl tick according to the given type.
+ */
+function scheduleTick( schedulingType: TickSchedulingType = TickSchedulingType.AnimationFrame): void
 {
-    /// #if DEBUG
-        if (!vn.anchorDN)
-        {
+    switch (schedulingType)
+    {
+        case TickSchedulingType.Sync:
+            performMimbleTick();
+            break;
+
+        case TickSchedulingType.Microtask:
+            if (!s_isMicrotaskScheduled)
+            {
+                queueMicrotask( performMimbleTick);
+                s_isMicrotaskScheduled = true;
+            }
+            break;
+
+        case TickSchedulingType.AnimationFrame:
+            if (s_scheduledFrameHandle === 0)
+                s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
+            break;
+    }
+}
+
+
+
+// Schedules an update for the given node.
+export function requestNodeUpdate( vn: VN, req?: ChildrenUpdateRequest, schedulingType?: TickSchedulingType): void
+{
+    if (!vn.anchorDN)
+    {
+        /// #if DEBUG
             console.warn( `Update requested for virtual node '${getVNPath(vn).join("->")}' that is not mounted`)
-            return;
-        }
-    /// #endif
+        /// #endif
+
+        return;
+    }
 
 	// add this node to the map of nodes for which either update or replacement or
 	// deletion is scheduled. Note that a node will only be present once in the map no
@@ -193,20 +214,25 @@ export function requestNodeUpdate( vn: VN, req?: ChildrenUpdateRequest): void
 	// update" method.
 	if (vn instanceof ClassCompVN)
 	{
-		let comp = vn.comp;
-		if (comp.beforeUpdate && s_schedulerState !== SchedulerState.BeforeUpdate)
-			s_callsScheduledBeforeUpdate.set( comp.beforeUpdate, s_wrapCallback( {func: comp.beforeUpdate, funcThisArg: comp, creator: comp}));
+        let comp = vn.comp;
+        let func = comp.afterUpdate;
+		if (func)
+            s_callsScheduledAfterUpdate.set( func, s_wrapCallback( {func, funcThisArg: comp, creator: comp}));
 
-		if (comp.afterUpdate)
-			s_callsScheduledAfterUpdate.set( comp.afterUpdate, s_wrapCallback( {func: comp.afterUpdate, funcThisArg: comp, creator: comp}));
+        if (s_schedulerState !== SchedulerState.BeforeUpdate)
+        {
+            func = comp.beforeUpdate;
+            if (func)
+                s_callsScheduledBeforeUpdate.set( func, s_wrapCallback( {func, funcThisArg: comp, creator: comp}));
+        }
 	}
 
     // schedule Mimbl tick using animation frame. If this call comes from a wrapped callback, the
     // callback might schedule a tick using microtask. In this case, the animation frame will be
     // canceled. The update is scheduled in the next tick unless the request is made during a
     // "before update" function execution.
-    if (!s_ignoreSchedulingRequest && s_scheduledFrameHandle === 0 && s_schedulerState !== SchedulerState.BeforeUpdate)
-        s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
+    if (!s_ignoreSchedulingRequest && s_schedulerState !== SchedulerState.BeforeUpdate)
+        scheduleTick( schedulingType || TickSchedulingType.AnimationFrame);
 }
 
 
@@ -214,7 +240,7 @@ export function requestNodeUpdate( vn: VN, req?: ChildrenUpdateRequest): void
 // Schedules to call the given function either before or after all the scheduled components
 // have been updated.
 export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean,
-    funcThisArg?: any, creator?: any): void
+    funcThisArg?: any, creator?: any, schedulingType?: TickSchedulingType): void
 {
 	/// #if DEBUG
 	if (!func)
@@ -232,8 +258,8 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 
 			// a "before update" function is always scheduled in the next frame even if the
 			// call is made from another "before update" function.
-            if (!s_ignoreSchedulingRequest && s_scheduledFrameHandle === 0)
-                s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
+            if (!s_ignoreSchedulingRequest)
+                scheduleTick( schedulingType || TickSchedulingType.AnimationFrame);
 		}
 	}
 	else
@@ -244,10 +270,10 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 
 			// an "after update" function is scheduled in the next cycle unless the request is made
 			// either from a "before update" function execution or during a node update.
-            if (!s_ignoreSchedulingRequest && s_scheduledFrameHandle === 0  &&
+            if (!s_ignoreSchedulingRequest &&
                 s_schedulerState !== SchedulerState.BeforeUpdate && s_schedulerState !== SchedulerState.Update)
             {
-                s_scheduledFrameHandle = requestAnimationFrame( onAnimationFrame);
+                scheduleTick( schedulingType || TickSchedulingType.AnimationFrame);
             }
 		}
 	}
@@ -312,7 +338,10 @@ function performMimbleTick(): void
         s_scheduledFrameHandle = 0;
     }
 
-	// call functions scheduled to be invoked before updating components. If this function
+    // clear the flag that the tick is scheduled in a microtsk
+    s_isMicrotaskScheduled = false;
+
+    // call functions scheduled to be invoked before updating components. If this function
 	// calls the requestUpdate method or schedules a function to be invoked after updates,
 	// they will be executed in this cycle. However, if it schedules a function to be invoked
 	// before updates, it will be executed in the next cycle.
@@ -337,8 +366,47 @@ function performMimbleTick(): void
 		// update requests. Arrange scheduled nodes by their nesting depths and perform updates.
 		s_schedulerState = SchedulerState.Update;
 		let vnsScheduledForUpdate = s_vnsScheduledForUpdate;
-		s_vnsScheduledForUpdate = new Map<VN,any>();
-		performUpdate( vnsScheduledForUpdate);
+        s_vnsScheduledForUpdate = new Map<VN,any>();
+
+        vnsScheduledForUpdate.forEach( (req: ChildrenUpdateRequest, vn: VN) =>
+        {
+            // it can happen that we encounter already unmounted virtual nodes - ignore them
+            if (!vn.anchorDN)
+                return;
+
+            try
+            {
+                // first perform partial update if requested
+                if (vn.partialUpdateRequested)
+                {
+                    vn.partialUpdateRequested = false;
+                    vn.performPartialUpdate();
+                }
+
+                // then perform normal update if requested
+                if (vn.updateRequested)
+                {
+                    // clear the flag that update has been requested for the node
+                    vn.updateRequested = false;
+
+                    // if the component was already updated in this cycle, don't update it again
+                    if (vn.lastUpdateTick === s_currentTick)
+                        return;
+
+                    performChildrenOperation( vn, req);
+                }
+            }
+            catch( err)
+            {
+                // find the nearest error handling service. If nobody else, it is implemented
+                // by the RootVN object.
+                let errorService = vn.getService( "StdErrorHandling");
+                if (errorService)
+                    errorService.reportError( err);
+                else
+                    console.error( "BUG: updateNode threw exception but StdErrorHandling service was not found.", err);
+            }
+        });
 
         /// #if USE_STATS
             DetailedStats.stop( true);
@@ -356,53 +424,6 @@ function performMimbleTick(): void
 
 	s_schedulerState = SchedulerState.Idle;
 };
-
-
-
-// Performs rendering phase for all components scheduled for update and recursively for their
-// sub-nodes where necessary. Returns array of VNDisp structures for each updated node.
-function performUpdate( vns: Map<VN,any>): void
-{
-	vns.forEach( (req: ChildrenUpdateRequest, vn: VN) =>
-	{
-        // it can happen that we encounter already unmounted virtual nodes - ignore them
-        if (!vn.anchorDN)
-            return;
-
-        try
-        {
-            // first perform partial update if requested
-            if (vn.partialUpdateRequested)
-            {
-                vn.partialUpdateRequested = false;
-                vn.performPartialUpdate();
-            }
-
-            // then perform normal update if requested
-            if (vn.updateRequested)
-            {
-                // clear the flag that update has been requested for the node
-                vn.updateRequested = false;
-
-                // if the component was already updated in this cycle, don't update it again
-                if (vn.lastUpdateTick === s_currentTick)
-                    return;
-
-                performChildrenOperation( vn, req);
-            }
-        }
-        catch( err)
-        {
-            // find the nearest error handling service. If nobody else, it is implemented
-            // by the RootVN object.
-            let errorService = vn.getService( "StdErrorHandling");
-            if (errorService)
-                errorService.reportError( err);
-            else
-                console.error( "BUG: updateNode threw exception but StdErrorHandling service was not found.", err);
-        }
-    });
-}
 
 
 

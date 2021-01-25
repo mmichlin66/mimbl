@@ -1,4 +1,4 @@
-﻿import {Component, RefPropType, setRef, IVNode, UpdateStrategy} from "../api/mim";
+﻿import {Component, RefPropType, setRef, IVNode, UpdateStrategy, TickSchedulingType} from "../api/mim";
 import {
     notifyServiceUnpublished, notifyServiceUnsubscribed, requestNodeUpdate,
     notifyServicePublished, notifyServiceSubscribed
@@ -159,7 +159,7 @@ export abstract class VN implements IVNode
 
 
     /** Determines whether the node is currently mounted */
-	public get isMounted(): boolean { return !!this.anchorDN; }
+	public get isMounted(): boolean { return this.anchorDN != null; }
 
 
 
@@ -176,11 +176,11 @@ export abstract class VN implements IVNode
 
 
     // Schedules an update for this node.
-	public requestUpdate( req?: ChildrenUpdateRequest): void
+	public requestUpdate( req?: ChildrenUpdateRequest, schedulingType?: TickSchedulingType): void
 	{
 		if (!this.updateRequested)
 		{
-			requestNodeUpdate( this, req);
+			requestNodeUpdate( this, req, schedulingType);
 			this.updateRequested = true;
 		}
 	}
@@ -188,11 +188,11 @@ export abstract class VN implements IVNode
 
 
 	// Schedules an update for this node.
-	public requestPartialUpdate(): void
+	public requestPartialUpdate( schedulingType?: TickSchedulingType): void
 	{
 		if (!this.partialUpdateRequested)
 		{
-			requestNodeUpdate( this);
+			requestNodeUpdate( this, undefined, schedulingType);
 			this.partialUpdateRequested = true;
 		}
 	}
