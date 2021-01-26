@@ -6,7 +6,7 @@ import {
     VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN, FuncProxyVN,
     ManagedCompVN, enterMutationScope, exitMutationScope, ChildrenUpdateRequest,
     ChildrenUpdateOperation, GrowRequest, MoveRequest, SetRequest, SpliceRequest, SwapRequest,
-    TrimRequest, UpdateRequest, SliceRequest
+    TrimRequest, SliceRequest
 } from "../internal"
 
 /// #if USE_STATS
@@ -454,7 +454,6 @@ function performChildrenOperation( vn: VN, req: ChildrenUpdateRequest)
     {
         switch( req.op)
         {
-            case ChildrenUpdateOperation.Update: updateNodeChildren( vn, req); break;
             case ChildrenUpdateOperation.Set: setNodeChildren( vn, req); break;
             case ChildrenUpdateOperation.Slice: sliceNodeChildren( vn, req); break;
             case ChildrenUpdateOperation.Splice: spliceNodeChildren( vn, req); break;
@@ -488,36 +487,33 @@ function rerenderNode( disp: VNDisp): void
 
 
 
-// Reconciles the node's children with the new content.
-function updateNodeChildren( vn: VN, req: UpdateRequest): void
-{
-    reconcileAndUpdateSubNodes( vn, {oldVN: vn}, createVNChainFromContent( req.content));
-}
-
-
-
 // Unmounts existing sub-nodes of the given node and mounts the new ones obtained from the given
 // new content.
 function setNodeChildren( vn: VN, req: SetRequest): void
 {
-    let ownDN = vn.ownDN;
-
-    if (vn.subNodes)
+    if (req.update)
+        reconcileAndUpdateSubNodes( vn, {oldVN: vn}, createVNChainFromContent( req.content));
+    else
     {
-        // if we are removing all sub-nodes under an element, we can optimize by setting
-        // textContent to null;
-        if (ownDN)
-            (ownDN as Element).textContent = null;
+        let ownDN = vn.ownDN;
 
-        vn.subNodes.forEach( svn => { unmountNode( svn, !ownDN) });
-    }
+        if (vn.subNodes)
+        {
+            // if we are removing all sub-nodes under an element, we can optimize by setting
+            // textContent to null;
+            if (ownDN)
+                (ownDN as Element).textContent = null;
 
-    vn.subNodes = req.content && createVNChainFromContent( req.content);
-    if (vn.subNodes)
-    {
-        let anchorDN = ownDN ? ownDN : vn.anchorDN;
-        let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
-        vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
+            vn.subNodes.forEach( svn => { unmountNode( svn, !ownDN) });
+        }
+
+        vn.subNodes = req.content && createVNChainFromContent( req.content);
+        if (vn.subNodes)
+        {
+            let anchorDN = ownDN ? ownDN : vn.anchorDN;
+            let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
+            vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
+        }
     }
 }
 
@@ -1043,46 +1039,6 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
 
 
 
-// // Recursively mounts sub-nodes of the given node. If our node knows to handle errors, we do it
-// // under try/catch; otherwise, the exceptions go to either the ancestor node that knows to handle
-// // errors or to the Mimbl tick loop.
-// function mountSubNodes( vn: VN, subNodes: VN[], anchorDN: DN, beforeDN: DN): void
-// {
-//     if (!vn.supportsErrorHandling)
-//         subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
-//     else
-//     {
-//         try
-//         {
-//             subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
-//         }
-//         catch( err)
-//         {
-//             /// #if VERBOSE_NODE
-//                 console.debug( `Calling handleError() on node ${vn.name}. Error:`, err);
-//             /// #endif
-
-//             // let the node handle the error and re-render; then we render the new
-//             // content but we do it without try/catch this time; otherwise, we may end
-//             // up in an infinite loop
-//             let newSubNodes = createVNChainFromContent( vn.handleError( err));
-
-//             // unmount existing sub-nodes (that were mounted so far)
-//             if (vn.subNodes)
-//                 vn.subNodes.forEach( svn => unmountNode( svn, true));
-
-//             // mount the new ones
-//             if (newSubNodes)
-//             {
-//                 vn.subNodes = newSubNodes;
-//                 vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
-//             }
-//         }
-//     }
-// }
-
-
-
 // Recursively removes DOM nodes corresponding to this VN and its sub-nodes.
 function unmountNode( vn: VN, removeOwnNode: boolean)
 {
@@ -1137,7 +1093,7 @@ function unmountNode( vn: VN, removeOwnNode: boolean)
 function reconcileAndUpdateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], catchErrors: boolean = true): void
 {
     // reconcile old and new sub-nodes
-    buildSubNodeDispositions( disp, newSubNodes);
+    buildSubNodeDispositions( disp, vn.subNodes, newSubNodes);
 
     // remove from DOM the old nodes designated to be removed (that is, those for which there
     // was no counterpart new node that would either update or replace it). We need to remove
@@ -1621,10 +1577,9 @@ type VNDisp =
  * into groups of consecutive nodes that should be updated and of nodes that should be inserted.
  * The groups are built in a way so that if a node should be moved, its entire group is moved.
  */
-function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
+function buildSubNodeDispositions( disp: VNDisp, oldChain: VN[], newChain: VN[]): void
 {
     let newLen = newChain ? newChain.length : 0;
-    let oldChain = disp.oldVN.subNodes;
     let oldLen = oldChain ? oldChain.length : 0;
 
     // if either old or new or both chains are empty, we do special things

@@ -399,17 +399,14 @@ export const enum ChildrenUpdateOperation
 
 
 /** Parameters for the Set request */
-export type UpdateRequest = {
-    op?: ChildrenUpdateOperation.Update;
-    content?: any;
-}
-
-
-
-/** Parameters for the Set request */
 export type SetRequest = {
     op?: ChildrenUpdateOperation.Set;
+
+    // content to replace current children
     content?: any;
+
+    // Flag indicating whether the old sub-nodes are unmounted or are allowed to be updated
+    update?: boolean
 }
 
 
@@ -498,7 +495,7 @@ export type GrowRequest =
 
 
 /** Parameters for the Grow request */
-export type ChildrenUpdateRequest = UpdateRequest | SetRequest | SliceRequest | SpliceRequest |
+export type ChildrenUpdateRequest = SetRequest | SliceRequest | SpliceRequest |
     MoveRequest | SwapRequest | TrimRequest | GrowRequest;
 
 

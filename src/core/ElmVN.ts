@@ -95,9 +95,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     public updateChildren( content: any, schedulingType?: TickSchedulingType): void
     {
         if (!schedulingType || schedulingType === TickSchedulingType.Sync)
-            syncUpdate( this, {op: ChildrenUpdateOperation.Update, content});
+            syncUpdate( this, {op: ChildrenUpdateOperation.Set, content, update: true});
         else
-            this.requestUpdate( {op: ChildrenUpdateOperation.Update, content});
+            this.requestUpdate( {op: ChildrenUpdateOperation.Set, content, update: true});
     }
 
     /**
