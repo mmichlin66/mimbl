@@ -17,7 +17,8 @@ export * from "./api/mim"
 import {s_initStyleScheduler} from "./internal"
 
 // Set Mimbl style scheduler as the default scheduler for style-related DOM-writing operations.
-export let mimblStyleSchedulerType = s_initStyleScheduler();
+export let mimblStyleSchedulerType
+s_initStyleScheduler().then( n => mimblStyleSchedulerType = n);
 
 
 

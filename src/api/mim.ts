@@ -324,7 +324,7 @@ export interface IElementProps<TRef extends Element = Element, TChildren = any> 
 	id?: IDPropType;
 	lang?: string;
 	role?: string;
-	style?: Styleset;
+	style?: string | Styleset;
 	tabindex?: number;
 
 	// global events

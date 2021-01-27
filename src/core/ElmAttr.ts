@@ -1,8 +1,6 @@
-﻿import {
-    Styleset, setElementStyle, SchedulerType, diffStylesets, StringStyleset, setElementStringStyle,
-    MediaQuery, mediaQueryToString
-} from "mimcss"
+﻿import {Styleset, SchedulerType, StringStyleset, MediaQuery} from "mimcss"
 import {ICustomAttributeHandlerClass, TickSchedulingType} from "../api/mim"
+import {s_mimcss} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats";
@@ -349,26 +347,56 @@ export function removeElmProp( elm: Element, propName: string, info: AttrPropInf
 // items, the key value is from the new style value; for removed items, the key value is undefined.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-function setStyleProp( elm: Element, attrName: string, propVal: Styleset): void
+function setStyleProp( elm: Element, attrName: string, propVal: string | Styleset): void
 {
-	setElementStyle( elm as HTMLElement, propVal, SchedulerType.Sync);
+    if (typeof propVal === "object")
+        s_mimcss.setElementStyle( elm as HTMLElement, propVal, SchedulerType.Sync);
+    else
+        elm.setAttribute( attrName, propVal);
 }
 
 
 
-function diffStyleProp( attrName: string, oldPropVal: Styleset, newPropVal: Styleset): any
+function diffStyleProp( attrName: string, oldPropVal: string | Styleset, newPropVal: string | Styleset): any
 {
-	let res = diffStylesets( oldPropVal, newPropVal);
+    if (oldPropVal === newPropVal)
+        return undefined;
 
-	// we have to return undefined because null is considered a valid update value
-	return res == null ? undefined : res;
+    if ((typeof oldPropVal === "object" || typeof newPropVal === "object") && !s_mimcss)
+    {
+        return undefined;
+    }
+    else if (typeof oldPropVal === "object" && typeof newPropVal === "object")
+    {
+        // we have to return undefined because null is considered a valid update value
+        let res = s_mimcss.diffStylesets( oldPropVal, newPropVal);
+        return res == null ? undefined : res;
+    }
+    else if (typeof oldPropVal === "string" && typeof newPropVal === "string")
+        return newPropVal;
+    else if (typeof oldPropVal === "string")
+    {
+        let newPropValAsString = s_mimcss.stylesetToString( newPropVal);
+        return oldPropVal !== newPropValAsString ? newPropValAsString : undefined;
+    }
+    else //if (typeof newPropVal === "string")
+    {
+        let oldPropValAsString = s_mimcss.stylesetToString( oldPropVal);
+        return oldPropValAsString !== newPropVal ? newPropVal : undefined;
+    }
 }
 
 
 
-function updateStyleProp( elm: Element, attrName: string, updateVal: StringStyleset): void
+function updateStyleProp( elm: Element, attrName: string, updateVal: string | StringStyleset): void
 {
-	setElementStringStyle( elm as HTMLElement, updateVal, SchedulerType.Sync);
+    if (typeof updateVal === "object")
+    {
+        if (s_mimcss)
+            s_mimcss.setElementStringStyle( elm as HTMLElement, updateVal, SchedulerType.Sync);
+    }
+    else
+        elm.setAttribute( attrName, updateVal);
 }
 
 
@@ -382,7 +410,13 @@ function updateStyleProp( elm: Element, attrName: string, updateVal: StringStyle
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 function setMediaProp( elm: Element, attrName: string, propVal: MediaQuery): void
 {
-    elm[attrName] = mediaQueryToString( propVal);
+    if (typeof propVal === "object")
+    {
+        if (s_mimcss)
+            elm[attrName] = s_mimcss.setElementStringStyle( elm as HTMLElement, propVal, SchedulerType.Sync);
+    }
+    else
+        elm[attrName] = propVal;
 }
 
 
@@ -392,8 +426,13 @@ function diffMediaProp( attrName: string, oldPropVal: MediaQuery, newPropVal: Me
     if (oldPropVal === newPropVal)
         return undefined;
 
-	let oldString = mediaQueryToString( oldPropVal);
-	let newString = mediaQueryToString( oldPropVal);
+    if ((typeof oldPropVal === "object" || typeof newPropVal === "object") && !s_mimcss)
+    {
+        return undefined;
+    }
+
+    let oldString = typeof oldPropVal === "object" ? s_mimcss.mediaQueryToString( oldPropVal) : oldPropVal;
+	let newString = typeof newPropVal === "object" ? s_mimcss.mediaQueryToString( oldPropVal) : newPropVal;
 
 	// we have to return undefined because null is considered a valid update value
 	return newString === oldString ? undefined : newString;
