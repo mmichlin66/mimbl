@@ -170,6 +170,19 @@ export type UpdateStrategy =
 	 * The flag's default value is false, that is recycling is enabled.
 	 */
     disableKeyedNodeRecycling?: boolean;
+
+	/**
+	 * Flag determining whether the reconciliation procedure should not pay attention to the keys.
+     * This flag is complimentary to the disableKeyedNodeRecycling flag and take effect only if the
+     * latter is false (or undefined). When the ignoreKeys flag is false (default) we try to match
+     * new sub-nodes to old ones using keys. Setting the ignoreKeys flag to true completely
+     * ignores keys and the matching is done by going through the lists of the new and
+     * old sub-nodes sequentially. Under certain circumstance this may speed up the reconciliation
+     * process
+	 *
+	 * The flag's default value is false, that is keys are used for matching the nodes.
+	 */
+    ignoreKeys?: boolean;
 };
 
 
