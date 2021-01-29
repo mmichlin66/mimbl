@@ -492,7 +492,8 @@ function rerenderNode( disp: VNDisp): void
 function setNodeChildren( vn: VN, req: SetRequest): void
 {
     if (req.update)
-        reconcileAndUpdateSubNodes( vn, {oldVN: vn}, createVNChainFromContent( req.content));
+        reconcileAndUpdateSubNodes( vn, {oldVN: vn}, createVNChainFromContent( req.content),
+            true, req.updateStrategy);
     else
     {
         let ownDN = vn.ownDN;
@@ -527,7 +528,18 @@ function sliceNodeChildren( vn: VN, req: SliceRequest): void
         return;
 
     let oldLen = oldSubNodes.length;
-    let startIndex = Math.max( req.startIndex, 0);
+
+    // validate request parameters
+    let startIndex = req.startIndex;
+    if (startIndex < 0 || startIndex > oldLen)
+    {
+        /// #if DEBUG
+            console.error( `Parameters for SliceChildren operation are incorrect`, req);
+        /// #endif
+
+        return;
+    }
+
     let endIndex = req.endIndex != null ? Math.min( req.endIndex, oldLen) : oldLen;
     if (endIndex - startIndex === oldLen)
         return;
@@ -573,16 +585,36 @@ function spliceNodeChildren( vn: VN, req: SpliceRequest): void
     let oldSubNodes = vn.subNodes;
     let oldLen = oldSubNodes ? oldSubNodes.length : 0;
 
-    // validate and adjust request parameters
-    let index = Math.min( req.index, oldLen);
-    if (index < 0)
-        index = 0;
-    else if (index > oldLen)
-        index = oldLen;
+    // validate request parameters
+    let index = req.index;
+    if (index < 0 || index > oldLen)
+    {
+        /// #if DEBUG
+            console.error( `Parameters for SpliceChildren operation are incorrect`, req);
+        /// #endif
+
+        return;
+    }
+
+    // calculate the number of sub-nodes to delete
+    let countToDelete = !req.countToDelete ? 0 : Math.min( req.countToDelete, oldLen - index);
+
+    // create new sub-nodes - if none were created, we only need to adjust the old list of
+    // sub-nodes to remove the unmounted nodes (if any)
+    let newSubNodes = req.contentToInsert && createVNChainFromContent( req.contentToInsert);
+
+    // // determine if we need to reconcile old and new nodes (and we have those)
+    // if (req.update && countToDelete > 0 && newSubNodes)
+    // {
+    //     let disp = {oldVN: vn}
+    //     buildSubNodeDispositions( disp, oldSubNodes, newSubNodes, req.updateStrategy,
+    //         index, index + countToDelete);
+    // }
+    // else
+    // {
 
     // unmount nodes if necessary - note that it is OK if req.countToDelete is negative - it is
     // the same as if it was set to 0 because we only use >0 comparisons.
-    let countToDelete = !req.countToDelete ? 0 : Math.min( req.countToDelete, oldLen - index);
     if (countToDelete > 0)
     {
         let stopIndex = index + countToDelete;
@@ -590,9 +622,6 @@ function spliceNodeChildren( vn: VN, req: SpliceRequest): void
             unmountNode( oldSubNodes[i], true);
     }
 
-    // create new sub-nodes - if none were created, we only need to adjust the old list of
-    // sub-nodes to remove the unmounted nodes (if any)
-    let newSubNodes = req.contentToInsert && createVNChainFromContent( req.contentToInsert);
     if (!newSubNodes)
     {
         if (countToDelete > 0)
@@ -602,7 +631,10 @@ function spliceNodeChildren( vn: VN, req: SpliceRequest): void
     }
 
     // insert new nodes into the old list at the given index
-    oldSubNodes.splice( index, countToDelete, ...newSubNodes);
+    if (oldSubNodes)
+        oldSubNodes.splice( index, countToDelete, ...newSubNodes);
+    else
+        vn.subNodes = oldSubNodes = newSubNodes;
 
     // determine the node before which the new nodes should be mounted
     let ownDN = vn.ownDN;
@@ -618,6 +650,8 @@ function spliceNodeChildren( vn: VN, req: SpliceRequest): void
         oldSubNodes[i].index = i;
         mountNode( oldSubNodes[i], vn, anchorDN, beforeDN);
     }
+
+    // }
 }
 
 // Moves a range of sub-nodes to a new location. Moving a region to a new index is the same as
@@ -633,7 +667,7 @@ function moveNodeChildren( vn: VN, req: MoveRequest): void
     if (oldLen < 2)
     {
         /// #if DEBUG
-            console.error( `Cannot perform move children operation when less than two children exist`);
+            console.error( `Parameters for MoveChildren operation are incorrect`);
         /// #endif
 
         return;
@@ -660,7 +694,7 @@ function moveNodeChildren( vn: VN, req: MoveRequest): void
     if (index1 < 0 || index2 + count2 > oldLen)
     {
         /// #if DEBUG
-            console.error( `Cannot move children - range/shift parameters are incorrect`, req);
+            console.error( `Parameters for MoveChildren operation are incorrect`, req);
         /// #endif
 
         return;
@@ -679,7 +713,7 @@ function swapNodeChildren( vn: VN, req: SwapRequest): void
     if (oldLen < 2)
     {
         /// #if DEBUG
-            console.error( `Cannot perform swap children operation when less than two children exist`);
+            console.error( `Parameters for SwapChildren operation are incorrect`, req);
         /// #endif
 
         return;
@@ -707,7 +741,7 @@ function swapNodeChildren( vn: VN, req: SwapRequest): void
         index1 + count1 > index2 || index2 + count2 > oldLen)
     {
         /// #if DEBUG
-            console.error( `Cannot swap children - range parameters are incorrect`, req);
+            console.error( `Parameters for SwapChildren operation are incorrect`, req);
         /// #endif
 
         return;
@@ -834,7 +868,13 @@ function trimNodeChildren( vn: VN, req: TrimRequest): void
     let startCount = req.startCount;
     let endCount = req.endCount;
     if (startCount < 0 || endCount < 0)
+    {
+        /// #if DEBUG
+            console.error( `Parameters for TrimChildren operation are incorrect`, req);
+        /// #endif
+
         return;
+    }
 
     let oldLen = oldSubNodes.length;
     if (startCount + endCount >= oldLen)
@@ -1090,10 +1130,11 @@ function unmountNode( vn: VN, removeOwnNode: boolean)
 
 
 
-function reconcileAndUpdateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], catchErrors: boolean = true): void
+function reconcileAndUpdateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[],
+    catchErrors: boolean = true, updateStrategy?: UpdateStrategy): void
 {
     // reconcile old and new sub-nodes
-    buildSubNodeDispositions( disp, vn.subNodes, newSubNodes, vn.updateStrategy);
+    buildSubNodeDispositions( disp, vn.subNodes, newSubNodes, updateStrategy || vn.updateStrategy);
 
     // remove from DOM the old nodes designated to be removed (that is, those for which there
     // was no counterpart new node that would either update or replace it). We need to remove
@@ -1134,7 +1175,7 @@ function reconcileAndUpdateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], ca
         // since we have sub-nodes, we need to create nodes for them and render. If our node
         // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
         // either the uncestor node that knows to handle errors or to the Mimbl tick loop.
-        if (!vn.supportsErrorHandling || !catchErrors)
+        if (!catchErrors! || vn.supportsErrorHandling)
             updateSubNodes( vn, disp, newSubNodes, anchorDN, beforeDN);
         else
         {
@@ -1578,10 +1619,16 @@ type VNDisp =
  * The groups are built in a way so that if a node should be moved, its entire group is moved.
  */
 function buildSubNodeDispositions( disp: VNDisp, oldChain: VN[], newChain: VN[],
-    updateStrategy: UpdateStrategy): void
+    updateStrategy: UpdateStrategy, oldStartIndex?: number, oldEndIndex?: number): void
 {
+    // adjust start and end indices in the old chain
+    if (oldStartIndex == null)
+        oldStartIndex = 0;
+    if (oldEndIndex == null)
+        oldEndIndex = oldChain ? oldChain.length : 0;
+
+    let oldLen = oldEndIndex - oldStartIndex;
     let newLen = newChain ? newChain.length : 0;
-    let oldLen = oldChain ? oldChain.length : 0;
 
     // if either old or new or both chains are empty, we do special things
     if (newLen === 0 && oldLen === 0)
@@ -1609,7 +1656,7 @@ function buildSubNodeDispositions( disp: VNDisp, oldChain: VN[], newChain: VN[],
     // to avoid creating temporary structures
     if (newLen === 1 && oldLen === 1)
     {
-        let oldVN = oldChain[0]
+        let oldVN = oldChain[oldStartIndex]
         let newVN = newChain[0];
         if (oldVN === newVN ||
                 ((ignoreKeys || allowKeyedNodeRecycling || newVN.key === oldVN.key) &&
@@ -1640,7 +1687,8 @@ function buildSubNodeDispositions( disp: VNDisp, oldChain: VN[], newChain: VN[],
     // update old sub-nodes with new sub-nodes sequentially.
     if (ignoreKeys)
     {
-        hasUpdates = reconcileWithoutKeys( newChain, oldChain, disp.subNodeDisps, subNodesToRemove);
+        hasUpdates = reconcileWithoutKeys( oldChain, oldStartIndex, oldEndIndex, newChain,
+            disp.subNodeDisps, subNodesToRemove);
     }
     else
     {
@@ -1650,19 +1698,21 @@ function buildSubNodeDispositions( disp: VNDisp, oldChain: VN[], newChain: VN[],
         // goes to the map and the rest to the unkeyed list.
         let oldKeyedMap = new Map<any,VN>();
         let oldUnkeyedList: VN[] = [];
+        let oldVN: VN;
         let key: any;
-        oldChain.forEach( oldVN =>
+        for( let i = oldStartIndex; i < oldEndIndex; i++)
         {
+            oldVN = oldChain[i];
             key = oldVN.key;
             if (key != null && !oldKeyedMap.has( key))
                 oldKeyedMap.set( key, oldVN);
             else
                 oldUnkeyedList.push( oldVN);
-        });
+        }
 
         hasUpdates = allowKeyedNodeRecycling
-            ? reconcileWithRecycling( newChain, oldKeyedMap, oldUnkeyedList, disp.subNodeDisps, subNodesToRemove)
-            : reconcileWithoutRecycling( newChain, oldKeyedMap, oldUnkeyedList, disp.subNodeDisps, subNodesToRemove);
+            ? reconcileWithRecycling( oldKeyedMap, oldUnkeyedList, newChain, disp.subNodeDisps, subNodesToRemove)
+            : reconcileWithoutRecycling( oldKeyedMap, oldUnkeyedList, newChain, disp.subNodeDisps, subNodesToRemove);
     }
 
     // if we don't have any updates, this means that all old nodes should be deleted and all new
@@ -1687,10 +1737,10 @@ function buildSubNodeDispositions( disp: VNDisp, oldChain: VN[], newChain: VN[],
 /**
  * Reconciles new and old nodes without paying attention to keys.
  */
-function reconcileWithoutKeys( newChain: VN[], oldChain: VN[], subNodeDisps: VNDisp[],
-    subNodesToRemove: VN[]): boolean
+function reconcileWithoutKeys( oldChain: VN[], oldStartIndex: number, oldEndIndex: number,
+    newChain: VN[], subNodeDisps: VNDisp[], subNodesToRemove: VN[]): boolean
 {
-    let oldLen = oldChain.length;
+    let oldLen = oldEndIndex - oldStartIndex;
     let newLen = newChain.length;
     let commonLen = Math.min( oldLen, newLen);
 
@@ -1700,7 +1750,7 @@ function reconcileWithoutKeys( newChain: VN[], oldChain: VN[], subNodeDisps: VND
     let oldVN: VN, newVN: VN;
     for( let i = 0; i < commonLen; i++)
     {
-        oldVN = oldChain[i];
+        oldVN = oldChain[oldStartIndex + i];
         newVN = newChain[i];
         subDisp = { newVN };
         if (oldVN === newVN)
@@ -1744,7 +1794,7 @@ function reconcileWithoutKeys( newChain: VN[], oldChain: VN[], subNodeDisps: VND
         if (oldLen > commonLen)
         {
             for( let i = commonLen; i < oldLen; i++)
-                subNodesToRemove.push( oldChain[i]);
+                subNodesToRemove.push( oldChain[oldStartIndex + i]);
         }
     }
 
@@ -1756,7 +1806,7 @@ function reconcileWithoutKeys( newChain: VN[], oldChain: VN[], subNodeDisps: VND
 /**
  * Reconciles new and old nodes without recycling non-matching keyed nodes.
  */
-function reconcileWithoutRecycling( newChain: VN[], oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[],
+function reconcileWithoutRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[], newChain: VN[],
     subNodeDisps: VNDisp[], subNodesToRemove: VN[]): boolean
 {
     // remember the length of the unkeyed list;
@@ -1835,7 +1885,7 @@ function reconcileWithoutRecycling( newChain: VN[], oldKeyedMap: Map<any,VN>, ol
 /**
  * Reconciles new and old nodes with recycling non-matching keyed nodes.
  */
-function reconcileWithRecycling( newChain: VN[], oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[],
+function reconcileWithRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[], newChain: VN[],
     subNodeDisps: VNDisp[], subNodesToRemove: VN[]): boolean
 {
     // remember the length of the unkeyed list;

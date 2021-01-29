@@ -383,17 +383,22 @@ export const enum ChildrenUpdateOperation
     Swap = 5,
 
     /**
+     * Some sub-nodes are removed from the start and the end of the list. The parameters contain
+     * the number of nodes to remove from the start and the number of nodes to remove from the end.
+     * If only single number is give it is used for both the start and the end.
+     */
+    Trim = 6,
+
+    /**
      * Some sub-nodes are added at the start and the end of the list. The parameters contain
      * the content to add at the start and the content to add at the end.
      */
     Grow = 7,
 
     /**
-     * Some sub-nodes are removed from the start and the end of the list. The parameters contain
-     * the number of nodes to remove from the start and the number of nodes to remove from the end.
-     * If only single number is give it is used for both the start and the end.
+     * Some sub-nodes are replaced at the start and the end of the list.
      */
-    Trim = 6,
+    TrimGrow = 8,
 }
 
 
@@ -407,6 +412,10 @@ export type SetRequest = {
 
     // Flag indicating whether the old sub-nodes are unmounted or are allowed to be updated
     update?: boolean
+
+    // Update strategy to use when updating nodes. If this parameter is undefined, the update
+    // strategy of the node itself is used.
+    updateStrategy?: UpdateStrategy;
 }
 
 
@@ -441,6 +450,10 @@ export type SpliceRequest =
 
     // Flag indicating whether the old sub-nodes are unmounted or are allowed to be updated
     update?: boolean;
+
+    // Update strategy to use when updating nodes. If this parameter is undefined, the update
+    // strategy of the node itself is used.
+    updateStrategy?: UpdateStrategy;
 }
 
 
@@ -466,9 +479,17 @@ export type MoveRequest =
 export type SwapRequest =
 {
     op?: ChildrenUpdateOperation.Swap;
+
+    /** Start index of the first range */
     index1: number;
+
+    /** Number of sub-nodes in the first range */
     count1: number;
+
+    /** Start index of the second range */
     index2: number
+
+    /** Number of sub-nodes in the second range */
     count2: number;
 }
 
@@ -490,6 +511,33 @@ export type GrowRequest =
     op?: ChildrenUpdateOperation.Grow;
     startContent?: any;
     endContent?: any;
+}
+
+
+
+/** Parameters for the TrimGrow request */
+export type TrimGrowRequest =
+{
+    op?: ChildrenUpdateOperation.TrimGrow;
+
+    // Number of sub-nodes to delete at the start
+    startCountToDelete?: number;
+
+    // content to insert at the start
+    startContentToInsert?: any;
+
+    // Number of sub-nodes to delete at the end
+    endCountToDelete?: number;
+
+    // content to insert at the end
+    endContentToInsert?: any;
+
+    // Flag indicating whether the old sub-nodes are unmounted or are allowed to be updated
+    update?: boolean;
+
+    // Update strategy to use when updating nodes. If this parameter is undefined, the update
+    // strategy of the node itself is used.
+    updateStrategy?: UpdateStrategy;
 }
 
 

@@ -1137,7 +1137,7 @@ export interface IElmVN<T extends Element = Element> extends IVNode
      * and unmounting only those that cannot be updated.
      * @param children
      */
-    updateChildren( content: any, schedulingType?: TickSchedulingType): void;
+    updateChildren( content: any, updateStrategy?: UpdateStrategy, schedulingType?: TickSchedulingType): void;
 
     /**
      * Completely replaces the element's sub-nodes with the given content. This method unmounts all
@@ -1164,7 +1164,8 @@ export interface IElmVN<T extends Element = Element> extends IVNode
      * @param update Optional flag determining whether to reconcile or completely replace the
      * sub-nodes being removed with the new content. The default is to replace.
      */
-    spliceChildren( index: number, countToDelete?: number, contentToInsert?: any, update?: boolean, schedulingType?: TickSchedulingType): void;
+    spliceChildren( index: number, countToDelete?: number, contentToInsert?: any, update?: boolean,
+        updateStrategy?: UpdateStrategy, schedulingType?: TickSchedulingType): void;
 
     /**
      * Moves a range of sub-nodes to a new location.

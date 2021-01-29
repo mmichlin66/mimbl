@@ -1,6 +1,6 @@
 ﻿import {
     IElmVN, EventFuncType, ICustomAttributeHandler, IElementProps, Component,
-    EventPropType, setRef, RefType, ElmRefType, CallbackWrappingParams, TickSchedulingType
+    EventPropType, setRef, RefType, ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy
 } from "../api/mim"
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo, AttrPropInfo, EventPropInfo,
@@ -92,12 +92,12 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      * Updates the element's sub-nodes with the given content.
      * @param children
      */
-    public updateChildren( content: any, schedulingType?: TickSchedulingType): void
+    public updateChildren( content: any, updateStrategy?: UpdateStrategy, schedulingType?: TickSchedulingType): void
     {
         if (!schedulingType || schedulingType === TickSchedulingType.Sync)
-            syncUpdate( this, {op: ChildrenUpdateOperation.Set, content, update: true});
+            syncUpdate( this, {op: ChildrenUpdateOperation.Set, content, update: true, updateStrategy});
         else
-            this.requestUpdate( {op: ChildrenUpdateOperation.Set, content, update: true});
+            this.requestUpdate( {op: ChildrenUpdateOperation.Set, content, update: true, updateStrategy});
     }
 
     /**
@@ -133,12 +133,13 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      * @param countToDelete
      * @param contentToInsert
      */
-    public spliceChildren( index: number, countToDelete?: number, contentToInsert?: any, update?: boolean, schedulingType?: TickSchedulingType): void
+    public spliceChildren( index: number, countToDelete?: number, contentToInsert?: any, update?: boolean,
+        updateStrategy?: UpdateStrategy, schedulingType?: TickSchedulingType): void
     {
         if (!schedulingType || schedulingType === TickSchedulingType.Sync)
-            syncUpdate( this, {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert, update});
+            syncUpdate( this, {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert, update, updateStrategy});
         else
-            this.requestUpdate( {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert, update});
+            this.requestUpdate( {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert, update, updateStrategy});
     }
 
     /**
