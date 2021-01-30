@@ -82,7 +82,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         else
             this.propsForPartialUpdate = props;
 
-        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+        if (schedulingType === TickSchedulingType.Sync)
             this.updatePropsOnly( this.propsForPartialUpdate)
         else
             this.requestPartialUpdate();
@@ -94,7 +94,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      */
     public updateChildren( content: any, updateStrategy?: UpdateStrategy, schedulingType?: TickSchedulingType): void
     {
-        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+        if (schedulingType === TickSchedulingType.Sync)
             syncUpdate( this, {op: ChildrenUpdateOperation.Set, content, update: true, updateStrategy});
         else
             this.requestUpdate( {op: ChildrenUpdateOperation.Set, content, update: true, updateStrategy});
@@ -106,7 +106,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      */
     public setChildren( content?: any, schedulingType?: TickSchedulingType): void
     {
-        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+        if (schedulingType === TickSchedulingType.Sync)
             syncUpdate( this, {op: ChildrenUpdateOperation.Set, content});
         else
             this.requestUpdate( {op: ChildrenUpdateOperation.Set, content});
@@ -121,7 +121,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      */
     public sliceChildren( startIndex: number, endIndex?: number, schedulingType?: TickSchedulingType): void
     {
-        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+        if (schedulingType === TickSchedulingType.Sync)
             syncUpdate( this, {op: ChildrenUpdateOperation.Slice, startIndex, endIndex});
         else
             this.requestUpdate( {op: ChildrenUpdateOperation.Slice, startIndex, endIndex});
@@ -136,7 +136,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     public spliceChildren( index: number, countToDelete?: number, contentToInsert?: any, update?: boolean,
         updateStrategy?: UpdateStrategy, schedulingType?: TickSchedulingType): void
     {
-        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+        if (schedulingType === TickSchedulingType.Sync)
             syncUpdate( this, {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert, update, updateStrategy});
         else
             this.requestUpdate( {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert, update, updateStrategy});
@@ -150,7 +150,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      */
     public moveChildren( index: number, count: number, shift: number, schedulingType?: TickSchedulingType): void
     {
-        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+        if (schedulingType === TickSchedulingType.Sync)
             syncUpdate( this, {op: ChildrenUpdateOperation.Move, index, count, shift});
         else
             this.requestUpdate( {op: ChildrenUpdateOperation.Move, index, count, shift});
@@ -165,7 +165,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      */
     public swapChildren( index1: number, count1: number, index2: number, count2: number, schedulingType?: TickSchedulingType): void
     {
-        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+        if (schedulingType === TickSchedulingType.Sync)
             syncUpdate( this, {op: ChildrenUpdateOperation.Swap, index1, count1, index2, count2});
         else
             this.requestUpdate( {op: ChildrenUpdateOperation.Swap, index1, count1, index2, count2});
@@ -178,7 +178,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      */
     public trimChildren( startCount: number, endCount: number, schedulingType?: TickSchedulingType): void
     {
-        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+        if (schedulingType === TickSchedulingType.Sync)
             syncUpdate( this, {op: ChildrenUpdateOperation.Trim, startCount, endCount});
         else
             this.requestUpdate( {op: ChildrenUpdateOperation.Trim, startCount, endCount});
@@ -191,7 +191,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      */
     public growChildren( startContent?: any, endContent?: any, schedulingType?: TickSchedulingType): void
     {
-        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
+        if (schedulingType === TickSchedulingType.Sync)
             syncUpdate( this, {op: ChildrenUpdateOperation.Grow, startContent, endContent});
         else
             this.requestUpdate( {op: ChildrenUpdateOperation.Grow, startContent, endContent});
