@@ -492,8 +492,10 @@ function rerenderNode( disp: VNDisp): void
 function setNodeChildren( vn: VN, req: SetRequest): void
 {
     if (req.update)
-        reconcileAndUpdateSubNodes( vn, {oldVN: vn}, createVNChainFromContent( req.content),
-            true, req.updateStrategy);
+    {
+        reconcileAndUpdateSubNodes( vn, {oldVN: vn, updateStrategy: req.updateStrategy},
+            createVNChainFromContent( req.content));
+    }
     else
     {
         let ownDN = vn.ownDN;
@@ -1131,10 +1133,10 @@ function unmountNode( vn: VN, removeOwnNode: boolean)
 
 
 function reconcileAndUpdateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[],
-    catchErrors: boolean = true, updateStrategy?: UpdateStrategy): void
+    catchErrors: boolean = true): void
 {
     // reconcile old and new sub-nodes
-    buildSubNodeDispositions( disp, vn.subNodes, newSubNodes, updateStrategy || vn.updateStrategy);
+    buildSubNodeDispositions( disp, newSubNodes);
 
     // remove from DOM the old nodes designated to be removed (that is, those for which there
     // was no counterpart new node that would either update or replace it). We need to remove
@@ -1505,92 +1507,33 @@ const enum VNDispAction
 
 
 /**
- * The VNDispGroup class describes a group of consecutive VNDisp objects correspponding to the
- * sequence of sub-nodes. The group is described using indices of VNDisp objects in the
- * subNodeDisp field of the parent VNDisp object.
- */
-interface VNDispGroup
-{
-	// /** parent VNDisp to which this group belongs */
-	// parentDisp: VNDisp;
-
-	/** Action to be performed on the nodes in the group */
-	action: VNDispAction;
-
-	/** Index of the first VNDisp in the group */
-	first: number;
-
-	/** Index of the last VNDisp in the group */
-	last?: number;
-
-	/** Number of nodes in the group. */
-	count?: number;
-
-	/** First DOM node in the group - will be known after the nodes are physically updated */
-	firstDN?: DN;
-
-	/** First DOM node in the group - will be known after the nodes are physically updated */
-	lastDN?: DN;
-}
-
-
-
-/**
- * Determines first and last DOM nodes for the group. This method is invoked only after the
- * nodes were physically updated/inserted and we can obtain their DOM nodes.
- */
-function determineGroupDNs( group: VNDispGroup, disps: VNDisp[])
-{
-    let useNewVN = group.action === VNDispAction.Insert;
-    if (group.count === 1)
-    {
-        let vn = useNewVN ? disps[group.first].newVN : disps[group.first].oldVN;
-
-        group.firstDN = getFirstDN(vn);
-        group.lastDN = getLastDN( vn);
-    }
-    else
-    {
-        for( let i = group.first; i <= group.last; i++)
-        {
-            if (group.firstDN = getFirstDN( useNewVN ? disps[i].newVN : disps[i].oldVN))
-                break;
-        }
-
-        for( let i = group.last; i >= group.first; i--)
-        {
-            if (group.lastDN = getLastDN( useNewVN ? disps[i].newVN : disps[i].oldVN))
-                break;
-        }
-    }
-}
-
-
-
-/**
- * If a node has more than this number of sub-nodes, then we build groups. The idea is that
- * otherwise, the overhead of building groups is not worth it.
- */
-const NO_GROUP_THRESHOLD = 8;
-
-
-
-/**
  * The VNDisp class is a recursive structure that describes a disposition for a node and its
  * sub-nodes during the reconciliation process.
  */
 type VNDisp =
 {
-	/** Old virtual node to be updated. This is only used for the Update action. */
+	/** Old virtual node to be updated. This can be null only only for the Insert action. */
 	oldVN?: VN;
 
-	/** New virtual node to insert or to update an old node */
+	/** New virtual node to insert or to update an old node. */
 	newVN?: VN;
+
+	/** Array of old sub-nodes; if undefined, sub-nodes of the oldVN are used. */
+	subNodes?: VN[];
 
 	/** Action to be performed on the node */
 	action?: VNDispAction;
 
-	/**
+    /** Start index in the old array of sub-nodes; if undefined, 0 is used. */
+    startIndex?: number;
+
+    /** End index in the old array of sub-nodes; if undefined, the array length is used. */
+    endIndex?: number;
+
+    /** Update strategy object; if undefined, the update strategy from the oldVN is used. */
+    updateStrategy?: UpdateStrategy;
+
+    /**
      * Flag indicating that all old sub-nodes should be deleted and all new sub-nodes inserted.
      * If this flag is set, the subNodeDisps, subNodesToRemove and subNodeGroups fields are
      * ignored.
@@ -1612,20 +1555,25 @@ type VNDisp =
 
 
 /**
+ * If a node has more than this number of sub-nodes, then we build groups. The idea is that
+ * otherwise, the overhead of building groups is not worth it.
+ */
+const NO_GROUP_THRESHOLD = 8;
+
+
+
+/**
  * Compares old and new chains of sub-nodes and determines what nodes should be created, deleted
  * or updated. The result is remembered as an array of VNDisp objects for each sub-node and as
  * array of old sub-nodes that should be deleted. In addition, the new sub-nodes are divided
  * into groups of consecutive nodes that should be updated and of nodes that should be inserted.
  * The groups are built in a way so that if a node should be moved, its entire group is moved.
  */
-function buildSubNodeDispositions( disp: VNDisp, oldChain: VN[], newChain: VN[],
-    updateStrategy: UpdateStrategy, oldStartIndex?: number, oldEndIndex?: number): void
+function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
 {
-    // adjust start and end indices in the old chain
-    if (oldStartIndex == null)
-        oldStartIndex = 0;
-    if (oldEndIndex == null)
-        oldEndIndex = oldChain ? oldChain.length : 0;
+    let oldChain = disp.subNodes !== undefined ? disp.subNodes : disp.oldVN.subNodes;
+    let oldStartIndex = disp.startIndex || 0;
+    let oldEndIndex = disp.startIndex || oldChain ? oldChain.length : 0;
 
     let oldLen = oldEndIndex - oldStartIndex;
     let newLen = newChain ? newChain.length : 0;
@@ -1642,6 +1590,8 @@ function buildSubNodeDispositions( disp: VNDisp, oldChain: VN[], newChain: VN[],
         disp.replaceAllSubNodes = true;
         return;
     }
+
+    let updateStrategy = disp.updateStrategy || disp.oldVN.updateStrategy;
 
     // determine whether recycling of non-matching old keyed sub-nodes by non-matching new
     // keyed sub-nodes is allowed. If update strategy is not defined for the node, the
@@ -2007,6 +1957,69 @@ function reconcileWithRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[],
     }
 
     return hasUpdates;
+}
+
+
+
+/**
+ * The VNDispGroup class describes a group of consecutive VNDisp objects correspponding to the
+ * sequence of sub-nodes. The group is described using indices of VNDisp objects in the
+ * subNodeDisp field of the parent VNDisp object.
+ */
+interface VNDispGroup
+{
+	// /** parent VNDisp to which this group belongs */
+	// parentDisp: VNDisp;
+
+	/** Action to be performed on the nodes in the group */
+	action: VNDispAction;
+
+	/** Index of the first VNDisp in the group */
+	first: number;
+
+	/** Index of the last VNDisp in the group */
+	last?: number;
+
+	/** Number of nodes in the group. */
+	count?: number;
+
+	/** First DOM node in the group - will be known after the nodes are physically updated */
+	firstDN?: DN;
+
+	/** First DOM node in the group - will be known after the nodes are physically updated */
+	lastDN?: DN;
+}
+
+
+
+/**
+ * Determines first and last DOM nodes for the group. This method is invoked only after the
+ * nodes were physically updated/inserted and we can obtain their DOM nodes.
+ */
+function determineGroupDNs( group: VNDispGroup, disps: VNDisp[])
+{
+    let useNewVN = group.action === VNDispAction.Insert;
+    if (group.count === 1)
+    {
+        let vn = useNewVN ? disps[group.first].newVN : disps[group.first].oldVN;
+
+        group.firstDN = getFirstDN(vn);
+        group.lastDN = getLastDN( vn);
+    }
+    else
+    {
+        for( let i = group.first; i <= group.last; i++)
+        {
+            if (group.firstDN = getFirstDN( useNewVN ? disps[i].newVN : disps[i].oldVN))
+                break;
+        }
+
+        for( let i = group.last; i >= group.first; i--)
+        {
+            if (group.lastDN = getLastDN( useNewVN ? disps[i].newVN : disps[i].oldVN))
+                break;
+        }
+    }
 }
 
 
