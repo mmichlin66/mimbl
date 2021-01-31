@@ -455,10 +455,10 @@ function performChildrenOperation( vn: VN, req: ChildrenUpdateRequest)
         switch( req.op)
         {
             case ChildrenUpdateOperation.Set: setNodeChildren( vn, req); break;
-            case ChildrenUpdateOperation.Slice: sliceNodeChildren( vn, req); break;
             case ChildrenUpdateOperation.Splice: spliceNodeChildren( vn, req); break;
             case ChildrenUpdateOperation.Move: moveNodeChildren( vn, req); break;
             case ChildrenUpdateOperation.Swap: swapNodeChildren( vn, req); break;
+            case ChildrenUpdateOperation.Slice: sliceNodeChildren( vn, req); break;
             case ChildrenUpdateOperation.Trim: trimNodeChildren( vn, req); break;
             case ChildrenUpdateOperation.Grow: growNodeChildren( vn, req); break;
         }
@@ -493,90 +493,67 @@ function setNodeChildren( vn: VN, req: SetRequest): void
 {
     if (req.update)
     {
-        reconcileAndUpdateSubNodes( vn, {oldVN: vn, updateStrategy: req.updateStrategy},
+        reconcileAndUpdateSubNodes( vn,
+            {oldVN: vn, oldStartIndex: req.startIndex, odlEndIndex: req.endIndex, updateStrategy: req.updateStrategy},
             createVNChainFromContent( req.content));
+
+        return;
     }
+
+    let oldSubNodes = vn.subNodes;
+    let oldLen = oldSubNodes ? oldSubNodes.length : 0;
+
+    // validate request parameters
+    let startIndex = req.startIndex || 0;
+    if (startIndex < 0 || startIndex > oldLen)
+    {
+        /// #if DEBUG
+            console.error( `Parameters for SetChildren operation are incorrect`, req);
+        /// #endif
+
+        return;
+    }
+
+    let endIndex = req.endIndex || oldLen;
+    if (endIndex < 0 || endIndex > oldLen)
+        endIndex = oldLen;
+    else if (endIndex < startIndex)
+    {
+        /// #if DEBUG
+            console.error( `Parameters for SetChildren operation are incorrect`, req);
+        /// #endif
+
+        return;
+    }
+
+    // if the range of old sub-nodes is only a portion of all sub-nodes, we call the Splice
+    // operation; otherwise, we need to remove all old sub-nodes and add new
+    let rangeLen = endIndex - startIndex;
+    if (rangeLen < oldLen)
+        spliceNodeChildren( vn, {index: startIndex, countToDelete: rangeLen, contentToInsert: req.content});
     else
     {
         let ownDN = vn.ownDN;
-
-        if (vn.subNodes)
+        if (oldSubNodes)
         {
             // if we are removing all sub-nodes under an element, we can optimize by setting
             // textContent to null;
             if (ownDN)
                 (ownDN as Element).textContent = null;
 
-            vn.subNodes.forEach( svn => { unmountNode( svn, !ownDN) });
+            oldSubNodes.forEach( svn => { unmountNode( svn, !ownDN) });
         }
 
-        vn.subNodes = req.content && createVNChainFromContent( req.content);
-        if (vn.subNodes)
+        let newSubNodes = req.content && createVNChainFromContent( req.content);
+        if (newSubNodes)
         {
             let anchorDN = ownDN ? ownDN : vn.anchorDN;
             let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
-            vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
+            newSubNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
         }
+
+        vn.subNodes = newSubNodes;
     }
-}
-
-
-
-// At the given index, removes a given number of sub-nodes and then inserts the new content.
-function sliceNodeChildren( vn: VN, req: SliceRequest): void
-{
-    let oldSubNodes = vn.subNodes;
-    if (!oldSubNodes)
-        return;
-
-    let oldLen = oldSubNodes.length;
-
-    // validate request parameters
-    let startIndex = req.startIndex;
-    if (startIndex < 0 || startIndex > oldLen)
-    {
-        /// #if DEBUG
-            console.error( `Parameters for SliceChildren operation are incorrect`, req);
-        /// #endif
-
-        return;
-    }
-
-    let endIndex = req.endIndex != null ? Math.min( req.endIndex, oldLen) : oldLen;
-    if (endIndex - startIndex === oldLen)
-        return;
-
-    // if the range is empty/invalid unmount all sub-nodes
-    if (endIndex <= startIndex)
-    {
-        // if we are removing all sub-nodes under an element, we can optimize by setting
-        // textContent to null;
-        let ownDN = vn.ownDN;
-        if (ownDN)
-            (ownDN as Element).textContent = null;
-
-        oldSubNodes.forEach( svn => { unmountNode( svn, !ownDN) });
-        vn.subNodes = null;
-        return;
-    }
-
-    // trim at start
-    if (startIndex > 0)
-    {
-        for( let i = 0; i < startIndex; i++)
-            unmountNode( oldSubNodes[i], true);
-    }
-
-    // trim at end
-    if (endIndex < oldLen)
-    {
-        for( let i = endIndex; i < oldLen; i++)
-            unmountNode( oldSubNodes[i], true);
-    }
-
-    // extract only remaining nodes and change their indices
-    vn.subNodes = oldSubNodes.slice( startIndex, endIndex);
-    vn.subNodes.forEach( (svn, i) => { svn.index = i });
 }
 
 
@@ -599,21 +576,21 @@ function spliceNodeChildren( vn: VN, req: SpliceRequest): void
     }
 
     // calculate the number of sub-nodes to delete
-    let countToDelete = !req.countToDelete ? 0 : Math.min( req.countToDelete, oldLen - index);
+    let countToDelete = req.countToDelete || 0;
+    if (countToDelete < 0)
+    {
+        /// #if DEBUG
+            console.error( `Parameters for SpliceChildren operation are incorrect`, req);
+        /// #endif
 
-    // create new sub-nodes - if none were created, we only need to adjust the old list of
-    // sub-nodes to remove the unmounted nodes (if any)
+        return;
+    }
+    else
+        countToDelete = Math.min( req.countToDelete, oldLen - index);
+
     let newSubNodes = req.contentToInsert && createVNChainFromContent( req.contentToInsert);
-
-    // // determine if we need to reconcile old and new nodes (and we have those)
-    // if (req.update && countToDelete > 0 && newSubNodes)
-    // {
-    //     let disp = {oldVN: vn}
-    //     buildSubNodeDispositions( disp, oldSubNodes, newSubNodes, req.updateStrategy,
-    //         index, index + countToDelete);
-    // }
-    // else
-    // {
+    if (countToDelete === 0 && !newSubNodes)
+        return;
 
     // unmount nodes if necessary - note that it is OK if req.countToDelete is negative - it is
     // the same as if it was set to 0 because we only use >0 comparisons.
@@ -626,34 +603,33 @@ function spliceNodeChildren( vn: VN, req: SpliceRequest): void
 
     if (!newSubNodes)
     {
+        // if we don't have new sub-nodes, we just delete the old ones (if any)
         if (countToDelete > 0)
             oldSubNodes.splice( index, countToDelete);
-
-        return;
     }
-
-    // insert new nodes into the old list at the given index
-    if (oldSubNodes)
-        oldSubNodes.splice( index, countToDelete, ...newSubNodes);
     else
-        vn.subNodes = oldSubNodes = newSubNodes;
-
-    // determine the node before which the new nodes should be mounted
-    let ownDN = vn.ownDN;
-    let anchorDN = ownDN ? ownDN : vn.anchorDN;
-    let beforeDN = index + newSubNodes.length < oldSubNodes.length
-        ? getFirstDN( oldSubNodes[index + newSubNodes.length])
-        : ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
-
-    // mount new nodes
-    let stopIndex = index + newSubNodes.length;
-    for( let i = index; i < stopIndex; i++)
     {
-        oldSubNodes[i].index = i;
-        mountNode( oldSubNodes[i], vn, anchorDN, beforeDN);
-    }
+        // insert new nodes into the old list at the given index
+        if (oldSubNodes)
+            oldSubNodes.splice( index, countToDelete, ...newSubNodes);
+        else
+            vn.subNodes = oldSubNodes = newSubNodes;
 
-    // }
+        // determine the node before which the new nodes should be mounted
+        let ownDN = vn.ownDN;
+        let anchorDN = ownDN ? ownDN : vn.anchorDN;
+        let beforeDN = index + newSubNodes.length < oldSubNodes.length
+            ? getFirstDN( oldSubNodes[index + newSubNodes.length])
+            : ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
+
+        // mount new nodes
+        let stopIndex = index + newSubNodes.length;
+        for( let i = index; i < stopIndex; i++)
+        {
+            oldSubNodes[i].index = i;
+            mountNode( oldSubNodes[i], vn, anchorDN, beforeDN);
+        }
+    }
 }
 
 // Moves a range of sub-nodes to a new location. Moving a region to a new index is the same as
@@ -860,26 +836,32 @@ function moveDOMRange( vn: VN, subNodes: VN[], index: number, count: number, ind
 
 
 
-// Removes the given number of nodes from the start and/or the end of the list of sub-nodes.
-function trimNodeChildren( vn: VN, req: TrimRequest): void
+// At the given index, removes a given number of sub-nodes and then inserts the new content.
+function sliceNodeChildren( vn: VN, req: SliceRequest): void
 {
     let oldSubNodes = vn.subNodes;
     if (!oldSubNodes)
         return;
 
-    let startCount = req.startCount;
-    let endCount = req.endCount;
-    if (startCount < 0 || endCount < 0)
+    let oldLen = oldSubNodes.length;
+
+    // validate request parameters
+    let startIndex = req.startIndex;
+    if (startIndex < 0 || startIndex > oldLen)
     {
         /// #if DEBUG
-            console.error( `Parameters for TrimChildren operation are incorrect`, req);
+            console.error( `Parameters for SliceChildren operation are incorrect`, req);
         /// #endif
 
         return;
     }
 
-    let oldLen = oldSubNodes.length;
-    if (startCount + endCount >= oldLen)
+    let endIndex = req.endIndex != null ? Math.min( req.endIndex, oldLen) : oldLen;
+    if (endIndex - startIndex === oldLen)
+        return;
+
+    // if the range is empty unmount all sub-nodes
+    if (endIndex <= startIndex)
     {
         // if we are removing all sub-nodes under an element, we can optimize by setting
         // textContent to null;
@@ -887,28 +869,40 @@ function trimNodeChildren( vn: VN, req: TrimRequest): void
         if (ownDN)
             (ownDN as Element).textContent = null;
 
-        oldSubNodes.forEach( svn => unmountNode( svn, !ownDN));
+        oldSubNodes.forEach( svn => { unmountNode( svn, !ownDN) });
         vn.subNodes = null;
         return;
     }
 
     // trim at start
-    if (startCount > 0)
+    if (startIndex > 0)
     {
-        for( let i = 0; i < startCount; i++)
+        for( let i = 0; i < startIndex; i++)
             unmountNode( oldSubNodes[i], true);
     }
 
     // trim at end
-    if (endCount > 0)
+    if (endIndex < oldLen)
     {
-        for( let i = 0; i < endCount; i++)
-            unmountNode( oldSubNodes[oldLen - i - 1], true);
+        for( let i = endIndex; i < oldLen; i++)
+            unmountNode( oldSubNodes[i], true);
     }
 
     // extract only remaining nodes and change their indices
-    vn.subNodes = oldSubNodes.slice( startCount, oldLen - endCount);
+    vn.subNodes = oldSubNodes.slice( startIndex, endIndex);
     vn.subNodes.forEach( (svn, i) => { svn.index = i });
+}
+
+
+
+// Removes the given number of nodes from the start and/or the end of the list of sub-nodes.
+function trimNodeChildren( vn: VN, req: TrimRequest): void
+{
+    let oldSubNodes = vn.subNodes;
+    if (!oldSubNodes)
+        return;
+
+    sliceNodeChildren( vn, { startIndex: req.startCount, endIndex: oldSubNodes.length - req.endCount })
 }
 
 
@@ -1137,36 +1131,60 @@ function reconcileAndUpdateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[],
 {
     // reconcile old and new sub-nodes
     buildSubNodeDispositions( disp, newSubNodes);
+    if (disp.noChanges)
+        return;
 
     // remove from DOM the old nodes designated to be removed (that is, those for which there
     // was no counterpart new node that would either update or replace it). We need to remove
     // old nodes first before we start inserting new - one reason is to properly maintain
     // references.
-    let ownDN = vn.ownDN;
-    if (disp.replaceAllSubNodes)
+    let oldSubNodes = vn.subNodes;
+    if (oldSubNodes)
     {
-        if (vn.subNodes)
+        if (disp.replaceAllSubNodes)
         {
-            // if we are removing all sub-nodes under an element, we can optimize by setting
-            // textContent to null;
-            if (ownDN)
-                (ownDN as Element).textContent = null;
+            if (disp.allSubNodesProcessed)
+            {
+                // if we are removing all sub-nodes under an element, we can optimize by setting
+                // textContent to null;
+                let ownDN = vn.ownDN;
+                if (ownDN)
+                    (ownDN as Element).textContent = null;
 
-            vn.subNodes.forEach( svn => { unmountNode( svn, !ownDN) });
+                oldSubNodes.forEach( svn => { unmountNode( svn, !ownDN) });
+            }
+            else
+            {
+                for( let i = disp.oldStartIndex; i < disp.odlEndIndex; i++)
+                    unmountNode( oldSubNodes[i], true);
+            }
+        }
+        else if (disp.subNodesToRemove)
+        {
+            for( let i = 0, len = disp.subNodesToRemove.length; i < len; i++)
+                unmountNode( disp.subNodesToRemove[i], true);
+        }
+
+        if (!newSubNodes)
+        {
+            if (disp.allSubNodesProcessed)
+                vn.subNodes = null;
+            else
+            {
+                // remove the portion of the sub-nodes that was updated and update indices
+                oldSubNodes.splice( disp.oldStartIndex, disp.oldLength)
+                for( let i = disp.oldStartIndex, len = oldSubNodes.length; i < len; i++)
+                    oldSubNodes[i].index = i;
+            }
         }
     }
-	else if (disp.subNodesToRemove)
-	{
-		disp.subNodesToRemove.forEach( svn => { unmountNode( svn, true) });
-	}
 
-    if (!newSubNodes)
-        vn.subNodes = null;
-    else
+    if (newSubNodes)
     {
         // determine the anchor node to use when inserting new or moving existing sub-nodes. If
         // our node has its own DN, it will be the anchor for the sub-nodes; otherwise, our node's
         // anchor will be the anchor for the sub-nodes too.
+        let ownDN = vn.ownDN;
         let anchorDN = ownDN || vn.anchorDN;
 
         // if this virtual node doesn't define its own DOM node (true for components), we will
@@ -1196,24 +1214,17 @@ function reconcileAndUpdateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[],
                 // up in an infinite loop
                 newSubNodes = vn.handleError( err);
 
-                // cleanup the disp structure from the previous data
-                disp.replaceAllSubNodes = undefined;
-                disp.subNodeDisps = undefined;
-                disp.subNodeGroups = undefined;
-                disp.subNodesToRemove = undefined;
-
                 // update sub-nodes with the new data without catching errors
-                reconcileAndUpdateSubNodes( vn, disp, newSubNodes, false);
+                reconcileAndUpdateSubNodes( vn, {oldVN: disp.oldVN}, newSubNodes, false);
             }
         }
     }
 
-    // if (newVN && oldVN !== newVN)
     if (disp.action === VNDispAction.Update)
     {
         // notify the new component that it replaced the old component. If components cache some
         // JSX-produced nodes, this is the opportunity to copy them from the old to the new. This
-        // is because the old nodes are updated from the new ones and the new ones re discarded.
+        // is because the old nodes are updated from the new ones and the new ones discarded.
         let fn = disp.newVN.didUpdate;
         fn && fn.call( vn);
     }
@@ -1229,10 +1240,25 @@ function reconcileAndUpdateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[],
 // the oldVN member of the VNDisp structure.
 function updateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], anchorDN: DN, beforeDN: DN): void
 {
+    let oldSubNodes = vn.subNodes;
     if (disp.replaceAllSubNodes)
     {
-        vn.subNodes = newSubNodes;
-        newSubNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
+        if (disp.allSubNodesProcessed)
+        {
+            vn.subNodes = newSubNodes;
+            newSubNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
+        }
+        else
+        {
+            // replace the portion of the sub-nodes that was updated and update indices
+            let oldStartIndex = disp.oldStartIndex;
+            oldSubNodes.splice( oldStartIndex, disp.oldLength)
+            for( let i = disp.oldStartIndex + newSubNodes.length, len = oldSubNodes.length; i < len; i++)
+                oldSubNodes[i].index = i;
+
+            newSubNodes.forEach( (svn, i) => { svn.index = oldStartIndex + i; mountNode( svn, vn, anchorDN, beforeDN); });
+        }
+
     }
     else
     {
@@ -1240,44 +1266,48 @@ function updateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], anchorDN: DN, 
         // the number of nodes in the new list is the same as the previous number of nodes, we
         // don't re-allocate the array. This can also help if there are old nodes that should not
         // be changed
-        if (!vn.subNodes)
+        if (!oldSubNodes)
             vn.subNodes = new Array<VN>(newSubNodes.length);
-        else if (vn.subNodes.length > newSubNodes.length)
-            vn.subNodes.splice( newSubNodes.length);
+        else if (disp.oldLength > newSubNodes.length)
+            oldSubNodes.splice( newSubNodes.length);
 
         // perform updates and inserts by either groups or individual nodes.
         if (disp.subNodeGroups)
-            updateSubNodesByGroups( vn, disp.subNodeDisps, disp.subNodeGroups, anchorDN, beforeDN);
+            updateSubNodesByGroups( vn, disp, anchorDN, beforeDN);
         else
-            updateSubNodesByNodes( vn, disp.subNodeDisps, anchorDN, beforeDN);
+            updateSubNodesByNodes( vn, disp, anchorDN, beforeDN);
     }
 }
 
 
 
 // Performs updates and inserts by individual nodes.
-function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, beforeDN: DN): void
+function updateSubNodesByNodes( parentVN: VN, disp: VNDisp, anchorDN: DN, beforeDN: DN): void
 {
     let parentSubNodes = parentVN.subNodes;
+    let subNodeDisps = disp.subNodeDisps;
 
 	// perform DOM operations according to sub-node disposition. We need to decide for each
 	// node what node to use to insert or move it before. We go from the end of the list of
 	// new nodes and on each iteration we decide the value of the "beforeDN".
-    for( let i = disps.length - 1; i >= 0; i--)
+    for( let i = subNodeDisps.length - 1; i >= 0; i--)
     {
-        let disp = disps[i];
-        let newVN = disp.newVN;
-        let oldVN = disp.oldVN;
+        let subNodeDisp = subNodeDisps[i];
+        let newVN = subNodeDisp.newVN;
+        let oldVN = subNodeDisp.oldVN;
+
+        // since we might be updating only a portion of the old sub-nodes, get the real index
+        let index = disp.oldStartIndex + i;
 
         // for the Update operation, the old node becomes a sub-node; for the Insert operation
         // the new node become a sub-node.
         let svn: VN;
-        if (disp.action === VNDispAction.Insert)
+        if (subNodeDisp.action === VNDispAction.Insert)
         {
             // we must assign the index and put the node in the list of sub-nodes before calling
             // mountNode because it may use this info if the node is cloned
-            newVN.index = i;
-            parentSubNodes[i] = newVN;
+            newVN.index = index;
+            parentSubNodes[index] = newVN;
 
             // if mountNode clones the node, it puts the new node into the list of sub-nodes
             // and returns it; otherwise, it returns the original node.
@@ -1285,7 +1315,7 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
         }
         else // Update or NoChange
         {
-            parentSubNodes[i] = svn = oldVN;
+            parentSubNodes[index] = svn = oldVN;
             if (oldVN !== newVN)
             {
                 /// #if VERBOSE_NODE
@@ -1294,16 +1324,16 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 
                 // update method must exists for nodes with action Update
                 if (oldVN.update( newVN))
-                    rerenderNode( disp);
+                    rerenderNode( subNodeDisp);
             }
 
             // determine whether all the nodes under this VN should be moved.
-            if (i !== oldVN.index)
+            if (index !== oldVN.index)
                 moveNode( oldVN, anchorDN, beforeDN);
 
             // we must assign the new index after the comparison above because otherwise the
             // comparison will not work
-            svn.index = i;
+            svn.index = index;
         }
 
 
@@ -1317,11 +1347,14 @@ function updateSubNodesByNodes( parentVN: VN, disps: VNDisp[], anchorDN: DN, bef
 
 // Performs updates and inserts by groups. We go from the end of the list of update groups
 // and on each iteration we decide the value of the "beforeDN".
-function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGroup[], anchorDN: DN, beforeDN: DN): void
+function updateSubNodesByGroups( parentVN: VN, disp: VNDisp, anchorDN: DN, beforeDN: DN): void
 {
     let parentSubNodes = parentVN.subNodes;
+    let subNodeDisps = disp.subNodeDisps;
+    let groups = disp.subNodeGroups;
+
     let currBeforeDN = beforeDN;
-    let disp: VNDisp;
+    let subNodeDisp: VNDisp;
     let newVN: VN;
     let oldVN: VN;
     let group: VNDispGroup;
@@ -1334,13 +1367,16 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
             let groupLast = group.last;
             for( let j = group.first; j <= groupLast; j++)
             {
-                disp = disps[j];
-                newVN = disp.newVN;
+                subNodeDisp = subNodeDisps[j];
+                newVN = subNodeDisp.newVN;
+
+                // since we might be updating only a portion of the old sub-nodes, get the real index
+                let index = disp.oldStartIndex + j;
 
                 // we must assign the index and put the node in the list of sub-nodes before calling
                 // mountNode because it may use this info if the node is cloned
-                newVN.index = j;
-                parentSubNodes[j] = newVN;
+                newVN.index = index;
+                parentSubNodes[index] = newVN;
                 mountNode( newVN, parentVN, anchorDN, currBeforeDN);
             }
         }
@@ -1350,22 +1386,22 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
             let groupFirst = group.first;
             for( let j = group.last; j >= groupFirst; j--)
             {
-                disp = disps[j];
-                newVN = disp.newVN;
-                oldVN = disp.oldVN;
+                subNodeDisp = subNodeDisps[j];
+                newVN = subNodeDisp.newVN;
+                oldVN = subNodeDisp.oldVN;
 
-                oldVN.index = j;
-                parentSubNodes[j] = oldVN;
-                // if (oldVN !== newVN)
-                // {
-                    /// #if VERBOSE_NODE
-                        console.debug( `Calling update() on node ${oldVN.name}`);
-                    /// #endif
+                // since we might be updating only a portion of the old sub-nodes, get the real index
+                let index = disp.oldStartIndex + j;
+                oldVN.index = index;
+                parentSubNodes[index] = oldVN;
 
-                    // update method must exists for nodes with action Update
-                    if (oldVN.update( newVN))
-                        rerenderNode( disp);
-                // }
+                /// #if VERBOSE_NODE
+                    console.debug( `Calling update() on node ${oldVN.name}`);
+                /// #endif
+
+                // update method must exists for nodes with action Update
+                if (oldVN.update( newVN))
+                    rerenderNode( subNodeDisp);
             }
         }
         else // NoChange)
@@ -1375,20 +1411,21 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
             // If this is not true, we just place every sub-node in the group into the parent's
             // sub-node array
             let groupFirst = group.first;
-            if (parentSubNodes[groupFirst] !== disps[groupFirst].oldVN)
+            if (parentSubNodes[disp.oldStartIndex + groupFirst] !== subNodeDisps[groupFirst].oldVN)
             {
                 for( let j = group.last; j >= groupFirst; j--)
                 {
-                    oldVN = disps[j].oldVN;
-                    oldVN.index = j;
-                    parentSubNodes[j] = oldVN;
+                    oldVN = subNodeDisps[j].oldVN;
+                    let index = disp.oldStartIndex + j;
+                    oldVN.index = index;
+                    parentSubNodes[index] = oldVN;
                 }
             }
         }
 
 		// now that all nodes in the group have been updated or inserted, we can determine
 		// first and last DNs for the group
-		determineGroupDNs( group, disps);
+		determineGroupDNs( group, subNodeDisps);
 
 		// if the group has at least one DN, its first DN becomes the node before which the next
         // group of new nodes (if any) should be inserted.
@@ -1415,9 +1452,9 @@ function updateSubNodesByGroups( parentVN: VN, disps: VNDisp[], groups: VNDispGr
 				// that we are swapping two groups. In this case we want to move the shorter one.
                 let prevGroup = groups[i-1];
 				if (group.lastDN.nextSibling === prevGroup.firstDN && group.count > prevGroup.count)
-					moveGroup( prevGroup, disps, anchorDN, group.firstDN);
+					moveGroup( prevGroup, subNodeDisps, anchorDN, group.firstDN);
 				else
-					moveGroup( group, disps, anchorDN, currBeforeDN);
+					moveGroup( group, subNodeDisps, anchorDN, currBeforeDN);
 			}
 
 			// the group's first DN becomes the new beforeDN. Note that firstDN cannot be null
@@ -1518,20 +1555,28 @@ type VNDisp =
 	/** New virtual node to insert or to update an old node. */
 	newVN?: VN;
 
-	/** Array of old sub-nodes; if undefined, sub-nodes of the oldVN are used. */
-	subNodes?: VN[];
-
 	/** Action to be performed on the node */
 	action?: VNDispAction;
 
     /** Start index in the old array of sub-nodes; if undefined, 0 is used. */
-    startIndex?: number;
+    oldStartIndex?: number;
 
     /** End index in the old array of sub-nodes; if undefined, the array length is used. */
-    endIndex?: number;
+    odlEndIndex?: number;
 
     /** Update strategy object; if undefined, the update strategy from the oldVN is used. */
     updateStrategy?: UpdateStrategy;
+
+    /** Length of the (sub-)array of old sub-nodes. */
+    oldLength?: number;
+
+    /** Flag indicating that all old sub-nodes are being updated. This is true if oldLength === oldSubNodes.length */
+    allSubNodesProcessed?: boolean;
+
+    /**
+     * Flag indicating that no action should be taken; that is, the new sub-nodes are the same as old ones.
+     */
+	noChanges?: boolean;
 
     /**
      * Flag indicating that all old sub-nodes should be deleted and all new sub-nodes inserted.
@@ -1571,20 +1616,24 @@ const NO_GROUP_THRESHOLD = 8;
  */
 function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
 {
-    let oldChain = disp.subNodes !== undefined ? disp.subNodes : disp.oldVN.subNodes;
-    let oldStartIndex = disp.startIndex || 0;
-    let oldEndIndex = disp.startIndex || oldChain ? oldChain.length : 0;
+    let oldChain = disp.oldVN.subNodes;
+    let oldStartIndex = disp.oldStartIndex || (disp.oldStartIndex = 0);
+    let oldEndIndex = disp.odlEndIndex || (disp.odlEndIndex = (oldChain ? oldChain.length : 0));
 
-    let oldLen = oldEndIndex - oldStartIndex;
+    // oldLen is the length of the portion of the old sub-nodes that will be reconciled.
+    let oldLen = disp.oldLength = oldEndIndex - oldStartIndex;
     let newLen = newChain ? newChain.length : 0;
 
     // if either old or new or both chains are empty, we do special things
     if (newLen === 0 && oldLen === 0)
     {
         // both chains are empty - do nothing
+        disp.noChanges = true;
         return;
     }
-    else if (newLen === 0 || oldLen === 0)
+
+    disp.allSubNodesProcessed = oldLen === (oldChain ? oldChain.length : 0);
+    if (newLen === 0 || oldLen === 0)
     {
         // either old or new chain is empty - either delete all old nodes or insert all new nodes
         disp.replaceAllSubNodes = true;
@@ -1608,12 +1657,12 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
     {
         let oldVN = oldChain[oldStartIndex]
         let newVN = newChain[0];
-        if (oldVN === newVN ||
-                ((ignoreKeys || allowKeyedNodeRecycling || newVN.key === oldVN.key) &&
+        if (oldVN === newVN)
+            disp.noChanges = true;
+        else if ((allowKeyedNodeRecycling || ignoreKeys || newVN.key === oldVN.key) &&
                     oldVN.constructor === newVN.constructor &&
-                    (!oldVN.isUpdatePossible || oldVN.isUpdatePossible( newVN))
-                )
-            )
+                    (!oldVN.isUpdatePossible || oldVN.isUpdatePossible( newVN)
+                ))
         {
             // old node can be updated with information from the new node
             disp.subNodeDisps = [{ oldVN, newVN, action: VNDispAction.Update}];

@@ -407,8 +407,16 @@ export const enum ChildrenUpdateOperation
 export type SetRequest = {
     op?: ChildrenUpdateOperation.Set;
 
-    // content to replace current children
+    // Content to replace the given range.
     content?: any;
+
+    // Index of the first sub-node in the range to be replaced by the new content. If undefined,
+    // the default value is 0.
+    startIndex?: number;
+
+    // Index after the last sub-node in the range to be replaced by the new content. If undefined,
+    // the range includes all sub-nodes from startIndex to the end.
+    endIndex?: number;
 
     // Flag indicating whether the old sub-nodes are unmounted or are allowed to be updated
     update?: boolean
@@ -416,20 +424,6 @@ export type SetRequest = {
     // Update strategy to use when updating nodes. If this parameter is undefined, the update
     // strategy of the node itself is used.
     updateStrategy?: UpdateStrategy;
-}
-
-
-
-/** Parameters for the Slice request */
-export type SliceRequest =
-{
-    op?: ChildrenUpdateOperation.Slice;
-
-    // Index of the first sub-node in the range
-    startIndex: number;
-
-    // Index after the last sub-node in the range
-    endIndex?: number;
 }
 
 
@@ -447,13 +441,6 @@ export type SpliceRequest =
 
     // New content to insert (or update the old sub-nodes)
     contentToInsert?: any;
-
-    // Flag indicating whether the old sub-nodes are unmounted or are allowed to be updated
-    update?: boolean;
-
-    // Update strategy to use when updating nodes. If this parameter is undefined, the update
-    // strategy of the node itself is used.
-    updateStrategy?: UpdateStrategy;
 }
 
 
@@ -495,11 +482,29 @@ export type SwapRequest =
 
 
 
+/** Parameters for the Slice request */
+export type SliceRequest =
+{
+    op?: ChildrenUpdateOperation.Slice;
+
+    // Index of the first sub-node in the range
+    startIndex: number;
+
+    // Index after the last sub-node in the range
+    endIndex?: number;
+}
+
+
+
 /** Parameters for the Trim request */
 export type TrimRequest =
 {
     op?: ChildrenUpdateOperation.Trim;
+
+    /** Number of sub-nodes to remove at the start */
     startCount: number;
+
+    /** Number of sub-nodes to remove at the end */
     endCount: number;
 }
 
@@ -509,42 +514,19 @@ export type TrimRequest =
 export type GrowRequest =
 {
     op?: ChildrenUpdateOperation.Grow;
+
+    /** Content to add at the start */
     startContent?: any;
+
+    /** Content to add at the end */
     endContent?: any;
 }
 
 
 
-/** Parameters for the TrimGrow request */
-export type TrimGrowRequest =
-{
-    op?: ChildrenUpdateOperation.TrimGrow;
-
-    // Number of sub-nodes to delete at the start
-    startCountToDelete?: number;
-
-    // content to insert at the start
-    startContentToInsert?: any;
-
-    // Number of sub-nodes to delete at the end
-    endCountToDelete?: number;
-
-    // content to insert at the end
-    endContentToInsert?: any;
-
-    // Flag indicating whether the old sub-nodes are unmounted or are allowed to be updated
-    update?: boolean;
-
-    // Update strategy to use when updating nodes. If this parameter is undefined, the update
-    // strategy of the node itself is used.
-    updateStrategy?: UpdateStrategy;
-}
-
-
-
 /** Parameters for the Grow request */
-export type ChildrenUpdateRequest = SetRequest | SliceRequest | SpliceRequest |
-    MoveRequest | SwapRequest | TrimRequest | GrowRequest;
+export type ChildrenUpdateRequest = SetRequest | SpliceRequest |
+    MoveRequest | SwapRequest | SliceRequest | TrimRequest | GrowRequest;
 
 
 
