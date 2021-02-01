@@ -81,7 +81,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         else
             this.propsForPartialUpdate = props;
 
-        if (schedulingType === TickSchedulingType.Sync)
+        if (!schedulingType || schedulingType === TickSchedulingType.Sync)
         {
             this.updatePropsOnly( this.propsForPartialUpdate)
             this.propsForPartialUpdate = null;
