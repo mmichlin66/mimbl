@@ -1605,6 +1605,7 @@ type VNDisp =
 }
 
 
+
 /**
  * If a node has more than this number of sub-nodes, then we build groups. The idea is that
  * otherwise, the overhead of building groups is not worth it.
@@ -1685,16 +1686,12 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
 
     // prepare array for VNDisp objects for new nodes
     disp.subNodeDisps = new Array( newLen);
-    let subNodesToRemove: VN[] = [];
     let hasUpdates: boolean;
 
     // if we can ignore keys, we don't need to create a map of old sub-nodes; instead, we can
     // update old sub-nodes with new sub-nodes sequentially.
     if (ignoreKeys)
-    {
-        hasUpdates = reconcileWithoutKeys( oldChain, oldStartIndex, oldEndIndex, newChain,
-            disp.subNodeDisps, subNodesToRemove);
-    }
+        hasUpdates = reconcileWithoutKeys( disp, oldChain, newChain);
     else
     {
         // we are here if either old and new chains contain more than one node and we need to
@@ -1715,9 +1712,12 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
                 oldUnkeyedList.push( oldVN);
         }
 
-        hasUpdates = allowKeyedNodeRecycling
-            ? reconcileWithRecycling( oldKeyedMap, oldUnkeyedList, newChain, disp.subNodeDisps, subNodesToRemove)
-            : reconcileWithoutRecycling( oldKeyedMap, oldUnkeyedList, newChain, disp.subNodeDisps, subNodesToRemove);
+        // if we didn't find any keys, we can run reconciliation that doesn't look at keys
+        hasUpdates = oldKeyedMap.size === 0
+            ? reconcileWithoutKeys( disp, oldUnkeyedList, newChain)
+            : allowKeyedNodeRecycling
+                ? reconcileWithRecycling( disp, oldKeyedMap, oldUnkeyedList, newChain)
+                : reconcileWithoutRecycling( disp, oldKeyedMap, oldUnkeyedList, newChain);
     }
 
     // if we don't have any updates, this means that all old nodes should be deleted and all new
@@ -1725,14 +1725,17 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
     if (!hasUpdates)
     {
         disp.replaceAllSubNodes = true;
-        disp.subNodeDisps = null;
+        // disp.subNodeDisps = null;
+        // disp.subNodesToRemove = null;
+        // disp.subNodeGroups = null;
     }
     else
     {
-        if (subNodesToRemove.length > 0)
-            disp.subNodesToRemove = subNodesToRemove;
-
-        if (newLen > NO_GROUP_THRESHOLD)
+        // if the number of sub-nodes is big enough and groups were not built yet, built them now.
+        // The sequential reconciliation that ignores keys can build the groups as it iterate over
+        // the sub-nodes, while reconciliations that look at keys cannot do it that way, so we'll
+        // do it here.
+        if (newLen > NO_GROUP_THRESHOLD && !disp.subNodeDisps)
             disp.subNodeGroups = buildSubNodeGroups( disp.subNodeDisps);
     }
 }
@@ -1742,22 +1745,24 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
 /**
  * Reconciles new and old nodes without paying attention to keys.
  */
-function reconcileWithoutKeys( oldChain: VN[], oldStartIndex: number, oldEndIndex: number,
-    newChain: VN[], subNodeDisps: VNDisp[], subNodesToRemove: VN[]): boolean
+function reconcileWithoutKeys( disp: VNDisp, oldChain: VN[], newChain: VN[]): boolean
 {
-    let oldLen = oldEndIndex - oldStartIndex;
+    let oldStartIndex = disp.oldStartIndex;
+    let oldLen = disp.oldLength;
     let newLen = newChain.length;
     let commonLen = Math.min( oldLen, newLen);
 
+    let subNodeDisps = disp.subNodeDisps;
+    let subNodesToRemove: VN[] = [];
+
     // loop over new nodes and determine which ones should be updated, inserted or deleted
-    let subDisp: VNDisp;
     let hasUpdates = false;
-    let oldVN: VN, newVN: VN;
+    let subDisp: VNDisp, oldVN: VN, newVN: VN;
     for( let i = 0; i < commonLen; i++)
     {
         oldVN = oldChain[oldStartIndex + i];
         newVN = newChain[i];
-        subDisp = { newVN };
+        subNodeDisps[i] = subDisp = { newVN };
         if (oldVN === newVN)
         {
             subDisp.action = VNDispAction.NoChange;
@@ -1767,8 +1772,7 @@ function reconcileWithoutKeys( oldChain: VN[], oldStartIndex: number, oldEndInde
             // flag will not be set
             hasUpdates = true;
         }
-        else if (oldVN.constructor === newVN.constructor &&
-                (oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN)))
+        else if (oldVN.constructor === newVN.constructor && (!oldVN.isUpdatePossible || oldVN.isUpdatePossible( newVN)))
         {
             // old node can be updated with information from the new node
             subDisp.action = VNDispAction.Update;
@@ -1782,8 +1786,6 @@ function reconcileWithoutKeys( oldChain: VN[], oldStartIndex: number, oldEndInde
             subDisp.action = VNDispAction.Insert;
             subNodesToRemove.push( oldVN);
         }
-
-        subNodeDisps[i] = subDisp;
     }
 
     if (hasUpdates)
@@ -1803,6 +1805,9 @@ function reconcileWithoutKeys( oldChain: VN[], oldStartIndex: number, oldEndInde
         }
     }
 
+    if (subNodesToRemove.length > 0)
+        disp.subNodesToRemove = subNodesToRemove;
+
     return hasUpdates;
 }
 
@@ -1811,18 +1816,16 @@ function reconcileWithoutKeys( oldChain: VN[], oldStartIndex: number, oldEndInde
 /**
  * Reconciles new and old nodes without recycling non-matching keyed nodes.
  */
-function reconcileWithoutRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[], newChain: VN[],
-    subNodeDisps: VNDisp[], subNodesToRemove: VN[]): boolean
+function reconcileWithoutRecycling( disp: VNDisp, oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[], newChain: VN[]): boolean
 {
-    // remember the length of the unkeyed list;
+    let subNodeDisps = disp.subNodeDisps;
+    let subNodesToRemove: VN[] = [];
     let oldUnkeyedListLength = oldUnkeyedList.length;
 
     // loop over new nodes and determine which ones should be updated, inserted or deleted
     let oldUnkeyedListIndex = 0;
-    let subDisp: VNDisp;
     let hasUpdates = false;
-    let oldVN: VN;
-    let key: any;
+    let subDisp: VNDisp, oldVN: VN, key: any;
     newChain.forEach( (newVN, subNodeIndex) =>
     {
         // try to look up the old node by the new node's key if exists
@@ -1843,7 +1846,7 @@ function reconcileWithoutRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN
         if (!oldVN && !key && oldUnkeyedListIndex != oldUnkeyedListLength)
             oldVN = oldUnkeyedList[oldUnkeyedListIndex++];
 
-        subDisp = { newVN };
+        subNodeDisps[subNodeIndex] = subDisp = { newVN };
         if (!oldVN)
             subDisp.action = VNDispAction.Insert;
         else if (oldVN === newVN)
@@ -1856,7 +1859,7 @@ function reconcileWithoutRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN
             hasUpdates = true;
         }
         else if (key === oldVN.key && oldVN.constructor === newVN.constructor &&
-                (oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN)))
+                (!oldVN.isUpdatePossible || oldVN.isUpdatePossible( newVN)))
         {
             // old node can be updated with information from the new node
             subDisp.action = VNDispAction.Update;
@@ -1871,7 +1874,7 @@ function reconcileWithoutRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN
             subNodesToRemove.push( oldVN);
         }
 
-        subNodeDisps[subNodeIndex] = subDisp;
+        subDisp;
     });
 
     if (hasUpdates)
@@ -1882,6 +1885,9 @@ function reconcileWithoutRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN
             subNodesToRemove.push( oldUnkeyedList[i]);
     }
 
+    if (subNodesToRemove.length > 0)
+        disp.subNodesToRemove = subNodesToRemove;
+
     return hasUpdates;
 }
 
@@ -1890,18 +1896,16 @@ function reconcileWithoutRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN
 /**
  * Reconciles new and old nodes with recycling non-matching keyed nodes.
  */
-function reconcileWithRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[], newChain: VN[],
-    subNodeDisps: VNDisp[], subNodesToRemove: VN[]): boolean
+function reconcileWithRecycling( disp: VNDisp, oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[], newChain: VN[]): boolean
 {
-    // remember the length of the unkeyed list;
+    let subNodeDisps = disp.subNodeDisps;
+    let subNodesToRemove: VN[] = [];
     let oldUnkeyedListLength = oldUnkeyedList.length;
 
     // loop over new nodes and determine which ones should be updated, inserted or deleted
     let oldUnkeyedListIndex = 0;
-    let subDisp: VNDisp;
     let hasUpdates = false;
-    let oldVN: VN;
-    let key: any;
+    let subDisp: VNDisp, oldVN: VN, key: any;
 
     // the array of unmatched disps will point to the VNDisp objects already in the subNodesDisps
     let unmatchedDisps: VNDisp[] = [];
@@ -1924,7 +1928,7 @@ function reconcileWithRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[],
         if (!oldVN && oldUnkeyedListIndex != oldUnkeyedListLength)
             oldVN = oldUnkeyedList[oldUnkeyedListIndex++];
 
-        subDisp = { newVN };
+        subNodeDisps[subNodeIndex] = subDisp = { newVN };
         if (!oldVN)
         {
             // temporarily set the action to Insert but put the unmatched disp aside so that we can
@@ -1942,7 +1946,7 @@ function reconcileWithRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[],
             hasUpdates = true;
         }
         else if (oldVN.constructor === newVN.constructor &&
-                (oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN)))
+                (!oldVN.isUpdatePossible || oldVN.isUpdatePossible( newVN)))
         {
             // old node can be updated with information from the new node
             subDisp.action = VNDispAction.Update;
@@ -1956,8 +1960,6 @@ function reconcileWithRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[],
             subDisp.action = VNDispAction.Insert;
             subNodesToRemove.push( oldVN);
         }
-
-        subNodeDisps[subNodeIndex] = subDisp;
     });
 
     // if we have unmatched new nodes and the map of old keyed nodes is not empty, try using the
@@ -1999,8 +2001,6 @@ function reconcileWithRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[],
                 }
             }
         });
-
-        oldKeyedMap.clear();
     }
 
     if (hasUpdates)
@@ -2010,6 +2010,9 @@ function reconcileWithRecycling( oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[],
         for( let i = oldUnkeyedListIndex; i < oldUnkeyedListLength; i++)
             subNodesToRemove.push( oldUnkeyedList[i]);
     }
+
+    if (subNodesToRemove.length > 0)
+        disp.subNodesToRemove = subNodesToRemove;
 
     return hasUpdates;
 }
