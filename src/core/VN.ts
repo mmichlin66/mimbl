@@ -383,28 +383,30 @@ export const enum ChildrenUpdateOperation
     Swap = 5,
 
     /**
-     * Some sub-nodes are removed from the start and the end of the list. The parameters contain
+     * Remove sub-nodes from the start and/or the end of the list. The parameters contain
      * the number of nodes to remove from the start and the number of nodes to remove from the end.
      * If only single number is give it is used for both the start and the end.
      */
     Trim = 6,
 
     /**
-     * Some sub-nodes are added at the start and the end of the list. The parameters contain
+     * Add sub-nodes at the start and/or the end of the list. The parameters contain
      * the content to add at the start and the content to add at the end.
      */
     Grow = 7,
 
     /**
-     * Some sub-nodes are replaced at the start and the end of the list.
+     * Reverse sub-nodes within the given range. The parameter define the start and end indices
+     * of the range.
      */
-    TrimGrow = 8,
+    Reverse = 8,
 }
 
 
 
 /** Parameters for the Set request */
-export type SetRequest = {
+export type SetRequest =
+{
     op?: ChildrenUpdateOperation.Set;
 
     // Content to replace the given range.
@@ -524,9 +526,23 @@ export type GrowRequest =
 
 
 
+/** Parameters for the Reverse request */
+export type ReverseRequest =
+{
+    op?: ChildrenUpdateOperation.Reverse;
+
+    // Index of the first sub-node in the range
+    startIndex: number;
+
+    // Index after the last sub-node in the range
+    endIndex?: number;
+}
+
+
+
 /** Parameters for the Grow request */
-export type ChildrenUpdateRequest = SetRequest | SpliceRequest |
-    MoveRequest | SwapRequest | SliceRequest | TrimRequest | GrowRequest;
+export type ChildrenUpdateRequest = SetRequest | SpliceRequest | MoveRequest | SwapRequest |
+    SliceRequest | TrimRequest | GrowRequest | ReverseRequest;
 
 
 

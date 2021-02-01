@@ -5,8 +5,8 @@
 import {
     VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN, FuncProxyVN,
     ManagedCompVN, enterMutationScope, exitMutationScope, ChildrenUpdateRequest,
-    ChildrenUpdateOperation, GrowRequest, MoveRequest, SetRequest, SpliceRequest, SwapRequest,
-    TrimRequest, SliceRequest
+    ChildrenUpdateOperation, SetRequest, SpliceRequest, MoveRequest, SwapRequest,
+    SliceRequest, TrimRequest, GrowRequest, ReverseRequest
 } from "../internal"
 
 /// #if USE_STATS
@@ -461,6 +461,7 @@ function performChildrenOperation( vn: VN, req: ChildrenUpdateRequest)
             case ChildrenUpdateOperation.Slice: sliceNodeChildren( vn, req); break;
             case ChildrenUpdateOperation.Trim: trimNodeChildren( vn, req); break;
             case ChildrenUpdateOperation.Grow: growNodeChildren( vn, req); break;
+            case ChildrenUpdateOperation.Reverse: reverseNodeChildren( vn, req); break;
         }
     }
 
@@ -503,28 +504,18 @@ function setNodeChildren( vn: VN, req: SetRequest): void
     let oldSubNodes = vn.subNodes;
     let oldLen = oldSubNodes ? oldSubNodes.length : 0;
 
-    // validate request parameters
     let startIndex = req.startIndex || 0;
-    if (startIndex < 0 || startIndex > oldLen)
-    {
-        /// #if DEBUG
-            console.error( `Parameters for SetChildren operation are incorrect`, req);
-        /// #endif
-
-        return;
-    }
-
     let endIndex = req.endIndex || oldLen;
     if (endIndex < 0 || endIndex > oldLen)
         endIndex = oldLen;
-    else if (endIndex < startIndex)
-    {
-        /// #if DEBUG
-            console.error( `Parameters for SetChildren operation are incorrect`, req);
-        /// #endif
 
-        return;
-    }
+    /// #if DEBUG
+        // validate request parameters
+        if (startIndex < 0 || startIndex > oldLen || endIndex < startIndex)
+        {
+            console.error( `Parameters for SetChildren operation are incorrect`, req);
+        }
+    /// #endif
 
     // if the range of old sub-nodes is only a portion of all sub-nodes, we call the Splice
     // operation; otherwise, we need to remove all old sub-nodes and add new
@@ -566,27 +557,17 @@ function spliceNodeChildren( vn: VN, req: SpliceRequest): void
 
     // validate request parameters
     let index = req.index;
-    if (index < 0 || index > oldLen)
-    {
-        /// #if DEBUG
-            console.error( `Parameters for SpliceChildren operation are incorrect`, req);
-        /// #endif
+    let countToDelete = req.countToDelete || 0;
 
-        return;
-    }
+    /// #if DEBUG
+        if (index < 0 || index > oldLen || countToDelete < 0)
+        {
+            console.error( `Parameters for SpliceChildren operation are incorrect`, req);
+        }
+    /// #endif
 
     // calculate the number of sub-nodes to delete
-    let countToDelete = req.countToDelete || 0;
-    if (countToDelete < 0)
-    {
-        /// #if DEBUG
-            console.error( `Parameters for SpliceChildren operation are incorrect`, req);
-        /// #endif
-
-        return;
-    }
-    else
-        countToDelete = Math.min( req.countToDelete, oldLen - index);
+    countToDelete = Math.min( req.countToDelete, oldLen - index);
 
     let newSubNodes = req.contentToInsert && createVNChainFromContent( req.contentToInsert);
     if (countToDelete === 0 && !newSubNodes)
@@ -642,14 +623,13 @@ function moveNodeChildren( vn: VN, req: MoveRequest): void
 
     let oldSubNodes = vn.subNodes;
     let oldLen = oldSubNodes ? oldSubNodes.length : 0;
-    if (oldLen < 2)
-    {
-        /// #if DEBUG
-            console.error( `Parameters for MoveChildren operation are incorrect`);
-        /// #endif
 
-        return;
-    }
+    /// #if DEBUG
+        if (oldLen < 2)
+        {
+            console.error( `Parameters for MoveChildren operation are incorrect`, req);
+        }
+    /// #endif
 
     // we will use 1 for the range residing lower in the list
     let index1: number, count1: number, index2: number, count2: number;
@@ -668,16 +648,6 @@ function moveNodeChildren( vn: VN, req: MoveRequest): void
         count2 = req.shift;
     }
 
-    // validate request parameters
-    if (index1 < 0 || index2 + count2 > oldLen)
-    {
-        /// #if DEBUG
-            console.error( `Parameters for MoveChildren operation are incorrect`, req);
-        /// #endif
-
-        return;
-    }
-
     swapNodeChildren( vn, { index1, count1, index2, count2 })
 }
 
@@ -688,14 +658,6 @@ function swapNodeChildren( vn: VN, req: SwapRequest): void
 {
     let oldSubNodes = vn.subNodes;
     let oldLen = oldSubNodes ? oldSubNodes.length : 0;
-    if (oldLen < 2)
-    {
-        /// #if DEBUG
-            console.error( `Parameters for SwapChildren operation are incorrect`, req);
-        /// #endif
-
-        return;
-    }
 
     // we will use 1 for the range residing lower in the list
     let index1: number, count1: number, index2: number, count2: number;
@@ -714,16 +676,13 @@ function swapNodeChildren( vn: VN, req: SwapRequest): void
         count2 = req.count1;
     }
 
-    // validate request parameters
-    if (index1 < 0 || index2 > oldLen || count1 <= 0 || count2 <= 0 ||
-        index1 + count1 > index2 || index2 + count2 > oldLen)
-    {
-        /// #if DEBUG
+    /// #if DEBUG
+        if (oldLen < 2 || index1 < 0 || index2 > oldLen || count1 <= 0 || count2 <= 0 ||
+            index1 + count1 > index2 || index2 + count2 > oldLen)
+        {
             console.error( `Parameters for SwapChildren operation are incorrect`, req);
-        /// #endif
-
-        return;
-    }
+        }
+    /// #endif
 
     // the third range is the range between the two input ones - it might be empty
     let index3 = index1 + count1;
@@ -844,17 +803,14 @@ function sliceNodeChildren( vn: VN, req: SliceRequest): void
         return;
 
     let oldLen = oldSubNodes.length;
+    let startIndex = req.startIndex || 0;
 
-    // validate request parameters
-    let startIndex = req.startIndex;
-    if (startIndex < 0 || startIndex > oldLen)
-    {
-        /// #if DEBUG
+    /// #if DEBUG
+        if (startIndex < 0 || startIndex > oldLen)
+        {
             console.error( `Parameters for SliceChildren operation are incorrect`, req);
-        /// #endif
-
-        return;
-    }
+        }
+    /// #endif
 
     let endIndex = req.endIndex != null ? Math.min( req.endIndex, oldLen) : oldLen;
     if (endIndex - startIndex === oldLen)
@@ -947,8 +903,8 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
         newStartSubNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
 
         // change indices of the old nodes
-        let startIndex = newStartSubNodes.length;
-        oldSubNodes.forEach( (svn, i) => { svn.index = startIndex + i });
+        let shift = newStartSubNodes.length;
+        oldSubNodes.forEach( (svn, i) => { svn.index += shift });
     }
 
     // mount new sub-nodes at the end
@@ -958,8 +914,57 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
         if (beforeDN)
             beforeDN = beforeDN.nextSibling;
 
-        let startIndex = newSubNodes.length - newEndSubNodes.length;
-        newEndSubNodes.forEach( (svn, i) => { svn.index = startIndex + i; mountNode( svn, vn, anchorDN, beforeDN); });
+        let shift = newSubNodes.length - newEndSubNodes.length;
+        newEndSubNodes.forEach( (svn, i) => { svn.index = shift + i; mountNode( svn, vn, anchorDN, beforeDN); });
+    }
+}
+
+
+
+// Reverses the given range of sub-nodes.
+function reverseNodeChildren( vn: VN, req: ReverseRequest): void
+{
+    let oldSubNodes = vn.subNodes;
+    if (!oldSubNodes)
+        return;
+
+    let oldLen = oldSubNodes.length;
+    let startIndex = req.startIndex || 0;
+    let endIndex = req.endIndex != null ? Math.min( req.endIndex, oldLen) : oldLen;
+
+    /// #if DEBUG
+        if (oldLen < 2 || startIndex < 0 || startIndex > oldLen || endIndex <= startIndex)
+        {
+            console.error( `Parameters for ReverseChildren operation are incorrect`, req);
+        }
+    /// #endif
+
+    // find the DOM node after the last element in the range - this will be the node before which
+    // we will move all our nodes from one before last back to the first
+    let ownDN = vn.ownDN;
+    let anchorDN = ownDN ? ownDN : vn.anchorDN;
+    let beforeDN = endIndex === oldLen
+        ? ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN)
+        : getFirstDN( oldSubNodes[endIndex]);
+
+    let svn: VN;
+    for( let i = endIndex - 2; i >= startIndex; i--)
+    {
+        svn = oldSubNodes[i];
+        moveNode( svn, anchorDN, beforeDN);
+    }
+
+    // now swap virtual nodes and update their indices
+    let svn2: VN, tempIndex: number;
+    for( let i1 = startIndex, i2 = endIndex - 1; i1 < i2; i1++, i2--)
+    {
+        svn = oldSubNodes[i1];
+        svn2 = oldSubNodes[i2];
+        oldSubNodes[i1] = svn2;
+        oldSubNodes[i2] = svn;
+        tempIndex = svn.index;
+        svn.index = svn2.index;
+        svn2.index = tempIndex;
     }
 }
 
@@ -1484,7 +1489,8 @@ function moveNode( vn: VN, anchorDN: DN, beforeDN: DN): void
     }
 
     /// #if USE_STATS
-        DetailedStats.log( vn.statsCategory, StatsAction.Moved);
+        if (!vn.ownDN)
+            DetailedStats.log( vn.statsCategory, StatsAction.Moved);
     /// #endif
 }
 

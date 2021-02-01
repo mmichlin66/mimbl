@@ -6,7 +6,8 @@
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo, AttrPropInfo, EventPropInfo, getElmPropInfo,
     setElmProp, removeElmProp, updateElmProp, s_wrapCallback, ChildrenUpdateOperation, syncUpdate,
-    SetRequest, SpliceRequest, MoveRequest, SwapRequest, SliceRequest, TrimRequest, GrowRequest
+    SetRequest, SpliceRequest, MoveRequest, SwapRequest, SliceRequest, TrimRequest, GrowRequest,
+    ReverseRequest, ChildrenUpdateRequest
 } from "../internal"
 
 /// #if USE_STATS
@@ -89,76 +90,74 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             this.requestPartialUpdate();
     }
 
+
+
     // Replaces the given range of sub-nodes with the new content
     public setChildren( content?: any, startIndex?: number, endIndex?: number, update?: boolean,
         updateStrategy?: UpdateStrategy, schedulingType?: TickSchedulingType): void
     {
-        let req: SetRequest = {
+        this.doChildrenOp( {
             op: ChildrenUpdateOperation.Set, content, startIndex, endIndex,
             update, updateStrategy
-        }
-
-        if (schedulingType === TickSchedulingType.Sync)
-            syncUpdate( this, req);
-        else
-            this.requestUpdate( req);
+        }, schedulingType);
     }
 
     // At the given index, removes a given number of sub-nodes and then inserts the new content.
     public spliceChildren( index: number, countToDelete?: number, contentToInsert?: any,
         schedulingType?: TickSchedulingType): void
     {
-        let req: SpliceRequest = {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert};
-        if (schedulingType === TickSchedulingType.Sync)
-            syncUpdate( this, req);
-        else
-            this.requestUpdate( req);
+        this.doChildrenOp( {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert}, schedulingType);
     }
 
     // Moves a range of sub-nodes to a new location.
     public moveChildren( index: number, count: number, shift: number, schedulingType?: TickSchedulingType): void
     {
-        let req: MoveRequest = {op: ChildrenUpdateOperation.Move, index, count, shift};
-        if (schedulingType === TickSchedulingType.Sync)
-            syncUpdate( this, req);
-        else
-            this.requestUpdate( req);
+        this.doChildrenOp( {op: ChildrenUpdateOperation.Move, index, count, shift}, schedulingType);
     }
 
     // Swaps two ranges of the element's sub-nodes. The ranges cannot intersect.
     public swapChildren( index1: number, count1: number, index2: number, count2: number, schedulingType?: TickSchedulingType): void
     {
-        let req: SwapRequest = {op: ChildrenUpdateOperation.Swap, index1, count1, index2, count2};
-        if (schedulingType === TickSchedulingType.Sync)
-            syncUpdate( this, req);
-        else
-            this.requestUpdate( req);
+        this.doChildrenOp( {op: ChildrenUpdateOperation.Swap, index1, count1, index2, count2}, schedulingType);
     }
 
     // Retains the given range of the sub-nodes unmounting the sub-nodes outside the given range.
     public sliceChildren( startIndex: number, endIndex?: number, schedulingType?: TickSchedulingType): void
     {
-        let req: SliceRequest = {op: ChildrenUpdateOperation.Slice, startIndex, endIndex};
-        if (schedulingType === TickSchedulingType.Sync)
-            syncUpdate( this, req);
-        else
-            this.requestUpdate( req);
+        this.doChildrenOp( {op: ChildrenUpdateOperation.Slice, startIndex, endIndex}, schedulingType);
     }
 
     // Removes the given number of nodes from the start and/or the end of the list of sub-nodes.
     public trimChildren( startCount: number, endCount: number, schedulingType?: TickSchedulingType): void
     {
-        let req: TrimRequest = {op: ChildrenUpdateOperation.Trim, startCount, endCount};
-        if (schedulingType === TickSchedulingType.Sync)
-            syncUpdate( this, req);
-        else
-            this.requestUpdate( req);
+        this.doChildrenOp( {op: ChildrenUpdateOperation.Trim, startCount, endCount}, schedulingType);
     }
 
     // Adds the given content at the start and/or at the end of the existing children.
     public growChildren( startContent?: any, endContent?: any, schedulingType?: TickSchedulingType): void
     {
-        let req: GrowRequest = {op: ChildrenUpdateOperation.Grow, startContent, endContent};
+        this.doChildrenOp( {op: ChildrenUpdateOperation.Grow, startContent, endContent}, schedulingType);
+    }
+
+    /**
+     * Reverses sub-nodes within the given range.
+     * @param startIndex Index of the first sub-node in the range. If undefined, the array of
+     * sub-nodes starts at index 0.
+     * @param endIndex Index of the sub-node after the last sub-node in the range. If
+     * this parameter is zero or undefined or greater than the length of the sub-nodes array, the
+     * range will include all sub-nodes from the startIndex to the end of the array.
+     * @param schedulingType Type determining whether the operation is performed immediately or
+     * is scheduled to a Mimbl tick.
+     */
+    public reverseChildren( startIndex?: number, endIndex?: number, schedulingType?: TickSchedulingType): void
+    {
+        this.doChildrenOp( {op: ChildrenUpdateOperation.Reverse, startIndex, endIndex}, schedulingType);
+    }
+
+    // Either performs immediately or schedules the execution of a children operation defined by
+    // the given request.
+    private doChildrenOp( req: ChildrenUpdateRequest, schedulingType: TickSchedulingType)
+    {
         if (schedulingType === TickSchedulingType.Sync)
             syncUpdate( this, req);
         else

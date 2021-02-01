@@ -1190,8 +1190,9 @@ export interface IElmVN<T extends Element = Element> extends IVNode
     /**
      * Retains the given range of the sub-nodes unmounting the sub-nodes outside this range. This
      * method operates similar to the Array.prototype.slice method.
-     * @param startIndex Index of the first sub-node in the range
-     * @param endIndex (optional) Index of the sub-node after the last sub-node in the range. If
+     * @param startIndex Index of the first sub-node in the range. If undefined, the array of
+     * sub-nodes starts at index 0.
+     * @param endIndex Index of the sub-node after the last sub-node in the range. If
      * this parameter is zero or undefined or greater than the length of the sub-nodes array, the
      * range will include all sub-nodes from the startIndex to the end of the array.
      * @param schedulingType Type determining whether the operation is performed immediately or
@@ -1216,6 +1217,18 @@ export interface IElmVN<T extends Element = Element> extends IVNode
      * is scheduled to a Mimbl tick.
      */
     growChildren( startContent?: any, endContent?: any, schedulingType?: TickSchedulingType): void;
+
+    /**
+     * Reverses sub-nodes within the given range.
+     * @param startIndex Index of the first sub-node in the range. If undefined, the array of
+     * sub-nodes starts at index 0.
+     * @param endIndex Index of the sub-node after the last sub-node in the range. If
+     * this parameter is zero or undefined or greater than the length of the sub-nodes array, the
+     * range will include all sub-nodes from the startIndex to the end of the array.
+     * @param schedulingType Type determining whether the operation is performed immediately or
+     * is scheduled to a Mimbl tick.
+     */
+    reverseChildren( startIndex?: number, endIndex?: number, schedulingType?: TickSchedulingType): void;
 }
 
 
