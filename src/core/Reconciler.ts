@@ -540,7 +540,7 @@ function setNodeChildren( vn: VN, req: SetRequest): void
         {
             let anchorDN = ownDN ? ownDN : vn.anchorDN;
             let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
-            newSubNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
+            newSubNodes.forEach( (svn, i) => mountNode( svn, vn, i, anchorDN, beforeDN));
         }
 
         vn.subNodes = newSubNodes;
@@ -606,10 +606,7 @@ function spliceNodeChildren( vn: VN, req: SpliceRequest): void
         // mount new nodes
         let stopIndex = index + newSubNodes.length;
         for( let i = index; i < stopIndex; i++)
-        {
-            oldSubNodes[i].index = i;
-            mountNode( oldSubNodes[i], vn, anchorDN, beforeDN);
-        }
+            mountNode( oldSubNodes[i], vn, i, anchorDN, beforeDN);
     }
 }
 
@@ -884,7 +881,7 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
             : newStartSubNodes || newEndSubNodes;
 
         let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
-        vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
+        vn.subNodes.forEach( (svn, i) => mountNode( svn, vn, i, anchorDN, beforeDN));
         return;
     }
 
@@ -900,11 +897,11 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
     if (newStartSubNodes)
     {
         let beforeDN = getFirstDN( oldSubNodes[0]);
-        newStartSubNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
+        newStartSubNodes.forEach( (svn, i) => mountNode( svn, vn, i, anchorDN, beforeDN));
 
         // change indices of the old nodes
         let shift = newStartSubNodes.length;
-        oldSubNodes.forEach( (svn, i) => { svn.index += shift });
+        oldSubNodes.forEach( svn => { svn.index += shift });
     }
 
     // mount new sub-nodes at the end
@@ -915,7 +912,7 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
             beforeDN = beforeDN.nextSibling;
 
         let shift = newSubNodes.length - newEndSubNodes.length;
-        newEndSubNodes.forEach( (svn, i) => { svn.index = shift + i; mountNode( svn, vn, anchorDN, beforeDN); });
+        newEndSubNodes.forEach( (svn, i) => mountNode( svn, vn, shift + i, anchorDN, beforeDN));
     }
 }
 
@@ -977,7 +974,7 @@ function reverseNodeChildren( vn: VN, req: ReverseRequest): void
 // content returned from the error handling method is rendered; otherwise, the exception
 // is re-thrown. Thus, the exception is propagated up until it is handled by a node that
 // handles it or up to the root node.
-function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
+function mountNode( vn: VN, parent: VN, index: number, anchorDN: DN, beforeDN: DN): VN
 {
     // if the node is already mounted, call its clone method if implemented.
     if (vn.anchorDN)
@@ -991,6 +988,7 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
             vn.ignoreUnmount = true;
             vn.parent = parent;
             vn.anchorDN = anchorDN;
+            vn.index = index;
             moveNode( vn, anchorDN, beforeDN);
             return vn;
         }
@@ -999,7 +997,7 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
             // if the clone method returns a new node, we replace the old node in the parent's
             // list of subnodes. Then we proceed with the mounting. We know that parent exists
             // because this method is not called on the RootVN.
-            parent.subNodes[vn.index] = clone;
+            parent.subNodes[index] = clone;
             vn = clone;
         }
     }
@@ -1007,6 +1005,7 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
 	// initialize the node
     vn.parent = parent;
 	vn.anchorDN = anchorDN;
+    vn.index = index;
 
 	/// #if VERBOSE_NODE
 		console.debug( `Calling mount() on node ${vn.name}`);
@@ -1035,12 +1034,12 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
         // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
         // either the ancestor node that knows to handle errors or to the Mimbl tick loop.
         if (!vn.supportsErrorHandling)
-            vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, newAnchorDN, newBeforeDN); });
+            vn.subNodes.forEach( (svn, i) => mountNode( svn, vn, i, newAnchorDN, newBeforeDN));
         else
         {
             try
             {
-                vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, newAnchorDN, newBeforeDN); });
+                vn.subNodes.forEach( (svn, i) => mountNode( svn, vn, i, newAnchorDN, newBeforeDN));
             }
             catch( err)
             {
@@ -1061,7 +1060,7 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
                 if (newSubNodes)
                 {
                     vn.subNodes = newSubNodes;
-                    vn.subNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, newAnchorDN, newBeforeDN); });
+                    vn.subNodes.forEach( (svn, i) => mountNode( svn, vn, i, newAnchorDN, newBeforeDN));
                 }
             }
         }
@@ -1070,10 +1069,6 @@ function mountNode( vn: VN, parent: VN, anchorDN: DN, beforeDN: DN): VN
 	// if we have our own DOM node, add it under the anchor node
 	if (ownDN)
 		anchorDN.insertBefore( ownDN, beforeDN);
-
-	/// #if VERBOSE_NODE
-		console.debug( `Calling didMount() on node ${vn.name}`);
-	/// #endif
 
     return vn;
 }
@@ -1251,7 +1246,7 @@ function updateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], anchorDN: DN, 
         if (disp.allSubNodesProcessed)
         {
             vn.subNodes = newSubNodes;
-            newSubNodes.forEach( (svn, i) => { svn.index = i; mountNode( svn, vn, anchorDN, beforeDN); });
+            newSubNodes.forEach( (svn, i) => mountNode( svn, vn, i, anchorDN, beforeDN));
         }
         else
         {
@@ -1261,7 +1256,7 @@ function updateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], anchorDN: DN, 
             for( let i = disp.oldStartIndex + newSubNodes.length, len = oldSubNodes.length; i < len; i++)
                 oldSubNodes[i].index = i;
 
-            newSubNodes.forEach( (svn, i) => { svn.index = oldStartIndex + i; mountNode( svn, vn, anchorDN, beforeDN); });
+            newSubNodes.forEach( (svn, i) => mountNode( svn, vn, oldStartIndex + i, anchorDN, beforeDN));
         }
 
     }
@@ -1309,14 +1304,12 @@ function updateSubNodesByNodes( parentVN: VN, disp: VNDisp, anchorDN: DN, before
         let svn: VN;
         if (subNodeDisp.action === VNDispAction.Insert)
         {
-            // we must assign the index and put the node in the list of sub-nodes before calling
-            // mountNode because it may use this info if the node is cloned
-            newVN.index = index;
+            // we must put the node in the list of sub-nodes before calling mountNode because it may use this info if the node is cloned
             parentSubNodes[index] = newVN;
 
             // if mountNode clones the node, it puts the new node into the list of sub-nodes
             // and returns it; otherwise, it returns the original node.
-            svn = mountNode( newVN, parentVN, anchorDN, beforeDN);
+            svn = mountNode( newVN, parentVN, index, anchorDN, beforeDN);
         }
         else // Update or NoChange
         {
@@ -1378,11 +1371,10 @@ function updateSubNodesByGroups( parentVN: VN, disp: VNDisp, anchorDN: DN, befor
                 // since we might be updating only a portion of the old sub-nodes, get the real index
                 let index = disp.oldStartIndex + j;
 
-                // we must assign the index and put the node in the list of sub-nodes before calling
+                // we must put the node in the list of sub-nodes before calling
                 // mountNode because it may use this info if the node is cloned
-                newVN.index = index;
                 parentSubNodes[index] = newVN;
-                mountNode( newVN, parentVN, anchorDN, currBeforeDN);
+                mountNode( newVN, parentVN, index, anchorDN, currBeforeDN);
             }
         }
         else if (group.action === VNDispAction.Update)
