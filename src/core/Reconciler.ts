@@ -540,7 +540,7 @@ function setNodeChildren( vn: VN, req: SetRequest): void
         {
             let anchorDN = ownDN ? ownDN : vn.anchorDN;
             let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
-            newSubNodes.forEach( (svn, i) => mountNode( svn, vn, i, anchorDN, beforeDN));
+            mountSubNodes( vn, newSubNodes, anchorDN, beforeDN);
         }
 
         vn.subNodes = newSubNodes;
@@ -881,7 +881,7 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
             : newStartSubNodes || newEndSubNodes;
 
         let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
-        vn.subNodes.forEach( (svn, i) => mountNode( svn, vn, i, anchorDN, beforeDN));
+        mountSubNodes( vn, vn.subNodes, anchorDN, beforeDN);
         return;
     }
 
@@ -897,11 +897,11 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
     if (newStartSubNodes)
     {
         let beforeDN = getFirstDN( oldSubNodes[0]);
-        newStartSubNodes.forEach( (svn, i) => mountNode( svn, vn, i, anchorDN, beforeDN));
+        mountSubNodes( vn, newStartSubNodes, anchorDN, beforeDN);
 
         // change indices of the old nodes
         let shift = newStartSubNodes.length;
-        oldSubNodes.forEach( svn => { svn.index += shift });
+        oldSubNodes.forEach( svn => svn.index += shift);
     }
 
     // mount new sub-nodes at the end
@@ -911,8 +911,7 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
         if (beforeDN)
             beforeDN = beforeDN.nextSibling;
 
-        let shift = newSubNodes.length - newEndSubNodes.length;
-        newEndSubNodes.forEach( (svn, i) => mountNode( svn, vn, shift + i, anchorDN, beforeDN));
+        mountSubNodes( vn, newEndSubNodes, anchorDN, beforeDN, newSubNodes.length - newEndSubNodes.length);
     }
 }
 
@@ -1029,41 +1028,7 @@ function mountNode( vn: VN, parent: VN, index: number, anchorDN: DN, beforeDN: D
         // determine what nodes to use as anchor and "before" for the sub-nodes
         let newAnchorDN = ownDN ? ownDN : anchorDN;
         let newBeforeDN = ownDN ? null : beforeDN;
-
-        // since we have sub-nodes, we need to create nodes for them and render. If our node
-        // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
-        // either the ancestor node that knows to handle errors or to the Mimbl tick loop.
-        if (!vn.supportsErrorHandling)
-            vn.subNodes.forEach( (svn, i) => mountNode( svn, vn, i, newAnchorDN, newBeforeDN));
-        else
-        {
-            try
-            {
-                vn.subNodes.forEach( (svn, i) => mountNode( svn, vn, i, newAnchorDN, newBeforeDN));
-            }
-            catch( err)
-            {
-                /// #if VERBOSE_NODE
-                    console.debug( `Calling handleError() on node ${vn.name}. Error:`, err);
-                /// #endif
-
-                // let the node handle the error and re-render; then we render the new
-                // content but we do it without try/catch this time; otherwise, we may end
-                // up in an infinite loop
-                let newSubNodes = createVNChainFromContent( vn.handleError( err));
-
-                // unmount existing sub-nodes (that were mounted so far)
-                if (vn.subNodes)
-                    vn.subNodes.forEach( svn => unmountNode( svn, true));
-
-                // mount the new ones
-                if (newSubNodes)
-                {
-                    vn.subNodes = newSubNodes;
-                    vn.subNodes.forEach( (svn, i) => mountNode( svn, vn, i, newAnchorDN, newBeforeDN));
-                }
-            }
-        }
+        mountSubNodes( vn, vn.subNodes, newAnchorDN, newBeforeDN)
     }
 
 	// if we have our own DOM node, add it under the anchor node
@@ -1071,6 +1036,60 @@ function mountNode( vn: VN, parent: VN, index: number, anchorDN: DN, beforeDN: D
 		anchorDN.insertBefore( ownDN, beforeDN);
 
     return vn;
+}
+
+
+
+// Recursively mounts sub-nodes.
+function mountSubNodes( vn: VN, subNodes: VN[], anchorDN: DN, beforeDN: DN, startIndex?: number): void
+{
+    // If our node knows to handle errors, we mount sub-nodes under try/catch; otherwise, the
+    // exceptions go to either the ancestor node that knows to handle errors or to the Mimbl tick
+    // loop.
+    if (!vn.supportsErrorHandling)
+    {
+        if (!startIndex)
+            subNodes.forEach( (svn, i) => mountNode( svn, vn, i, anchorDN, beforeDN));
+        else
+            subNodes.forEach( (svn, i) => mountNode( svn, vn, startIndex + i, anchorDN, beforeDN));
+    }
+    else
+    {
+        try
+        {
+            if (!startIndex)
+                subNodes.forEach( (svn, i) => mountNode( svn, vn, i, anchorDN, beforeDN));
+            else
+                subNodes.forEach( (svn, i) => mountNode( svn, vn, startIndex + i, anchorDN, beforeDN));
+        }
+        catch( err)
+        {
+            /// #if VERBOSE_NODE
+                console.debug( `Calling handleError() on node ${vn.name}. Error:`, err);
+            /// #endif
+
+            // let the node handle the error and re-render; then we render the new
+            // content but we do it without try/catch this time; otherwise, we may end
+            // up in an infinite loop
+            let newSubNodes = createVNChainFromContent( vn.handleError( err));
+
+            // unmount existing sub-nodes (that were mounted so far)
+            if (vn.subNodes)
+            {
+                if (vn.ownDN)
+                    (vn.ownDN as Element).textContent = null;
+
+                vn.subNodes.forEach( svn => unmountNode( svn, !vn.ownDN));
+            }
+
+            // mount the new ones - here we are replacing all old nodes regadless of startIndex
+            if (newSubNodes)
+            {
+                vn.subNodes = newSubNodes;
+                newSubNodes.forEach( (svn, i) => mountNode( svn, vn, i, anchorDN, beforeDN));
+            }
+        }
+    }
 }
 
 
@@ -1246,7 +1265,7 @@ function updateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], anchorDN: DN, 
         if (disp.allSubNodesProcessed)
         {
             vn.subNodes = newSubNodes;
-            newSubNodes.forEach( (svn, i) => mountNode( svn, vn, i, anchorDN, beforeDN));
+            mountSubNodes( vn, newSubNodes, anchorDN, beforeDN);
         }
         else
         {
@@ -1256,7 +1275,7 @@ function updateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], anchorDN: DN, 
             for( let i = disp.oldStartIndex + newSubNodes.length, len = oldSubNodes.length; i < len; i++)
                 oldSubNodes[i].index = i;
 
-            newSubNodes.forEach( (svn, i) => mountNode( svn, vn, oldStartIndex + i, anchorDN, beforeDN));
+            mountSubNodes( vn, newSubNodes, anchorDN, beforeDN, oldStartIndex);
         }
 
     }
@@ -2231,6 +2250,9 @@ function collectImmediateDNs( vn: VN, arr: DN[]): void
 // sub-nodes starts and, therefore, it only traverses mounted nodes.
 function getNextDNUnderSameAnchorDN( vn: VN, anchorDN: DN): DN
 {
+    // if (vn.ownDN)
+    //     return null;
+
 	// check if we have sibling DOM nodes after our last sub-node - that might be elements
 	// not controlled by our component. Note that we have either null or non-empty array.
 	if (vn.subNodes)
