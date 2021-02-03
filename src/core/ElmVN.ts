@@ -6,8 +6,7 @@
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo, AttrPropInfo, EventPropInfo, getElmPropInfo,
     setElmProp, removeElmProp, updateElmProp, s_wrapCallback, ChildrenUpdateOperation, syncUpdate,
-    SetRequest, SpliceRequest, MoveRequest, SwapRequest, SliceRequest, TrimRequest, GrowRequest,
-    ReverseRequest, ChildrenUpdateRequest
+    ChildrenUpdateRequest, DN
 } from "../internal"
 
 /// #if USE_STATS
@@ -67,6 +66,37 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 		return name;
 	}
+
+
+
+    // Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
+    // This method is only called on the mounted nodes.
+    public getFirstDN(): DN
+    {
+        return this.ownDN;
+    }
+
+    // Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
+    // This method is only called on the mounted nodes.
+    public getLastDN(): DN
+    {
+        return this.ownDN;
+    }
+
+    // Returns the list of DOM nodes that are immediate children of this virtual node; that is, are
+    // NOT children of sub-nodes that have their own DOM node. May return null but never returns
+    // empty array.
+    public getImmediateDNs(): DN | DN[] | null
+    {
+        return this.ownDN;
+    }
+
+    // Collects all DOM nodes that are the immediate children of this virtual node (that is,
+    // are NOT children of sub-nodes that have their own DOM node) into the given array.
+    protected collectImmediateDNs( arr: DN[]): void
+    {
+        arr.push( this.ownDN);
+    }
 
 
 

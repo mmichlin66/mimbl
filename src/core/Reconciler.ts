@@ -492,15 +492,6 @@ function rerenderNode( disp: VNDisp): void
 // new content.
 function setNodeChildren( vn: VN, req: SetRequest): void
 {
-    if (req.update)
-    {
-        reconcileAndUpdateSubNodes( vn,
-            {oldVN: vn, oldStartIndex: req.startIndex, odlEndIndex: req.endIndex, updateStrategy: req.updateStrategy},
-            createVNChainFromContent( req.content));
-
-        return;
-    }
-
     let oldSubNodes = vn.subNodes;
     let oldLen = oldSubNodes ? oldSubNodes.length : 0;
 
@@ -516,6 +507,15 @@ function setNodeChildren( vn: VN, req: SetRequest): void
             console.error( `Parameters for SetChildren operation are incorrect`, req);
         }
     /// #endif
+
+    if (req.update)
+    {
+        reconcileAndUpdateSubNodes( vn,
+            {oldVN: vn, oldStartIndex: startIndex, odlEndIndex: endIndex, updateStrategy: req.updateStrategy},
+            createVNChainFromContent( req.content));
+
+        return;
+    }
 
     // if the range of old sub-nodes is only a portion of all sub-nodes, we call the Splice
     // operation; otherwise, we need to remove all old sub-nodes and add new
@@ -600,7 +600,7 @@ function spliceNodeChildren( vn: VN, req: SpliceRequest): void
         let ownDN = vn.ownDN;
         let anchorDN = ownDN ? ownDN : vn.anchorDN;
         let beforeDN = index + newSubNodes.length < oldSubNodes.length
-            ? getFirstDN( oldSubNodes[index + newSubNodes.length])
+            ? oldSubNodes[index + newSubNodes.length].getFirstDN()
             : ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
 
         // mount new nodes
@@ -784,7 +784,7 @@ function moveDOMRange( vn: VN, subNodes: VN[], index: number, count: number, ind
     if (indexBefore == subNodes.length)
         beforeDN = vn.ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
     else
-        beforeDN = getFirstDN( subNodes[indexBefore]);
+        beforeDN = subNodes[indexBefore].getFirstDN();
 
     for( let i = 0; i < count; i++)
         moveNode( subNodes[index + i], anchorDN, beforeDN);
@@ -887,16 +887,16 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
 
     // we are here if the array of old sub-nodes is not empty. Now create new array combining
     // new and old sub-nodes in the correct order.
-    let newSubNodes = newStartSubNodes ? newStartSubNodes.concat( oldSubNodes) : oldSubNodes;
-    if (newEndSubNodes)
-        newSubNodes = newSubNodes.concat( newEndSubNodes);
-
-    vn.subNodes = newSubNodes;
+    vn.subNodes = newStartSubNodes && newEndSubNodes
+        ? newStartSubNodes.concat( oldSubNodes, newEndSubNodes)
+        : newStartSubNodes
+            ? newStartSubNodes.concat( oldSubNodes)
+            : oldSubNodes.concat( newEndSubNodes);
 
     // mount new sub-nodes at the start
     if (newStartSubNodes)
     {
-        let beforeDN = getFirstDN( oldSubNodes[0]);
+        let beforeDN = oldSubNodes[0].getFirstDN();
         mountSubNodes( vn, newStartSubNodes, anchorDN, beforeDN);
 
         // change indices of the old nodes
@@ -907,11 +907,14 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
     // mount new sub-nodes at the end
     if (newEndSubNodes)
     {
-        let beforeDN = ownDN ? null : getLastDN( oldSubNodes[oldSubNodes.length - 1]);
-        if (beforeDN)
-            beforeDN = beforeDN.nextSibling;
+        // let beforeDN = ownDN ? null : (oldSubNodes[oldSubNodes.length - 1]).getLastDN();
+        // if (beforeDN)
+        //     beforeDN = beforeDN.nextSibling;
 
-        mountSubNodes( vn, newEndSubNodes, anchorDN, beforeDN, newSubNodes.length - newEndSubNodes.length);
+        // mountSubNodes( vn, newEndSubNodes, anchorDN, beforeDN, vn.subNodes.length - newEndSubNodes.length);
+        mountSubNodes( vn, newEndSubNodes, anchorDN,
+            ownDN ? null : getNextDNUnderSameAnchorDN(vn, anchorDN),
+            vn.subNodes.length - newEndSubNodes.length);
     }
 }
 
@@ -941,7 +944,7 @@ function reverseNodeChildren( vn: VN, req: ReverseRequest): void
     let anchorDN = ownDN ? ownDN : vn.anchorDN;
     let beforeDN = endIndex === oldLen
         ? ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN)
-        : getFirstDN( oldSubNodes[endIndex]);
+        : oldSubNodes[endIndex].getFirstDN();
 
     let svn: VN;
     for( let i = endIndex - 2; i >= startIndex; i--)
@@ -1026,9 +1029,7 @@ function mountNode( vn: VN, parent: VN, index: number, anchorDN: DN, beforeDN: D
     if (vn.subNodes)
     {
         // determine what nodes to use as anchor and "before" for the sub-nodes
-        let newAnchorDN = ownDN ? ownDN : anchorDN;
-        let newBeforeDN = ownDN ? null : beforeDN;
-        mountSubNodes( vn, vn.subNodes, newAnchorDN, newBeforeDN)
+        mountSubNodes( vn, vn.subNodes, ownDN ? ownDN : anchorDN, ownDN ? null : beforeDN)
     }
 
 	// if we have our own DOM node, add it under the anchor node
@@ -1356,7 +1357,7 @@ function updateSubNodesByNodes( parentVN: VN, disp: VNDisp, anchorDN: DN, before
 
         // if the virtual node defines a DOM node, it becomes the DOM node before which
         // next components should be inserted/moved
-        beforeDN = getFirstDN( svn) || beforeDN;
+        beforeDN = svn.getFirstDN() || beforeDN;
     }
 }
 
@@ -1486,7 +1487,7 @@ function updateSubNodesByGroups( parentVN: VN, disp: VNDisp, anchorDN: DN, befor
 function moveNode( vn: VN, anchorDN: DN, beforeDN: DN): void
 {
     // check whether the last of the DOM nodes already resides right before the needed node
-    let dns = getImmediateDNs( vn);
+    let dns = vn.getImmediateDNs();
     if (!dns)
         return;
     else if (Array.isArray(dns))
@@ -1530,7 +1531,7 @@ function moveGroup( group: VNDispGroup, disps: VNDisp[], anchorDN: DN, beforeDN:
     let useNewVN = group.action === VNDispAction.Insert;
 	for( let i = group.first, last = group.last; i <= last; i++)
 	{
-        dns = getImmediateDNs( useNewVN ? disps[i].newVN : disps[i].oldVN);
+        dns = (useNewVN ? disps[i].newVN : disps[i].oldVN).getImmediateDNs();
         if (!dns)
             continue;
         else if (Array.isArray(dns))
@@ -1776,7 +1777,7 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
         // The sequential reconciliation that ignores keys can build the groups as it iterate over
         // the sub-nodes, while reconciliations that look at keys cannot do it that way, so we'll
         // do it here.
-        if (newLen > NO_GROUP_THRESHOLD && !disp.subNodeDisps)
+        if (newLen > NO_GROUP_THRESHOLD && !disp.subNodeGroups)
             disp.subNodeGroups = buildSubNodeGroups( disp.subNodeDisps);
     }
 }
@@ -2102,20 +2103,20 @@ function determineGroupDNs( group: VNDispGroup, disps: VNDisp[])
     {
         let vn = useNewVN ? disps[group.first].newVN : disps[group.first].oldVN;
 
-        group.firstDN = getFirstDN(vn);
-        group.lastDN = getLastDN( vn);
+        group.firstDN = vn.getFirstDN();
+        group.lastDN = vn.getLastDN();
     }
     else
     {
         for( let i = group.first; i <= group.last; i++)
         {
-            if (group.firstDN = getFirstDN( useNewVN ? disps[i].newVN : disps[i].oldVN))
+            if (group.firstDN = (useNewVN ? disps[i].newVN : disps[i].oldVN).getFirstDN())
                 break;
         }
 
         for( let i = group.last; i >= group.first; i--)
         {
-            if (group.lastDN = getLastDN( useNewVN ? disps[i].newVN : disps[i].oldVN))
+            if (group.lastDN = (useNewVN ? disps[i].newVN : disps[i].oldVN).getLastDN())
                 break;
         }
     }
@@ -2196,81 +2197,6 @@ function buildSubNodeGroups( disps: VNDisp[]): VNDispGroup[]
 
 
 
-// Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
-// This method is only called on the mounted nodes.
-function getFirstDN( vn: VN): DN
-{
-	if (vn.ownDN)
-		return vn.ownDN;
-	else if (!vn.subNodes)
-		return null;
-
-	// recursively call this method on the sub-nodes from first to last until a valid node
-	// is returned
-	let dn: DN;
-	for( let svn of vn.subNodes)
-	{
-		if (dn = getFirstDN( svn))
-			return dn;
-	}
-
-	return null;
-}
-
-
-
-// Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
-// This method is only called on the mounted nodes.
-function getLastDN( vn: VN): DN
-{
-	if (vn.ownDN)
-		return vn.ownDN;
-	else if (!vn.subNodes)
-		return null;
-
-	// recursively call this method on the sub-nodes from last to first until a valid node
-	// is returned
-	let dn: DN;
-	for( let i = vn.subNodes.length - 1; i >= 0; i--)
-	{
-		if (dn = getLastDN( vn.subNodes[i]))
-			return dn;
-	}
-
-	return null;
-}
-
-
-
-// Returns the list of DOM nodes that are immediate children of this virtual node; that is, are
-// NOT children of sub-nodes that have their own DOM node. May return null but never returns
-// empty array.
-function getImmediateDNs( vn: VN): DN | DN[] | null
-{
-	if (vn.ownDN)
-        return vn.ownDN;
-    else if (!vn.subNodes)
-        return null;
-
-	let arr: DN[] = [];
-    vn.subNodes.forEach( svn => collectImmediateDNs( svn, arr));
-	return arr.length === 0 ? null : arr;
-}
-
-
-
-// Collects all DOM nodes that are the immediate children of this virtual node (that is,
-// are NOT children of sub-nodes that have their own DOM node) into the given array.
-function collectImmediateDNs( vn: VN, arr: DN[]): void
-{
-	if (vn.ownDN)
-		arr.push( vn.ownDN);
-	else if (vn.subNodes)
-		vn.subNodes.forEach( svn => collectImmediateDNs( svn, arr));
-}
-
-
-
 // Finds the first DOM node in the tree of virtual nodes that comes after our node that is a
 // child of our own anchor element. We use it as a node before which to insert/move nodes of
 // our sub-nodes during the reconciliation process. The algorithm first goes to the next
@@ -2282,19 +2208,6 @@ function getNextDNUnderSameAnchorDN( vn: VN, anchorDN: DN): DN
 {
     if (vn.ownDN)
         return null;
-
-	// // check if we have sibling DOM nodes after our last sub-node - that might be elements
-	// // not controlled by our component. Note that we have either null or non-empty array.
-	// if (vn.subNodes)
-	// {
-	// 	let dn = getLastDN( vn.subNodes[vn.subNodes.length - 1]);
-	// 	if (dn)
-	// 	{
-	// 		let nextSibling = dn.nextSibling;
-	// 		if (nextSibling)
-	// 			return nextSibling;
-	// 	}
-	// }
 
     // if we don't have parent, this means that it is a root node and it doesn't have siblings
     let parent = vn.parent;
@@ -2312,7 +2225,7 @@ function getNextDNUnderSameAnchorDN( vn: VN, anchorDN: DN): DN
 		// note that getFirstDN call traverses the hierarchy of nodes. Note also that it
 		// cannot find a node under a different anchor element because the first different
 		// anchor element will be returned as a wanted node.
-		const dn = getFirstDN( nvn);
+		const dn = nvn.getFirstDN();
 		if (dn)
 			return dn;
 	}
@@ -2439,7 +2352,7 @@ Array.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 
 // Add toVNs method to the VN class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-(VN.prototype as any)[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+VN.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 {
     if (nodes)
         nodes.push( this);

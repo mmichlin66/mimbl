@@ -163,6 +163,67 @@ export abstract class VN implements IVNode
 
 
 
+    // Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
+    // This method is only called on the mounted nodes.
+    public getFirstDN(): DN
+    {
+        if (!this.subNodes)
+            return null;
+
+        // recursively call this method on the sub-nodes from first to last until a valid node
+        // is returned
+        let dn: DN;
+        for( let svn of this.subNodes)
+        {
+            if (dn = svn.getFirstDN())
+                return dn;
+        }
+
+        return null;
+    }
+
+    // Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
+    // This method is only called on the mounted nodes.
+    public getLastDN(): DN
+    {
+        if (!this.subNodes)
+            return null;
+
+        // recursively call this method on the sub-nodes from last to first until a valid node
+        // is returned
+        let dn: DN;
+        for( let i = this.subNodes.length - 1; i >= 0; i--)
+        {
+            if (dn = this.subNodes[i].getLastDN())
+                return dn;
+        }
+
+        return null;
+    }
+
+    // Returns the list of DOM nodes that are immediate children of this virtual node; that is, are
+    // NOT children of sub-nodes that have their own DOM node. May return null but never returns
+    // empty array.
+    public getImmediateDNs(): DN | DN[] | null
+    {
+        if (!this.subNodes)
+            return null;
+
+        let arr: DN[] = [];
+        this.subNodes.forEach( svn => svn.collectImmediateDNs( arr));
+        return arr.length === 0 ? null : arr;
+    }
+
+    // Collects all DOM nodes that are the immediate children of this virtual node (that is,
+    // are NOT children of sub-nodes that have their own DOM node) into the given array.
+    protected collectImmediateDNs( arr: DN[]): void
+    {
+        if (this.subNodes)
+            this.subNodes.forEach( svn => svn.collectImmediateDNs( arr));
+    }
+
+
+
 	// Level of nesting at which the node resides relative to the root node.
 	public get depth(): number
     {

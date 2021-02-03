@@ -1,5 +1,5 @@
 ﻿import {ITextVN, TickSchedulingType} from "../api/mim"
-import {VN} from "../internal"
+import {DN, VN} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -38,6 +38,37 @@ export class TextVN extends VN implements ITextVN
 	// reporting. The name can change during the lifetime of the virtual node; for example,
 	// it can reflect an "id" property of an element (if any).
 	public get name(): string { return "#text"; }
+
+
+
+    // Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
+    // This method is only called on the mounted nodes.
+    public getFirstDN(): DN
+    {
+        return this.ownDN;
+    }
+
+    // Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
+    // This method is only called on the mounted nodes.
+    public getLastDN(): DN
+    {
+        return this.ownDN;
+    }
+
+    // Returns the list of DOM nodes that are immediate children of this virtual node; that is, are
+    // NOT children of sub-nodes that have their own DOM node. May return null but never returns
+    // empty array.
+    public getImmediateDNs(): DN | DN[] | null
+    {
+        return this.ownDN;
+    }
+
+    // Collects all DOM nodes that are the immediate children of this virtual node (that is,
+    // are NOT children of sub-nodes that have their own DOM node) into the given array.
+    protected collectImmediateDNs( arr: DN[]): void
+    {
+        arr.push( this.ownDN);
+    }
 
 
 
