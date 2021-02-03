@@ -1487,12 +1487,28 @@ function moveNode( vn: VN, anchorDN: DN, beforeDN: DN): void
 {
     // check whether the last of the DOM nodes already resides right before the needed node
     let dns = getImmediateDNs( vn);
-    if (!dns || dns[dns.length - 1].nextSibling === beforeDN)
+    if (!dns)
         return;
-
-    for( let dn of dns)
+    else if (Array.isArray(dns))
     {
-        anchorDN.insertBefore( dn, beforeDN);
+        if (dns[dns.length - 1].nextSibling === beforeDN)
+            return;
+
+        for( let dn of dns)
+        {
+            anchorDN.insertBefore( dn, beforeDN);
+
+            /// #if USE_STATS
+                DetailedStats.log( StatsCategory.Elm, StatsAction.Moved);
+            /// #endif
+        }
+    }
+    else
+    {
+        if (dns.nextSibling === beforeDN)
+            return;
+
+        anchorDN.insertBefore( dns, beforeDN);
 
         /// #if USE_STATS
             DetailedStats.log( StatsCategory.Elm, StatsAction.Moved);
@@ -1510,11 +1526,14 @@ function moveNode( vn: VN, anchorDN: DN, beforeDN: DN): void
 // Moves all the nodes in the given group before the given DOM node.
 function moveGroup( group: VNDispGroup, disps: VNDisp[], anchorDN: DN, beforeDN: DN): void
 {
-    let dns: DN[];
+    let dns: DN | DN[] | null;
     let useNewVN = group.action === VNDispAction.Insert;
-	for( let i = group.first; i <= group.last; i++)
+	for( let i = group.first, last = group.last; i <= last; i++)
 	{
-        if (dns = getImmediateDNs( useNewVN ? disps[i].newVN : disps[i].oldVN))
+        dns = getImmediateDNs( useNewVN ? disps[i].newVN : disps[i].oldVN);
+        if (!dns)
+            continue;
+        else if (Array.isArray(dns))
         {
             for( let dn of dns)
             {
@@ -1524,11 +1543,22 @@ function moveGroup( group: VNDispGroup, disps: VNDisp[], anchorDN: DN, beforeDN:
                     DetailedStats.log( StatsCategory.Elm, StatsAction.Moved);
                 /// #endif
             }
+        }
+        else
+        {
+            if (dns.nextSibling === beforeDN)
+                return;
+
+            anchorDN.insertBefore( dns, beforeDN);
 
             /// #if USE_STATS
-                DetailedStats.log( (useNewVN ? disps[i].newVN : disps[i].oldVN).statsCategory, StatsAction.Moved);
+                DetailedStats.log( StatsCategory.Elm, StatsAction.Moved);
             /// #endif
         }
+
+        /// #if USE_STATS
+            DetailedStats.log( (useNewVN ? disps[i].newVN : disps[i].oldVN).statsCategory, StatsAction.Moved);
+        /// #endif
 	}
 }
 
@@ -2215,10 +2245,10 @@ function getLastDN( vn: VN): DN
 // Returns the list of DOM nodes that are immediate children of this virtual node; that is, are
 // NOT children of sub-nodes that have their own DOM node. May return null but never returns
 // empty array.
-function getImmediateDNs( vn: VN): DN[] | null
+function getImmediateDNs( vn: VN): DN | DN[] | null
 {
 	if (vn.ownDN)
-        return [vn.ownDN];
+        return vn.ownDN;
     else if (!vn.subNodes)
         return null;
 
@@ -2250,44 +2280,45 @@ function collectImmediateDNs( vn: VN, arr: DN[]): void
 // sub-nodes starts and, therefore, it only traverses mounted nodes.
 function getNextDNUnderSameAnchorDN( vn: VN, anchorDN: DN): DN
 {
-    // if (vn.ownDN)
-    //     return null;
+    if (vn.ownDN)
+        return null;
 
-	// check if we have sibling DOM nodes after our last sub-node - that might be elements
-	// not controlled by our component. Note that we have either null or non-empty array.
-	if (vn.subNodes)
-	{
-		let dn = getLastDN( vn.subNodes[vn.subNodes.length - 1]);
-		if (dn)
-		{
-			let nextSibling = dn.nextSibling;
-			if (nextSibling)
-				return nextSibling;
-		}
-	}
+	// // check if we have sibling DOM nodes after our last sub-node - that might be elements
+	// // not controlled by our component. Note that we have either null or non-empty array.
+	// if (vn.subNodes)
+	// {
+	// 	let dn = getLastDN( vn.subNodes[vn.subNodes.length - 1]);
+	// 	if (dn)
+	// 	{
+	// 		let nextSibling = dn.nextSibling;
+	// 		if (nextSibling)
+	// 			return nextSibling;
+	// 	}
+	// }
 
     // if we don't have parent, this means that it is a root node and it doesn't have siblings
-    if (!vn.parent)
+    let parent = vn.parent;
+    if (!parent)
         return null;
 
     // loop over our next siblings
-    let siblings = vn.parent.subNodes;
+    let siblings = parent.subNodes;
 	for( let i = vn.index + 1; i < siblings.length; i++)
 	{
         let nvn = siblings[i];
 		if (!nvn.anchorDN)
 			return null;
 
-		// note that getLastDN call traverses the hierarchy of nodes. Note also that it
+		// note that getFirstDN call traverses the hierarchy of nodes. Note also that it
 		// cannot find a node under a different anchor element because the first different
 		// anchor element will be returned as a wanted node.
-		const dn = getLastDN( nvn);
+		const dn = getFirstDN( nvn);
 		if (dn)
 			return dn;
 	}
 
 	// recurse to our parent if it has the same anchor element
-	return vn.parent.anchorDN !== anchorDN ? null : getNextDNUnderSameAnchorDN( vn.parent, anchorDN);
+	return parent.anchorDN !== anchorDN ? null : parent.ownDN ? null : getNextDNUnderSameAnchorDN( parent, anchorDN);
 }
 
 
