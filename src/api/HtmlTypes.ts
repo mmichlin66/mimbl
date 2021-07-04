@@ -124,13 +124,6 @@ export interface IHtmlBaseElementProps extends IHtmlElementProps<HTMLBaseElement
 
 
 
-// <basefont>
-export interface IHtmlBasefontElementProps extends IHtmlElementProps<HTMLBaseFontElement>
-{
-}
-
-
-
 // <blockquote>
 export interface IHtmlBlockquoteElementProps extends IHtmlElementProps<HTMLQuoteElement>
 {

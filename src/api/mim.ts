@@ -472,7 +472,6 @@ export namespace JSX
 
 		b: html.IHtmlElementProps;
 		base: html.IHtmlBaseElementProps;
-		basefont: html.IHtmlBasefontElementProps;
 		bdi: html.IHtmlElementProps;
 		bdo: html.IHtmlElementProps;
 		big: html.IHtmlElementProps;
@@ -972,7 +971,7 @@ class RefProxyHandler implements ProxyHandler<any>
     public getOwnPropertyDescriptor( target: any, prop: PropertyKey): PropertyDescriptor | undefined
         { return Reflect.getOwnPropertyDescriptor( this.obj, prop); }
 
-    public ownKeys( target: any): PropertyKey[]
+    public ownKeys( target: any): ArrayLike<string | symbol>
         { return Reflect.ownKeys( this.obj); }
 
 }
