@@ -37,7 +37,7 @@ export async function s_initStyleScheduler(): Promise<number>
     if (s_mimcss)
     {
         let schedulerType = s_mimcss.registerScheduler( new StyleScheduler());
-        s_mimcss.setDefaultSchedulerType( schedulerType);
+        s_mimcss.setDefaultScheduler( schedulerType);
         return schedulerType;
     }
     else
