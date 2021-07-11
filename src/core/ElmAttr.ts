@@ -350,7 +350,10 @@ export function removeElmProp( elm: Element, propName: string, info: AttrPropInf
 function setStyleProp( elm: Element, attrName: string, propVal: string | Styleset): void
 {
     if (typeof propVal === "object")
-        s_mimcss.setElementStyle( elm as HTMLElement, propVal, SchedulerType.Sync);
+    {
+        if (s_mimcss)
+            s_mimcss.setElementStyle( elm as HTMLElement, propVal, SchedulerType.Sync);
+    }
     else
         elm.setAttribute( attrName, propVal);
 }
