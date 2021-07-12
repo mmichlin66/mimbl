@@ -11,11 +11,11 @@ npm install mimbl
 Mimbl provides all the standard React-style functionality that developers expect from component authoring libraries: declarative laying out of HTML structure, function- and class-based components, references, error boundaries, lazy-loading, etc. In addition to this functionality Mimbl provides the following unique features:
 
 - Components whose lifecycle is controlled by developers and which can be accessed via standard property and method invocation.
-- Build in mechanism for initiating component updates by triggering state changes.
+- Built-in mechanism for initiating component updates by triggering state changes.
 - Partitioning components into multiple independently updatable areas just by using rendering methods.
 - Custom HTML and SVG attributes defined by developers and supported via handler objects.
 - Service publish/subscribe mechanism.
-- Mimcss library for style definitions.
+- [Mimcss](https://mmichlin66.github.io/mimcss/guide/introduction.html) library for style definitions.
 
 ## Usage
 The Mimbl library provides a custom JSX factory function called `jsx`. In order for this function to be invoked by the TypeScript compiler, the tsconfig.json file must have the following option:
@@ -24,7 +24,8 @@ The Mimbl library provides a custom JSX factory function called `jsx`. In order 
 "compilerOptions":
 {
     "jsx": "react",
-    "jsxFactory": "mim.jsx"
+    "jsxFactory": "mim.jsx",
+    "jsxFragmentFactory": "mim.Fragment"
 }
  ```
 
@@ -44,7 +45,7 @@ class HelloWorld extends mim.Component
         super();
         this.color = color;
     }
-    
+
     render(): any
     {
         return <span style={ {color: this.color} }>Hello World!</span>;
