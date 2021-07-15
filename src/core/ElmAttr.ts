@@ -1,4 +1,4 @@
-﻿import {Styleset, SchedulerType, StringStyleset, MediaQuery} from "mimcss"
+﻿import {Styleset, SchedulerType, StringStyleset, MediaStatement} from "mimcss"
 import {ICustomAttributeHandlerClass, TickSchedulingType} from "../api/mim"
 import {s_mimcss} from "../internal"
 
@@ -349,12 +349,9 @@ export function removeElmProp( elm: Element, propName: string, info: AttrPropInf
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 function setStyleProp( elm: Element, attrName: string, propVal: string | Styleset): void
 {
-    if (typeof propVal === "object")
-    {
-        if (s_mimcss)
-            s_mimcss.setElementStyle( elm as HTMLElement, propVal, SchedulerType.Sync);
-    }
-    else
+    if (s_mimcss)
+        s_mimcss.setElementStyle( elm as HTMLElement, propVal, SchedulerType.Sync);
+    else if (typeof propVal === "string")
         elm.setAttribute( attrName, propVal);
 }
 
@@ -365,18 +362,18 @@ function diffStyleProp( attrName: string, oldPropVal: string | Styleset, newProp
     if (oldPropVal === newPropVal)
         return undefined;
 
-    if ((typeof oldPropVal === "object" || typeof newPropVal === "object") && !s_mimcss)
-    {
+    // if Mimcss library is not included, then style attributes can only be strings. If they are
+    // not, this is an application bug and we canont handle it.
+    if (!s_mimcss && (typeof oldPropVal !== "string" || typeof newPropVal !== "string"))
         return undefined;
-    }
+    else if (typeof oldPropVal === "string" && typeof newPropVal === "string")
+        return newPropVal;
     else if (typeof oldPropVal === "object" && typeof newPropVal === "object")
     {
         // we have to return undefined because null is considered a valid update value
         let res = s_mimcss.diffStylesets( oldPropVal, newPropVal);
         return res == null ? undefined : res;
     }
-    else if (typeof oldPropVal === "string" && typeof newPropVal === "string")
-        return newPropVal;
     else if (typeof oldPropVal === "string")
     {
         let newPropValAsString = s_mimcss.stylesetToString( newPropVal);
@@ -408,36 +405,30 @@ function updateStyleProp( elm: Element, attrName: string, updateVal: string | St
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Handling of media property. Media property can be specified either as a string or as the
-// IMediaFeatureset object from the Mimcss library.
+// MediaStatement object from the Mimcss library.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-function setMediaProp( elm: Element, attrName: string, propVal: MediaQuery): void
+function setMediaProp( elm: Element, attrName: string, propVal: MediaStatement): void
 {
-    if (typeof propVal === "object")
-    {
-        if (s_mimcss)
-            elm[attrName] = s_mimcss.setElementStringStyle( elm as HTMLElement, propVal, SchedulerType.Sync);
-    }
-    else
-        elm[attrName] = propVal;
+   elm[attrName] = s_mimcss.mediaToString( propVal);
 }
 
 
 
-function diffMediaProp( attrName: string, oldPropVal: MediaQuery, newPropVal: MediaQuery): any
+function diffMediaProp( attrName: string, oldPropVal: MediaStatement, newPropVal: MediaStatement): any
 {
     if (oldPropVal === newPropVal)
         return undefined;
 
-    if ((typeof oldPropVal === "object" || typeof newPropVal === "object") && !s_mimcss)
-    {
+    // if Mimcss library is not included, then media attributes can only be strings. If they are
+    // not, this is an application bug and we canont handle it.
+    if (!s_mimcss && (typeof oldPropVal !== "string" || typeof newPropVal !== "string"))
         return undefined;
-    }
 
-    let oldString = typeof oldPropVal === "object" ? s_mimcss.mediaQueryToString( oldPropVal) : oldPropVal;
-	let newString = typeof newPropVal === "object" ? s_mimcss.mediaQueryToString( oldPropVal) : newPropVal;
+    let oldString = s_mimcss.mediaToString( oldPropVal);
+	let newString = s_mimcss.mediaToString( newPropVal);
 
-	// we have to return undefined because null is considered a valid update value
+	// we must return undefined because null is considered a valid update value
 	return newString === oldString ? undefined : newString;
 }
 
