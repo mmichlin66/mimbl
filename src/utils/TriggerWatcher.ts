@@ -1088,7 +1088,7 @@ export function trigger( targetOrDepth: any, name?: string): any
 {
     if (typeof targetOrDepth === "number")
     {
-        // If the first parameter is a number that it is an explicitly specified depth using
+        // If the first parameter is a number, then it is an explicitly specified depth using
         // decorator factory.
         return triggerDecoratorHelper.bind( undefined, targetOrDepth);
     }

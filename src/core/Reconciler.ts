@@ -1016,6 +1016,8 @@ function mountNode( vn: VN, parent: VN, index: number, anchorDN: DN, beforeDN: D
 	fn && fn.call(vn);
 	let ownDN = vn.ownDN;
 
+    // let prevCreator = vn instanceof ClassCompVN ? setCurrentClassComp( vn.comp) : undefined;
+
     // some nodes don't implement the render method; for example, TextVNs don't have any sub-nodes
     // while ElmVNs have subNodes filed populated during JSX
     fn = vn.render;
@@ -1031,6 +1033,9 @@ function mountNode( vn: VN, parent: VN, index: number, anchorDN: DN, beforeDN: D
         // determine what nodes to use as anchor and "before" for the sub-nodes
         mountSubNodes( vn, vn.subNodes, ownDN ? ownDN : anchorDN, ownDN ? null : beforeDN)
     }
+
+    // if (prevCreator !== undefined)
+    //     setCurrentClassComp( prevCreator);
 
 	// if we have our own DOM node, add it under the anchor node
 	if (ownDN)

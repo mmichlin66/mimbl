@@ -129,6 +129,8 @@ export class FuncProxyVN extends VN
         let ret = this.actFunc( this.arg);
         setCurrentClassComp( prevCreator);
         return ret;
+
+        // return this.actFunc( this.arg);
 	}
 
 
