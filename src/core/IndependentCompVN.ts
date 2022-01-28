@@ -1,4 +1,4 @@
-﻿import {IIndependentCompVN, Component} from "../api/mim"
+﻿import {IIndependentCompVN, IComponent} from "../api/mim"
 import {ClassCompVN} from "../internal"
 
 
@@ -11,7 +11,7 @@ import {ClassCompVN} from "../internal"
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 {
-	constructor( comp: Component)
+	constructor( comp: IComponent)
 	{
 		super();
 
@@ -78,7 +78,7 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 
     // if the node is recycled for a different component, this field keeps the old component
     // until the didUpdate method is called.
-    private oldComp: Component;
+    private oldComp: IComponent;
 }
 
 

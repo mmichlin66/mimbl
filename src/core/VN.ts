@@ -1,4 +1,4 @@
-﻿import {Component, RefPropType, setRef, IVNode, UpdateStrategy, TickSchedulingType} from "../api/mim";
+﻿import {IComponent, RefPropType, setRef, IVNode, UpdateStrategy, TickSchedulingType} from "../api/mim";
 import {
     notifyServiceUnpublished, notifyServiceUnsubscribed, requestNodeUpdate,
     notifyServicePublished, notifyServiceSubscribed
@@ -42,7 +42,7 @@ export abstract class VN implements IVNode
 	public parent?: VN;
 
     /** Class component that created this node in its render method (or undefined). */
-    public creator?: Component;
+    public creator?: IComponent;
 
 	/**
      * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the

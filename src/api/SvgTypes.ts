@@ -809,3 +809,93 @@ export interface ISvgViewElementProps extends ISvgConditionalProcessingProps
 
 
 
+export interface ISvgIntrinsicElements
+{
+    svg: ISvgSvgElementProps;
+
+    svgA: ISvgAElementProps;
+    animate: ISvgConditionalProcessingProps | ISvgAnimationProps;
+    animateMotion: ISvgAnimateMotionElementProps;
+    animateTarnsform: ISvgConditionalProcessingProps | ISvgAnimationProps;
+
+    circle: ISvgCircleElementProps;
+    clipPath: ISvgClipPathElementProps;
+    colorProfile: ISvgColorProfilePathElementProps;
+
+    defs: ISvgElementProps;
+    desc: ISvgElementProps;
+    discard: ISvgDiscardElementProps;
+
+    ellipse: ISvgEllipseElementProps;
+
+    feBlend: ISvgFeBlendElementProps;
+    feColorMatrix: ISvgFeColorMatrixElementProps;
+    feComponentTransfer: ISvgFeComponentTransferElementProps;
+    feComposite: ISvgFeCompositeElementProps;
+    feConvolveMatrix: ISvgFeConvolveMatrixElementProps;
+    feDiffuseLighting: ISvgFeDiffuseLightingElementProps;
+    feDisplacementMap: ISvgFeDisplacementMapElementProps;
+    feDistantLight: ISvgFeDistantLightElementProps;
+    feDropShadow: ISvgFeDropShadowElementProps;
+    feFlood: ISvgFeFloodElementProps;
+    feFuncA: ISvgTransferFunctionsProps;
+    feFuncB: ISvgTransferFunctionsProps;
+    feFuncG: ISvgTransferFunctionsProps;
+    feFuncR: ISvgTransferFunctionsProps;
+    feGaussianBlur: ISvgFeGaussianBlurElementProps;
+    feImage: ISvgFeImageElementProps;
+    feMerge: ISvgPresentationProps | ISvgFilterPrimitiveProps;
+    feMergeNode: ISvgFeMergeNodeElementProps;
+    feMorphology: ISvgFeMorphologyElementProps;
+    feOffset: ISvgFeOffsetElementProps;
+    fePointLight: ISvgFePointLightElementProps;
+    feSpecularLighting: ISvgFeSpecularLightingElementProps;
+    feSpotLight: ISvgFeSpotLightElementProps;
+    feTile: ISvgFeTileElementProps;
+    feTurbulence: ISvgFeTurbulenceElementProps;
+    filter: ISvgFilterElementProps;
+    foreignObject: ISvgForeignObjectElementProps;
+
+    g: ISvgConditionalProcessingProps | ISvgPresentationProps;
+
+    hatch: ISvgHatchElementProps;
+    hatchpath: ISvgHatchpathElementProps;
+
+    image: ISvgImageElementProps;
+
+    line: ISvgLineElementProps;
+    linearGradient: ISvgLinearGradientElementProps;
+
+    marker: ISvgMarkerElementProps;
+    mask: ISvgMaskElementProps;
+    metadata: ISvgElementProps;
+    mpath: ISvgMPathElementProps;
+
+    path: ISvgPathElementProps;
+    pattern: ISvgPatternElementProps;
+    polygon: ISvgPolygonElementProps;
+    polyline: ISvgPolylineElementProps;
+
+    radialGradient: ISvgRadialGradientElementProps;
+    rect: ISvgRectElementProps;
+
+    svgScript: ISvgScriptElementProps;
+    set: ISvgSetElementProps;
+    solidcolor: ISvgElementProps;
+    stop: ISvgStopElementProps;
+    svgStyle: ISvgStyleElementProps;
+    switch: ISvgConditionalProcessingProps | ISvgPresentationProps;
+    symbol: ISvgSymbolElementProps;
+
+    text: ISvgTextElementProps;
+    textPath: ISvgTextPathElementProps;
+    svgTitle: ISvgElementProps;
+    textSpan: ISvgTextSpanElementProps;
+
+    use: ISvgUseElementProps;
+
+    view: ISvgViewElementProps;
+
+    //[elemName: string]: any
+}
+

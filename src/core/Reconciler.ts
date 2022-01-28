@@ -1,6 +1,6 @@
 ﻿import {
     ScheduledFuncType, Component, Fragment, FuncProxy, PromiseProxy, CallbackWrappingParams,
-    TickSchedulingType, UpdateStrategy
+    TickSchedulingType, UpdateStrategy, IComponent
 } from "../api/mim"
 import {
     VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN, FuncProxyVN,
@@ -52,10 +52,10 @@ let s_ignoreSchedulingRequest: boolean = false;
 
 
 // Current object that is set as "creator" during rendering when instantiating certain virtual nodes.
-let s_currentClassComp: Component = null;
+let s_currentClassComp: IComponent = null;
 
 // Sets the given object as the current "creator" object.
-export function setCurrentClassComp( comp: Component): Component
+export function setCurrentClassComp( comp: IComponent): IComponent
 {
     let prevComp = s_currentClassComp;
     s_currentClassComp = comp;
@@ -2307,7 +2307,7 @@ Component.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 {
     // if the component (this can only be an Instance component) is already attached to VN,
     // return this existing VN; otherwise create a new one.
-    let vn = this.vn ? this.vn : new IndependentCompVN( this);
+    let vn = this.vn ?? new IndependentCompVN( this);
     if (nodes)
         nodes.push( vn);
 
@@ -2384,11 +2384,18 @@ Promise.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 // virtual node or nodes.
 Object.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 {
-    let s = this.toString();
-    if (!s)
-        return null;
+    let vn: VN;
+    if (typeof this.render === "function")
+        vn = this.vn ?? new IndependentCompVN( this);
+    else
+    {
+        let s = this.toString();
+        if (!s)
+            return null;
 
-    let vn = new TextVN( s);
+        vn = new TextVN( s);
+    }
+
     if (nodes)
         nodes.push( vn);
 

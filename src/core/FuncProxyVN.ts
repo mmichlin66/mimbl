@@ -1,4 +1,4 @@
-﻿import {symRenderNoWatcher, RenderMethodType, Component} from "../api/mim"
+﻿import {symRenderNoWatcher, RenderMethodType, IComponent} from "../api/mim"
 import {VN, createWatcher, IWatcher, setCurrentClassComp} from "../internal"
 
 /// #if USE_STATS
@@ -34,7 +34,7 @@ let symFuncsToNodes = Symbol( "symFuncsToNodes");
  */
 export class FuncProxyVN extends VN
 {
-	constructor( creator: Component, func: RenderMethodType, funcThisArg?: any, arg?: any, key?: any)
+	constructor( creator: IComponent, func: RenderMethodType, funcThisArg?: any, arg?: any, key?: any)
 	{
 		super();
 

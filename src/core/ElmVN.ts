@@ -1,5 +1,5 @@
 ﻿import {
-    IElmVN, EventFuncType, ICustomAttributeHandler, IElementProps, Component,
+    IElmVN, EventFuncType, ICustomAttributeHandler, IElementProps, IComponent,
     EventPropType, setRef, RefType, ElmRefType, CallbackWrappingParams, TickSchedulingType,
     UpdateStrategy
 } from "../api/mim"
@@ -32,7 +32,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 
-	constructor( creator: Component, tagName: string, props: IElementProps<T>, subNodes: VN[])
+	constructor( creator: IComponent, tagName: string, props: IElementProps<T>, subNodes: VN[])
 	{
 		super();
 

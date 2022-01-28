@@ -1,6 +1,6 @@
-﻿import {IClassCompVN, Component, symRenderNoWatcher} from "../api/mim"
+﻿import {IClassCompVN, symRenderNoWatcher, IComponent, RenderMethodType, ScheduledFuncType, TickSchedulingType} from "../api/mim"
 import {createWatcher, IWatcher} from "../utils/TriggerWatcher"
-import {VN, setCurrentClassComp} from "../internal"
+import {VN, setCurrentClassComp, FuncProxyVN, scheduleFuncCall, s_wrapCallback} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -17,7 +17,7 @@ import {VN, setCurrentClassComp} from "../internal"
 export abstract class ClassCompVN extends VN implements IClassCompVN
 {
 	// Component instance.
-	public comp: Component;
+	public comp: IComponent;
 
 
 
@@ -137,6 +137,47 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 		let retVal = this.comp.handleError( err);
         setCurrentClassComp( prevCreator);
         return retVal;
+	}
+
+
+
+    /** This method is called by the component when it needs to be updated. */
+	public updateMe( func?: RenderMethodType, funcThisArg?: any, key?: any): void
+    {
+        // if no arguments are provided we request to update the entire component.
+		if (!func)
+			this.requestUpdate();
+		else
+            FuncProxyVN.update( func, funcThisArg || this.comp, key);
+    }
+
+
+
+	/**
+	 * Schedules the given function to be called before any components scheduled to be updated in
+	 * the Mimbl tick are updated.
+	 * @param func Function to be called
+	 * @param funcThisArg Object that will be used as "this" value when the function is called. If this
+	 *   parameter is undefined, the component instance will be used (which allows scheduling
+	 *   regular unbound components' methods). This parameter will be ignored if the function
+	 *   is already bound or is an arrow function.
+	 */
+	public callMe( func: ScheduledFuncType, beforeUpdate: boolean, funcThisArg?: any): void
+	{
+		scheduleFuncCall( func, beforeUpdate, funcThisArg || this.comp, this.comp);
+	}
+
+
+
+	/**
+	 * Creates a wrapper function with the same signature as the given callback so that if the original
+	 * callback throws an exception, it is processed by the Mimbl error handling mechanism so that the
+	 * exception bubbles from the component up the hierarchy until a component that knows to
+	 * handle errors is found.
+	 */
+    public wrapCallback<T extends Function>( func: T, funcThisArg?: any, schedulingType?: TickSchedulingType): T
+	{
+		return s_wrapCallback( {func, funcThisArg: funcThisArg || this.comp, creator: this.comp, schedulingType});
 	}
 
 

@@ -1,4 +1,4 @@
-﻿import {IManagedCompVN, IComponentClass, setRef, RefPropType} from "../api/mim"
+﻿import {IManagedCompVN, IComponentClass, setRef, RefPropType, Component} from "../api/mim"
 import {ClassCompVN} from "../internal"
 
 
@@ -141,7 +141,7 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 		this.key = newVN.key;
 
 		// remember the new properties
-        this.comp.props = this.props = newVN.props;
+        (this.comp as Component).props = this.props = newVN.props;
 
 		return shouldRender;
 	}

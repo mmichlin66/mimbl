@@ -920,3 +920,160 @@ export interface IHtmlXmpElementProps extends IHtmlElementProps<HTMLPreElement>
 
 
 
+export interface IHtmlIntrinsicElements
+{
+    // HTML elements
+    a: IHtmlAElementProps;
+    abbr: IHtmlElementProps;
+    acronym: IHtmlElementProps;
+    address: IHtmlElementProps;
+    applet: IHtmlAppletElementProps;
+    area: IHtmlAreaElementProps;
+    article: IHtmlElementProps;
+    aside: IHtmlElementProps;
+    audio: IHtmlAudioElementProps;
+
+    b: IHtmlElementProps;
+    base: IHtmlBaseElementProps;
+    bdi: IHtmlElementProps;
+    bdo: IHtmlElementProps;
+    big: IHtmlElementProps;
+    blockquote: IHtmlBlockquoteElementProps;
+    body: IHtmlElementProps;
+    br: IHtmlBrElementProps;
+    button: IHtmlButtonElementProps;
+
+    canvas: IHtmlCanvasElementProps;
+    caption: IHtmlCaptionElementProps;
+    center: IHtmlElementProps;
+    cite: IHtmlElementProps;
+    code: IHtmlElementProps;
+    col: IHtmlColElementProps;
+    colgroup: IHtmlColgroupElementProps;
+
+    data: IHtmlDataElementProps;
+    datalist: IHtmlDataListElementProps;
+    dd: IHtmlDdElementProps;
+    del: IHtmlDelElementProps;
+    details: IHtmlDetailsElementProps;
+    dfn: IHtmlElementProps;
+    dialog: IHtmlDialogElementProps;
+    dir: IHtmlDirElementProps;
+    div: IHtmlDivElementProps;
+    dl: IHtmlDlElementProps;
+    dt: IHtmlElementProps;
+
+    em: IHtmlElementProps;
+    embed: IHtmlEmbedElementProps;
+
+    fieldset: IHtmlFieldsetElementProps;
+    figcaption: IHtmlElementProps;
+    figure: IHtmlElementProps;
+    font: IHtmlFontElementProps;
+    footer: IHtmlElementProps;
+    form: IHtmlFormElementProps;
+    frame: IHtmlFrameElementProps;
+    frameset: IHtmlFramesetElementProps;
+
+    h1: IHtmlH1ElementProps;
+    h2: IHtmlH2ElementProps;
+    h3: IHtmlH3ElementProps;
+    h4: IHtmlH4ElementProps;
+    h5: IHtmlH5ElementProps;
+    h6: IHtmlH6ElementProps;
+    head: IHtmlHeadElementProps;
+    header: IHtmlElementProps;
+    hgroup: IHtmlElementProps;
+    hr: IHtmlHrElementProps;
+    html: IHtmlHtmlElementProps;
+
+    i: IHtmlElementProps;
+    iframe: IHtmlIframeElementProps;
+    img: IHtmlImgElementProps;
+    input: IHtmlInputElementProps;
+    ins: IHtmlInsElementProps;
+
+    kbd: IHtmlElementProps;
+    keygen: IHtmlElementProps;
+
+    label: IHtmlLabelElementProps;
+    legend: IHtmlLegendElementProps;
+    li: IHtmlLiElementProps;
+    link: IHtmlLinkElementProps;
+    listing: IHtmlListingElementProps;
+
+    main: IHtmlElementProps;
+    map: IHtmlMapElementProps;
+    mark: IHtmlElementProps;
+    menu: IHtmlMenuElementProps;
+    menuitem: IHtmlElementProps;
+    meta: IHtmlMetaElementProps;
+    meter: IHtmlMeterElementProps;
+
+    nav: IHtmlElementProps;
+    nobr: IHtmlElementProps;
+    noframes: IHtmlElementProps;
+    noscript: IHtmlElementProps;
+
+    object: IHtmlObjectElementProps;
+    ol: IHtmlOlElementProps;
+    optgroup: IHtmlOptgroupElementProps;
+    option: IHtmlOptionElementProps;
+    output: IHtmlOutputElementProps;
+
+    p: IHtmlPElementProps;
+    param: IHtmlParamElementProps;
+    picture: IHtmlPictureElementProps;
+    pre: IHtmlPreElementProps;
+    progress: IHtmlProgressElementProps;
+
+    q: IHtmlQElementProps;
+
+    rb: IHtmlElementProps;
+    rp: IHtmlElementProps;
+    rt: IHtmlElementProps;
+    rtc: IHtmlElementProps;
+    ruby: IHtmlElementProps;
+
+    s: IHtmlElementProps;
+    samp: IHtmlElementProps;
+    script: IHtmlScriptElementProps;
+    section: IHtmlElementProps;
+    select: IHtmlSelectElementProps;
+    slot: IHtmlSlotElementProps;
+    small: IHtmlElementProps;
+    source: IHtmlSourceElementProps;
+    span: IHtmlSpanElementProps;
+    strike: IHtmlElementProps;
+    strong: IHtmlElementProps;
+    style: IHtmlStyleElementProps;
+    sub: IHtmlElementProps;
+    summary: IHtmlElementProps;
+    sup: IHtmlElementProps;
+
+    table: IHtmlTableElementProps;
+    tbody: IHtmlTbodyElementProps;
+    td: IHtmlTdElementProps;
+    template: IHtmlTemplateElementProps;
+    textarea: IHtmlTextareaElementProps;
+    tfoot: IHtmlTfootElementProps;
+    th: IHtmlThElementProps;
+    thead: IHtmlTHeadElementProps;
+    time: IHtmlTimeElementProps;
+    title: IHtmlTitleElementProps;
+    tr: IHtmlTrElementProps;
+    track: IHtmlTrackElementProps;
+    tt: IHtmlElementProps;
+
+    u: IHtmlElementProps;
+    ul: IHtmlUlElementProps;
+
+    var: IHtmlElementProps;
+    video: IHtmlVideoElementProps;
+
+    wbr: IHtmlElementProps;
+
+    xmp: IHtmlXmpElementProps;
+
+}
+
