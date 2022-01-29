@@ -945,7 +945,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	public clonedFrom: ElmVN<T>;
 
     // Redefine the ownDN property from VN to be of the Element type
-	public ownDN: T;
+	public declare ownDN: T;
 
     // Reference to the element that is specified as a "ref" property.
 	private ref: RefType<T>;

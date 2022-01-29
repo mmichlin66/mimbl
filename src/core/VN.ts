@@ -384,16 +384,15 @@ export abstract class VN implements IVNode
 
 
 
+    /// #if DEBUG
+    private debugID = g_nextVNDebugID++;
+	/// #endif
+
 	// Map of service IDs to service objects published by this node.
 	private publishedServices: Map<string,any>;
 
 	// Map of service IDs to objects constituting subscriptions made by this node.
 	private subscribedServices: Map<string,VNSubscribedServiceInfo>;
-
-    /// #if DEBUG
-    private debugID = g_nextVNDebugID++;
-	/// #endif
-
 }
 
 

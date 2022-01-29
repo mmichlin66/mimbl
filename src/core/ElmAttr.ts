@@ -1,6 +1,6 @@
 ﻿import {Styleset, SchedulerType, StringStyleset, MediaStatement} from "mimcss"
 import {ICustomAttributeHandlerClass, TickSchedulingType} from "../api/mim"
-import {s_mimcss} from "../internal"
+import {mimcss} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats";
@@ -349,8 +349,8 @@ export function removeElmProp( elm: Element, propName: string, info: AttrPropInf
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 function setStyleProp( elm: Element, attrName: string, propVal: string | Styleset): void
 {
-    if (s_mimcss)
-        s_mimcss.setElementStyle( elm as HTMLElement, propVal, SchedulerType.Sync);
+    if (mimcss)
+        mimcss.setElementStyle( elm as HTMLElement, propVal, SchedulerType.Sync);
     else if (typeof propVal === "string")
         elm.setAttribute( attrName, propVal);
 }
@@ -364,24 +364,24 @@ function diffStyleProp( attrName: string, oldPropVal: string | Styleset, newProp
 
     // if Mimcss library is not included, then style attributes can only be strings. If they are
     // not, this is an application bug and we canont handle it.
-    if (!s_mimcss && (typeof oldPropVal !== "string" || typeof newPropVal !== "string"))
+    if (!mimcss && (typeof oldPropVal !== "string" || typeof newPropVal !== "string"))
         return undefined;
     else if (typeof oldPropVal === "string" && typeof newPropVal === "string")
         return newPropVal;
     else if (typeof oldPropVal === "object" && typeof newPropVal === "object")
     {
         // we have to return undefined because null is considered a valid update value
-        let res = s_mimcss.diffStylesets( oldPropVal, newPropVal);
+        let res = mimcss.diffStylesets( oldPropVal, newPropVal);
         return res == null ? undefined : res;
     }
     else if (typeof oldPropVal === "string")
     {
-        let newPropValAsString = s_mimcss.stylesetToString( newPropVal);
+        let newPropValAsString = mimcss.stylesetToString( newPropVal);
         return oldPropVal !== newPropValAsString ? newPropValAsString : undefined;
     }
     else //if (typeof newPropVal === "string")
     {
-        let oldPropValAsString = s_mimcss.stylesetToString( oldPropVal);
+        let oldPropValAsString = mimcss.stylesetToString( oldPropVal);
         return oldPropValAsString !== newPropVal ? newPropVal : undefined;
     }
 }
@@ -392,8 +392,8 @@ function updateStyleProp( elm: Element, attrName: string, updateVal: string | St
 {
     if (typeof updateVal === "object")
     {
-        if (s_mimcss)
-            s_mimcss.setElementStringStyle( elm as HTMLElement, updateVal, SchedulerType.Sync);
+        if (mimcss)
+            mimcss.setElementStringStyle( elm as HTMLElement, updateVal, SchedulerType.Sync);
     }
     else
         elm.setAttribute( attrName, updateVal);
@@ -410,7 +410,7 @@ function updateStyleProp( elm: Element, attrName: string, updateVal: string | St
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 function setMediaProp( elm: Element, attrName: string, propVal: MediaStatement): void
 {
-   elm[attrName] = s_mimcss.mediaToString( propVal);
+   elm[attrName] = mimcss.mediaToString( propVal);
 }
 
 
@@ -422,11 +422,11 @@ function diffMediaProp( attrName: string, oldPropVal: MediaStatement, newPropVal
 
     // if Mimcss library is not included, then media attributes can only be strings. If they are
     // not, this is an application bug and we canont handle it.
-    if (!s_mimcss && (typeof oldPropVal !== "string" || typeof newPropVal !== "string"))
+    if (!mimcss && (typeof oldPropVal !== "string" || typeof newPropVal !== "string"))
         return undefined;
 
-    let oldString = s_mimcss.mediaToString( oldPropVal);
-	let newString = s_mimcss.mediaToString( newPropVal);
+    let oldString = mimcss.mediaToString( oldPropVal);
+	let newString = mimcss.mediaToString( newPropVal);
 
 	// we must return undefined because null is considered a valid update value
 	return newString === oldString ? undefined : newString;

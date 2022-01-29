@@ -13,7 +13,7 @@ import {scheduleFuncCall} from "../internal"
  * can do so. Note that in this case, styles, classes, element IDs and some other entities cannot
  * be defined using Mimcss constructs.
  */
-export let s_mimcss: any;
+export let mimcss: any;
 
 /**
  * Initializes style scheduler used by Mimbl to schedule writing style changes to the DOM. This
@@ -25,7 +25,7 @@ export async function s_initStyleScheduler(): Promise<number>
 {
     try
     {
-        s_mimcss = await import("mimcss");
+        mimcss = await import("mimcss");
     }
     catch(err)
     {
@@ -34,10 +34,10 @@ export async function s_initStyleScheduler(): Promise<number>
         /// #endif
     }
 
-    if (s_mimcss)
+    if (mimcss)
     {
-        let schedulerType = s_mimcss.registerScheduler( new StyleScheduler());
-        s_mimcss.setDefaultScheduler( schedulerType);
+        let schedulerType = mimcss.registerScheduler( new StyleScheduler());
+        mimcss.setDefaultScheduler( schedulerType);
         return schedulerType;
     }
     else
