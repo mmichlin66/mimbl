@@ -869,6 +869,8 @@ export interface IClassCompVN extends IVNode
 	 * Schedules the given function to be called before any components scheduled to be updated in
 	 * the Mimbl tick are updated.
 	 * @param func Function to be called
+     * @beforeUpdate Flag indicating whether the function will be called just before the Mimbl
+     * tick (true) or right after (false)
 	 * @param funcThisArg Object that will be used as "this" value when the function is called. If this
 	 *   parameter is undefined, the component instance will be used (which allows scheduling
 	 *   regular unbound components' methods). This parameter will be ignored if the function
@@ -1339,7 +1341,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	}
 }
 
-// Make the methods that are invoked during component lifecicle undefined so that lookup is faster.
+// Make the methods that are invoked during component lifecycle undefined so that lookup is faster.
 Component.prototype.displayName = undefined;
 Component.prototype.willMount = undefined;
 Component.prototype.didMount = undefined;
