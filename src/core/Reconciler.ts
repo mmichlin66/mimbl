@@ -1038,7 +1038,7 @@ function mountNode( vn: VN, parent: VN, index: number, anchorDN: DN, beforeDN: D
     //     setCurrentClassComp( prevCreator);
 
 	// if we have our own DOM node, add it under the anchor node
-	if (ownDN)
+	if (ownDN && !(ownDN instanceof ShadowRoot))
 		anchorDN.insertBefore( ownDN, beforeDN);
 
     return vn;
@@ -1128,7 +1128,7 @@ function unmountNode( vn: VN, removeOwnNode: boolean)
     if (ownDN)
     {
         vn.ownDN = null;
-        if (removeOwnNode)
+        if (removeOwnNode && !(ownDN instanceof ShadowRoot))
             (ownDN as any as ChildNode).remove();
     }
 

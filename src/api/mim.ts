@@ -39,7 +39,26 @@ export interface IComponentClass<TProps = {}, TChildren = any>
 
 
 /**
- * Interface that must be implemented by all components.
+ * Type for the `shadow` property in the [[IComponent]] interface. This can be one of the following:
+ * - boolean - if the value is true, a `<div>` element will be created and shadow root attached to
+ *   it with mode "open".
+ * - string - an element with this name will be created and shadow root attached to
+ *   it with mode "open".
+ * - ShadowRootInit - a `<div>` element will be created and shadow root attached to
+ *   it with the given initialization prameters.
+ * - two-item tuple - the first items is the name of the element to create and attach a  shadow
+ *   root to; the second item specifies the shadow root initialization prameters.
+ */
+export type ComponentShadowParams = boolean | string | ShadowRootInit |
+    [tagName: string, init: ShadowRootInit]
+
+
+
+/**
+ * Interface that must be implemented by all components. Although it has many methods that
+ * components can implement, in practice, there is only one mandatory method - `render()`.
+ * Coponents should be ready to have the `vn` property set, although they don't have to declare
+ * it.
  *
  * @typeparam TProps Type defining properties that can be passed to this class-based component.
  *		Default type is an empty object (no properties).
@@ -60,6 +79,13 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * the virtual node is attached to the component.
 	 */
 	readonly displayName?: string;
+
+	/**
+	 * Flag indicating whether the component uses shadow DOM and optional parameters defining how
+     * the shadow DOM is created. The property is read once right before the component is mounted
+     * and stays the same during the component's life time.
+	 */
+	readonly shadow?: ComponentShadowParams;
 
 	/**
 	 * Sets, gets or clears the virtual node object of the component. This property is set twice:
@@ -226,7 +252,7 @@ export function wrapCallback<T extends Function>( params?: CallbackWrappingParam
 }
 
 /**
- * Retrieves the argumnet that was passed when a callback was wrapped. This function can only be
+ * Retrieves the argument that was passed when a callback was wrapped. This function can only be
  * called from the callback itself while it is executing.
  */
 export function getCallbackArg(): any
@@ -562,7 +588,7 @@ export type RefFunc<T = any> = (newRef: T) => void;
 
 
 // Symbol used to keep the referenced object inside the Ref class instance.
-let symRef = Symbol("symRef");
+let symRef = Symbol("ref");
 
 /**
  * Reference class to use whenever a reference to an object is needed - for example, with JSX `ref`
@@ -861,6 +887,15 @@ export interface IClassCompVN extends IVNode
 {
 	/** Gets the component instance. */
     readonly comp: IComponent;
+
+	/**
+     * If the component specifies the [[shadow]] property, the `shadowRoot` property will be set
+     * to the shadow root element under which the component's content returned from the `render()`
+     * method will be placed. If the component doesn't specify the [[shadow]] property, the
+     * `shadowRoot` property will be undefined. Components can access the shadow root via their
+     * `vn.shadowRoot` property.
+     */
+    readonly shadowRoot?: ShadowRoot;
 
 	/** This method is called by the component when it needs to be updated. */
 	updateMe( func?: RenderMethodType, funcThisArg?: any, key?: any): void;
