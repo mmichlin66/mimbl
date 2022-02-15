@@ -1,5 +1,5 @@
-﻿import {IErrorHandlingService} from "../api/mim"
-import {VN, DN, scheduleFuncCall} from "../internal"
+﻿import {IComponent, IErrorHandlingService} from "../api/mim"
+import {VN, DN, scheduleFuncCall, VNDisp} from "../internal"
 
 /// #if USE_STATS
 	import {StatsCategory} from "../utils/Stats"
@@ -22,7 +22,6 @@ export class RootVN extends VN implements IErrorHandlingService
 		super();
 
 		this.anchorDN = anchorDN;
-        this.supportsErrorHandling = true;
 	};
 
 
@@ -37,6 +36,32 @@ export class RootVN extends VN implements IErrorHandlingService
 	public get name(): string { return "Root"; }
 
 
+
+	/**
+     * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
+     * and before the given node.
+     */
+	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+    {
+        super.mount( creator, parent, index, anchorDN);
+    }
+
+    /**
+     * Recursively removes the content of this virtual node from DOM.
+     */
+	public unmount( removeFromDOM: boolean): void
+    {
+        super.unmount( removeFromDOM);
+    }
+
+	/**
+     * Recursively updates this node from the given node. This method is invoked only if update
+     * happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
+     * point to a VN of the same type as this node.
+     */
+	public update( disp: VNDisp): void
+    {
+    }
 
 	// Sets the content to be rendered under this root node and triggers update.
 	public setContent( content: any, sync: boolean): void
@@ -146,7 +171,7 @@ export class RootVN extends VN implements IErrorHandlingService
 
 
 
-let symRootMountPoint = Symbol("symRootMountPoint");
+let symRootMountPoint = Symbol("rootMountPoint");
 
 
 

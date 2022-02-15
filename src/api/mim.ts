@@ -3,7 +3,7 @@ import {IHtmlIntrinsicElements} from "./HtmlTypes";
 import {ISvgIntrinsicElements} from "./SvgTypes";
 import {
     PropType, EventSlot, mountRoot, unmountRoot, TextVN,
-    s_wrapCallback, registerElmProp, symJsxToVNs, s_getCallbackArg
+    s_wrapCallback, registerElmProp, symJsxToVNs, s_getCallbackArg, shadowDecorator
 } from "../internal";
 
 
@@ -49,8 +49,33 @@ export interface IComponentClass<TProps = {}, TChildren = any>
  * - two-item tuple - the first items is the name of the element to create and attach a  shadow
  *   root to; the second item specifies the shadow root initialization prameters.
  */
-export type ComponentShadowParams = boolean | string | ShadowRootInit |
-    [tagName: string, init: ShadowRootInit]
+export type ComponentShadowOptions = boolean | string | ShadowRootInit |
+    [tag: string, init: ShadowRootInit]
+
+
+
+/**
+ * Decorator function for components that allows them to use shadow DOM.
+ *
+ * **Example:**
+ * ```typescript
+ * // A `<div>` element will be created with shadow DOM in open mode
+ * @css.withShadow
+ * class MyComponent extends mim.Component {...}
+ *
+ * // A `<span>` element will be created with shadow DOM in open mode
+ * @css.embedded("span")
+ * class SecondWidgetStyles extends css.StyleDefinition {...}
+ *
+ * // A `<span>` element will be created with shadow DOM in open mode
+ * @css.embedded("span")
+ * class SecondWidgetStyles extends css.StyleDefinition {...}
+ * ```
+ */
+ export const withShadow = (options: Function | ComponentShadowOptions): any =>
+    typeof options === "function"
+        ? shadowDecorator( true, options)
+        : shadowDecorator.bind( undefined, options)
 
 
 
@@ -79,13 +104,6 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * the virtual node is attached to the component.
 	 */
 	readonly displayName?: string;
-
-	/**
-	 * Flag indicating whether the component uses shadow DOM and optional parameters defining how
-     * the shadow DOM is created. The property is read once right before the component is mounted
-     * and stays the same during the component's life time.
-	 */
-	readonly shadow?: ComponentShadowParams;
 
 	/**
 	 * Sets, gets or clears the virtual node object of the component. This property is set twice:

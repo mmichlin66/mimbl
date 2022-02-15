@@ -1,12 +1,11 @@
 ﻿import {
-    IElmVN, EventFuncType, ICustomAttributeHandler, IElementProps, IComponent,
-    EventPropType, setRef, RefType, ElmRefType, CallbackWrappingParams, TickSchedulingType,
-    UpdateStrategy
+    IElmVN, EventFuncType, ICustomAttributeHandler, IElementProps, EventPropType, setRef, RefType,
+    ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy, IComponent
 } from "../api/mim"
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo, AttrPropInfo, EventPropInfo, getElmPropInfo,
     setElmProp, removeElmProp, updateElmProp, s_wrapCallback, ChildrenUpdateOperation, syncUpdate,
-    ChildrenUpdateRequest, DN
+    ChildrenUpdateRequest, DN, VNDisp, mountSubNodes, reconcileSubNodes, unmountSubNodes,
 } from "../internal"
 
 /// #if USE_STATS
@@ -32,11 +31,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 
-	constructor( creator: IComponent, tagName: string, props: IElementProps<T>, subNodes: VN[])
+	constructor( tagName: string, props: IElementProps<T>, subNodes: VN[])
 	{
 		super();
 
-		this.creator = creator;
 		this.elmName = tagName;
 		this.props = props;
 		this.subNodes = subNodes;
@@ -66,37 +64,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 		return name;
 	}
-
-
-
-    // Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
-    // This method is only called on the mounted nodes.
-    public getFirstDN(): DN
-    {
-        return this.ownDN;
-    }
-
-    // Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
-    // This method is only called on the mounted nodes.
-    public getLastDN(): DN
-    {
-        return this.ownDN;
-    }
-
-    // Returns the list of DOM nodes that are immediate children of this virtual node; that is, are
-    // NOT children of sub-nodes that have their own DOM node. May return null but never returns
-    // empty array.
-    public getImmediateDNs(): DN | DN[] | null
-    {
-        return this.ownDN;
-    }
-
-    // Collects all DOM nodes that are the immediate children of this virtual node (that is,
-    // are NOT children of sub-nodes that have their own DOM node) into the given array.
-    protected collectImmediateDNs( arr: DN[]): void
-    {
-        arr.push( this.ownDN);
-    }
 
 
 
@@ -196,88 +163,49 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 
-    // Creates a virtual node as a "clone" of this one. This method is invoked when an already
-    // mounted node is returned during rendering. The method can either create a new virtual
-    // node or it can mark the node in a special way and return the same instance. If this method
-    // is not implemented, the same instance will be used.
-    public clone(): VN
-    {
-        let newElmVN = new ElmVN( this.creator, this.elmName, this.props, this.subNodes);
-        newElmVN.clonedFrom = this;
-        return newElmVN;
-    }
-
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount(): void
+	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
 	{
-        // if the element already exists, this means that the node is being reused by different
-        // parents. That is OK as long as the node is "static"; that is, it doesn't have any
-        // dynamic behavior and its properties and children remain the same. In this case, we
-        // can clone the already created element.
-        let clonedFrom = this.clonedFrom;
-        if (clonedFrom && clonedFrom.ownDN)
-        {
-            // we don't clone the children (if any) because they will be cloned by our sub-nodes
-            this.ownDN = clonedFrom.ownDN.cloneNode( false) as T;
+        super.mount( creator, parent, index, anchorDN);
 
-            // copy information about attributes and events
-            this.attrs = clonedFrom.attrs;
-            this.events = clonedFrom.events;
-            this.customAttrs = clonedFrom.customAttrs;
-
-            // forget the fact that we were cloned
-            this.clonedFrom = null;
-        }
+        // create the element. If namespace is provided use it
+        let ns = this.props?.xmlns;
+        if (ns)
+            this.ownDN = document.createElementNS( ns, this.elmName) as any as T;
         else
         {
-            // create the element. If namespace is provided use it
-            let ns = this.props?.xmlns;
-            if (ns)
-                this.ownDN = document.createElementNS( ns, this.elmName) as any as T;
-            else
+            // if the element is in the list use the provided namespace; otherwise, use the
+            // namespace of the anchor element.
+            let info = elmInfos[this.elmName];
+            if (typeof info === "number")
             {
-                // if the element is in the list use the provided namespace; otherwise, use the
-                // namespace of the anchor element.
-                let info = elmInfos[this.elmName];
-                if (typeof info === "number")
+                switch( info)
                 {
-                    switch( info)
-                    {
-                        case ENamespace.HTML:
-                            this.ownDN = document.createElement( this.elmName) as any as T;
-                            break;
-                        case ENamespace.SVG:
-                            this.ownDN = document.createElementNS( SvgNamespace, this.elmName) as T
-                            break;
-                        case ENamespace.MATHML:
-                            this.ownDN = document.createElementNS( MathNamespace, this.elmName) as T
-                            break;
-                    }
+                    case ENamespace.HTML:
+                        this.ownDN = document.createElement( this.elmName) as any as T;
+                        break;
+                    case ENamespace.SVG:
+                        this.ownDN = document.createElementNS( SvgNamespace, this.elmName) as T
+                        break;
+                    case ENamespace.MATHML:
+                        this.ownDN = document.createElementNS( MathNamespace, this.elmName) as T
+                        break;
                 }
-                else if (!info)
-                    this.ownDN = document.createElementNS( (this.anchorDN as Element).namespaceURI, this.elmName) as T;
-                else
-                    this.ownDN = document.createElementNS( info.ns, info.name || this.elmName) as T;
-
-                // // if the element is in the list use the provided namespace; otherwise, use the
-                // // namespace of the anchor element.
-                // let info = elmInfos[this.elmName];
-                // this.ownDN = info
-                //     ? info.ns
-                //         ? document.createElementNS( info.ns, info.name || this.elmName) as T
-                //         : document.createElement( this.elmName) as any as T
-                //     : document.createElementNS( (this.anchorDN as Element).namespaceURI, this.elmName) as T;
             }
+            else if (!info)
+                this.ownDN = document.createElementNS( (this.anchorDN as Element).namespaceURI, this.elmName) as T;
+            else
+                this.ownDN = document.createElementNS( info.ns, info.name || this.elmName) as T;
+        }
 
-            // translate properties into attributes, events and custom attributes
-            if (this.props)
-            {
-                this.parseProps( this.props);
-                if (this.attrs)
-                    this.addAttrs();
-            }
+        // translate properties into attributes, events and custom attributes
+        if (this.props)
+        {
+            this.parseProps( this.props);
+            if (this.attrs)
+                this.addAttrs();
         }
 
         // note that if we were cloned we don't need to add attributes and if were not cloned we
@@ -294,7 +222,14 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         if (this.vnref)
             setRef( this.vnref, this);
 
-		/// #if USE_STATS
+        // add sub-nodes
+        if (this.subNodes)
+            mountSubNodes( creator, this, this.subNodes, this.ownDN, null);
+
+        // add element to DOM
+        anchorDN.insertBefore( this.ownDN, beforeDN);
+
+        /// #if USE_STATS
 			DetailedStats.log( StatsCategory.Elm, StatsAction.Added);
 		/// #endif
 	}
@@ -302,8 +237,11 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 	// Releases reference to the DOM node corresponding to this virtual node.
-	public unmount(): void
+	public unmount( removeFromDOM: boolean): void
 	{
+        if (removeFromDOM)
+            this.ownDN.remove();
+
 		// unset the reference value if specified. We check whether the reference still points
 		// to our element before setting it to undefined. If the same ElmRef object is used for
 		// more than one element (and/or components) it can happen that the reference is changed
@@ -318,7 +256,14 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		if (this.customAttrs)
 			this.removeCustomAttrs();
 
-		/// #if USE_STATS
+        if (this.subNodes)
+            unmountSubNodes( this.subNodes, false);
+
+        this.ownDN = null;
+
+        super.unmount( removeFromDOM);
+
+        /// #if USE_STATS
 			DetailedStats.log( StatsCategory.Elm, StatsAction.Deleted);
 		/// #endif
 	}
@@ -340,12 +285,14 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node. The returned value indicates whether children
 	// should be updated (that is, this node's render method should be called).
-	public update( newVN: ElmVN<T>): boolean
+	public update( newVN: ElmVN<T>, disp: VNDisp): void
 	{
-        // we need to update attributes and events only if the new props are different from the
-        // current ones
+        // it might theoretically happen that a different component reuses this element, so we
+        // need to compare the creators. Also we need to update attributes and events if the new
+        // props are different from the current ones.
         if (this.creator !== newVN.creator || !s_deepCompare( this.props, newVN.props, 3))
         {
+            this.creator = newVN.creator;
             if (newVN.props)
                 newVN.parseProps( newVN.props);
 
@@ -365,7 +312,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                     setRef( this.vnref, this);
             }
 
-            // remember the new value of the key and updateStartegyproperties (even if the
+            // remember the new value of the key and updateStartegy properties (even if the
             // values are the same)
             this.props = newVN.props;
             this.key = newVN.key;
@@ -376,10 +323,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             this.updateCustomAttrs( newVN.customAttrs);
         }
 
-		// render method should be called if either old or new node has children
-		let shouldRender = this.subNodes != null || newVN.subNodes != null;
-
-		return shouldRender;
+        if (this.subNodes || newVN.subNodes)
+            reconcileSubNodes( this.creator, this, disp, newVN.subNodes);
 	}
 
 
@@ -968,15 +913,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     // element's properties without re-rendering its children.
     private propsForPartialUpdate: any;
 }
-
-
-
-// Define methods/properties that are invoked during mounting/unmounting/updating and which don't
-// have or have trivial implementation so that lookup is faster.
-ElmVN.prototype.render = undefined;
-ElmVN.prototype.didUpdate = undefined;
-ElmVN.prototype.supportsErrorHandling = false;
-ElmVN.prototype.ignoreUnmount = false;
 
 
 

@@ -1,11 +1,30 @@
-﻿import {IClassCompVN, symRenderNoWatcher, IComponent, RenderMethodType, ScheduledFuncType, TickSchedulingType} from "../api/mim"
-import {createWatcher, IWatcher} from "../utils/TriggerWatcher"
-import {VN, setCurrentClassComp, FuncProxyVN, scheduleFuncCall, s_wrapCallback, mimcss} from "../internal"
+﻿import {IClassCompVN, symRenderNoWatcher, IComponent, RenderMethodType, ScheduledFuncType, TickSchedulingType, IComponentClass, ComponentShadowOptions} from "../api/mim"
+import {
+    DN, VN, setCurrentClassComp, FuncProxyVN, scheduleFuncCall, s_wrapCallback, mountContent,
+    unmountSubNodes, VNDisp, reconcile, createWatcher, IWatcher
+} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
-import { DN } from "./VN";
 /// #endif
+
+
+
+/**
+ * Symbol used on component class to specify shadow parameters (ComponentShadowParams)
+ */
+const symShadowOptions = Symbol("shadowParam");
+
+/**
+ * Decorator function for component classes, which sets the symbol on the given class with the
+ * given shadaow options.
+ * @param cls Component class to decorate
+ * @param options Shadow options to set
+ */
+export const shadowDecorator = (options: ComponentShadowOptions, cls: Function): void =>
+{
+    cls[symShadowOptions] = options;
+}
 
 
 
@@ -17,14 +36,29 @@ import { DN } from "./VN";
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export abstract class ClassCompVN extends VN implements IClassCompVN
 {
-	// Component instance.
+	/** Type of the class-based component. */
+	public compClass: IComponentClass;
+
+	/** Component instance. */
 	public comp: IComponent;
 
-    /** Optional shadow root if the component specifies the `shadow` property */
-    public shadowRoot?: ShadowRoot;
+    /**
+     * Optional element serving as a host for shadow root if the component specifies the `shadow`
+     * property.
+     */
+    public rootHost?: Element;
 
-    /** Specifal virtual node created if the component specifies the `shadow` property */
-    private shadowVN?: ShadowRootVN;
+    /** Optional shadow root if the component specifies the `shadow` property */
+    public declare ownDN?: ShadowRoot;
+
+	/**
+     * If the component specifies the [[shadow]] property, the `shadowRoot` property will be set
+     * to the shadow root element under which the component's content returned from the `render()`
+     * method will be placed. If the component doesn't specify the [[shadow]] property, the
+     * `shadowRoot` property will be undefined. Components can access the shadow root via their
+     * `vn.shadowRoot` property.
+     */
+    public get shadowRoot(): ShadowRoot { return this.ownDN; };
 
 
 
@@ -34,16 +68,42 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
 
+	/**
+     * Prepares component for mounting but doesn't render and mount sub-nodes
+     */
+	public prepareMount( comp: IComponent): void
+    {
+        // check whether the component is already connected to another node
+        let oldVN = comp.vn as ClassCompVN;
+
+        // connect the component to this virtual node
+        comp.vn = this;
+
+        // don't need try/catch because it will be caught up the chain
+        let fn: Function = comp.willMount;
+        fn && fn.call( comp);
+
+        // establish watcher if not disabled using the @noWatcher decorator
+        let render = comp.render;
+        if (render[symRenderNoWatcher])
+            this.actRender = render.bind( comp);
+        else
+            this.actRender = this.renderWatcher = createWatcher( render, this.requestUpdate, comp, this);
+
+        if (comp.getUpdateStrategy)
+            this.updateStrategy = comp.getUpdateStrategy();
+    }
+
+
+
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount(): void
+	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
     {
-        // connect the component to this virtual node
-        let comp = this.comp;
-        comp.vn = this;
+        super.mount( creator, parent, index, anchorDN);
 
-        let shadowOptions = comp.shadow;
+        let shadowOptions = this.compClass[symShadowOptions] as ComponentShadowOptions;
         if (shadowOptions)
         {
             let tag: string = "div";
@@ -58,32 +118,41 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
             else if (typeof shadowOptions === "object")
                 init = shadowOptions;
 
-            this.ownDN = document.createElement( tag);
-            this.shadowRoot = (this.ownDN as Element).attachShadow( init);
-            this.shadowVN = new ShadowRootVN( this.shadowRoot);
+            this.rootHost = document.createElement( tag);
+            this.ownDN = this.rootHost.attachShadow( init);
         }
 
-        // don't need try/catch because it will be caught up the chain
-        let fn: Function = comp.willMount;
-        if (fn)
-        {
-            let prevCreator = setCurrentClassComp( comp);
-            fn.call( comp);
-            setCurrentClassComp( prevCreator);
-        }
+        let comp = this.comp;
+        let prevCreator = setCurrentClassComp( comp);
 
-        // establish watcher if not disabled using the @noWatcher decorator
-        let render = comp.render;
-        if (render[symRenderNoWatcher])
-            this.actRender = render.bind( comp);
+        this.prepareMount( comp);
+
+        if (!this.comp.handleError)
+            mountContent( comp, this, this.actRender(), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
         else
-            this.actRender = this.renderWatcher = createWatcher( render, this.requestUpdate, comp, this);
+        {
+            try
+            {
+                mountContent( comp, this, this.actRender(), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
+            }
+            catch( err)
+            {
+                /// #if VERBOSE_NODE
+                    console.debug( `Calling handleError() on node ${this.name}. Error:`, err);
+                /// #endif
 
-        if (comp.handleError)
-            this.supportsErrorHandling = true;
+                // let the node handle the error and re-render; then we render the new
+                // content but we do it without try/catch this time; otherwise, we may end
+                // up in an infinite loop. We also set our component as current again.
+                setCurrentClassComp( comp);
+                mountContent( comp, this, this.comp.handleError( err), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
+            }
+        }
 
-        if (comp.getUpdateStrategy)
-            this.updateStrategy = comp.getUpdateStrategy();
+        setCurrentClassComp( prevCreator);
+
+        if (this.rootHost)
+            anchorDN.insertBefore( this.rootHost, beforeDN);
 
         /// #if USE_STATS
             DetailedStats.log( StatsCategory.Comp, StatsAction.Added);
@@ -93,45 +162,104 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
     // Releases reference to the DOM node corresponding to this virtual node.
-    public unmount(): void
+    public prepareUnmount( comp: IComponent): void
     {
-        let comp = this.comp;
-        let fn = comp.willUnmount;
-		if (fn)
-        {
-            // need try/catch but only to log
-            try
-            {
-                let prevCreator = setCurrentClassComp( comp);
-                fn.call( comp);
-                setCurrentClassComp( prevCreator);
-            }
-            catch( err)
-            {
-                console.error( `Exception in willUnmount of component '${this.name}'`, err);
-            }
-        }
-
         if (this.renderWatcher)
         {
             this.renderWatcher.dispose();
             this.renderWatcher = null;
         }
 
-		comp.vn = undefined;
-
-        if (this.shadowRoot)
+        let fn = comp.willUnmount;
+        if (fn)
         {
-            this.shadowRoot = null;
-            this.shadowVN = null;
-            (this.ownDN as Element).remove();
+            // need try/catch but only to log
+            let prevCreator = setCurrentClassComp( comp);
+            try
+            {
+                fn.call( comp);
+            }
+            catch( err)
+            {
+                console.error( `Exception in willUnmount of component '${this.name}'`, err);
+            }
+            setCurrentClassComp( prevCreator);
+        }
+
+        comp.vn = undefined;
+    }
+
+
+
+    // Releases reference to the DOM node corresponding to this virtual node.
+    public unmount( removeFromDOM: boolean): void
+    {
+        let comp = this.comp;
+        this.prepareUnmount( comp);
+
+        if (this.rootHost)
+        {
+            this.rootHost.remove();
+            this.rootHost = null;
             this.ownDN = null;
         }
+
+        if (this.subNodes)
+        {
+            unmountSubNodes( this.subNodes, removeFromDOM);
+            this.subNodes = null;
+        }
+
+        super.unmount( removeFromDOM);
 
         /// #if USE_STATS
             DetailedStats.log( StatsCategory.Comp, StatsAction.Deleted);
         /// #endif
     }
+
+
+
+	// Determines whether the update of this node from the given node is possible. The newVN
+	// parameter is guaranteed to point to a VN of the same type as this node.
+	public isUpdatePossible( newVN: ClassCompVN): boolean
+	{
+		// update is possible if the component class name is the same
+		return this.compClass === newVN.compClass;
+	}
+
+
+
+	// Updated this node from the given node. This method is invoked only if update
+	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
+	// point to a VN of the same type as this node.
+	public update( newVN: ClassCompVN, disp: VNDisp): void
+	{
+        let comp = this.comp;
+        let prevCreator = setCurrentClassComp( comp);
+
+        if (!comp.handleError)
+            reconcile( comp, this, disp, this.actRender());
+        else
+        {
+            try
+            {
+                reconcile( comp, this, disp, this.actRender());
+            }
+            catch( err)
+            {
+                /// #if VERBOSE_NODE
+                    console.debug( `Calling handleError() on node ${this.name}. Error`, err);
+                /// #endif
+
+                // let the node handle its own error and re-render; then we render the new
+                // content but we do it without try/catch this time; otherwise, we may end
+                // up in an infinite loop
+                reconcile( comp, this, {oldVN: disp.oldVN}, this.handleError( err));
+            }
+        }
+
+        setCurrentClassComp( prevCreator);
+	}
 
 
 
@@ -157,13 +285,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         let prevCreator = setCurrentClassComp( this.comp);
         let content = this.actRender();
         setCurrentClassComp( prevCreator);
-
-        if (this.shadowVN)
-        {
-            this.shadowVN.content = content;
-            content = this.shadowVN;
-        }
-
         return content;
 	}
 
@@ -178,12 +299,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         let prevCreator = setCurrentClassComp( this.comp);
 		let content = this.comp.handleError( err);
         setCurrentClassComp( prevCreator);
-
-        if (this.shadowVN)
-        {
-            this.shadowVN.content = content;
-            content = this.shadowVN;
-        }
 
         return content;
 	}
@@ -241,101 +356,5 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	private actRender: (...args: any) => any;
 }
 
-
-
-/**
- * Represents a node responsible for representing a shadow root for an element that is created for
- * a component that wants to work with shadow DOM.
- */
-class ShadowRootVN extends VN
-{
-    content: any;
-
-	constructor( root: ShadowRoot)
-	{
-		super();
-        this.ownDN = root;
-	};
-
-
-
-/// #if USE_STATS
-	public get statsCategory(): StatsCategory { return StatsCategory.Text; }
-/// #endif
-
-
-
-	// String representation of the virtual node. This is used mostly for tracing and error
-	// reporting. The name can change during the lifetime of the virtual node; for example,
-	// it can reflect an "id" property of an element (if any).
-	public get name(): string { return "#shadow"; }
-
-
-
-    // Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
-    // This method is only called on the mounted nodes.
-    public getFirstDN(): DN
-    {
-        return this.ownDN;
-    }
-
-    // Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
-    // This method is only called on the mounted nodes.
-    public getLastDN(): DN
-    {
-        return this.ownDN;
-    }
-
-    // Returns the list of DOM nodes that are immediate children of this virtual node; that is, are
-    // NOT children of sub-nodes that have their own DOM node. May return null but never returns
-    // empty array.
-    public getImmediateDNs(): DN | DN[] | null
-    {
-        return this.ownDN;
-    }
-
-    // Collects all DOM nodes that are the immediate children of this virtual node (that is,
-    // are NOT children of sub-nodes that have their own DOM node) into the given array.
-    protected collectImmediateDNs( arr: DN[]): void
-    {
-        arr.push( this.ownDN);
-    }
-
-
-
-    // // Creates and returns DOM node corresponding to this virtual node.
-	// public mount(): void
-	// {
-	// 	this.ownDN = this.elm.attachShadow({mode: "open"});
-	// }
-
-
-    // Generates list of sub-nodes according to the current state
-	public render(): any
-	{
-        return this.content;
-    }
-
-	// Updated this node from the given node. This method is invoked only if update
-	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node. The returned value indicates whether children
-	// should be updated (that is, this node's render method should be called).
-	public update( newVN: ShadowRootVN): boolean
-	{
-		return true;
-    }
-}
-
-
-// Define methods/properties that are invoked during mounting/unmounting/updating and which don't
-// have or have trivial implementation so that lookup is faster.
-
-/// #if !USE_STATS
-    ShadowRootVN.prototype.unmount = undefined;
-/// #endif
-
-ShadowRootVN.prototype.isUpdatePossible = undefined; // this mens that update is always possible
-ShadowRootVN.prototype.didUpdate = undefined;
-ShadowRootVN.prototype.ignoreUnmount = false;
 
 

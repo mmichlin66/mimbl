@@ -1,12 +1,12 @@
 ﻿import {
     ScheduledFuncType, Component, Fragment, FuncProxy, PromiseProxy, CallbackWrappingParams,
-    TickSchedulingType, UpdateStrategy, IComponent
+    TickSchedulingType, IComponent
 } from "../api/mim"
 import {
     VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN, FuncProxyVN,
     ManagedCompVN, enterMutationScope, exitMutationScope, ChildrenUpdateRequest,
     ChildrenUpdateOperation, SetRequest, SpliceRequest, MoveRequest, SwapRequest,
-    SliceRequest, TrimRequest, GrowRequest, ReverseRequest
+    SliceRequest, TrimRequest, GrowRequest, ReverseRequest, VNDisp, VNDispAction, VNDispGroup
 } from "../internal"
 
 /// #if USE_STATS
@@ -55,7 +55,10 @@ let s_ignoreSchedulingRequest: boolean = false;
 let s_currentClassComp: IComponent = null;
 
 // Sets the given object as the current "creator" object.
-export function setCurrentClassComp( comp: IComponent): IComponent
+export const getCurrentClassComp = (): IComponent => s_currentClassComp;
+
+// Sets the given object as the current "creator" object.
+export const setCurrentClassComp = (comp: IComponent): IComponent =>
 {
     let prevComp = s_currentClassComp;
     s_currentClassComp = comp;
@@ -69,10 +72,7 @@ let s_currentCallbackArg: any;
 
 // Retrieves the argumnet that was passed when a callback was wrapped. This function can only be called
 // from the callback itself while it is executing.
-export function s_getCallbackArg(): any
-{
-    return s_currentCallbackArg;
-}
+export const s_getCallbackArg = (): any => s_currentCallbackArg;
 
 
 
@@ -110,10 +110,8 @@ const enum SchedulerState
 // {
 //     return CallbackWrapper.bind( creator, func, funcThisArg, schedulingType);
 // }
-export function s_wrapCallback<T extends Function>( params: CallbackWrappingParams<T>): T
-{
-    return CallbackWrapper.bind( params);
-}
+export const s_wrapCallback = <T extends Function>( params: CallbackWrappingParams<T>): T =>
+    CallbackWrapper.bind( params);
 
 
 
@@ -123,10 +121,6 @@ export function s_wrapCallback<T extends Function>( params: CallbackWrappingPara
  */
 function CallbackWrapper( this: CallbackWrappingParams<Function>): any
 {
-    // remember the current creator and set the new one
-    let prevCreator = s_currentClassComp;
-    s_currentClassComp = this.creator;
-
     // we don't want the triggers encountered during the callback execution to cause the watchers
     // to run immediately, so we enter mutation scope
     enterMutationScope();
@@ -150,7 +144,6 @@ function CallbackWrapper( this: CallbackWrappingParams<Function>): any
         exitMutationScope();
         s_currentCallbackArg = undefined;
         s_ignoreSchedulingRequest = false;
-        s_currentClassComp = prevCreator;
     }
 
     // schedule a Mimbl tick if instructed to do so
@@ -165,7 +158,7 @@ function CallbackWrapper( this: CallbackWrappingParams<Function>): any
 /**
  * Schedule (or executes) Mimbl tick according to the given type.
  */
-function scheduleTick( schedulingType: TickSchedulingType = TickSchedulingType.AnimationFrame): void
+const scheduleTick = (schedulingType: TickSchedulingType = TickSchedulingType.AnimationFrame): void =>
 {
     switch (schedulingType)
     {
@@ -191,7 +184,7 @@ function scheduleTick( schedulingType: TickSchedulingType = TickSchedulingType.A
 
 
 // Schedules an update for the given node.
-export function requestNodeUpdate( vn: VN, req?: ChildrenUpdateRequest, schedulingType?: TickSchedulingType): void
+export const requestNodeUpdate = (vn: VN, req?: ChildrenUpdateRequest, schedulingType?: TickSchedulingType): void =>
 {
     if (!vn.anchorDN)
     {
@@ -239,8 +232,8 @@ export function requestNodeUpdate( vn: VN, req?: ChildrenUpdateRequest, scheduli
 
 // Schedules to call the given function either before or after all the scheduled components
 // have been updated.
-export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean,
-    funcThisArg?: any, creator?: any, schedulingType?: TickSchedulingType): void
+export const scheduleFuncCall = (func: ScheduledFuncType, beforeUpdate: boolean,
+    funcThisArg?: any, creator?: any, schedulingType?: TickSchedulingType): void =>
 {
 	/// #if DEBUG
 	if (!func)
@@ -283,7 +276,7 @@ export function scheduleFuncCall( func: ScheduledFuncType, beforeUpdate: boolean
 
 // Performs the specified operation on the sub-nodes of the given node. This function is called
 // when the operation is invoked synchronously; that is, without going through the Mimbl tick.
-export function syncUpdate( vn: VN, req: ChildrenUpdateRequest)
+export const syncUpdate = (vn: VN, req: ChildrenUpdateRequest): void =>
 {
     // it can happen that we encounter already unmounted virtual nodes - ignore them
     if (!vn.anchorDN)
@@ -316,7 +309,7 @@ export function syncUpdate( vn: VN, req: ChildrenUpdateRequest)
 
 
 // Callback that is called on a new UI cycle when there is a need to update UI components
-function onAnimationFrame(): void
+const onAnimationFrame = (): void =>
 {
 	// clear the scheduled frame handle so that new update requests will
 	// schedule a new frame.
@@ -328,7 +321,7 @@ function onAnimationFrame(): void
 
 
 // Reconciler main entrance point
-function performMimbleTick(): void
+const performMimbleTick = (): void =>
 {
     // clear a scheduled frame (if any). This can happen if we were invoked from the callback
     // wrapper while a frame has been previously scheduled.
@@ -428,8 +421,7 @@ function performMimbleTick(): void
 
 
 // Call functions scheduled before or after update cycle.
-function callScheduledFunctions( funcs: Map<ScheduledFuncType,ScheduledFuncType>, beforeUpdate: boolean)
-{
+const callScheduledFunctions = (funcs: Map<ScheduledFuncType,ScheduledFuncType>, beforeUpdate: boolean) =>
 	funcs.forEach( wrapper =>
 	{
 		try
@@ -438,18 +430,26 @@ function callScheduledFunctions( funcs: Map<ScheduledFuncType,ScheduledFuncType>
 		}
 		catch( err)
 		{
+            /// #if DEBUG
 			console.error( `Exception while invoking function ${beforeUpdate ? "before" : "after"} updating components\n`, err);
+            /// #endif
 		}
 	});
-}
 
 
 
 // Performs the specified operation on the sub-nodes of the given node.
-function performChildrenOperation( vn: VN, req: ChildrenUpdateRequest)
+const performChildrenOperation = (vn: VN, req: ChildrenUpdateRequest): void =>
 {
+    s_currentClassComp = vn instanceof ClassCompVN ? vn.comp : vn.creator;
+
     if (!req)
-        rerenderNode( {oldVN: vn});
+    {
+        // We call the render method without try/catch. If it throws, the control goes to either the
+        // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
+        let fn: Function = vn.render;
+        reconcile( s_currentClassComp, vn, {oldVN: vn}, fn && createVNChainFromContent( fn.call( vn)));
+    }
     else
     {
         switch( req.op)
@@ -470,27 +470,9 @@ function performChildrenOperation( vn: VN, req: ChildrenUpdateRequest)
 
 
 
-// Updates the sub-nodes of the given node using new sub-nodes. New sub-nodes are obtained either
-// by rendering the old node or by getting them from the new node.
-function rerenderNode( disp: VNDisp): void
-{
-    // The render method is invoked on the old node assuming that the old node already has the
-    // updated information from the new node. If, however, the old node doesn't have the render
-    // method, we get the sub-nodes from the new node. For example, ElmVN doesn't have the render
-    // method but it has the sub-nodes filled in during the JSX operations.
-    // We call the render method without try/catch. If it throws, the control goes to either the
-    // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
-	let oldVN = disp.oldVN;
-    let fn: Function = oldVN.render;
-    reconcileAndUpdateSubNodes( oldVN, disp,
-        fn ? createVNChainFromContent( fn.call( oldVN)) : disp.newVN.subNodes);
-}
-
-
-
 // Unmounts existing sub-nodes of the given node and mounts the new ones obtained from the given
 // new content.
-function setNodeChildren( vn: VN, req: SetRequest): void
+const setNodeChildren = (vn: VN, req: SetRequest): void =>
 {
     let oldSubNodes = vn.subNodes;
     let oldLen = oldSubNodes ? oldSubNodes.length : 0;
@@ -510,8 +492,8 @@ function setNodeChildren( vn: VN, req: SetRequest): void
 
     if (req.update)
     {
-        reconcileAndUpdateSubNodes( vn,
-            {oldVN: vn, oldStartIndex: startIndex, odlEndIndex: endIndex, updateStrategy: req.updateStrategy},
+        reconcile( vn.creator, vn,
+            {oldVN: vn, oldStartIndex: startIndex, oldEndIndex: endIndex, updateStrategy: req.updateStrategy},
             createVNChainFromContent( req.content));
 
         return;
@@ -532,7 +514,7 @@ function setNodeChildren( vn: VN, req: SetRequest): void
             if (ownDN)
                 (ownDN as Element).textContent = null;
 
-            oldSubNodes.forEach( svn => { unmountNode( svn, !ownDN) });
+            oldSubNodes.forEach( svn => svn.unmount( !ownDN));
         }
 
         let newSubNodes = req.content && createVNChainFromContent( req.content);
@@ -540,7 +522,7 @@ function setNodeChildren( vn: VN, req: SetRequest): void
         {
             let anchorDN = ownDN ? ownDN : vn.anchorDN;
             let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
-            mountSubNodes( vn, newSubNodes, anchorDN, beforeDN);
+            mountSubNodes( vn.creator, vn, newSubNodes, anchorDN, beforeDN);
         }
 
         vn.subNodes = newSubNodes;
@@ -550,7 +532,7 @@ function setNodeChildren( vn: VN, req: SetRequest): void
 
 
 // At the given index, removes a given number of sub-nodes and then inserts the new content.
-function spliceNodeChildren( vn: VN, req: SpliceRequest): void
+const spliceNodeChildren = (vn: VN, req: SpliceRequest): void =>
 {
     let oldSubNodes = vn.subNodes;
     let oldLen = oldSubNodes ? oldSubNodes.length : 0;
@@ -569,7 +551,7 @@ function spliceNodeChildren( vn: VN, req: SpliceRequest): void
     // calculate the number of sub-nodes to delete
     countToDelete = Math.min( req.countToDelete, oldLen - index);
 
-    let newSubNodes = req.contentToInsert && createVNChainFromContent( req.contentToInsert);
+    let newSubNodes = req.contentToInsert != null && createVNChainFromContent( req.contentToInsert);
     if (countToDelete === 0 && !newSubNodes)
         return;
 
@@ -579,7 +561,7 @@ function spliceNodeChildren( vn: VN, req: SpliceRequest): void
     {
         let stopIndex = index + countToDelete;
         for( let i = index; i < stopIndex; i++)
-            unmountNode( oldSubNodes[i], true);
+            oldSubNodes[i].unmount( true);
     }
 
     if (!newSubNodes)
@@ -606,14 +588,14 @@ function spliceNodeChildren( vn: VN, req: SpliceRequest): void
         // mount new nodes
         let stopIndex = index + newSubNodes.length;
         for( let i = index; i < stopIndex; i++)
-            mountNode( oldSubNodes[i], vn, i, anchorDN, beforeDN);
+            oldSubNodes[i].mount( vn.creator, vn, i, anchorDN, beforeDN);
     }
 }
 
 // Moves a range of sub-nodes to a new location. Moving a region to a new index is the same as
 // swapping two adjacent regions - the region being moved and the region from either the new index
 // to the beginning of the first region or the end of the first region to the new index.
-function moveNodeChildren( vn: VN, req: MoveRequest): void
+const moveNodeChildren = (vn: VN, req: MoveRequest): void =>
 {
     if (req.shift  === 0 || req.count === 0)
         return;
@@ -651,7 +633,7 @@ function moveNodeChildren( vn: VN, req: MoveRequest): void
 
 
 // Swaps two ranges of the element's sub-nodes. The ranges cannot intersect.
-function swapNodeChildren( vn: VN, req: SwapRequest): void
+const swapNodeChildren = (vn: VN, req: SwapRequest): void =>
 {
     let oldSubNodes = vn.subNodes;
     let oldLen = oldSubNodes ? oldSubNodes.length : 0;
@@ -778,7 +760,7 @@ function swapNodeChildren( vn: VN, req: SwapRequest): void
 
 // Moves the DOM nodes corresponding to the given range of sub-nodes. This function doesn't move
 // the virtual node objects themselves within the list - only their corresponding DOM nodes.
-function moveDOMRange( vn: VN, subNodes: VN[], index: number, count: number, indexBefore: number, anchorDN: DN)
+const moveDOMRange = (vn: VN, subNodes: VN[], index: number, count: number, indexBefore: number, anchorDN: DN) =>
 {
     let beforeDN: DN;
     if (indexBefore == subNodes.length)
@@ -793,7 +775,7 @@ function moveDOMRange( vn: VN, subNodes: VN[], index: number, count: number, ind
 
 
 // At the given index, removes a given number of sub-nodes and then inserts the new content.
-function sliceNodeChildren( vn: VN, req: SliceRequest): void
+const sliceNodeChildren = (vn: VN, req: SliceRequest): void =>
 {
     let oldSubNodes = vn.subNodes;
     if (!oldSubNodes)
@@ -822,7 +804,7 @@ function sliceNodeChildren( vn: VN, req: SliceRequest): void
         if (ownDN)
             (ownDN as Element).textContent = null;
 
-        oldSubNodes.forEach( svn => { unmountNode( svn, !ownDN) });
+        oldSubNodes.forEach( svn => svn.unmount( !ownDN));
         vn.subNodes = null;
         return;
     }
@@ -831,14 +813,14 @@ function sliceNodeChildren( vn: VN, req: SliceRequest): void
     if (startIndex > 0)
     {
         for( let i = 0; i < startIndex; i++)
-            unmountNode( oldSubNodes[i], true);
+            oldSubNodes[i].unmount(true);
     }
 
     // trim at end
     if (endIndex < oldLen)
     {
         for( let i = endIndex; i < oldLen; i++)
-            unmountNode( oldSubNodes[i], true);
+            oldSubNodes[i].unmount(true);
     }
 
     // extract only remaining nodes and change their indices
@@ -849,23 +831,21 @@ function sliceNodeChildren( vn: VN, req: SliceRequest): void
 
 
 // Removes the given number of nodes from the start and/or the end of the list of sub-nodes.
-function trimNodeChildren( vn: VN, req: TrimRequest): void
+const trimNodeChildren = (vn: VN, req: TrimRequest): void =>
 {
     let oldSubNodes = vn.subNodes;
-    if (!oldSubNodes)
-        return;
-
-    sliceNodeChildren( vn, { startIndex: req.startCount, endIndex: oldSubNodes.length - req.endCount })
+    if (oldSubNodes)
+        sliceNodeChildren( vn, { startIndex: req.startCount, endIndex: oldSubNodes.length - req.endCount })
 }
 
 
 
 // Adds new content before and/or after the existing children of the given node
-function growNodeChildren( vn: VN, req: GrowRequest): void
+const growNodeChildren = (vn: VN, req: GrowRequest): void =>
 {
     // convert content to arrays of sub-nodes. Note that arrays cannot be empty but can be null.
-    let newStartSubNodes = req.startContent && createVNChainFromContent( req.startContent);
-    let newEndSubNodes = req.endContent && createVNChainFromContent( req.endContent);
+    let newStartSubNodes = req.startContent != null && createVNChainFromContent( req.startContent);
+    let newEndSubNodes = req.endContent != null && createVNChainFromContent( req.endContent);
     if (!newStartSubNodes && !newEndSubNodes)
         return;
 
@@ -881,7 +861,7 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
             : newStartSubNodes || newEndSubNodes;
 
         let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
-        mountSubNodes( vn, vn.subNodes, anchorDN, beforeDN);
+        mountSubNodes( vn.creator, vn, vn.subNodes, anchorDN, beforeDN);
         return;
     }
 
@@ -897,7 +877,7 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
     if (newStartSubNodes)
     {
         let beforeDN = oldSubNodes[0].getFirstDN();
-        mountSubNodes( vn, newStartSubNodes, anchorDN, beforeDN);
+        mountSubNodes( vn.creator, vn, newStartSubNodes, anchorDN, beforeDN);
 
         // change indices of the old nodes
         let shift = newStartSubNodes.length;
@@ -912,7 +892,7 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
         //     beforeDN = beforeDN.nextSibling;
 
         // mountSubNodes( vn, newEndSubNodes, anchorDN, beforeDN, vn.subNodes.length - newEndSubNodes.length);
-        mountSubNodes( vn, newEndSubNodes, anchorDN,
+        mountSubNodes( vn.creator, vn, newEndSubNodes, anchorDN,
             ownDN ? null : getNextDNUnderSameAnchorDN(vn, anchorDN),
             vn.subNodes.length - newEndSubNodes.length);
     }
@@ -921,7 +901,7 @@ function growNodeChildren( vn: VN, req: GrowRequest): void
 
 
 // Reverses the given range of sub-nodes.
-function reverseNodeChildren( vn: VN, req: ReverseRequest): void
+const reverseNodeChildren = (vn: VN, req: ReverseRequest): void =>
 {
     let oldSubNodes = vn.subNodes;
     if (!oldSubNodes)
@@ -935,6 +915,7 @@ function reverseNodeChildren( vn: VN, req: ReverseRequest): void
         if (oldLen < 2 || startIndex < 0 || startIndex > oldLen || endIndex <= startIndex)
         {
             console.error( `Parameters for ReverseChildren operation are incorrect`, req);
+            return;
         }
     /// #endif
 
@@ -969,190 +950,41 @@ function reverseNodeChildren( vn: VN, req: ReverseRequest): void
 
 
 
-// Recursively creates and renders this node and its sub-nodes. This method is invoked
-// when a node is first mounted. If an exception is thrown during the execution of this
-// method (which can be only from components' willMount or render methods),
-// the component is asked to handle the error. If the component handles the error, the
-// content returned from the error handling method is rendered; otherwise, the exception
-// is re-thrown. Thus, the exception is propagated up until it is handled by a node that
-// handles it or up to the root node.
-function mountNode( vn: VN, parent: VN, index: number, anchorDN: DN, beforeDN: DN): VN
+// Recursively mounts sub-nodes.
+export const mountContent = (creator: IComponent, vn: VN, content: any,
+    anchorDN: DN, beforeDN: DN, startIndex?: number): void =>
 {
-    // if the node is already mounted, call its clone method if implemented.
-    if (vn.anchorDN)
-    {
-        let fn = vn.clone;
-        let clone = fn ? fn.call(vn) : vn;
-        if (clone === vn)
-        {
-            // if the clone method is not implemented or if it returns the same node, we move the
-            // node into the new position and indicate that we will not need to call unmount.
-            vn.ignoreUnmount = true;
-            vn.parent = parent;
-            vn.anchorDN = anchorDN;
-            vn.index = index;
-            moveNode( vn, anchorDN, beforeDN);
-            return vn;
-        }
-        else
-        {
-            // if the clone method returns a new node, we replace the old node in the parent's
-            // list of subnodes. Then we proceed with the mounting. We know that parent exists
-            // because this method is not called on the RootVN.
-            parent.subNodes[index] = clone;
-            vn = clone;
-        }
-    }
+    let subNodes = createVNChainFromContent(content);
+    if (subNodes)
+        mountSubNodes( creator, vn, subNodes, anchorDN, beforeDN, startIndex);
 
-	// initialize the node
-    vn.parent = parent;
-	vn.anchorDN = anchorDN;
-    vn.index = index;
-
-	/// #if VERBOSE_NODE
-		console.debug( `Calling mount() on node ${vn.name}`);
-	/// #endif
-    let fn = vn.mount;
-	fn && fn.call(vn);
-	let ownDN = vn.ownDN;
-
-    // let prevCreator = vn instanceof ClassCompVN ? setCurrentClassComp( vn.comp) : undefined;
-
-    // some nodes don't implement the render method; for example, TextVNs don't have any sub-nodes
-    // while ElmVNs have subNodes filed populated during JSX
-    fn = vn.render;
-    if (fn)
-    {
-        // we call the render method without try/catch
-        vn.subNodes = createVNChainFromContent( fn.call(vn));
-    }
-
-    // a node may have sub-nodes even if it doesn't implement the render method - e.g. ElmVN
-    if (vn.subNodes)
-    {
-        // determine what nodes to use as anchor and "before" for the sub-nodes
-        mountSubNodes( vn, vn.subNodes, ownDN ? ownDN : anchorDN, ownDN ? null : beforeDN)
-    }
-
-    // if (prevCreator !== undefined)
-    //     setCurrentClassComp( prevCreator);
-
-	// if we have our own DOM node, add it under the anchor node
-	if (ownDN && !(ownDN instanceof ShadowRoot))
-		anchorDN.insertBefore( ownDN, beforeDN);
-
-    return vn;
+    vn.subNodes = subNodes;
 }
 
 
 
 // Recursively mounts sub-nodes.
-function mountSubNodes( vn: VN, subNodes: VN[], anchorDN: DN, beforeDN: DN, startIndex?: number): void
-{
-    // If our node knows to handle errors, we mount sub-nodes under try/catch; otherwise, the
-    // exceptions go to either the ancestor node that knows to handle errors or to the Mimbl tick
-    // loop.
-    if (!vn.supportsErrorHandling)
-    {
-        if (!startIndex)
-            subNodes.forEach( (svn, i) => mountNode( svn, vn, i, anchorDN, beforeDN));
-        else
-            subNodes.forEach( (svn, i) => mountNode( svn, vn, startIndex + i, anchorDN, beforeDN));
-    }
-    else
-    {
-        try
-        {
-            if (!startIndex)
-                subNodes.forEach( (svn, i) => mountNode( svn, vn, i, anchorDN, beforeDN));
-            else
-                subNodes.forEach( (svn, i) => mountNode( svn, vn, startIndex + i, anchorDN, beforeDN));
-        }
-        catch( err)
-        {
-            /// #if VERBOSE_NODE
-                console.debug( `Calling handleError() on node ${vn.name}. Error:`, err);
-            /// #endif
-
-            // let the node handle the error and re-render; then we render the new
-            // content but we do it without try/catch this time; otherwise, we may end
-            // up in an infinite loop
-            let newSubNodes = createVNChainFromContent( vn.handleError( err));
-
-            // unmount existing sub-nodes (that were mounted so far)
-            if (vn.subNodes)
-            {
-                if (vn.ownDN)
-                    (vn.ownDN as Element).textContent = null;
-
-                vn.subNodes.forEach( svn => unmountNode( svn, !vn.ownDN));
-            }
-
-            // mount the new ones - here we are replacing all old nodes regadless of startIndex
-            if (newSubNodes)
-            {
-                vn.subNodes = newSubNodes;
-                newSubNodes.forEach( (svn, i) => mountNode( svn, vn, i, anchorDN, beforeDN));
-            }
-        }
-    }
-}
+export const mountSubNodes = (creator: IComponent, vn: VN, subNodes: VN[],
+    anchorDN: DN, beforeDN: DN, startIndex?: number): void =>
+        subNodes.forEach( (svn, i) =>
+            svn.mount( creator, vn, startIndex ? startIndex + i : i, anchorDN, beforeDN));
 
 
 
-// Recursively removes DOM nodes corresponding to this VN and its sub-nodes.
-function unmountNode( vn: VN, removeOwnNode: boolean)
-{
-    if (vn.ignoreUnmount)
-    {
-        vn.ignoreUnmount = false;
-        return;
-    }
-
-	// get the DOM node before we call unmount, because unmount will clear it.
-	let ownDN = vn.ownDN;
-
-    // call unmount on our node - regardless whether it has its own DN or not
-    let fn: Function = vn.unmount;
-    if (fn)
-    {
-        /// #if VERBOSE_NODE
-            console.debug( `Calling unmount() on node ${vn.name}`);
-        /// #endif
-        fn.call(vn);
-    }
-
-    // If the virtual node has its own DOM node, remove it from the DOM tree unless the
-    // removeOwnNode parameter is false, which means this node is removed when the upper
-    // node is removed.
-    if (ownDN)
-    {
-        vn.ownDN = null;
-        if (removeOwnNode && !(ownDN instanceof ShadowRoot))
-            (ownDN as any as ChildNode).remove();
-    }
-
-    if (vn.subNodes)
-	{
-        // DOM nodes of sub-nodes don't need to be removed if either the upper DOM node has
-        // already been removed or our own DOM node is removed (true is only passed further if
-        // our parameter was true and we don't have own DN). It can happen that if errors occur,
-        // some elements in the VN.subNodes array are left empty. The forEach function skips
-        // over empty slots.
-        let removeSubNodeOwnNodes = removeOwnNode && !ownDN;
-        vn.subNodes.forEach( svn => unmountNode( svn, removeSubNodeOwnNodes));
-        vn.subNodes = null;
-    }
-
-    // mark the node as unmounted
-	vn.anchorDN = null;
-    vn.parent = null;
-}
+/**
+ * Recursively unmounts nodes from the given array.
+ */
+export const unmountSubNodes = (subNodes: VN[], removeFromDOM: boolean): void =>
+    subNodes.forEach( svn => svn.unmount( removeFromDOM));
 
 
 
-function reconcileAndUpdateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[],
-    catchErrors: boolean = true): void
+export const reconcile = (creator: IComponent, vn: VN, disp: VNDisp, content: any): void =>
+    reconcileSubNodes( creator, vn, disp, createVNChainFromContent(content));
+
+
+
+export const reconcileSubNodes = ( creator: IComponent, vn: VN, disp: VNDisp, newSubNodes: VN[]): void =>
 {
     // reconcile old and new sub-nodes
     buildSubNodeDispositions( disp, newSubNodes);
@@ -1166,9 +998,9 @@ function reconcileAndUpdateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[],
     let oldSubNodes = vn.subNodes;
     if (oldSubNodes)
     {
-        if (disp.replaceAllSubNodes)
+        if (disp.replaceAll)
         {
-            if (disp.allSubNodesProcessed)
+            if (disp.allProcessed)
             {
                 // if we are removing all sub-nodes under an element, we can optimize by setting
                 // textContent to null;
@@ -1176,23 +1008,23 @@ function reconcileAndUpdateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[],
                 if (ownDN)
                     (ownDN as Element).textContent = null;
 
-                oldSubNodes.forEach( svn => { unmountNode( svn, !ownDN) });
+                oldSubNodes.forEach( svn => svn.unmount( !ownDN));
             }
             else
             {
-                for( let i = disp.oldStartIndex; i < disp.odlEndIndex; i++)
-                    unmountNode( oldSubNodes[i], true);
+                for( let i = disp.oldStartIndex; i < disp.oldEndIndex; i++)
+                    oldSubNodes[i].unmount(true);
             }
         }
-        else if (disp.subNodesToRemove)
+        else if (disp.toRemove)
         {
-            for( let i = 0, len = disp.subNodesToRemove.length; i < len; i++)
-                unmountNode( disp.subNodesToRemove[i], true);
+            for( let i = 0, len = disp.toRemove.length; i < len; i++)
+                disp.toRemove[i].unmount(true);
         }
 
         if (!newSubNodes)
         {
-            if (disp.allSubNodesProcessed)
+            if (disp.allProcessed)
                 vn.subNodes = null;
             else
             {
@@ -1220,38 +1052,7 @@ function reconcileAndUpdateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[],
         // since we have sub-nodes, we need to create nodes for them and render. If our node
         // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
         // either the uncestor node that knows to handle errors or to the Mimbl tick loop.
-        if (!catchErrors! || vn.supportsErrorHandling)
-            updateSubNodes( vn, disp, newSubNodes, anchorDN, beforeDN);
-        else
-        {
-            try
-            {
-                updateSubNodes( vn, disp, newSubNodes, anchorDN, beforeDN);
-            }
-            catch( err)
-            {
-                /// #if VERBOSE_NODE
-                    console.debug( `Calling handleError() on node ${vn.name}. Error`, err);
-                /// #endif
-
-                // let the node handle its own error and re-render; then we render the new
-                // content but we do it without try/catch this time; otherwise, we may end
-                // up in an infinite loop
-                newSubNodes = vn.handleError( err);
-
-                // update sub-nodes with the new data without catching errors
-                reconcileAndUpdateSubNodes( vn, {oldVN: disp.oldVN}, newSubNodes, false);
-            }
-        }
-    }
-
-    if (disp.action === VNDispAction.Update)
-    {
-        // notify the new component that it replaced the old component. If components cache some
-        // JSX-produced nodes, this is the opportunity to copy them from the old to the new. This
-        // is because the old nodes are updated from the new ones and the new ones discarded.
-        let fn = disp.newVN.didUpdate;
-        fn && fn.call( vn);
+        updateSubNodes( creator, vn, disp, newSubNodes, anchorDN, beforeDN);
     }
 
     // indicate that the node was updated in this cycle - this will prevent it from
@@ -1263,15 +1064,16 @@ function reconcileAndUpdateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[],
 
 // Performs rendering phase of the update on the sub-nodes of the node, which is passed as
 // the oldVN member of the VNDisp structure.
-function updateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], anchorDN: DN, beforeDN: DN): void
+const updateSubNodes = (creator: IComponent, vn: VN, disp: VNDisp, newSubNodes: VN[],
+    anchorDN: DN, beforeDN: DN): void =>
 {
     let oldSubNodes = vn.subNodes;
-    if (disp.replaceAllSubNodes)
+    if (disp.replaceAll)
     {
-        if (disp.allSubNodesProcessed)
+        if (disp.allProcessed)
         {
             vn.subNodes = newSubNodes;
-            mountSubNodes( vn, newSubNodes, anchorDN, beforeDN);
+            mountSubNodes( creator, vn, newSubNodes, anchorDN, beforeDN);
         }
         else
         {
@@ -1281,7 +1083,7 @@ function updateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], anchorDN: DN, 
             for( let i = disp.oldStartIndex + newSubNodes.length, len = oldSubNodes.length; i < len; i++)
                 oldSubNodes[i].index = i;
 
-            mountSubNodes( vn, newSubNodes, anchorDN, beforeDN, oldStartIndex);
+            mountSubNodes( creator, vn, newSubNodes, anchorDN, beforeDN, oldStartIndex);
         }
 
     }
@@ -1297,7 +1099,7 @@ function updateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], anchorDN: DN, 
             oldSubNodes.splice( newSubNodes.length);
 
         // perform updates and inserts by either groups or individual nodes.
-        if (disp.subNodeGroups)
+        if (disp.subGroups)
             updateSubNodesByGroups( vn, disp, anchorDN, beforeDN);
         else
             updateSubNodesByNodes( vn, disp, anchorDN, beforeDN);
@@ -1307,10 +1109,10 @@ function updateSubNodes( vn: VN, disp: VNDisp, newSubNodes: VN[], anchorDN: DN, 
 
 
 // Performs updates and inserts by individual nodes.
-function updateSubNodesByNodes( parentVN: VN, disp: VNDisp, anchorDN: DN, beforeDN: DN): void
+const updateSubNodesByNodes = (parentVN: VN, disp: VNDisp, anchorDN: DN, beforeDN: DN): void =>
 {
     let parentSubNodes = parentVN.subNodes;
-    let subNodeDisps = disp.subNodeDisps;
+    let subNodeDisps = disp.subDisps;
 
 	// perform DOM operations according to sub-node disposition. We need to decide for each
 	// node what node to use to insert or move it before. We go from the end of the list of
@@ -1329,25 +1131,29 @@ function updateSubNodesByNodes( parentVN: VN, disp: VNDisp, anchorDN: DN, before
         let svn: VN;
         if (subNodeDisp.action === VNDispAction.Insert)
         {
-            // we must put the node in the list of sub-nodes before calling mountNode because it may use this info if the node is cloned
-            parentSubNodes[index] = newVN;
+            // we must put the node in the list of sub-nodes before calling mountNode because it
+            // may use this info if the node is cloned
+            parentSubNodes[index] = svn = newVN;
 
             // if mountNode clones the node, it puts the new node into the list of sub-nodes
             // and returns it; otherwise, it returns the original node.
-            svn = mountNode( newVN, parentVN, index, anchorDN, beforeDN);
+            newVN.mount( s_currentClassComp, parentVN, index, anchorDN, beforeDN);
         }
         else // Update or NoChange
         {
             parentSubNodes[index] = svn = oldVN;
             if (oldVN !== newVN)
             {
+                // if the creator for the new element is not determined yet, use current component
+                if (!newVN.creator)
+                    newVN.creator = s_currentClassComp;
+
                 /// #if VERBOSE_NODE
                     console.debug( `Calling update() on node ${oldVN.name}`);
                 /// #endif
 
                 // update method must exists for nodes with action Update
-                if (oldVN.update( newVN))
-                    rerenderNode( subNodeDisp);
+                oldVN.update( newVN, subNodeDisp);
             }
 
             // determine whether all the nodes under this VN should be moved.
@@ -1370,11 +1176,11 @@ function updateSubNodesByNodes( parentVN: VN, disp: VNDisp, anchorDN: DN, before
 
 // Performs updates and inserts by groups. We go from the end of the list of update groups
 // and on each iteration we decide the value of the "beforeDN".
-function updateSubNodesByGroups( parentVN: VN, disp: VNDisp, anchorDN: DN, beforeDN: DN): void
+const updateSubNodesByGroups = (parentVN: VN, disp: VNDisp, anchorDN: DN, beforeDN: DN): void =>
 {
     let parentSubNodes = parentVN.subNodes;
-    let subNodeDisps = disp.subNodeDisps;
-    let groups = disp.subNodeGroups;
+    let subNodeDisps = disp.subDisps;
+    let groups = disp.subGroups;
 
     let currBeforeDN = beforeDN;
     let subNodeDisp: VNDisp;
@@ -1399,7 +1205,7 @@ function updateSubNodesByGroups( parentVN: VN, disp: VNDisp, anchorDN: DN, befor
                 // we must put the node in the list of sub-nodes before calling
                 // mountNode because it may use this info if the node is cloned
                 parentSubNodes[index] = newVN;
-                mountNode( newVN, parentVN, index, anchorDN, currBeforeDN);
+                newVN.mount( s_currentClassComp, parentVN, index, anchorDN, currBeforeDN);
             }
         }
         else if (group.action === VNDispAction.Update)
@@ -1409,21 +1215,27 @@ function updateSubNodesByGroups( parentVN: VN, disp: VNDisp, anchorDN: DN, befor
             for( let j = group.last; j >= groupFirst; j--)
             {
                 subNodeDisp = subNodeDisps[j];
-                newVN = subNodeDisp.newVN;
                 oldVN = subNodeDisp.oldVN;
+                newVN = subNodeDisp.newVN;
 
                 // since we might be updating only a portion of the old sub-nodes, get the real index
                 let index = disp.oldStartIndex + j;
                 oldVN.index = index;
                 parentSubNodes[index] = oldVN;
 
-                /// #if VERBOSE_NODE
-                    console.debug( `Calling update() on node ${oldVN.name}`);
-                /// #endif
+                if (oldVN !== newVN)
+                {
+                    // if the creator for the new element is not determined yet, use current component
+                    if (!newVN.creator)
+                        newVN.creator = s_currentClassComp;
 
-                // update method must exists for nodes with action Update
-                if (oldVN.update( newVN))
-                    rerenderNode( subNodeDisp);
+                    /// #if VERBOSE_NODE
+                        console.debug( `Calling update() on node ${oldVN.name}`);
+                    /// #endif
+
+                    // update method must exists for nodes with action Update
+                    oldVN.update( newVN, subNodeDisp);
+                }
             }
         }
         else // NoChange)
@@ -1489,7 +1301,7 @@ function updateSubNodesByGroups( parentVN: VN, disp: VNDisp, anchorDN: DN, befor
 
 
 // Moves the given virtual node  so that all its immediate DNs reside before the given DN.
-function moveNode( vn: VN, anchorDN: DN, beforeDN: DN): void
+export const moveNode = (vn: VN, anchorDN: DN, beforeDN: DN): void =>
 {
     // check whether the last of the DOM nodes already resides right before the needed node
     let dns = vn.getImmediateDNs();
@@ -1530,7 +1342,7 @@ function moveNode( vn: VN, anchorDN: DN, beforeDN: DN): void
 
 
 // Moves all the nodes in the given group before the given DOM node.
-function moveGroup( group: VNDispGroup, disps: VNDisp[], anchorDN: DN, beforeDN: DN): void
+const moveGroup = (group: VNDispGroup, disps: VNDisp[], anchorDN: DN, beforeDN: DN): void =>
 {
     let dns: DN | DN[] | null;
     let useNewVN = group.action === VNDispAction.Insert;
@@ -1571,89 +1383,6 @@ function moveGroup( group: VNDispGroup, disps: VNDisp[], anchorDN: DN, beforeDN:
 
 
 /**
- * The VNAction enumeration specifies possible actions to perform for sub-nodes during
- * reconciliation process.
- */
-const enum VNDispAction
-{
-	/**
-	 * The new node should be inserted. This means that either there was no counterpart old node
-	 * found or the found node cannot be used to update the old one nor can the old node be reused
-	 * by the new one (e.g. they are of different type).
-	 */
-	Insert = 1,
-
-	/**
-	 * The new node should be used to update the old node.
-	 */
-	Update = 2,
-
-	/**
-	 * The new node is the same as the old node.
-	 */
-	NoChange = 3,
-}
-
-
-
-/**
- * The VNDisp class is a recursive structure that describes a disposition for a node and its
- * sub-nodes during the reconciliation process.
- */
-type VNDisp =
-{
-	/** Old virtual node to be updated. This can be null only only for the Insert action. */
-	oldVN?: VN;
-
-	/** New virtual node to insert or to update an old node. */
-	newVN?: VN;
-
-	/** Action to be performed on the node */
-	action?: VNDispAction;
-
-    /** Start index in the old array of sub-nodes; if undefined, 0 is used. */
-    oldStartIndex?: number;
-
-    /** End index in the old array of sub-nodes; if undefined, the array length is used. */
-    odlEndIndex?: number;
-
-    /** Update strategy object; if undefined, the update strategy from the oldVN is used. */
-    updateStrategy?: UpdateStrategy;
-
-    /** Length of the (sub-)array of old sub-nodes. */
-    oldLength?: number;
-
-    /** Flag indicating that all old sub-nodes are being updated. This is true if oldLength === oldSubNodes.length */
-    allSubNodesProcessed?: boolean;
-
-    /**
-     * Flag indicating that no action should be taken; that is, the new sub-nodes are the same as old ones.
-     */
-	noChanges?: boolean;
-
-    /**
-     * Flag indicating that all old sub-nodes should be deleted and all new sub-nodes inserted.
-     * If this flag is set, the subNodeDisps, subNodesToRemove and subNodeGroups fields are
-     * ignored.
-     */
-	replaceAllSubNodes?: boolean;
-
-	/**
-	 * Array of disposition objects for sub-nodes. This includes nodes to be updated
-	 * and to be inserted.
-	 */
-	subNodeDisps?: VNDisp[];
-
-	/** Array of sub-nodes that should be removed during update of the sub-nodes. */
-	subNodesToRemove?: VN[];
-
-	/** Array of groups of sub-nodes that should be updated or inserted. */
-	subNodeGroups?: VNDispGroup[];
-}
-
-
-
-/**
  * If a node has more than this number of sub-nodes, then we build groups. The idea is that
  * otherwise, the overhead of building groups is not worth it.
  */
@@ -1668,11 +1397,11 @@ const NO_GROUP_THRESHOLD = 8;
  * into groups of consecutive nodes that should be updated and of nodes that should be inserted.
  * The groups are built in a way so that if a node should be moved, its entire group is moved.
  */
-function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
+const buildSubNodeDispositions = (disp: VNDisp, newChain: VN[]): void =>
 {
     let oldChain = disp.oldVN.subNodes;
     let oldStartIndex = disp.oldStartIndex || (disp.oldStartIndex = 0);
-    let oldEndIndex = disp.odlEndIndex || (disp.odlEndIndex = (oldChain ? oldChain.length : 0));
+    let oldEndIndex = disp.oldEndIndex || (disp.oldEndIndex = (oldChain ? oldChain.length : 0));
 
     // oldLen is the length of the portion of the old sub-nodes that will be reconciled.
     let oldLen = disp.oldLength = oldEndIndex - oldStartIndex;
@@ -1686,11 +1415,11 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
         return;
     }
 
-    disp.allSubNodesProcessed = oldLen === (oldChain ? oldChain.length : 0);
+    disp.allProcessed = oldLen === (oldChain ? oldChain.length : 0);
     if (newLen === 0 || oldLen === 0)
     {
         // either old or new chain is empty - either delete all old nodes or insert all new nodes
-        disp.replaceAllSubNodes = true;
+        disp.replaceAll = true;
         return;
     }
 
@@ -1719,20 +1448,20 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
                 ))
         {
             // old node can be updated with information from the new node
-            disp.subNodeDisps = [{ oldVN, newVN, action: VNDispAction.Update}];
+            disp.subDisps = [{ oldVN, newVN, action: VNDispAction.Update}];
         }
         else
         {
             // old node cannot be updated, so the new node will be inserted and the old node will
             // be removed
-            disp.replaceAllSubNodes = true;
+            disp.replaceAll = true;
         }
 
         return;
     }
 
     // prepare array for VNDisp objects for new nodes
-    disp.subNodeDisps = new Array( newLen);
+    disp.subDisps = new Array( newLen);
     let hasUpdates: boolean;
 
     // if we can ignore keys, we don't need to create a map of old sub-nodes; instead, we can
@@ -1771,7 +1500,7 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
     // nodes should be inserted.
     if (!hasUpdates)
     {
-        disp.replaceAllSubNodes = true;
+        disp.replaceAll = true;
         // disp.subNodeDisps = null;
         // disp.subNodesToRemove = null;
         // disp.subNodeGroups = null;
@@ -1782,8 +1511,8 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
         // The sequential reconciliation that ignores keys can build the groups as it iterate over
         // the sub-nodes, while reconciliations that look at keys cannot do it that way, so we'll
         // do it here.
-        if (newLen > NO_GROUP_THRESHOLD && !disp.subNodeGroups)
-            disp.subNodeGroups = buildSubNodeGroups( disp.subNodeDisps);
+        if (newLen > NO_GROUP_THRESHOLD && !disp.subGroups)
+            disp.subGroups = buildSubNodeGroups( disp.subDisps);
     }
 }
 
@@ -1792,14 +1521,14 @@ function buildSubNodeDispositions( disp: VNDisp, newChain: VN[]): void
 /**
  * Reconciles new and old nodes without paying attention to keys.
  */
-function reconcileWithoutKeys( disp: VNDisp, oldChain: VN[], newChain: VN[]): boolean
+const reconcileWithoutKeys = (disp: VNDisp, oldChain: VN[], newChain: VN[]): boolean =>
 {
     let oldStartIndex = disp.oldStartIndex;
     let oldLen = disp.oldLength;
     let newLen = newChain.length;
     let commonLen = Math.min( oldLen, newLen);
 
-    let subNodeDisps = disp.subNodeDisps;
+    let subNodeDisps = disp.subDisps;
     let subNodesToRemove: VN[] = [];
 
     // loop over new nodes and determine which ones should be updated, inserted or deleted
@@ -1853,7 +1582,7 @@ function reconcileWithoutKeys( disp: VNDisp, oldChain: VN[], newChain: VN[]): bo
     }
 
     if (subNodesToRemove.length > 0)
-        disp.subNodesToRemove = subNodesToRemove;
+        disp.toRemove = subNodesToRemove;
 
     return hasUpdates;
 }
@@ -1863,9 +1592,10 @@ function reconcileWithoutKeys( disp: VNDisp, oldChain: VN[], newChain: VN[]): bo
 /**
  * Reconciles new and old nodes without recycling non-matching keyed nodes.
  */
-function reconcileWithoutRecycling( disp: VNDisp, oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[], newChain: VN[]): boolean
+const reconcileWithoutRecycling = ( disp: VNDisp, oldKeyedMap: Map<any,VN>,
+    oldUnkeyedList: VN[], newChain: VN[]): boolean =>
 {
-    let subNodeDisps = disp.subNodeDisps;
+    let subNodeDisps = disp.subDisps;
     let subNodesToRemove: VN[] = [];
     let oldUnkeyedListLength = oldUnkeyedList.length;
 
@@ -1933,7 +1663,7 @@ function reconcileWithoutRecycling( disp: VNDisp, oldKeyedMap: Map<any,VN>, oldU
     }
 
     if (subNodesToRemove.length > 0)
-        disp.subNodesToRemove = subNodesToRemove;
+        disp.toRemove = subNodesToRemove;
 
     return hasUpdates;
 }
@@ -1943,9 +1673,10 @@ function reconcileWithoutRecycling( disp: VNDisp, oldKeyedMap: Map<any,VN>, oldU
 /**
  * Reconciles new and old nodes with recycling non-matching keyed nodes.
  */
-function reconcileWithRecycling( disp: VNDisp, oldKeyedMap: Map<any,VN>, oldUnkeyedList: VN[], newChain: VN[]): boolean
+const reconcileWithRecycling = (disp: VNDisp, oldKeyedMap: Map<any,VN>,
+    oldUnkeyedList: VN[], newChain: VN[]): boolean =>
 {
-    let subNodeDisps = disp.subNodeDisps;
+    let subNodeDisps = disp.subDisps;
     let subNodesToRemove: VN[] = [];
     let oldUnkeyedListLength = oldUnkeyedList.length;
 
@@ -2059,40 +1790,9 @@ function reconcileWithRecycling( disp: VNDisp, oldKeyedMap: Map<any,VN>, oldUnke
     }
 
     if (subNodesToRemove.length > 0)
-        disp.subNodesToRemove = subNodesToRemove;
+        disp.toRemove = subNodesToRemove;
 
     return hasUpdates;
-}
-
-
-
-/**
- * The VNDispGroup class describes a group of consecutive VNDisp objects correspponding to the
- * sequence of sub-nodes. The group is described using indices of VNDisp objects in the
- * subNodeDisp field of the parent VNDisp object.
- */
-interface VNDispGroup
-{
-	// /** parent VNDisp to which this group belongs */
-	// parentDisp: VNDisp;
-
-	/** Action to be performed on the nodes in the group */
-	action: VNDispAction;
-
-	/** Index of the first VNDisp in the group */
-	first: number;
-
-	/** Index of the last VNDisp in the group */
-	last?: number;
-
-	/** Number of nodes in the group. */
-	count?: number;
-
-	/** First DOM node in the group - will be known after the nodes are physically updated */
-	firstDN?: DN;
-
-	/** First DOM node in the group - will be known after the nodes are physically updated */
-	lastDN?: DN;
 }
 
 
@@ -2101,7 +1801,7 @@ interface VNDispGroup
  * Determines first and last DOM nodes for the group. This method is invoked only after the
  * nodes were physically updated/inserted and we can obtain their DOM nodes.
  */
-function determineGroupDNs( group: VNDispGroup, disps: VNDisp[])
+const determineGroupDNs = (group: VNDispGroup, disps: VNDisp[]) =>
 {
     let useNewVN = group.action === VNDispAction.Insert;
     if (group.count === 1)
@@ -2133,7 +1833,7 @@ function determineGroupDNs( group: VNDispGroup, disps: VNDisp[])
  * From a flat list of new sub-nodes builds groups of consecutive nodes that should be either
  * updated or inserted.
  */
-function buildSubNodeGroups( disps: VNDisp[]): VNDispGroup[]
+const buildSubNodeGroups = (disps: VNDisp[]): VNDispGroup[] =>
 {
     // we are here only if we have some number of sub-node dispositions
     let count = disps.length;
@@ -2209,7 +1909,7 @@ function buildSubNodeGroups( disps: VNDisp[]): VNDispGroup[]
 // when we either find a DOM node (then it is returned) or find a different anchor element
 // (then null is returned). This method is called before the reconciliation process for our
 // sub-nodes starts and, therefore, it only traverses mounted nodes.
-function getNextDNUnderSameAnchorDN( vn: VN, anchorDN: DN): DN
+const getNextDNUnderSameAnchorDN = (vn: VN, anchorDN: DN): DN =>
 {
     if (vn.ownDN)
         return null;
@@ -2242,7 +1942,7 @@ function getNextDNUnderSameAnchorDN( vn: VN, anchorDN: DN): DN
 
 
 // Returns array of node names starting with this node and up until the top-level node.
-function getVNPath( vn: VN): string[]
+const getVNPath = (vn: VN): string[] =>
 {
 	let path: string[] = [];
 	for( let currVN = vn; currVN; currVN = currVN.parent)
@@ -2255,15 +1955,10 @@ function getVNPath( vn: VN): string[]
 
 // Creates an array of virtual nodes from the given content. Calls the createNodesFromContent and
 // if it returns a single node, wraps it in an array.
-function createVNChainFromContent( content: any): VN[] | null
+const createVNChainFromContent = (content: any): VN[] | null =>
 {
-    if (content == null)
-        return null;
-    else
-    {
-        let vns = content[symToVNs]();
-        return !vns ? null : Array.isArray(vns) ? vns.length === 0 ? null : vns : [vns];
-    }
+    let vns = content?.[symToVNs]();
+    return !vns ? null : Array.isArray(vns) ? vns.length === 0 ? null : vns : [vns];
 }
 
 
@@ -2272,16 +1967,13 @@ function createVNChainFromContent( content: any): VN[] | null
  * Symbol used to set a "toVNs" function to certain classes. This function converts the instances
  * of these classes to a VN or an array of VNs.
  */
-export let symToVNs = Symbol();
+let symToVNs = Symbol("toVNs");
 
 
 
 // Add toVNs method to the String class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-Boolean.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
-{
-    return null;
-};
+Boolean.prototype[symToVNs] = () => null
 
 
 
@@ -2297,7 +1989,7 @@ String.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
         nodes.push( vn);
 
     return vn;
-};
+}
 
 
 
@@ -2320,7 +2012,7 @@ Component.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 // virtual node or nodes.
 Function.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 {
-    let vn = new FuncProxyVN( s_currentClassComp, this);
+    let vn = new FuncProxyVN( this);
     if (nodes)
         nodes.push( vn);
 
@@ -2408,7 +2100,7 @@ Object.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
  * Symbol used to set a "jsxToVNs" function to certain classes. This function converts the instances
  * of these classes to a VN or an array of VNs.
  */
-export let symJsxToVNs = Symbol();
+export let symJsxToVNs = Symbol("jsxToVNs");
 
 
 
@@ -2417,33 +2109,30 @@ export let symJsxToVNs = Symbol();
 String.prototype[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
 {
     if (children.length === 0)
-        return new ElmVN( s_currentClassComp, this, props, null);
+        return new ElmVN( this, props, null);
 
     // if we have children we process them right away so that we can create ElmVN with  list
     // of sub-nodes.
-    let nodes: VN[] = [];
+    let subNodes: VN[] = [];
     children.forEach( item =>
     {
         if (item != null)
         {
             if (item instanceof VN)
-                nodes.push( item)
+                subNodes.push( item)
             else
-                item[symToVNs]( nodes);
+                item[symToVNs]( subNodes);
         }
     });
 
-    return new ElmVN( s_currentClassComp, this, props, nodes.length > 0 ? nodes : null);
+    return new ElmVN( this, props, subNodes.length > 0 ? subNodes : null);
 };
 
 
 
 // Add jsxToVNs method to the Fragment class object. This method is invoked by the JSX mechanism.
-Fragment[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+Fragment[symJsxToVNs] = (props: any, children: any[]): VN | VN[] | null =>
 {
-    if (children.length === 0)
-        return new ElmVN( s_currentClassComp, this, props, null);
-
     let nodes: VN[] = [];
     children.forEach( item =>
     {
@@ -2462,7 +2151,7 @@ Fragment[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
 
 
 // Add jsxToVNs method to the FuncProxy class object. This method is invoked by the JSX mechanism.
-FuncProxy[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+FuncProxy[symJsxToVNs] = (props: any, children: any[]): VN | VN[] | null =>
 {
     /// #if DEBUG
     if (!props || !props.func)
@@ -2472,16 +2161,14 @@ FuncProxy[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | nul
     }
     /// #endif
 
-    return new FuncProxyVN( s_currentClassComp, props.func, props.funcThisArg, props.arg, props.key);
+    return new FuncProxyVN( props.func, props.funcThisArg, props.arg, props.key);
 };
 
 
 
 // Add jsxToVNs method to the PromiseProxy class object. This method is invoked by the JSX mechanism.
-PromiseProxy[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
-{
-    return props && props.promise ? new PromiseProxyVN( props, children) : null;
-};
+PromiseProxy[symJsxToVNs] = (props: any, children: any[]): VN | VN[] | null =>
+    props?.promise ? new PromiseProxyVN( props, children) : null;
 
 
 
@@ -2499,8 +2186,7 @@ Component[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | nul
 {
     return new ManagedCompVN( this, props,
         children.length === 1 && Array.isArray( children[0]) ? children[0] : children);
-};
-
+}
 
 
 // Add jsxToVNs method to the Function class, which works for functional components. This method
@@ -2511,7 +2197,7 @@ Function.prototype[symJsxToVNs] = function( props: any, children: any[]): VN | V
     // the function runs under the current Mimbl context (e.g. creator object used as "this" for
     // event handlers).
     let content = this( props, children.length === 1 && Array.isArray( children[0]) ? children[0] : children);
-    return content && content[symToVNs]();
+    return content?.[symToVNs]();
 };
 
 

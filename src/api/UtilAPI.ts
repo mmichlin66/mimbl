@@ -12,10 +12,7 @@ import {s_isSvg, s_isSvgSvg} from "../internal";
  * or any other from SVG.
  * @param elm Element to test
  */
-export function isSvg( elm: Element): boolean
-{
-	return s_isSvg( elm);
-}
+export const isSvg = (elm: Element): boolean => s_isSvg( elm);
 
 
 
@@ -23,10 +20,7 @@ export function isSvg( elm: Element): boolean
  * Determines whether the given element is the <svg> element.
  * @param elm  Element to test
  */
-export function isSvgSvg( elm: Element): boolean
-{
-	return s_isSvgSvg( elm);
-}
+export const isSvgSvg = (elm: Element): boolean => s_isSvgSvg( elm);
 
 
 

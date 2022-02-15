@@ -1,5 +1,5 @@
-﻿import {ITextVN, TickSchedulingType} from "../api/mim"
-import {DN, VN} from "../internal"
+﻿import {IComponent, ITextVN, TickSchedulingType} from "../api/mim"
+import {DN, VN, VNDisp} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -16,7 +16,7 @@ export class TextVN extends VN implements ITextVN
 	public text: string;
 
 	// Text DOM node
-	public get textNode(): Text { return this.ownDN as Text }
+	public get textNode(): Text { return this.ownDN; }
 
 
 
@@ -41,37 +41,6 @@ export class TextVN extends VN implements ITextVN
 
 
 
-    // Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
-    // This method is only called on the mounted nodes.
-    public getFirstDN(): DN
-    {
-        return this.ownDN;
-    }
-
-    // Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
-    // This method is only called on the mounted nodes.
-    public getLastDN(): DN
-    {
-        return this.ownDN;
-    }
-
-    // Returns the list of DOM nodes that are immediate children of this virtual node; that is, are
-    // NOT children of sub-nodes that have their own DOM node. May return null but never returns
-    // empty array.
-    public getImmediateDNs(): DN | DN[] | null
-    {
-        return this.ownDN;
-    }
-
-    // Collects all DOM nodes that are the immediate children of this virtual node (that is,
-    // are NOT children of sub-nodes that have their own DOM node) into the given array.
-    protected collectImmediateDNs( arr: DN[]): void
-    {
-        arr.push( this.ownDN);
-    }
-
-
-
 	/**
      * Requests update of the text.
      */
@@ -91,25 +60,38 @@ export class TextVN extends VN implements ITextVN
 
 
 
-    // Creates and returns DOM node corresponding to this virtual node.
-	public mount(): void
-	{
-		/// #if USE_STATS
-			DetailedStats.log( StatsCategory.Text, StatsAction.Added);
-		/// #endif
-
-		this.ownDN = document.createTextNode( this.text);
-	}
-
-
-
-/// #if USE_STATS
-    // Cleans up the node object before it is released.
-    unmount(): void
+	/**
+     * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
+     * and before the given node.
+     */
+    public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
     {
-        DetailedStats.log( StatsCategory.Text, StatsAction.Deleted);
+        super.mount( creator, parent, index, anchorDN);
+
+        this.ownDN = document.createTextNode( this.text);
+        anchorDN.insertBefore( this.ownDN, beforeDN);
+
+        /// #if USE_STATS
+            DetailedStats.log( StatsCategory.Text, StatsAction.Added);
+        /// #endif
     }
-/// #endif
+
+
+
+    // Cleans up the node object before it is released.
+    public unmount( removeFromDOM: boolean): void
+    {
+        if (removeFromDOM)
+            this.ownDN.remove();
+
+		this.ownDN = null;
+
+        super.unmount( removeFromDOM);
+
+        /// #if USE_STATS
+            DetailedStats.log( StatsCategory.Text, StatsAction.Deleted);
+        /// #endif
+    }
 
 
 
@@ -117,7 +99,7 @@ export class TextVN extends VN implements ITextVN
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node. The returned value indicates whether children
 	// should be updated (that is, this node's render method should be called).
-	public update( newVN: TextVN): boolean
+	public update( newVN: TextVN, disp: VNDisp): void
 	{
         if (this.text !== newVN.text)
         {
@@ -127,9 +109,6 @@ export class TextVN extends VN implements ITextVN
                 DetailedStats.log( StatsCategory.Text, StatsAction.Updated);
             /// #endif
         }
-
-		// text nodes don't have sub-nodes
-		return false;
     }
 
 
@@ -149,6 +128,9 @@ export class TextVN extends VN implements ITextVN
 
 
 
+    // Text DOM node
+    public declare ownDN: Text;
+
     // Text waiting for the partial update operation
     private textForPartialUpdate: string;
 }
@@ -157,13 +139,7 @@ export class TextVN extends VN implements ITextVN
 // Define methods/properties that are invoked during mounting/unmounting/updating and which don't
 // have or have trivial implementation so that lookup is faster.
 
-/// #if !USE_STATS
-    TextVN.prototype.unmount = undefined;
-/// #endif
-
 TextVN.prototype.render = undefined;
-TextVN.prototype.isUpdatePossible = undefined; // this mens that update is always possible
-TextVN.prototype.didUpdate = undefined;
-TextVN.prototype.ignoreUnmount = false;
+TextVN.prototype.isUpdatePossible = undefined; // this means that update is always possible
 
 

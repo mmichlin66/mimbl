@@ -121,48 +121,6 @@ export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
 
 
 
-// Object that maps property names to PropInfo-derived objects. Information about custom
-// attributes is added to this object when the registerProperty method is called.
-let propInfos: {[P:string]: PropInfo} =
-{
-    // framework attributes.
-    key: { type: PropType.Framework },
-    ref: { type: PropType.Framework },
-    vnref: { type: PropType.Framework },
-    updateStrategy: { type: PropType.Framework },
-
-    // attributes - only those attributes are listed that have non-trivial treatment or whose value
-    // type is object or function. ID and class are present here because their value can be
-    // specified as Mimcss IDRule and ClassRule objects respectively.
-    id: { type: PropType.Attr },
-    class: { type: PropType.Attr },
-    style: { type: PropType.Attr, set: setStyleProp, diff: diffStyleProp, update: updateStyleProp },
-    media: { type: PropType.Attr, set: setMediaProp, diff: diffMediaProp, update: updateMediaProp },
-    value: { type: PropType.Attr, set: setValueProp, diff: diffValueProp, remove: removeValueProp },
-    defaultValue: { type: PropType.Attr, set: setValueProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
-    checked: { type: PropType.Attr, set: setCheckedProp, diff: diffCheckedProp, remove: removeCheckedProp },
-    defaultChecked: { type: PropType.Attr, set: setCheckedProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
-
-    // frequently used events for speeding up the lookup
-    click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },
-    mousemove: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-    mouseover: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-    pointermove: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-    pointerover: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-    input: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-    scroll: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-    touchmove: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-    wheel: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-
-    // // events
-    // mouseenter: { type: PropType.Event, isBubbling: false },
-    // mouseleave: { type: PropType.Event, isBubbling: false },
-    // pointerenter: { type: PropType.Event, isBubbling: false },
-    // pointerleave: { type: PropType.Event, isBubbling: false },
-};
-
-
-
 /**
  * Helper function that converts the given value to string.
  *   - strings are returned as is.
@@ -172,17 +130,11 @@ let propInfos: {[P:string]: PropInfo} =
  *   - everything else is converted by calling the toString method.
  */
 
-function valToString( val: any): string
-{
-	if (typeof val === "string")
-		return val;
-	else if (Array.isArray( val))
-		return val.map( item => valToString(item)).filter( item => !!item).join(" ");
-	else if (val == null)
-		return "";
-	else
-		return val.toString();
-}
+const valToString = (val: any): string =>
+	typeof val === "string" ? val :
+	Array.isArray( val) ? val.map( item => valToString(item)).filter( item => !!item).join(" ") :
+	val == null ? "" :
+    val.toString();
 
 
 
@@ -198,10 +150,7 @@ export function registerElmProp( propName: string, info: AttrPropInfo | EventPro
 
 
 // Registers information about the given property.
-export function getElmPropInfo( propName: string): PropInfo | undefined
-{
-    return propInfos[propName];
-}
+export const getElmPropInfo = (propName: string): PropInfo | undefined => propInfos[propName];
 
 
 
@@ -233,7 +182,8 @@ export function setElmProp( elm: Element, propName: string, info: AttrPropInfo |
 // Determines whether the old and the new values of the property are different and sets the
 // updated value to the element's attribute. Returns true if update has been performed and
 // false if no change in property value has been detected.
-export function updateElmProp( elm: Element, propName: string, info: AttrPropInfo | null, oldPropVal: any, newPropVal: any): boolean
+export function updateElmProp( elm: Element, propName: string, info: AttrPropInfo | null,
+    oldPropVal: any, newPropVal: any): boolean
 {
     // get property info object
     if (!info)
@@ -355,8 +305,6 @@ function setStyleProp( elm: Element, attrName: string, propVal: string | Stylese
         elm.setAttribute( attrName, propVal);
 }
 
-
-
 function diffStyleProp( attrName: string, oldPropVal: string | Styleset, newPropVal: string | Styleset): any
 {
     if (oldPropVal === newPropVal)
@@ -386,8 +334,6 @@ function diffStyleProp( attrName: string, oldPropVal: string | Styleset, newProp
     }
 }
 
-
-
 function updateStyleProp( elm: Element, attrName: string, updateVal: string | StringStyleset): void
 {
     if (typeof updateVal === "object")
@@ -401,21 +347,16 @@ function updateStyleProp( elm: Element, attrName: string, updateVal: string | St
 
 
 
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Handling of media property. Media property can be specified either as a string or as the
 // MediaStatement object from the Mimcss library.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-function setMediaProp( elm: Element, attrName: string, propVal: MediaStatement): void
-{
+const setMediaProp = (elm: Element, attrName: string, propVal: MediaStatement): void =>
    elm[attrName] = mimcss.mediaToString( propVal);
-}
 
-
-
-function diffMediaProp( attrName: string, oldPropVal: MediaStatement, newPropVal: MediaStatement): any
+const diffMediaProp = (attrName: string, oldPropVal: MediaStatement, newPropVal: MediaStatement): any =>
 {
     if (oldPropVal === newPropVal)
         return undefined;
@@ -432,13 +373,10 @@ function diffMediaProp( attrName: string, oldPropVal: MediaStatement, newPropVal
 	return newString === oldString ? undefined : newString;
 }
 
-
-
 function updateMediaProp( elm: Element, attrName: string, updateVal: string): void
 {
     elm[attrName] = updateVal;
 }
-
 
 
 
@@ -455,26 +393,16 @@ function setValueProp( elm: Element, attrName: string, propVal: any): void
 	(elm as any).value = propVal;
 }
 
-
-
-
-function diffValueProp( attrName: string, oldPropValVal: any, newPropVal: any): boolean
-{
-	// by always returning the new property value we cause the value to always be updated to
-	// that of the new property. We want always to set this value to the element because the
-	// element's value may have chnged (by the user or programmatically).
-	return newPropVal;
-}
-
-
-
+// by always returning the new property value we cause the value to always be updated to
+// that of the new property. We want always to set this value to the element because the
+// element's value may have chnged (by the user or programmatically).
+const diffValueProp = (attrName: string, oldPropValVal: any, newPropVal: any): boolean => newPropVal;
 
 function removeValueProp( elm: Element, attrName: string): void
 {
 	// we need to cast elm to any, because generic Element doesn't have value property.
 	(elm as any).value = null;
 }
-
 
 
 
@@ -485,21 +413,15 @@ function removeValueProp( elm: Element, attrName: string): void
 // defaultValue to initialize the control value once.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-function diffDefaultValueProp( attrName: string, oldPropValVal: any, newPropVal: any): boolean
-{
-	// by returning undefined we indicate that no changes were made to the property and thus the
-	// update will not be called
-	return undefined;
-}
 
-
-
+// by returning undefined we indicate that no changes were made to the property and thus the
+// update will not be called
+const diffDefaultValueProp = (attrName: string, oldPropValVal: any, newPropVal: any): boolean => undefined;
 
 function removeDefaultValueProp( elm: Element, attrName: string): void
 {
 	// do nothing
 }
-
 
 
 
@@ -516,18 +438,9 @@ function setCheckedProp( elm: Element, attrName: string, propVal: any): void
 	(elm as any).checked = propVal;
 }
 
-
-
-
-function diffCheckedProp( attrName: string, oldPropValVal: any, newPropVal: any): boolean
-{
-	// by always returning the new property value we cause the value to always be updated to
-	// that of the new property.
-	return newPropVal;
-}
-
-
-
+// by always returning the new property value we cause the value to always be updated to
+// that of the new property.
+const diffCheckedProp = (attrName: string, oldPropValVal: any, newPropVal: any): boolean => newPropVal;
 
 function removeCheckedProp( elm: Element, attrName: string): void
 {
@@ -535,6 +448,47 @@ function removeCheckedProp( elm: Element, attrName: string): void
 	(elm as any).checked = false;
 }
 
+
+
+// Object that maps property names to PropInfo-derived objects. Information about custom
+// attributes is added to this object when the registerProperty method is called.
+let propInfos: {[P:string]: PropInfo} =
+{
+    // framework attributes.
+    key: { type: PropType.Framework },
+    ref: { type: PropType.Framework },
+    vnref: { type: PropType.Framework },
+    updateStrategy: { type: PropType.Framework },
+
+    // attributes - only those attributes are listed that have non-trivial treatment or whose value
+    // type is object or function. ID and class are present here because their value can be
+    // specified as Mimcss IDRule and ClassRule objects respectively.
+    id: { type: PropType.Attr },
+    class: { type: PropType.Attr },
+    style: { type: PropType.Attr, set: setStyleProp, diff: diffStyleProp, update: updateStyleProp },
+    media: { type: PropType.Attr, set: setMediaProp, diff: diffMediaProp, update: updateMediaProp },
+    value: { type: PropType.Attr, set: setValueProp, diff: diffValueProp, remove: removeValueProp },
+    defaultValue: { type: PropType.Attr, set: setValueProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
+    checked: { type: PropType.Attr, set: setCheckedProp, diff: diffCheckedProp, remove: removeCheckedProp },
+    defaultChecked: { type: PropType.Attr, set: setCheckedProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
+
+    // frequently used events for speeding up the lookup
+    click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },
+    mousemove: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+    mouseover: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+    pointermove: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+    pointerover: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+    input: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+    scroll: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+    touchmove: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+    wheel: { type: PropType.Event, schedulingType: TickSchedulingType.None },
+
+    // // events
+    // mouseenter: { type: PropType.Event, isBubbling: false },
+    // mouseleave: { type: PropType.Event, isBubbling: false },
+    // pointerenter: { type: PropType.Event, isBubbling: false },
+    // pointerleave: { type: PropType.Event, isBubbling: false },
+};
 
 
 

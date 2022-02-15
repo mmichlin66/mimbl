@@ -1,5 +1,5 @@
-﻿import {PromiseProxyProps} from "../api/mim"
-import {VN} from "../internal"
+﻿import {IComponent, PromiseProxyProps} from "../api/mim"
+import {DN, reconcile, VN, VNDisp} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -8,22 +8,7 @@ import {VN} from "../internal"
 
 
 /**
- * Encapsultes a rendering function, which is usually a method of a class-based component. This
- * object remembers the function, the "this" pointer to use when calling the function and the
- * arguments to pass to it. This allows re-rendering only the part of the parent component as
- * though the method were a full blown independent component. Updating the nodes is accomplished
- * using the FuncProxy static update method accepting the function to be updated.
- *
- * The same function can be used multiple times within the parent component's render() method -
- * especially (but not necessarily) if it is called with different parameters. To distinguish
- * between multiple nodes when updating (using FuncProxy.update), a unique key must be assigned.
- * The node then creates a link between the function and the node. This link is removed when the
- * node is unmounted. The key is optional if the function is used only once in the parent's
- * render method. If the function is used more than once and keys are not provided or are the same
- * Mimble will issue an error.
- *
- * The link between the function and the nodes that use this function is kept in a map from the
- * keys to the nodes. The map is stored in a custom property on the function object itself.
+ * Encapsultes a Promise object.
  */
 export class PromiseProxyVN extends VN
 {
@@ -69,8 +54,10 @@ export class PromiseProxyVN extends VN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount(): void
+	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
 	{
+        super.mount( creator, parent, index, anchorDN);
+
         this.watchPromise();
 
 		/// #if USE_STATS
@@ -80,13 +67,15 @@ export class PromiseProxyVN extends VN
 
 
 
-    /// #if USE_STATS
-        // Cleans up the node object before it is released.
-        public unmount(): void
-        {
+    // Cleans up the node object before it is released.
+    public unmount( removeFromDOM: boolean): void
+    {
+        super.unmount( removeFromDOM);
+
+        /// #if USE_STATS
             DetailedStats.log( StatsCategory.Comp, StatsAction.Deleted);
-        }
-    /// #endif
+        /// #endif
+    }
 
 
 
@@ -116,16 +105,14 @@ export class PromiseProxyVN extends VN
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node. The returned value indicates whether children
 	// should be updated (that is, this node's render method should be called).
-	public update( newVN: PromiseProxyVN): boolean
+	public update( newVN: PromiseProxyVN, disp: VNDisp): void
 	{
 		// remember the new value of the key property (even if it is the same)
 		this.key = newVN.key;
 		this.content = newVN.content;
 		this.errorContentFunc = newVN.errorContentFunc;
 
-		// indicate that it is necessary to update the sub-nodes. The commitUpdate
-		// method should NOT be called.
-		return true;
+        reconcile( this.creator, this, disp, this.render());
 	}
 
 

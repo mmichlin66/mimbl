@@ -3,10 +3,8 @@
  * @param o1
  * @param o2
  */
-export function s_shallowCompare( o1: any, o2: any): boolean
-{
-    return s_deepCompare( o1, o2, 1);
-}
+export const s_shallowCompare = (o1: any, o2: any): boolean =>
+    s_deepCompare( o1, o2, 1);
 
 
 
@@ -16,7 +14,7 @@ export function s_shallowCompare( o1: any, o2: any): boolean
  * @param o1
  * @param o2
  */
-export function s_deepCompare( o1: any, o2: any, level: number = -1): boolean
+export const s_deepCompare = (o1: any, o2: any, level: number = -1): boolean =>
 {
 	if (o1 === o2)
 		return true;
@@ -135,10 +133,8 @@ export function s_deepCompare( o1: any, o2: any, level: number = -1): boolean
  * or any other from SVG.
  * @param elm Element to test
  */
-export function s_isSvg( elm: Element): boolean
-{
-	return "ownerSVGElement" in (elm as any);
-}
+export const s_isSvg = (elm: Element): boolean =>
+	"ownerSVGElement" in (elm as any);
 
 
 
@@ -146,11 +142,9 @@ export function s_isSvg( elm: Element): boolean
  * Determines whether the given element is the <svg> element.
  * @param elm  Element to test
  */
-export function s_isSvgSvg( elm: Element): boolean
-{
-	return elm.tagName === "svg";
-	// return (elm as any).ownerSVGElement === null;
-}
+export const s_isSvgSvg = (elm: Element): boolean =>
+	elm.tagName === "svg";
+	// (elm as any).ownerSVGElement === null;
 
 
 

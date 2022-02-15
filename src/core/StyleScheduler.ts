@@ -34,14 +34,17 @@ export async function s_initStyleScheduler(): Promise<number>
         /// #endif
     }
 
-    if (mimcss)
+    if (mimcss && mimcss.registerScheduler)
     {
         let schedulerType = mimcss.registerScheduler( new StyleScheduler());
         mimcss.setDefaultScheduler( schedulerType);
         return schedulerType;
     }
     else
+    {
+        mimcss = null;
         return 0;
+    }
 }
 
 

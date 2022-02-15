@@ -4,18 +4,6 @@
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-/**
- * The IDisposer interface allows clients to inform the object that it can clear its internal
- * resources. The object cannot be used after it has been disposed off.
- */
-export interface IDisposer
-{
-    /** Clears internal resources. */
-    dispose(): void;
-}
-
-
-
 /** Type for functions that accept any number of parameters and return any type */
 export type AnyAnyFunc = (...args: any[]) => any;
 
@@ -36,6 +24,7 @@ export type NoneVoidFunc = () => void;
 /**
  * The ITrigger interface represents an object that keeps a value and notifies all attached wathers
  * when this value changes.
+ * @typeparam T Type of the trigger value.
  */
 export interface ITrigger<T = any>
 {
@@ -81,7 +70,10 @@ enum TriggerDepth
 
 /**
  * Creates a trigger object of the given depth with the given initial value.
- * @param v
+ * @typeparam T Type of the trigger value.
+ * @param depth Depth of the trigger, whcih determines how many levels of nested properties of
+ * arrays, maps, sets and objects should trigger changes.
+ * @param v Optional initial value
  */
 export function createTrigger<T = any>( depth: number, v?: T): ITrigger<T>
 {
@@ -105,7 +97,7 @@ class Trigger<T = any> implements ITrigger<T>
     // Retrieves the current value
     public get(): T
     {
-        this.notifyRead();
+        notifyTriggerRead(this);
         return this.v;
     }
 
@@ -118,21 +110,17 @@ class Trigger<T = any> implements ITrigger<T>
 
         this.v = triggerrize( v, this, this.depth);
 
-        this.notifyChanged();
+        notifyTriggerChanged(this);
     }
 
-    // Notifies the manager that the trigger's value has been read
-    public notifyRead(): void
+    public addWatcher( watcher: Watcher): void
     {
-        g_manager.notifyTriggerRead(this)
+        this.watchers.add( watcher);
     }
 
-    // Notifies the manager that the trigger's value has been changed. We only notify the manager
-    // if there is at least one watcher attached to our trigger;
-    public notifyChanged(): void
+    public removeWatcher( watcher: Watcher): void
     {
-        if (this.watchers.size > 0)
-            g_manager.notifyTriggerChanged( this);
+        this.watchers.delete( watcher);
     }
 
 
@@ -158,34 +146,52 @@ class Trigger<T = any> implements ITrigger<T>
 
 /**
  * The IWatcher interface represents a callable object that wraps a function and has the same
- * signature as this function. When a watcher is called it cals the wrapped function and attaches
+ * signature as this function. When a watcher is called it calls the wrapped function and attaches
  * to all triggers whose values were read during the course of the call. When values of these
  * triggers change, a responder function is called. The responder function is provided when the
  * watcher is created, but it can be changed later.
+ * @typeparam T Type (signature) of the function to be watched.
  */
-export interface IWatcher<T extends AnyAnyFunc = any> extends IDisposer
+export interface IWatcher<T extends AnyAnyFunc = any>
 {
     /** This is a callable interface, which is implement as a function. */
     (...args: Parameters<T>): ReturnType<T>;
 
-    // /** Sets a responder function */
-    // setResponder( responder: NoneVoidFunc, responderThis?: any): void;
+    /** Clears internal resources. */
+    dispose(): void;
 }
 
 
 
 /**
- * A Symbol used to keep a watcher object attached to the watcher function.
+ * This function bound to an instance of the Watcher class is returned from the
+ * createWatcher function.
+ * @param args
+ * @returns
  */
-let symWatcher = Symbol( "symWatcher");
+function watcherExecute( this: Watcher, ...args: any[]): any
+{
+    return this.execute( args);
+}
 
-
+/**
+ * This function bound to an instance of the Watcher class is set to the property of the
+ * bound watcherExecute function.
+ * @param args
+ * @returns
+ */
+function watcherDispose( this: Watcher): void
+{
+    this.dispose();
+}
 
 /**
  * Creates a watcher function with the same signature as the given regular function. When the
  * watcher function is invoked it invokes the original function and it notices all trigger objects
  * that were read during its execution. When any of these trigger objects have their values
  * changed, the responder function will be called.
+ *
+ * @typeparam T Type (signature) of the function to be watched.
  * @param func Function to be watched
  * @param responder Function to be invoked when values of the trigger objects encountered during
  * the original function's last execution change.
@@ -196,25 +202,13 @@ let symWatcher = Symbol( "symWatcher");
 export function createWatcher<T extends AnyAnyFunc>( func: T, responder: NoneVoidFunc,
     funcThis?: any, responderThis?: any): IWatcher<T>
 {
-    function watcherFunc(...args: any[]): any
-    {
-        let watcher: Watcher = watcherFunc[symWatcher];
+    // create a new watcher object and bind the watcher function to this object.
+    let watcherObj = new Watcher( func, responder, funcThis, responderThis);
+    let watcherFunc = watcherExecute.bind( watcherObj);
 
-        // if the value of "this" for the original function was not supplied but now when the
-        // watcher executes, "this" is defined, we remember it.
-        return watcher.execute( this, args);
-    }
-
-    // keep the watcher object in the function object itself using a symbol.
-    watcherFunc[symWatcher] = new Watcher( func, responder, funcThis, responderThis);
-
-    // implement the dispose method
-    (watcherFunc as IWatcher).dispose = function()
-    {
-        let watcher = watcherFunc[symWatcher] as Watcher;
-        watcher && watcher.dispose();
-        delete watcherFunc[symWatcher];
-    }
+    // bind the watcher dispose function to the watcher object and set it as the property on
+    // the previously bound instance of the watcher function
+    watcherFunc.dispose = watcherDispose.bind( watcherObj)
 
     return watcherFunc as IWatcher<T>;
 }
@@ -240,30 +234,20 @@ class Watcher<T extends AnyAnyFunc = any>
     }
 
     /**
-     * Executes the original function while updating the set of attached triggers. The "funcThis"
-     * parameter is the "this" under which the internal watcher function has been called. It
-     * will be used to set the "this" to apply when invoking the original function if it wasn't
-     * set yet.
+     * Executes the original function while noticing read notificaions from triggers.
      */
-    public execute( funcThis: any, args: any[]): any
+    public execute( args: any[]): any
     {
         // check whether our watcher has been already disposed
         if (!this.func)
             throw new Error( "Disposed watcher was called.");
 
-        // Fix our "this" if it hasn't been set so far
-        if (!this.funcThis && funcThis)
-        {
-            this.funcThis = funcThis;
-            if (!this.responderThis)
-                this.responderThis = funcThis;
-        }
-
-        // clear all current triggers
-        this.clean();
+        // move all current triggers to a temporary set
+        let oldTriggers = this.triggers;
+        this.triggers = new Set();
 
         // install our watcher at the top of the watchers stack
-        g_manager.pushWatcher( this)
+        pushWatcher( this)
 
         // call the function
         try
@@ -273,7 +257,10 @@ class Watcher<T extends AnyAnyFunc = any>
         finally
         {
             // remove our watcher from the top of the watchers stack
-            g_manager.popWatcher()
+            popWatcher()
+
+            // remove our watcher from those triggers in the old set that are not in the current set
+            oldTriggers.forEach( trigger => !this.triggers.has(trigger) && trigger.removeWatcher(this));
         }
     }
 
@@ -290,8 +277,8 @@ class Watcher<T extends AnyAnyFunc = any>
         // set the func and responder properties to null to indicate that the watcher has been disposed
         this.func = null;
         this.responder = null;
-        this.funcThis = null;
-        this.responderThis = null;
+        // this.funcThis = null;
+        // this.responderThis = null;
     }
 
     // Notifies the watcher that it should call the responder function. This occurs when there
@@ -314,11 +301,11 @@ class Watcher<T extends AnyAnyFunc = any>
     private clean(): void
     {
         // detaches this watcher from all the triggers and the triggers from this watcher.
-        this.triggers.forEach( trigger => trigger.watchers.delete( this));
+        this.triggers.forEach( trigger => trigger.removeWatcher( this));
         this.triggers.clear();
 
         // ask the manager to forget about this watcher if it is currently in te deferred set
-        g_manager.removeDeferredWatcher( this);
+        removeDeferredWatcher( this);
     }
 
 
@@ -349,185 +336,20 @@ class Watcher<T extends AnyAnyFunc = any>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Manager
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-/**
- * The TriggerWatcherManager class is a singleton class that represents the global functionality
- * of the trigger-watcher mechanism. It includes a stack of watcher objects currently executing
- * their functions and watching for trigger objects to be read. When a trigger object is being
- * read (that is its get() method is called), all the watchers in the stack are notified, because
- * they all depend on the trigger object's value for their functionality.
- *
- * It also maintains a reference count of mutation scopes and handles notifying watchers of
- * mutations only when the last mutation scope has exited. The triggers don't notify the watchers
- * directly; instead, they notify the manager, which accumulates the information and notifies all
- * the watchers once out of the last mutation scope.
- */
-class TriggerWatcherManager
-{
-    /**
-     * Pushes the given watcher object to the top of the stack
-     */
-    public pushWatcher( watcher: Watcher): void
-    {
-        this.watcherStack.push( watcher);
-    }
-
-    /**
-     * Removes the watcher object currently on the top of the stack
-     */
-    public popWatcher(): void
-    {
-        this.watcherStack.pop();
-    }
-
-    /**
-     * Removes the watcher object from the set of deferred watchers
-     */
-    public removeDeferredWatcher( watcher: Watcher): void
-    {
-        this.deferredWatchers.delete( watcher);
-    }
-
-    /**
-     * Increments mutation scope reference count
-     */
-    public enterMutationScope(): void
-    {
-        this.mutationScopesRefCount++;
-    }
-
-    /**
-     * Decrements mutation scope reference count. If it reaches zero, notifies all deferred watchers.
-     */
-    public exitMutationScope(): void
-    {
-        if (this.mutationScopesRefCount === 0)
-            throw Error( "Unpaired call to exitMutationScope");
-
-        if (--this.mutationScopesRefCount === 0)
-        {
-            // since when watchers respond, they can execute their watcher functions and that could
-            // mess with the same set of watchers we are iterating over. Therefore, we make a copy
-            // of this set first.
-            let watchers = Array.from( this.deferredWatchers.keys());
-            this.deferredWatchers.clear();
-            watchers.forEach( watcher => watcher.respond());
-        }
-    }
-
-    /**
-     * Notifies that the value of the given trigger object has been read.
-     */
-    public notifyTriggerRead( trigger: Trigger): void
-    {
-        // attach all watchers currently on the stack to the trigger
-        for( let watcher of this.watcherStack)
-        {
-            watcher.triggers.add( trigger);
-            trigger.watchers.add( watcher);
-        }
-    }
-
-    /**
-     * Notifies that the value of the given trigger object has been changed. If this happens while
-     * within a mutation scope, we don't notify the watchers of this trigger but put them in a
-     * deferred set. If this happens outside of any mutation scope. In this case we notify the
-     * watchers of this trigger right away.
-     */
-    public notifyTriggerChanged( trigger: Trigger): void
-    {
-        // this method is supposed to be called only if the trigger has watchers
-        /// #if DEBUG
-            if (trigger.watchers.size === 0)
-                console.error( "notifyTriggerChanged was called by a trigger without watchers");
-        /// #endif
-
-        if (this.mutationScopesRefCount > 0)
-            trigger.watchers.forEach( watcher => this.deferredWatchers.add( watcher));
-        else
-        {
-            // since when watchers respond, they can execute their watcher functions and that could
-            // mess with the same set of watchers we are iterating over. Therefore, we make a copy
-            // of this set first.
-            let watchers = Array.from( trigger.watchers.keys());
-            watchers.forEach( watcher => watcher.respond());
-        }
-    }
-
-
-
-    // Stack of watcher objects. Watchers are pushed on top before they call the watched
-    // function and removed after this function returns. When a trigger notifies that its value
-    // has been changed, all the watchers in the stack are attached to this trigger. This means
-    // that the trigger's value is used by the watched functions.
-    private watcherStack: Watcher[] = [];
-
-    // Number of currently active mutation scopes. When a trigger notifies that its value has been
-    // changed while this number is not 0, the trigger will be remembered in the internal set.
-    // After all mutation scopes are finished, the watchers attached to all triggers in the set
-    // will be notified. When a trigger notifies that its value has been changed while there are
-    // no mutation scopes present, the watchers attached to the trigger are notified immediately.
-    private mutationScopesRefCount = 0;
-
-    // Set of watchers that should be notified when the last mutation scope exits. Using Set
-    // ensures that no matter how many triggers reference a watcher, the watcher will be present
-    // only once.
-    private deferredWatchers = new Set<Watcher>();
-}
-
-
-
-/** Singleton TriggerWatcherManager bject */
-let g_manager = new TriggerWatcherManager();
-
-
-
-/**
- * Increments mutation scope reference count
- */
-export function enterMutationScope(): void
-{
-    g_manager.enterMutationScope();
-}
-
-/**
- * Decrements mutation scope reference count. If it reaches zero, notifies all deferred watchers.
- */
-export function exitMutationScope(): void
-{
-    g_manager.exitMutationScope();
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
 // Computed triggers
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
- * The IComputedTrigger interface represents a value that is calculated by a function. This is a
- * combination of Trigger and Watcher. It is a watcher because it watches over the function and
- * calls it whenever any triggers this function uses are changed. It is a trigger because it
- * triggers change when the function returns a new value.
- *
- * The important fact about a computed trigger is that it only invokes the watched function
- * if it's value is being used by at least one watcher.
- */
-export interface IComputedTrigger<T = any> extends ITrigger<T>, IDisposer
-{
-}
-
-
-
-/**
  * Creates a computed trigger object whose value is calculated by the given function and with an
  * optional initial value.
- * @param v
+ *
+ * @typeparam T Type of the computed value.
+ * @param func Function, method or get accessor that produces the computed value.
+ * @param funcThis Optional `this` value to use when invoking the computing function.
+ * @returns Trigger object that will trigger changes only when the computed value changes.
  */
-export function createComputedTrigger<T = any>( func: NoneTypeFunc<T>, funcThis?: any): IComputedTrigger<T>
+export function createComputedTrigger<T = any>( func: NoneTypeFunc<T>, funcThis?: any): ITrigger<T>
 {
     return new ComputedTrigger( func, funcThis);
 }
@@ -543,7 +365,7 @@ export function createComputedTrigger<T = any>( func: NoneTypeFunc<T>, funcThis?
  * The important fact about a computed trigger is that it only invokes the watched function
  * if it's value is being used by at least one watcher.
  */
-class ComputedTrigger<T = any> extends Trigger<T> implements IComputedTrigger<T>
+class ComputedTrigger<T = any> extends Trigger<T>
 {
     constructor( func: NoneTypeFunc<T>, funcThis?: any)
     {
@@ -572,20 +394,17 @@ class ComputedTrigger<T = any> extends Trigger<T> implements IComputedTrigger<T>
         return super.get();
     }
 
-    /** Clears internal resources. */
-    public dispose(): void
+    public removeWatcher( watcher: Watcher): void
     {
-        // check whether the object is already disposed
-        if (!this.func)
-            return;
+        super.removeWatcher( watcher);
 
-        if (this.funcWatcher)
+        // we keep our function watcher only if we still have somebody watching us.
+        if (this.watchers.size === 0 && this.funcWatcher)
         {
             this.funcWatcher.dispose();
             this.funcWatcher = null;
+            this.isStale = true;
         }
-
-        this.func = null;
     }
 
     /**
@@ -596,7 +415,7 @@ class ComputedTrigger<T = any> extends Trigger<T> implements IComputedTrigger<T>
      */
     private responder(): void
     {
-        if (this.watchers.size > 0)
+        if (this.funcWatcher)
             super.set( this.funcWatcher());
         else
             this.isStale = true;
@@ -626,119 +445,132 @@ class ComputedTrigger<T = any> extends Trigger<T> implements IComputedTrigger<T>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Mutators
+// Global functionality of the trigger-watcher mechanism. It includes a stack of watcher objects
+// currently executing their functions and watching for trigger objects to be read. When a trigger
+// object is being read (that is its get() method is called), all the watchers in the stack are
+// notified, because they all depend on the trigger object's value for their functionality.
+//
+// It also maintains a reference count of mutation scopes and handles notifying watchers of
+// mutations only when the last mutation scope has exited. The triggers don't notify the watchers
+// directly; instead, they notify the manager, which accumulates the information and notifies all
+// the watchers once out of the last mutation scope.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Stack of watcher objects. Watchers are pushed on top before they call the watched
+// function and removed after this function returns. When a trigger notifies that its value
+// has been changed, all the watchers in the stack are attached to this trigger. This means
+// that the trigger's value is used by the watched functions.
+const watcherStack: Watcher[] = [];
+
+// Number of currently active mutation scopes. When a trigger notifies that its value has been
+// changed while this number is not 0, the trigger will be remembered in the internal set.
+// After all mutation scopes are finished, the watchers attached to all triggers in the set
+// will be notified. When a trigger notifies that its value has been changed while there are
+// no mutation scopes present, the watchers attached to the trigger are notified immediately.
+let mutationScopesRefCount = 0;
+
+// Set of watchers that should be notified when the last mutation scope exits. Using Set
+// ensures that no matter how many triggers reference a watcher, the watcher will be present
+// only once.
+const deferredWatchers = new Set<Watcher>();
+
+
+
 /**
- * The IMutator interface represents a callable object that wraps a function and has the same
- * signature as this function. When a watcher is called it cals the wrapped function and attaches
- * to all triggers whose values were read during the course of the call. When values of these
- * triggers change, a responder function is called. The responder function is provided when the
- * watcher is created, but it can be changed later.
+ * Pushes the given watcher object to the top of the stack
  */
-export interface IMutator<T extends AnyAnyFunc = any> extends IDisposer
+const pushWatcher = (watcher: Watcher): void =>
 {
-    /** This is a callable interface, which is implement as a function. */
-    (...args: Parameters<T>): ReturnType<T>;
+    watcherStack.push( watcher);
 }
 
-
-
 /**
- * A Symbol used to keep a mutator object attached to the mutator function.
+ * Removes the watcher object currently on the top of the stack
  */
-let symMutator = Symbol( "symMutator");
-
-
-
-/**
- * Creates a mutator function with the same signature as the given regular function which executes
- * the wrapped function within a mutation scope. Watchers for triggers that have their values
- * changed during execution of this function are not notified immediately. Instead, the watchers
- * are "deferred" and will be notified only once after the last mutation scope exits. This can be
- * useful since usually watchers depend on many triggers and we don't want the watchers being
- * notified many time but rather only once after all the changes have been done.
- * @param func Function around which to establish a mutation scope. If this is a class method,
- * then either provide the funcThis parameter or bind the function before passing it in. Note
- * that arrow functions are already bound.
- * @param funcThis The "this" value to apply when calling the function. This is necessary if the
- * function is an unboundclass method.
- */
-export function createMutator<T extends AnyAnyFunc>( func: T, funcThis?: any): IMutator<T>
+const popWatcher = (): void =>
 {
-    function mutatorFunc(...args: any[]): any
-    {
-        let mutator: Watcher = mutatorFunc[symWatcher];
-
-        // if the value of "this" for the original function was not supplied but now when the
-        // watcher executes, "this" is defined, we remember it.
-        return mutator.execute( this, args);
-    }
-
-    // keep the mutator object in the function object itself using a symbol.
-    mutatorFunc[symMutator] = new Mutator( func, funcThis);
-
-    // implement the dispose method
-    (mutatorFunc as IMutator).dispose = function()
-    {
-        let mutator = mutatorFunc[symMutator] as Watcher;
-        mutator && mutator.dispose();
-        delete mutatorFunc[symMutator];
-    }
-
-    return mutatorFunc as IWatcher<T>;
+    watcherStack.pop();
 }
 
-
+/**
+ * Removes the watcher object from the set of deferred watchers
+ */
+const removeDeferredWatcher = (watcher: Watcher): void =>
+{
+    deferredWatchers.delete( watcher);
+}
 
 /**
- * The Mutator class encapsulates the functionality of executing a wrapped function under a
- * mutation scope.
+ * Increments mutation scope reference count
  */
-class Mutator<T extends AnyAnyFunc = any>
+export const enterMutationScope = (): void =>
 {
-    constructor( func: T, funcThis?: any)
+    mutationScopesRefCount++;
+}
+
+/**
+ * Decrements mutation scope reference count. If it reaches zero, notifies all deferred watchers.
+ */
+export const exitMutationScope = (): void =>
+{
+    if (mutationScopesRefCount === 0)
+        throw Error( "Unpaired call to exitMutationScope");
+
+    if (--mutationScopesRefCount === 0)
     {
-        this.func = func;
-        this.funcThis = funcThis;
+        // since when watchers respond, they can execute their watcher functions and that could
+        // mess with the same set of watchers we are iterating over. Therefore, we make a copy
+        // of this set first.
+        let watchers = Array.from( deferredWatchers.keys());
+        deferredWatchers.clear();
+        watchers.forEach( watcher => watcher.respond());
+    }
+}
+
+/**
+ * Notifies that the value of the given trigger object has been read.
+ */
+const notifyTriggerRead = (trigger: Trigger): void =>
+{
+    let len = watcherStack.length;
+    if (len > 0)
+    {
+        let watcher = watcherStack[len -1];
+        watcher.triggers.add( trigger);
+        trigger.addWatcher( watcher);
     }
 
-    /**
-     * Executes the original function in a mutation scope.
-     */
-    public execute( funcThis: any, args: any[]): any
+    // // attach all watchers currently on the stack to the trigger
+    // for( let watcher of this.watcherStack)
+    // {
+    //     watcher.triggers.add( trigger);
+    //     trigger.addWatcher( watcher);
+    // }
+}
+
+/**
+ * Notifies that the value of the given trigger object has been changed. If this happens while
+ * within a mutation scope, we don't notify the watchers of this trigger but put them in a
+ * deferred set. If this happens outside of any mutation scope. In this case we notify the
+ * watchers of this trigger right away.
+ */
+const notifyTriggerChanged = (trigger: Trigger): void =>
+{
+    // if the trigger doesn't have watchers, do nothing
+    if (trigger.watchers.size === 0)
+        return;
+
+    if (mutationScopesRefCount > 0)
+        trigger.watchers.forEach( watcher => deferredWatchers.add( watcher));
+    else
     {
-        // check whether our watcher has been already disposed
-        if (!this.func)
-            throw new Error( "Disposed mutator was called.");
-
-        // Fix our "this" if it hasn't been set so far
-        if (!this.funcThis && funcThis)
-            this.funcThis = funcThis;
-
-        g_manager.enterMutationScope();
-        try { return this.func.apply( this.funcThis, args); }
-        finally { g_manager.exitMutationScope(); }
+        // since when watchers respond, they can execute their watcher functions and that could
+        // mess with the same set of watchers we are iterating over. Therefore, we make a copy
+        // of this set first.
+        let watchers = Array.from( trigger.watchers.keys());
+        watchers.forEach( watcher => watcher.respond());
     }
-
-    /** Clears internal resources. */
-    public dispose(): void
-    {
-        // check whether the object is already disposed
-        if (!this.func)
-            return;
-
-        // set the func and responder properties to null to indicate that the watcher has been disposed
-        this.func = null;
-        this.funcThis = null;
-    }
-
-    // Function being wrapped.
-    private func: T;
-
-    // "this" value to apply to the wrapped function when calling it.
-    private funcThis: any;
 }
 
 
@@ -769,13 +601,13 @@ function triggerrize<T = any>( v: T, trigger: Trigger, depth?: number): T
     if (!v || depth === 0)
         return v;
     else if (Array.isArray(v))
-        return new Proxy( v, new NonSlotContainerHandler( trigger, (depth ? depth : TriggerDepth.Shallow) - 1)) as any as T;
+        return new Proxy( v, new NonSlotHandler( trigger, (depth ? depth : TriggerDepth.Shallow) - 1)) as any as T;
     else if (v instanceof Map)
         return new Proxy( v, new MapHandler( trigger, (depth ? depth : TriggerDepth.Shallow) - 1)) as any as T;
     else if (v instanceof Set)
         return new Proxy( v, new SetHandler( trigger, (depth ? depth : TriggerDepth.Shallow) - 1)) as any as T;
     else if (v.constructor === Object)
-        return new Proxy( v, new NonSlotContainerHandler( trigger, (depth ? depth : TriggerDepth.Deep) - 1)) as any as T;
+        return new Proxy( v, new NonSlotHandler( trigger, (depth ? depth : TriggerDepth.Deep) - 1)) as any as T;
     else
         return v;
 }
@@ -785,7 +617,7 @@ function triggerrize<T = any>( v: T, trigger: Trigger, depth?: number): T
 /**
  * Base class for Array and plain object handlers.
  */
-class NonSlotContainerHandler implements ProxyHandler<any>
+class NonSlotHandler implements ProxyHandler<any>
 {
     constructor( trigger: Trigger, depth: number)
     {
@@ -795,7 +627,7 @@ class NonSlotContainerHandler implements ProxyHandler<any>
 
     get( target: any, prop: PropertyKey, receiver: any): any
     {
-        this.trigger.notifyRead();
+        notifyTriggerRead( this.trigger);
         return Reflect.get( target, prop, receiver);
     }
 
@@ -804,7 +636,7 @@ class NonSlotContainerHandler implements ProxyHandler<any>
         let oldValue = Reflect.get( target, prop, receiver);
         if (oldValue != value)
         {
-            this.trigger.notifyChanged();
+            notifyTriggerChanged( this.trigger);
             return Reflect.set( target, prop, triggerrize( value, this.trigger, this.depth), receiver);
         }
         else
@@ -813,43 +645,43 @@ class NonSlotContainerHandler implements ProxyHandler<any>
 
     deleteProperty( target: any, prop: PropertyKey): boolean
     {
-        this.trigger.notifyChanged();
+        notifyTriggerChanged( this.trigger);
         return Reflect.deleteProperty( target, prop);
     }
 
     defineProperty( target: any, prop: PropertyKey, attrs: PropertyDescriptor): boolean
     {
-        this.trigger.notifyChanged();
+        notifyTriggerChanged( this.trigger);
         return Reflect.defineProperty( target, prop, attrs);
     }
 
     has( target: any, prop: PropertyKey): boolean
     {
-        this.trigger.notifyRead();
+        notifyTriggerRead( this.trigger);
         return Reflect.has( target, prop);
     }
 
     getPrototypeOf( target: any): object | null
     {
-        this.trigger.notifyRead();
+        notifyTriggerRead( this.trigger);
         return Reflect.getPrototypeOf( target);
     }
 
     isExtensible( target: any): boolean
     {
-        this.trigger.notifyRead();
+        notifyTriggerRead( this.trigger);
         return Reflect.isExtensible( target);
     }
 
     getOwnPropertyDescriptor( target: any, prop: PropertyKey): PropertyDescriptor | undefined
     {
-        this.trigger.notifyRead();
+        notifyTriggerRead( this.trigger);
         return Reflect.getOwnPropertyDescriptor( target, prop);
     }
 
     ownKeys( target: any): ArrayLike<string | symbol>
     {
-        this.trigger.notifyRead();
+        notifyTriggerRead( this.trigger);
         return Reflect.ownKeys( target);
     }
 
@@ -865,33 +697,6 @@ class NonSlotContainerHandler implements ProxyHandler<any>
 
 
 
-// /**
-//  * Handler for arrays.
-//  */
-// class ArrayHandler extends NonSlotContainerHandler
-// {
-//     get( target: Array<any>, prop: PropertyKey, receiver: any): any
-//     {
-//         this.trigger.notifyRead();
-//         return Reflect.get( target, prop, receiver);
-//     }
-// }
-
-
-
-// /**
-//  * Handler for on plain objects.
-//  */
-// class ObjectHandler extends NonSlotContainerHandler
-// {
-//     get( target: any, prop: PropertyKey, receiver: any): any
-//     {
-//         return Reflect.get( target, prop, receiver);
-//     }
-// }
-
-
-
 /**
  * Base class for shallow Map/Set handlers. Methods whose names were supplied in the constructor,
  * notify change; all other methods notify read.
@@ -899,12 +704,12 @@ class NonSlotContainerHandler implements ProxyHandler<any>
  * For Map and Set in order to be proxied, the methods returned from get() must be
  * bound to the target. See https://javascript.info/proxy#built-in-objects-internal-slots.
  */
-class SlotContainerHandler implements ProxyHandler<any>
+abstract class SlotContainerHandler implements ProxyHandler<any>
 {
-    constructor( trigger: Trigger, mutatorMethodNames: Set<PropertyKey>, depth: number)
+    constructor( trigger: Trigger, mutators: Set<PropertyKey>, depth: number)
     {
         this.trigger = trigger;
-        this.mutatorMethodNames = mutatorMethodNames;
+        this.mutators = mutators;
         this.depth = depth;
     }
 
@@ -913,7 +718,7 @@ class SlotContainerHandler implements ProxyHandler<any>
     // method is a mutator.
     get( target: any, prop: PropertyKey, receiver: any): any
     {
-        this.trigger.notifyRead();
+        notifyTriggerRead( this.trigger);
 
         // in this context "this" is the handler; however, when the methods we return are called
         // the "this" will be the Proxy object. Therefore, we want these methods to capture and
@@ -932,26 +737,25 @@ class SlotContainerHandler implements ProxyHandler<any>
             // bind the original method to the target object
             let orgBoundMethod = propVal.bind( target);
 
-            if (this.mutatorMethodNames.has(prop))
+            if (this.mutators.has(prop))
             {
                 // for mutator methods we create and return a function that, when called, invokes the
                 // handler specific functionality, which knows about the structure of the arguments
                 // and will create proxies for the appropriate objects if needed. This functionality
                 // will also indicate whether an actual change occurs so that we can notify about it.
                 method = function(): any {
-                    let ret: [any, boolean] = handler.callOrgMutatorMethod( target, prop, orgBoundMethod, ...arguments);
-                    if (ret[1])
-                        handler.trigger.notifyChanged();
+                    let [val, changed] = handler.callMutator( target, prop, orgBoundMethod, ...arguments);
+                    if (changed)
+                        notifyTriggerChanged( handler.trigger);
 
-                    return ret[0];
-                    // return orgBoundMethod( ...arguments);
+                    return val;
                 };
             }
             else
             {
                 // For non-mutator methods, we notify the read and invoke the original method.
                 method = function(): any {
-                    handler.trigger.notifyRead();
+                    notifyTriggerRead( handler.trigger);
                     return orgBoundMethod( ...arguments);
                 };
             }
@@ -970,10 +774,8 @@ class SlotContainerHandler implements ProxyHandler<any>
      * @param args Two element tuple where the first element is the return value and the second
      * element is a flag indicating whether the container has changed.
      */
-    protected callOrgMutatorMethod( target: any, name: PropertyKey, orgMethod: Function, ...args: any[]): [any, boolean]
-    {
-        return [undefined,false];
-    }
+    protected abstract callMutator( target: any, name: PropertyKey, orgMethod: Function,
+        ...args: any[]): [any, boolean];
 
 
 
@@ -985,7 +787,7 @@ class SlotContainerHandler implements ProxyHandler<any>
     protected depth: number;
 
     // Set of method names, which mutate the contaier. All other methods only read from it.
-    private mutatorMethodNames: Set<PropertyKey>;
+    private mutators: Set<PropertyKey>;
 
     // This map keeps already wrapped methods so that we don't do binding more than once.
     private wrappedMethods = new Map<PropertyKey,Function>();
@@ -993,16 +795,16 @@ class SlotContainerHandler implements ProxyHandler<any>
 
 
 
+const mapMutatorMethodNames = new Set<PropertyKey>(["clear", "delete", "set"]);
+
 /**
  * Handler for maps.
  */
 class MapHandler extends SlotContainerHandler
 {
-    private static mutatorMethodNames = new Set<PropertyKey>(["clear", "delete", "set"]);
-
     constructor( trigger: Trigger, depth: number)
     {
-        super( trigger, MapHandler.mutatorMethodNames, depth);
+        super( trigger, mapMutatorMethodNames, depth);
     }
 
     /**
@@ -1012,7 +814,7 @@ class MapHandler extends SlotContainerHandler
      * @param args Two element tuple where the first element is the return value and the second
      * element is a flag indicating whether the container has changed.
      */
-    protected callOrgMutatorMethod( target: Map<any,any>, name: PropertyKey, orgMethod: Function, ...args: any[]): [any, boolean]
+    protected callMutator( target: Map<any,any>, name: PropertyKey, orgMethod: Function, ...args: any[]): [any, boolean]
     {
         if (name === "clear")
         {
@@ -1032,16 +834,16 @@ class MapHandler extends SlotContainerHandler
 
 
 
+const setMutatorMethodNames = new Set<PropertyKey>(["add", "delete", "clear"]);
+
 /**
  * Handler for sets.
  */
 class SetHandler extends SlotContainerHandler
 {
-    private static mutatorMethodNames = new Set<PropertyKey>(["add", "delete", "clear"]);
-
     constructor( trigger: Trigger, depth: number)
     {
-        super( trigger, SetHandler.mutatorMethodNames, depth);
+        super( trigger, setMutatorMethodNames, depth);
     }
 
     /**
@@ -1051,7 +853,7 @@ class SetHandler extends SlotContainerHandler
      * @param args Two element tuple where the first element is the return value and the second
      * element is a flag indicating whether the container has changed.
      */
-    protected callOrgMutatorMethod( target: Map<any,any>, name: PropertyKey, orgMethod: Function, ...args: any[]): [any, boolean]
+    protected callMutator( target: Map<any,any>, name: PropertyKey, orgMethod: Function, ...args: any[]): [any, boolean]
     {
         if (name === "add")
             return [orgMethod( triggerrize( args[0], this.trigger, this.depth)), true];
@@ -1084,7 +886,7 @@ class SetHandler extends SlotContainerHandler
  * depending on the value type: Shallow for arrays, maps and sets and Deep for objects.
  * The form `@trigger(n)` designates a trigger decorator factory with the specified depth.
  */
-export function trigger( targetOrDepth: any, name?: string): any
+export const trigger = (targetOrDepth: any, name?: string): any =>
 {
     if (typeof targetOrDepth === "number")
     {
@@ -1105,7 +907,7 @@ export function trigger( targetOrDepth: any, name?: string): any
 /**
  * Helper function for defining `@trigger` decorators.
  */
-function triggerDecoratorHelper( depth: number, target: any, name: string): void
+const triggerDecoratorHelper = (depth: number, target: any, name: string): void =>
 {
     let sym = Symbol( name + "_trigger");
 
@@ -1137,7 +939,7 @@ function triggerDecoratorHelper( depth: number, target: any, name: string): void
  * values changed. WHen this happens, the watcher objects attached to this computed value will
  * be notified to respond.
  */
-export function computed( target: any, name: string, propDescr: PropertyDescriptor)
+export const computed = (target: any, name: string, propDescr: PropertyDescriptor): void =>
 {
     let sym = Symbol(name);
 
@@ -1150,7 +952,7 @@ export function computed( target: any, name: string, propDescr: PropertyDescript
         let orgGet = propDescr.get;
         propDescr.get = function(): any
         {
-            let triggerObj = this[sym] as IComputedTrigger;
+            let triggerObj = this[sym] as ITrigger;
             if (!triggerObj)
                 this[sym] = triggerObj = createComputedTrigger( orgGet, this);
 
@@ -1162,9 +964,9 @@ export function computed( target: any, name: string, propDescr: PropertyDescript
             let orgSet = propDescr.set;
             propDescr.set = function( v: any): void
             {
-                g_manager.enterMutationScope();
+                enterMutationScope();
                 try { orgSet.call( this, v); }
-                finally { g_manager.exitMutationScope(); }
+                finally { exitMutationScope(); }
             }
         }
     }
@@ -1173,7 +975,7 @@ export function computed( target: any, name: string, propDescr: PropertyDescript
         let orgFunc = propDescr.value;
         propDescr.value = function( v: any): void
         {
-            let triggerObj = this[sym] as IComputedTrigger;
+            let triggerObj = this[sym] as ITrigger;
             if (!triggerObj)
                 this[sym] = triggerObj = createComputedTrigger( orgFunc, this);
 

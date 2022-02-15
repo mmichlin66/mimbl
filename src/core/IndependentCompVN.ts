@@ -1,5 +1,5 @@
-﻿import {IIndependentCompVN, IComponent} from "../api/mim"
-import {ClassCompVN} from "../internal"
+﻿import {IIndependentCompVN, IComponent, IComponentClass} from "../api/mim"
+import {ClassCompVN, DN, moveNode, VN, VNDisp} from "../internal"
 
 
 
@@ -15,6 +15,7 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 	{
 		super();
 
+        this.compClass = comp.constructor as IComponentClass;
         this.comp = this.key = comp;
 	};
 
@@ -32,13 +33,42 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 
 
 
-	// Determines whether the update of this node from the given node is possible. The newVN
-	// parameter is guaranteed to point to a VN of the same type as this node.
-	public isUpdatePossible( newVN: IndependentCompVN): boolean
-	{
-		// update is possible if the component class is the same
-		return this.comp.constructor === newVN.comp.constructor;
-	}
+	// Initializes internal stuctures of the virtual node. This method is called right after the
+    // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
+    // corresponding to this virtual node.
+	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+    {
+        // if the component is already connected to a node, we don't mount it again; instead, we
+        // remember the new parameters and move it to a new location. This can happen when the
+        // component is "moved" to a different place in the element hierarchy and the unmount
+        // method will also be invoked in this Mimbl tick. In this case, we take note to not
+        // unmount our node.
+        if (this.comp.vn)
+        {
+            this.ignoreUnmount = true;
+            this.creator = creator;
+            this.parent = parent;
+            this.index = index;
+            this.anchorDN = anchorDN;
+            if (this.rootHost)
+                anchorDN.insertBefore( this.rootHost, beforeDN);
+            else
+                moveNode( this, anchorDN, beforeDN);
+        }
+        else
+            super.mount( creator, parent, index, anchorDN, beforeDN);
+    }
+
+
+
+    // Releases reference to the DOM node corresponding to this virtual node.
+    public unmount( removeFromDOM: boolean): void
+    {
+        if (this.ignoreUnmount)
+            this.ignoreUnmount = false;
+        else
+            super.unmount( removeFromDOM);
+    }
 
 
 
@@ -46,46 +76,38 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node. The returned value indicates whether children
 	// should be updated (that is, this node's render method should be called).
-	public update( newVN: IndependentCompVN): boolean
+	public update( newVN: IndependentCompVN, disp: VNDisp): void
 	{
         // if it is the same component instance, we don't need to do anything
 		if (this.comp === newVN.comp)
-    		return false;
+    		return;
 
         // we are here if the component instances are different; we need to prepare the old
         // instance for unmounting and the new one for mounting.
-        this.unmount();
-        this.oldComp = this.comp;
+        let oldComp = this.comp;
+        this.prepareUnmount( oldComp);
         this.comp = this.key = newVN.comp;
-        this.mount();
+        this.prepareMount( newVN.comp);
 
-        return true;
-	}
+        super.update( this, disp);
 
-
-
-    // Notifies this node that it's children have been updated.
-	public didUpdate(): void
-	{
-        if (this.oldComp)
+        if (oldComp)
         {
             let fn = this.comp.didReplace;
-            fn && fn.call( this.comp, this.oldComp);
-            this.oldComp = undefined;
+            fn && fn.call( this.comp, oldComp);
         }
 	}
 
 
-    // if the node is recycled for a different component, this field keeps the old component
-    // until the didUpdate method is called.
-    private oldComp: IComponent;
+
+    /**
+     * Flag indicating that the component's mount method was invoked while it was already mounted.
+     * It can happen when the component is "moved" to a different place in the element hierarchy
+     * and the unmount method will also be invoked in this Mimbl tick. In this case, we don't call
+     * the component's willMount and willUnmount methods.
+     */
+    private ignoreUnmount?: boolean;
 }
-
-
-
-// Define methods/properties that are invoked during mounting/unmounting/updating and which don't
-// have or have trivial implementation so that lookup is faster.
-IndependentCompVN.prototype.ignoreUnmount = false;
 
 
 

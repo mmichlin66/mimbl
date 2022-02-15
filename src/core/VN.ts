@@ -1,7 +1,7 @@
 ﻿import {IComponent, RefPropType, setRef, IVNode, UpdateStrategy, TickSchedulingType} from "../api/mim";
 import {
     notifyServiceUnpublished, notifyServiceUnsubscribed, requestNodeUpdate,
-    notifyServicePublished, notifyServiceSubscribed
+    notifyServicePublished, notifyServiceSubscribed, getCurrentClassComp
 } from "../internal";
 
 
@@ -12,12 +12,12 @@ export type DN = Node;
 
 
 
-/// #if DEBUG
-    let g_nextVNDebugID = 1;
-/// #endif
-
 /// #if USE_STATS
     import {StatsCategory} from "../utils/Stats"
+/// #endif
+
+/// #if DEBUG
+    let g_nextVNDebugID = 1;
 /// #endif
 
 
@@ -29,6 +29,11 @@ export type DN = Node;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export abstract class VN implements IVNode
 {
+    constructor()
+    {
+        this.creator = getCurrentClassComp();
+    }
+
 	/// #if USE_STATS
         public abstract get statsCategory(): StatsCategory;
 	/// #endif
@@ -84,13 +89,6 @@ export abstract class VN implements IVNode
     // allows updating the element properties without re-rendering its children.
 	public partialUpdateRequested?: boolean;
 
-    // Flag indicating that the unmount method should not be called when destroying this node. It
-    // is possible to reuse virtual nodes during rendering. The clone method (if implemented by the
-    // node) will be called. If this method returns the same node (instead of creating a new one),
-    // the node can set this flag. When such node is unmounted, the sub-nodes will only be
-    // unmounted if this flag is false.
-	public ignoreUnmount?: boolean;
-
 	// "Tick number" during which the node was last updated. If this node's tick number equals
 	// the current tick number maintained by the root node, this indicates that this node was
 	// already updated in this update cycle. This helps prevent double-rendering of a
@@ -105,51 +103,43 @@ export abstract class VN implements IVNode
 	//
 	///////////////////////////////////////////////////////////////////////////////////////////////
 
-	// Initializes internal stuctures of the virtual node. This method is called right after the
-    // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
-    // corresponding to this virtual node.
-	public mount?(): void;
+	/**
+     * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
+     * and before the given node.
+     */
+	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+    {
+        this.creator = creator;
+        this.parent = parent;
+        this.index = index;
+        this.anchorDN = anchorDN;
+    }
 
-    // Creates a virtual node as a "clone" of this one. This method is invoked when an already
-    // mounted node is returned during rendering. The method can either create a new virtual
-    // node or it can mark the node in a special way and return the same instance. If this method
-    // is not implemented, the same instance will be used.
-	public clone?(): VN;
-
-	// Returns content that comprises the children of the node. If the node doesn't have
-	// sub-nodes, null should be returned. If this method is not implemented that means the node
-	// never has children - for example text nodes.
-	public render?(): any;
-
-    // Clears internal structures of the virtual node. For nodes that have their own DOM nodes,
-    // should only release the internally held reference to the DOM node - the actual removal of
-    // the node from DOM is done by the infrastructure.
-	public unmount?(): void;
+    /**
+     * Recursively removes the content of this virtual node from DOM.
+     */
+	public unmount( removeFromDOM: boolean): void
+    {
+        this.parent = null;
+        this.anchorDN = null;
+    }
 
 	// Determines whether the update of this node from the given node is possible. The newVN
 	// parameter is guaranteed to point to a VN of the same type as this node. If this method is
 	// not implemented the update is considered possible - e.g. for text nodes.
 	public isUpdatePossible?( newVN: VN): boolean;
 
-	// Updated this node from the given node. This method is invoked only if update
-	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node. The returned value indicates whether children
-	// should be updated (that is, this node's render method should be called).
-	public update?( newVN: VN): boolean;
-
-    /**
-     * Notifies this node that it's children have been updated.
+	/**
+     * Recursively updates this node from the given node. This method is invoked only if update
+     * happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
+     * point to a VN of the same type as this node.
      */
-    public didUpdate?(): void;
+	public abstract update( newVN: VN, disp: VNDisp): void;
 
-	// Determines whether the node supports handling of errors; that is, exception thrown during
-	// rendering of the node itself and/or its sub-nodes. If this method is not implemented the node
-	// doesn't support error handling.
-	public supportsErrorHandling?: boolean;
-
-    // This method is called after an exception was thrown during rendering of the node's
-    // sub-nodes. The method returns the new content to display.
-	public handleError?( err: any): any;
+	// Returns content that comprises the children of the node. If the node doesn't have
+	// sub-nodes, null should be returned. If this method is not implemented that means the node
+	// never has children - for example text nodes.
+	public render?(): any;
 
     // This method is called if the node requested a "partial" update. Different types of virtual
     // nodes can keep different data for the partial updates; for example, ElmVN can keep new
@@ -167,6 +157,8 @@ export abstract class VN implements IVNode
     // This method is only called on the mounted nodes.
     public getFirstDN(): DN
     {
+        if (this.ownDN)
+            return this.ownDN;
         if (!this.subNodes)
             return null;
 
@@ -186,6 +178,8 @@ export abstract class VN implements IVNode
     // This method is only called on the mounted nodes.
     public getLastDN(): DN
     {
+        if (this.ownDN)
+            return this.ownDN;
         if (!this.subNodes)
             return null;
 
@@ -206,6 +200,8 @@ export abstract class VN implements IVNode
     // empty array.
     public getImmediateDNs(): DN | DN[] | null
     {
+        if (this.ownDN)
+            return this.ownDN;
         if (!this.subNodes)
             return null;
 
@@ -216,9 +212,11 @@ export abstract class VN implements IVNode
 
     // Collects all DOM nodes that are the immediate children of this virtual node (that is,
     // are NOT children of sub-nodes that have their own DOM node) into the given array.
-    protected collectImmediateDNs( arr: DN[]): void
+    private collectImmediateDNs( arr: DN[]): void
     {
-        if (this.subNodes)
+        if (this.ownDN)
+            arr.push( this.ownDN);
+        else if (this.subNodes)
             this.subNodes.forEach( svn => svn.collectImmediateDNs( arr));
     }
 
@@ -393,6 +391,121 @@ export abstract class VN implements IVNode
 
 	// Map of service IDs to objects constituting subscriptions made by this node.
 	private subscribedServices: Map<string,VNSubscribedServiceInfo>;
+}
+
+
+
+/**
+ * The VNAction enumeration specifies possible actions to perform for sub-nodes during
+ * reconciliation process.
+ */
+export const enum VNDispAction
+{
+	/**
+	 * The new node should be inserted. This means that either there was no counterpart old node
+	 * found or the found node cannot be used to update the old one nor can the old node be reused
+	 * by the new one (e.g. they are of different type).
+	 */
+	Insert = 1,
+
+	/**
+	 * The new node should be used to update the old node.
+	 */
+	Update = 2,
+
+	/**
+	 * The new node is the same as the old node.
+	 */
+	NoChange = 3,
+}
+
+
+
+/**
+ * The VNDisp class is a recursive structure that describes a disposition for a node and its
+ * sub-nodes during the reconciliation process.
+ */
+export type VNDisp =
+{
+	/** Old virtual node to be updated. This can be null only for the Insert action. */
+	oldVN?: VN;
+
+	/** New virtual node to insert or from which to update an old node. */
+	newVN?: VN;
+
+	/** Action to be performed on the node */
+	action?: VNDispAction;
+
+    /** Start index in the old array of sub-nodes; if undefined, 0 is used. */
+    oldStartIndex?: number;
+
+    /** End index in the old array of sub-nodes; if undefined, the array length is used. */
+    oldEndIndex?: number;
+
+    /** Length of the (sub-)array of old sub-nodes. */
+    oldLength?: number;
+
+    /** Update strategy object; if undefined, the update strategy from the oldVN is used. */
+    updateStrategy?: UpdateStrategy;
+
+    /**
+     * Flag indicating that no action should be taken; that is, the new sub-nodes are the same
+     * as old ones.
+     */
+	noChanges?: boolean;
+
+    /**
+     * Flag indicating that all old sub-nodes are being updated or removed. This is true if
+     * oldLength === oldSubNodes.length
+     */
+    allProcessed?: boolean;
+
+    /**
+     * Flag indicating that all old sub-nodes should be deleted and all new sub-nodes inserted.
+     * If this flag is set, the subNodeDisps, subNodesToRemove and subNodeGroups fields are
+     * ignored.
+     */
+	replaceAll?: boolean;
+
+	/**
+	 * Array of disposition objects for sub-nodes. This includes nodes to be updated
+	 * and to be inserted.
+	 */
+	subDisps?: VNDisp[];
+
+	/** Array of sub-nodes that should be removed during update of the sub-nodes. */
+	toRemove?: VN[];
+
+	/** Array of groups of sub-nodes that should be updated or inserted. */
+	subGroups?: VNDispGroup[];
+}
+
+
+
+/**
+ * The VNDispGroup class describes a group of consecutive VNDisp objects correspponding to the
+ * sequence of sub-nodes. The group is described using indices of VNDisp objects in the
+ * subNodeDisp field of the parent VNDisp object.
+ */
+export interface VNDispGroup
+{
+	/** Action to be performed on the nodes in the group */
+	action: VNDispAction;
+
+	/** Index of the first VNDisp in the group */
+	first: number;
+
+	/** Index of the last VNDisp in the group */
+	last?: number;
+
+	/** Number of nodes in the group. */
+	count?: number;
+
+	/** First DOM node in the group - will be known after the nodes are physically updated */
+	firstDN?: DN;
+
+	/** First DOM node in the group - will be known after the nodes are physically updated */
+	lastDN?: DN;
 }
 
 

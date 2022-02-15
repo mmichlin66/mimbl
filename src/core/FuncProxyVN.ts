@@ -1,5 +1,8 @@
 ﻿import {symRenderNoWatcher, RenderMethodType, IComponent} from "../api/mim"
-import {VN, createWatcher, IWatcher, setCurrentClassComp} from "../internal"
+import {
+    VN, createWatcher, IWatcher, DN, mountContent, unmountSubNodes,
+    VNDisp, reconcile
+} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -34,14 +37,13 @@ let symFuncsToNodes = Symbol( "symFuncsToNodes");
  */
 export class FuncProxyVN extends VN
 {
-	constructor( creator: IComponent, func: RenderMethodType, funcThisArg?: any, arg?: any, key?: any)
+	constructor( func: RenderMethodType, funcThisArg?: any, arg?: any, key?: any)
 	{
 		super();
 
         // remember data from the props. Note that if funcThisArg is undefined it will be changed
         // to the node's creator component upon mounting. If there is no key specified, the arg
         // will be used (which may also be unspecified)
-        this.creator = creator;
 		this.func = func;
 		this.funcThisArg = funcThisArg;
 		this.arg = arg;
@@ -74,7 +76,7 @@ export class FuncProxyVN extends VN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount(): void
+	public prepareMount(): void
 	{
         if (!this.funcThisArg)
             this.funcThisArg = this.creator;
@@ -87,8 +89,22 @@ export class FuncProxyVN extends VN
             this.actFunc = func.bind( this.funcThisArg);
         else
             this.actFunc = this.funcWatcher = createWatcher( func, this.requestUpdate, this.funcThisArg, this);
+	}
 
-		/// #if USE_STATS
+
+
+	// Initializes internal stuctures of the virtual node. This method is called right after the
+    // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
+    // corresponding to this virtual node.
+	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	{
+        super.mount( creator, parent, index, anchorDN);
+
+        this.prepareMount();
+
+        mountContent( creator, this, this.render(), anchorDN, beforeDN);
+
+        /// #if USE_STATS
 			DetailedStats.log( StatsCategory.Comp, StatsAction.Added);
 		/// #endif
 	}
@@ -96,7 +112,7 @@ export class FuncProxyVN extends VN
 
 
     // Cleans up the node object before it is released.
-    public unmount(): void
+    public prepareUnmount(): void
     {
         if (this.funcWatcher)
         {
@@ -106,6 +122,22 @@ export class FuncProxyVN extends VN
 
         this.unlinkNodeFromFunc();
         this.actFunc = undefined;
+    }
+
+
+
+    // Cleans up the node object before it is released.
+    public unmount( removeFromDOM: boolean): void
+    {
+        this.prepareUnmount();
+
+        if (this.subNodes)
+        {
+            unmountSubNodes( this.subNodes, removeFromDOM);
+            this.subNodes = null;
+        }
+
+        super.unmount( removeFromDOM);
 
 		/// #if USE_STATS
 			DetailedStats.log( StatsCategory.Comp, StatsAction.Deleted);
@@ -125,12 +157,7 @@ export class FuncProxyVN extends VN
 			DetailedStats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-        let prevCreator = setCurrentClassComp( this.creator);
-        let ret = this.actFunc( this.arg);
-        setCurrentClassComp( prevCreator);
-        return ret;
-
-        // return this.actFunc( this.arg);
+        return this.actFunc( this.arg);
 	}
 
 
@@ -139,8 +166,11 @@ export class FuncProxyVN extends VN
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node. The returned value indicates whether children
 	// should be updated (that is, this node's render method should be called).
-	public update( newVN: FuncProxyVN): boolean
+	public update( newVN: FuncProxyVN, disp: VNDisp): void
 	{
+        if (!newVN.funcThisArg)
+            newVN.funcThisArg = this.creator;
+
 		// remember the new value of the key property (even if it is the same)
 		this.key = newVN.key;
 
@@ -150,22 +180,20 @@ export class FuncProxyVN extends VN
         {
             // we need to re-render only if the arguments are the same.
             if (this.arg !== newVN.arg)
-            {
                 this.arg = newVN.arg;
-                return true;
-            }
             else
-                return false;
+                return;
         }
         else
         {
-            this.unmount();
+            this.prepareUnmount();
             this.func = newVN.func;
             this.funcThisArg = newVN.funcThisArg;
             this.arg = newVN.arg;
-            this.mount();
-            return true;
+            this.prepareMount();
         }
+
+        reconcile( this.creator, this, disp, this.render());
 	}
 
 
@@ -260,10 +288,7 @@ export class FuncProxyVN extends VN
 
 // Define methods/properties that are invoked during mounting/unmounting/updating and which don't
 // have or have trivial implementation so that lookup is faster.
-FuncProxyVN.prototype.isUpdatePossible = undefined; // this mens that update is always possible
-FuncProxyVN.prototype.didUpdate = undefined;
-FuncProxyVN.prototype.supportsErrorHandling = false;
-FuncProxyVN.prototype.ignoreUnmount = false;
+FuncProxyVN.prototype.isUpdatePossible = undefined; // this means that update is always possible
 
 
 

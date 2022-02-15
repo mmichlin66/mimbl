@@ -1,5 +1,5 @@
-﻿import {IManagedCompVN, IComponentClass, setRef, RefPropType, Component} from "../api/mim"
-import {ClassCompVN} from "../internal"
+﻿import {IManagedCompVN, IComponentClass, setRef, RefPropType, Component, IComponent} from "../api/mim"
+import {ClassCompVN, DN, VN, VNDisp} from "../internal"
 
 
 
@@ -10,11 +10,6 @@ import {ClassCompVN} from "../internal"
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 {
-	// Type of the class-based component.
-	public compClass: IComponentClass;
-
-
-
 	constructor( compClass: IComponentClass, props: any, children: any[])
 	{
 		super();
@@ -62,12 +57,10 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount(): void
+	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
     {
 		// create component instance
         this.comp = new this.compClass( this.props);
-
-        super.mount();
 
         // set the reference value if specified
         if (this.ref)
@@ -83,12 +76,14 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
         // the component
         if (this.key != null)
             delete this.props.key;
+
+        super.mount( creator, parent, index, anchorDN, beforeDN);
     }
 
 
 
     // Releases reference to the DOM node corresponding to this virtual node.
-    public unmount(): void
+    public unmount( removeFromDOM: boolean): void
     {
 		// unset the reference value if specified. We check whether the reference still points
 		// to our component before setting it to undefined. If the same Ref object is used for
@@ -97,20 +92,10 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 		if (this.ref)
 			setRef( this.ref, undefined, this.comp);
 
-        super.unmount();
+        super.unmount( removeFromDOM);
 
         this.comp = null;
     }
-
-
-
-	// Determines whether the update of this node from the given node is possible. The newVN
-	// parameter is guaranteed to point to a VN of the same type as this node.
-	public isUpdatePossible( newVN: ManagedCompVN): boolean
-	{
-		// update is possible if the component class name is the same
-		return this.compClass === newVN.compClass;
-	}
 
 
 
@@ -118,10 +103,12 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node. The returned value indicates whether children
 	// should be updated (that is, this node's render method should be called).
-	public update( newVN: ManagedCompVN): boolean
+	public update( newVN: ManagedCompVN, disp: VNDisp): void
 	{
+        let comp = this.comp;
+
 		// let the component know about the new properties (if it is interested in them)
-		let shouldRender = this.comp.shouldUpdate && this.comp.shouldUpdate( newVN.props);
+		let shouldRender = comp.shouldUpdate && comp.shouldUpdate( newVN.props);
 
 		// if reference specification changed then set or unset it as necessary
 		if (newVN.ref !== this.ref)
@@ -132,18 +119,19 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 			// if reference is now specified, set it now; note that we already determined that
 			// the reference object is different.
 			if (this.ref)
-				setRef( this.ref, this.comp);
+				setRef( this.ref, comp);
 		}
 		else if (this.ref)
-			setRef( this.ref, undefined, this.comp);
+			setRef( this.ref, undefined, comp);
 
 		// remember the new value of the key property (even if it is the same)
 		this.key = newVN.key;
 
 		// remember the new properties
-        (this.comp as Component).props = this.props = newVN.props;
+        (comp as Component).props = this.props = newVN.props;
 
-		return shouldRender;
+		if (shouldRender)
+            super.update( newVN, disp);
 	}
 
 
@@ -156,13 +144,6 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 	// set during mount and unset during unmount.
 	private ref: RefPropType<any>;
 }
-
-
-
-// Define methods/properties that are invoked during mounting/unmounting/updating and which don't
-// have or have trivial implementation so that lookup is faster.
-ManagedCompVN.prototype.didUpdate = undefined;
-ManagedCompVN.prototype.ignoreUnmount = false;
 
 
 
