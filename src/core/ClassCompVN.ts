@@ -1,6 +1,9 @@
-﻿import {IClassCompVN, symRenderNoWatcher, IComponent, RenderMethodType, ScheduledFuncType, TickSchedulingType, IComponentClass, ComponentShadowOptions} from "../api/mim"
+﻿import {
+    IClassCompVN, symRenderNoWatcher, IComponent, RenderMethodType, ScheduledFuncType,
+    IComponentClass, ComponentShadowOptions
+} from "../api/mim"
 import {
-    DN, VN, setCurrentClassComp, FuncProxyVN, scheduleFuncCall, s_wrapCallback, mountContent,
+    DN, VN, setCurrentClassComp, FuncProxyVN, scheduleFuncCall, mountContent,
     unmountSubNodes, VNDisp, reconcile, createWatcher, IWatcher
 } from "../internal"
 
@@ -328,20 +331,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	 */
 	public callMe( func: ScheduledFuncType, beforeUpdate: boolean, funcThisArg?: any): void
 	{
-		scheduleFuncCall( func, beforeUpdate, funcThisArg || this.comp, this.comp);
-	}
-
-
-
-	/**
-	 * Creates a wrapper function with the same signature as the given callback so that if the original
-	 * callback throws an exception, it is processed by the Mimbl error handling mechanism so that the
-	 * exception bubbles from the component up the hierarchy until a component that knows to
-	 * handle errors is found.
-	 */
-    public wrapCallback<T extends Function>( func: T, funcThisArg?: any, schedulingType?: TickSchedulingType): T
-	{
-		return s_wrapCallback( {func, funcThisArg: funcThisArg || this.comp, creator: this.comp, schedulingType});
+		scheduleFuncCall( func, beforeUpdate, funcThisArg || this.comp);
 	}
 
 

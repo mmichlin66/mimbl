@@ -4,8 +4,8 @@
 } from "../api/mim"
 import {
     VN, s_deepCompare, PropType, CustomAttrPropInfo, AttrPropInfo, EventPropInfo, getElmPropInfo,
-    setElmProp, removeElmProp, updateElmProp, s_wrapCallback, ChildrenUpdateOperation, syncUpdate,
-    ChildrenUpdateRequest, DN, VNDisp, mountSubNodes, reconcileSubNodes, unmountSubNodes,
+    setElmProp, removeElmProp, updateElmProp, s_wrapCallback, ChildrenUpdateOperation,
+    DN, VNDisp, mountSubNodes, reconcileSubNodes, unmountSubNodes,
 } from "../internal"
 
 /// #if USE_STATS
@@ -93,7 +93,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     public setChildren( content?: any, startIndex?: number, endIndex?: number, update?: boolean,
         updateStrategy?: UpdateStrategy, schedulingType?: TickSchedulingType): void
     {
-        this.doChildrenOp( {
+        this.requestUpdate( {
             op: ChildrenUpdateOperation.Set, content, startIndex, endIndex,
             update, updateStrategy
         }, schedulingType);
@@ -103,37 +103,37 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     public spliceChildren( index: number, countToDelete?: number, contentToInsert?: any,
         schedulingType?: TickSchedulingType): void
     {
-        this.doChildrenOp( {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert}, schedulingType);
+        this.requestUpdate( {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert}, schedulingType);
     }
 
     // Moves a range of sub-nodes to a new location.
     public moveChildren( index: number, count: number, shift: number, schedulingType?: TickSchedulingType): void
     {
-        this.doChildrenOp( {op: ChildrenUpdateOperation.Move, index, count, shift}, schedulingType);
+        this.requestUpdate( {op: ChildrenUpdateOperation.Move, index, count, shift}, schedulingType);
     }
 
     // Swaps two ranges of the element's sub-nodes. The ranges cannot intersect.
     public swapChildren( index1: number, count1: number, index2: number, count2: number, schedulingType?: TickSchedulingType): void
     {
-        this.doChildrenOp( {op: ChildrenUpdateOperation.Swap, index1, count1, index2, count2}, schedulingType);
+        this.requestUpdate( {op: ChildrenUpdateOperation.Swap, index1, count1, index2, count2}, schedulingType);
     }
 
     // Retains the given range of the sub-nodes unmounting the sub-nodes outside the given range.
     public sliceChildren( startIndex: number, endIndex?: number, schedulingType?: TickSchedulingType): void
     {
-        this.doChildrenOp( {op: ChildrenUpdateOperation.Slice, startIndex, endIndex}, schedulingType);
+        this.requestUpdate( {op: ChildrenUpdateOperation.Slice, startIndex, endIndex}, schedulingType);
     }
 
     // Removes the given number of nodes from the start and/or the end of the list of sub-nodes.
     public trimChildren( startCount: number, endCount: number, schedulingType?: TickSchedulingType): void
     {
-        this.doChildrenOp( {op: ChildrenUpdateOperation.Trim, startCount, endCount}, schedulingType);
+        this.requestUpdate( {op: ChildrenUpdateOperation.Trim, startCount, endCount}, schedulingType);
     }
 
     // Adds the given content at the start and/or at the end of the existing children.
     public growChildren( startContent?: any, endContent?: any, schedulingType?: TickSchedulingType): void
     {
-        this.doChildrenOp( {op: ChildrenUpdateOperation.Grow, startContent, endContent}, schedulingType);
+        this.requestUpdate( {op: ChildrenUpdateOperation.Grow, startContent, endContent}, schedulingType);
     }
 
     /**
@@ -148,18 +148,18 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      */
     public reverseChildren( startIndex?: number, endIndex?: number, schedulingType?: TickSchedulingType): void
     {
-        this.doChildrenOp( {op: ChildrenUpdateOperation.Reverse, startIndex, endIndex}, schedulingType);
+        this.requestUpdate( {op: ChildrenUpdateOperation.Reverse, startIndex, endIndex}, schedulingType);
     }
 
-    // Either performs immediately or schedules the execution of a children operation defined by
-    // the given request.
-    private doChildrenOp( req: ChildrenUpdateRequest, schedulingType: TickSchedulingType)
-    {
-        if (schedulingType === TickSchedulingType.Sync)
-            syncUpdate( this, req);
-        else
-            this.requestUpdate( req);
-    }
+    // // Either performs immediately or schedules the execution of a children operation defined by
+    // // the given request.
+    // private doChildrenOp( req: ChildrenUpdateRequest, schedulingType: TickSchedulingType)
+    // {
+    //     if (schedulingType === TickSchedulingType.Sync)
+    //         syncUpdate( this, req);
+    //     else
+    //         this.requestUpdate( req);
+    // }
 
 
 
@@ -287,46 +287,35 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// should be updated (that is, this node's render method should be called).
 	public update( newVN: ElmVN<T>, disp: VNDisp): void
 	{
-        // it might theoretically happen that a different component reuses this element, so we
-        // need to compare the creators. Also we need to update attributes and events if the new
-        // props are different from the current ones.
-        if (this.creator !== newVN.creator || !s_deepCompare( this.props, newVN.props, 3))
+        // need to update attributes and events if the new props are different from the current ones.
+        if (!s_deepCompare( this.props, newVN.props, 3))
         {
-            this.creator = newVN.creator;
+            newVN.creator = this.creator;
             if (newVN.props)
                 newVN.parseProps( newVN.props);
 
-            // if reference specification changed then set or unset it as necessary
-            if (newVN.ref !== this.ref)
-            {
-                // remember the new reference specification
-                this.ref = newVN.ref;
-                this.vnref = newVN.vnref;
+            // remember new props
+            this.props = newVN.props;
 
-                // if reference is now specified, set it now; note that we already determined that
-                // the reference object is different.
-                if (this.ref)
-                    setRef( this.ref, this.ownDN);
-
-                if (this.vnref)
-                    setRef( this.vnref, this);
-            }
+            // if reference specifications changed then set or unset them as necessary
+            this.updateRef( newVN.ref);
+            this.updateVNref( newVN.vnref);
 
             // remember the new value of the key and updateStartegy properties (even if the
             // values are the same)
-            this.props = newVN.props;
             this.key = newVN.key;
             this.updateStrategy = newVN.updateStrategy;
 
+            // update attributes and events
             this.updateAttrs( newVN.attrs);
             this.updateEvents( newVN.events);
             this.updateCustomAttrs( newVN.customAttrs);
         }
 
+        // update children if they exist either on our or on the new element
         if (this.subNodes || newVN.subNodes)
             reconcileSubNodes( this.creator, this, disp, newVN.subNodes);
 	}
-
 
 
     // This method is called if the node requested a "partial" update. Different types of virtual
@@ -353,11 +342,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
             // get information about the property and determine its type.
             let propInfo = getElmPropInfo( propName);
-            let propType = propInfo
-                ? propInfo.type
-                : typeof propVal === "function" || typeof propVal === "object"
-                    ? PropType.Event
-                    : PropType.Attr;
+            let propType = propInfo?.type ?? PropType.Attr;
 
             if (propType === PropType.Attr)
                 this.updateAttrOnly( propName, propInfo as AttrPropInfo, propVal);
@@ -370,25 +355,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 if (propName === "key")
                     this.key = propVal;
                 else if (propName === "ref")
-                {
-                    if (propVal !== this.ref)
-                    {
-                        // if reference is now specified, set it now
-                        this.ref = propVal;
-                        if (propVal)
-                            setRef( this.ref, this.ownDN);
-                    }
-                }
+                    this.updateRef( propVal)
                 else if (propName === "vnref")
-                {
-                    if (propVal !== this.vnref)
-                    {
-                        // if reference is now specified, set it now
-                        this.vnref = propVal;
-                        if (propVal)
-                            setRef( this.vnref, this);
-                    }
-                }
+                    this.updateVNref( propVal)
                 else if (propName === "updateStrategy")
                     this.updateStrategy = propVal;
             }
@@ -401,7 +370,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// listeners and custom attributes.
 	private parseProps( props: any): void
 	{
-
         // loop over all properties ignoring the built-ins
         for( let propName in props)
 		{
@@ -415,12 +383,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 // Therefore, all regular attributes that can accept objects or arrays or functions
                 // must be explicitly registered.
 				let propInfo = getElmPropInfo( propName);
-                let propType = propInfo
-                    ? propInfo.type
-                    : typeof propVal === "function" || typeof propVal === "object"
-                        ? PropType.Event
-                        : PropType.Attr;
-
+                let propType = propInfo?.type ?? PropType.Attr;
 				if (propType === PropType.Attr)
 				{
 					if (!this.attrs)
@@ -460,6 +423,40 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		}
 	}
 
+
+
+    /**
+     * Updates reference to the DOM element.
+     */
+    private updateRef( newRef: RefType<T>): void
+    {
+        if (newRef !== this.ref)
+        {
+            if (this.ref)
+                setRef( this.ref, undefined);
+            this.ref = newRef;
+            if (this.ref)
+                setRef( this.ref, this.ownDN);
+        }
+    }
+
+    /**
+     * Updates reference to the virtual node.
+     */
+    private updateVNref( newVNref: ElmRefType<T>): void
+    {
+        if (newVNref !== this.vnref)
+        {
+            if (this.vnref)
+                setRef( this.vnref, undefined);
+            this.vnref = newVNref;
+            if (this.vnref)
+                setRef( this.vnref, this);
+        }
+    }
+
+
+
 	// Adds DOM attributes to the Element.
 	private addAttrs(): void
 	{
@@ -486,18 +483,18 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 			for( let name in oldAttrs)
 			{
 				let oldRTD = oldAttrs[name];
-				let newRTD = newAttrs ? newAttrs[name] : undefined;
-				if (!newRTD || !newRTD.val)
+				let newVal = newAttrs?.[name]?.val;
+				if (newVal == null || newVal === false)
 				{
 					// if there is no new property with the given name, remove the old property and
 					// remove the attribute from the element
 					removeElmProp( elm, name, oldRTD.info);
 				}
-				else if (oldRTD.val !== newRTD.val)
+				else if (oldRTD.val !== newVal)
 				{
-					// if the new property with the given name has a different value, remmeber this
-					// value and set it to the attribute in the element
-                    updateElmProp( elm, name, oldRTD.info, oldRTD.val, newRTD.val);
+					// if the new property with the given name has a different value, set it to
+                    // the attribute in the element
+                    updateElmProp( elm, name, oldRTD.info, oldRTD.val, newVal);
 				}
 			}
 		}
@@ -539,8 +536,11 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         {
             if (oldAttr)
             {
-                updateElmProp( this.ownDN, name, info, oldAttr.val, val)
-                oldAttr.val = val;
+                if (oldAttr.val !== val)
+                {
+                    updateElmProp( this.ownDN, name, info, oldAttr.val, val)
+                    oldAttr.val = val;
+                }
             }
             else
             {
@@ -620,7 +620,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 			for( let name in oldEvents)
 			{
 				let oldRTD = oldEvents[name];
-				let newRTD = newEvents ? newEvents[name] : undefined;
+				let newRTD = newEvents?.[name];
 				if (!newRTD)
 					this.removeEvent( name, oldRTD);
 				else
@@ -651,9 +651,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// been detected.
 	private updateEvent( name: string, oldRTD: EventRunTimeData, newRTD: EventRunTimeData): void
 	{
-		// double-equal-sign for useCapture is on purpose, because useCapture can be undefined or boolean
+		// double-equal-sign for useCapture is on purpose, because useCapture can be undefined or
+        // boolean.
 		if (oldRTD.func === newRTD.func &&
-			oldRTD.funcThisArg === newRTD.funcThisArg &&
+			oldRTD.thisArg === newRTD.thisArg &&
 			oldRTD.arg === newRTD.arg &&
 			oldRTD.useCapture == newRTD.useCapture)
 		{
@@ -680,10 +681,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     // when the properties of the element are updated as a result of requestPropsUpdate call; that
     // is when only the properties that should be added, updated or removed were specified and
     // there is no need to re-render the element's children
-	private updateEventOnly( name: string, info: EventPropInfo, val: any ): void
+	private updateEventOnly( name: string, info: EventPropInfo, val: EventPropType): void
 	{
-        let oldRTD = this.events && this.events[name];
-        let newRTD = val != null && this.getEventRTD( info, val as EventPropType);
+        let oldRTD = this.events?.[name];
+        let newRTD = val != null && this.getEventRTD( info, val);
         if (!newRTD)
         {
             if (oldRTD)
@@ -712,21 +713,31 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 
-    // Determines whether the given property value is of the type that is used for event handlers.
-    // If yes, then returns EventRunTimeData object; otherwise, returns undefined.
+    /**
+     * Returns EventRunTimeData object for the given value of the even property. The value can be
+     * either a function or a tuple or an object.
+     */
     private getEventRTD( info: EventPropInfo, propVal: EventPropType): EventRunTimeData
     {
-        if (typeof propVal === "function")
-            return { func: propVal, funcThisArg: this.creator, schedulingType: info ? info.schedulingType : undefined, creator: this.creator };
-        else
-            return {
-                func: propVal.func,
-                funcThisArg: propVal.funcThisArg ? propVal.funcThisArg : this.creator,
-                arg: propVal.arg,
-                schedulingType: propVal.schedulingType ? propVal.schedulingType : info ? info.schedulingType : undefined,
-                creator: propVal.creator ? propVal.creator : this.creator,
-                useCapture: propVal.useCapture
-            };
+        let rtd = typeof propVal === "function"
+            ? { func: propVal, thisArg: this.creator, schedulingType: info?.schedulingType }
+            : Array.isArray(propVal)
+                ? {
+                    func: propVal[0],
+                    thisArg: propVal[1] ?? this.creator,
+                    arg: propVal[2],
+                    schedulingType: propVal[3] ?? info?.schedulingType,
+                    useCapture: propVal[4]
+                }
+                : {
+                    func: propVal.func,
+                    thisArg: propVal.thisArg ?? this.creator,
+                    arg: propVal.arg,
+                    schedulingType: propVal.schedulingType ?? info?.schedulingType,
+                    useCapture: propVal.useCapture
+                };
+
+        return rtd;
     }
 
 
@@ -757,7 +768,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         }
         catch( err)
         {
+            /// #if DEBUG
             console.error( `Error creating handler for custom attribute '${name}': ${err.message}`);
+            /// #endif
+
             return false;
         }
 	}
@@ -782,7 +796,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         }
         catch( err)
         {
+            /// #if DEBUG
             console.error( `Error terminating handler for custom attribute '${name}': ${err.message}`);
+            /// #endif
         }
 	}
 
@@ -800,7 +816,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 			for( let name in oldCustomAttrs)
 			{
 				const oldCustomAttr = oldCustomAttrs[name];
-				const newCustomAttr = newCustomAttrs ? newCustomAttrs[name] : undefined;
+				const newCustomAttr = newCustomAttrs?.[name];
                 if (!newCustomAttr)
                     this.removeCustomAttr( name, oldCustomAttr, false);
 				else
@@ -841,7 +857,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         }
         catch( err)
         {
+            /// #if DEBUG
             console.error( `Error updating handler for custom attribute '${name}': ${err.message}`);
+            /// #endif
         }
 	}
 

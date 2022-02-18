@@ -3,7 +3,7 @@ import {IHtmlIntrinsicElements} from "./HtmlTypes";
 import {ISvgIntrinsicElements} from "./SvgTypes";
 import {
     PropType, EventSlot, mountRoot, unmountRoot, TextVN,
-    s_wrapCallback, registerElmProp, symJsxToVNs, s_getCallbackArg, shadowDecorator
+    s_wrapCallback, registerElmProp, symJsxToVNs, shadowDecorator
 } from "../internal";
 
 
@@ -247,17 +247,13 @@ export interface CallbackWrappingParams<T extends Function = Function>
 	func: T;
 
 	// Object that will be referenced by "this" within the event handler function
-	funcThisArg?: any;
+	thisArg?: any;
 
 	// Argument that can be retrieved from within the callback using the getCallbackArg function.
 	arg?: any;
 
-	// Type of scheduling the Mimbl tick after the event handler function returns. The defaul
+	// Type of scheduling the Mimbl tick after the event handler function returns.
 	schedulingType?: TickSchedulingType;
-
-    // Object that will be set as "current creator" for JSX parsing during the event handler
-    // function execution
-	creator?: any;
 };
 
 /**
@@ -268,16 +264,6 @@ export function wrapCallback<T extends Function>( params?: CallbackWrappingParam
 {
     return s_wrapCallback<T>( params);
 }
-
-/**
- * Retrieves the argument that was passed when a callback was wrapped. This function can only be
- * called from the callback itself while it is executing.
- */
-export function getCallbackArg(): any
-{
-    return s_getCallbackArg();
-}
-
 
 
 
@@ -293,10 +279,23 @@ export function getCallbackArg(): any
  */
 export type EventFuncType<T extends Event = Event> = (e: T) => void;
 
-/** Type defining the information that can be supplied for an event listener */
+/**
+ * Type defining a tuple that can be supplied for an event listener.
+ * @typeparam T DOM event type, e.g. MouseEvent
+ */
+export type EventTupleType<T extends Event = Event> =
+    [func: EventFuncType<T>, thisArg: any, arg?: any, schedulingType?: TickSchedulingType, useCapture?: boolean]
+
+/**
+ * Type defining an object that can be supplied for an event listener.
+ * @typeparam T DOM event type, e.g. MouseEvent
+ */
 export interface EventObjectType<T extends Event> extends CallbackWrappingParams<EventFuncType<T>>
 {
-	// Flag indicating whether this event should be used as Capturing (true) or Bubbling (false)
+	/**
+     * Flag indicating whether this event should be used as Capturing or Bubbling. The default
+     * value is `false`, that is, Bubbling.
+     */
 	useCapture?: boolean;
 };
 
@@ -304,7 +303,8 @@ export interface EventObjectType<T extends Event> extends CallbackWrappingParams
  * Union type that can be passed to an Element's event.
  * @typeparam T DOM event type, e.g. MouseEvent
  */
-export type EventPropType<T extends Event = Event> = EventFuncType<T> | EventObjectType<T>;
+export type EventPropType<T extends Event = Event> =
+    EventFuncType<T> | EventTupleType<T> | EventObjectType<T>;
 
 /**
  * Type for defining the id property of HTML elements
@@ -930,47 +930,6 @@ export interface IClassCompVN extends IVNode
 	 *   is already bound or is an arrow function.
 	 */
 	callMe( func: ScheduledFuncType, beforeUpdate: boolean, funcThisArg?: any): void;
-
-	/**
-	 * Creates a wrapper function with the same signature as the given callback so that if the original
-	 * callback throws an exception, it is processed by the Mimbl error handling mechanism so that the
-	 * exception bubbles from this component up the hierarchy until a component that knows to
-	 * handle errors is found.
-	 *
-	 * Use this method before passing callbacks to document and window event handlers as well as
-	 * non-DOM objects that use callbacks, e.g. fetch, Promise, setTimeout, etc. For example:
-	 *
-	 * ```typescript
-	 *	class ResizeMonitor extends mim.Component
-	 *	{
-	 *		private onWindowResize(e: Event): void {};
-	 *
-	 * 		wrapper: (e: Event): void;
-	 *
-	 * 		public startResizeMonitoring()
-	 *		{
-	 *			this.wrapper = this.wrapCallback( this.onWindowResize);
-	 *			window.addEventListener( "resize", this.wrapper);
-	 *		}
-	 *
-	 * 		public stopResizeMonitoring()
-	 *		{
-	 *			window.removeEventListener( "resize", this.wrapper);
-	 *			this.wrapper = undefined;
-	 *		}
-	 *	}
-	 * ```
-	 *
-	 * @param func Method/function to be wrapped
-     * @param funcThisArg Optional value of "this" to bind the callback to. If this parameter is
-     * undefined, the component instance will be used. This parameter will be ignored if the the
-     * function is already bound or is an arrow function.
-	 * @param schedulingType Type determining whether and how a Mimbl tick should be scheduled
-     * after callback invocation.
-	 * @returns Function that has the same signature as the given callback and that should be used
-	 *     instead of the original callback
-	 */
-    wrapCallback<T extends Function>( func: T, funcThisArg?: any, schedulingType?: TickSchedulingType): T
 }
 
 
@@ -1235,11 +1194,14 @@ export function registerCustomEvent( eventName: string): void
 
 export const enum TickSchedulingType
 {
-    /** No tick is scheduled */
-    None = 1,
+    // /** No tick is scheduled */
+    // None = 1,
 
-    /** The tick is executed right away in a synchronous manner */
-    Sync,
+    /**
+     * The tick is executed right away in a synchronous manner. If this scheduled type is specified
+     * for a callback, the tick is executed right after the callback returns.
+     */
+    Sync = 1,
 
     /** A microtask is scheduled for executing the tick */
     Microtask,
@@ -1346,51 +1308,6 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	protected callMeAfterUpdate( func: ScheduledFuncType, funcThisArg?: any): void
 	{
 		this.vn?.callMe( func, false, funcThisArg);
-	}
-
-	/**
-	 * Creates a wrapper function with the same signature as the given callback so that if the original
-	 * callback throws an exception, it is processed by the Mimbl error handling mechanism so that the
-	 * exception bubbles from this component up the hierarchy until a component that knows to
-	 * handle errors is found.
-	 *
-	 * Use this method before passing callbacks to document and window event handlers as well as
-	 * non-DOM objects that use callbacks, e.g. fetch, Promise, setTimeout, etc. For example:
-	 *
-	 * ```typescript
-	 *	class ResizeMonitor extends mim.Component
-	 *	{
-	 *		private onWindowResize(e: Event): void {};
-	 *
-	 * 		wrapper: (e: Event): void;
-	 *
-	 * 		public startResizeMonitoring()
-	 *		{
-	 *			this.wrapper = this.wrapCallback( this.onWindowResize);
-	 *			window.addEventListener( "resize", this.wrapper);
-	 *		}
-	 *
-	 * 		public stopResizeMonitoring()
-	 *		{
-	 *			window.removeEventListener( "resize", this.wrapper);
-	 *			this.wrapper = undefined;
-	 *		}
-	 *	}
-	 * ```
-	 *
-	 * @param func Method/function to be wrapped
-     * @param funcThisArg Optional value of "this" to bind the callback to. If this parameter is
-     * undefined, the component instance will be used. This parameter will be ignored if the the
-     * function is already bound or is an arrow function.
-	 * @param schedulingType Type determining whether and how a Mimbl tick should be scheduled
-     * after callback invocation.
-	 * @returns Function that has the same signature as the given callback and that should be used
-	 *     instead of the original callback
-	 */
-    protected wrapCallback<T extends Function>( func: T, funcThisArg?: any,
-        schedulingType?: TickSchedulingType): T
-	{
-		return this.vn?.wrapCallback( func, funcThisArg, schedulingType);
 	}
 }
 

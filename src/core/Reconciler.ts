@@ -67,15 +67,6 @@ export const setCurrentClassComp = (comp: IComponent): IComponent =>
 
 
 
-// Parameter that was passed when a callback was wrapped and which is set during the callback execution.
-let s_currentCallbackArg: any;
-
-// Retrieves the argumnet that was passed when a callback was wrapped. This function can only be called
-// from the callback itself while it is executing.
-export const s_getCallbackArg = (): any => s_currentCallbackArg;
-
-
-
 // State of the scheduler indicating in what phase of the update cycle we currently reside.
 const enum SchedulerState
 {
@@ -119,30 +110,27 @@ export const s_wrapCallback = <T extends Function>( params: CallbackWrappingPara
  * The CallbackWrapper function is used to wrap callbacks in order to have it executed in a Mimbl
  * context.
  */
-function CallbackWrapper( this: CallbackWrappingParams<Function>): any
+function CallbackWrapper( this: CallbackWrappingParams): any
 {
-    // we don't want the triggers encountered during the callback execution to cause the watchers
-    // to run immediately, so we enter mutation scope
-    enterMutationScope();
-
     // if some scheduling type is set (that is, we are going to schedule a Mimbl tick after
     // the callback), we should ignore requests to schedule a tick made during the callback
     // execution
-    let schedulingType = this.schedulingType || TickSchedulingType.Sync;
-    s_ignoreSchedulingRequest = schedulingType !== TickSchedulingType.None;
-
-    // params.arg will be available inside the callback via the getCurrentCallbackArg call.
-    s_currentCallbackArg = this.arg;
+    let schedulingType = this.schedulingType;
+    s_ignoreSchedulingRequest = !!schedulingType;
 
     let retVal: any;
     try
 	{
-		retVal = this.func.apply( this.funcThisArg, arguments);
+        // we don't want the triggers encountered during the callback execution to cause the watchers
+        // to run immediately, so we enter mutation scope
+        enterMutationScope();
+
+		// retVal = this.func.apply( this.funcThisArg, arguments);
+		retVal = this.func.call( this.thisArg, ...arguments, this.arg);
 	}
 	finally
 	{
         exitMutationScope();
-        s_currentCallbackArg = undefined;
         s_ignoreSchedulingRequest = false;
     }
 
@@ -210,13 +198,13 @@ export const requestNodeUpdate = (vn: VN, req?: ChildrenUpdateRequest, schedulin
         let comp = vn.comp;
         let func = comp.afterUpdate;
 		if (func)
-            s_callsScheduledAfterUpdate.set( func, s_wrapCallback( {func, funcThisArg: comp, creator: comp}));
+            s_callsScheduledAfterUpdate.set( func, s_wrapCallback( {func, thisArg: comp}));
 
         if (s_schedulerState !== SchedulerState.BeforeUpdate)
         {
             func = comp.beforeUpdate;
             if (func)
-                s_callsScheduledBeforeUpdate.set( func, s_wrapCallback( {func, funcThisArg: comp, creator: comp}));
+                s_callsScheduledBeforeUpdate.set( func, s_wrapCallback( {func, thisArg: comp}));
         }
 	}
 
@@ -233,7 +221,7 @@ export const requestNodeUpdate = (vn: VN, req?: ChildrenUpdateRequest, schedulin
 // Schedules to call the given function either before or after all the scheduled components
 // have been updated.
 export const scheduleFuncCall = (func: ScheduledFuncType, beforeUpdate: boolean,
-    funcThisArg?: any, creator?: any, schedulingType?: TickSchedulingType): void =>
+    funcThisArg?: any, schedulingType?: TickSchedulingType): void =>
 {
 	/// #if DEBUG
 	if (!func)
@@ -247,7 +235,7 @@ export const scheduleFuncCall = (func: ScheduledFuncType, beforeUpdate: boolean,
 	{
 		if (!s_callsScheduledBeforeUpdate.has( func))
 		{
-			s_callsScheduledBeforeUpdate.set( func, s_wrapCallback( {func, funcThisArg, creator}));
+			s_callsScheduledBeforeUpdate.set( func, s_wrapCallback( {func, thisArg: funcThisArg}));
 
 			// a "before update" function is always scheduled in the next frame even if the
 			// call is made from another "before update" function.
@@ -259,7 +247,7 @@ export const scheduleFuncCall = (func: ScheduledFuncType, beforeUpdate: boolean,
 	{
 		if (!s_callsScheduledAfterUpdate.has( func))
 		{
-			s_callsScheduledAfterUpdate.set( func, s_wrapCallback( {func, funcThisArg, creator}));
+			s_callsScheduledAfterUpdate.set( func, s_wrapCallback( {func, thisArg: funcThisArg}));
 
 			// an "after update" function is scheduled in the next cycle unless the request is made
 			// either from a "before update" function execution or during a node update.
@@ -274,37 +262,40 @@ export const scheduleFuncCall = (func: ScheduledFuncType, beforeUpdate: boolean,
 
 
 
-// Performs the specified operation on the sub-nodes of the given node. This function is called
-// when the operation is invoked synchronously; that is, without going through the Mimbl tick.
-export const syncUpdate = (vn: VN, req: ChildrenUpdateRequest): void =>
-{
-    // it can happen that we encounter already unmounted virtual nodes - ignore them
-    if (!vn.anchorDN)
-        return;
+// // Performs the specified operation on the sub-nodes of the given node. This function is called
+// // when the operation is invoked synchronously; that is, without going through the Mimbl tick.
+// export const syncUpdate = (vn: VN, req: ChildrenUpdateRequest): void =>
+// {
+//     // it can happen that we encounter already unmounted virtual nodes - ignore them
+//     if (!vn.anchorDN)
+//         return;
 
-    /// #if USE_STATS
-        DetailedStats.start( `Sync update: `);
-    /// #endif
+//     /// #if USE_STATS
+//         DetailedStats.start( `Sync update: `);
+//     /// #endif
 
-    try
-    {
-        performChildrenOperation( vn, req);
-    }
-    catch( err)
-    {
-        // find the nearest error handling service. If nobody else, it is implemented
-        // by the RootVN object.
-        let errorService = vn.getService( "StdErrorHandling");
-        if (errorService)
-            errorService.reportError( err);
-        else
-            console.error( "BUG: updateNode threw exception but StdErrorHandling service was not found.", err);
-    }
+//     try
+//     {
+//         performChildrenOperation( vn, req);
+//     }
+//     catch( err)
+//     {
+//         // find the nearest error handling service. If nobody else, it is implemented
+//         // by the RootVN object.
+//         let errorService = vn.getService( "StdErrorHandling");
+//         if (errorService)
+//             errorService.reportError( err);
 
-    /// #if USE_STATS
-        DetailedStats.stop( true);
-    /// #endif
-}
+//         /// #if DEBUG
+//         else
+//             console.error( "BUG: performChildrenOperation threw exception but StdErrorHandling service was not found.", err);
+//         /// #endif
+//     }
+
+//     /// #if USE_STATS
+//         DetailedStats.stop( true);
+//     /// #endif
+// }
 
 
 
@@ -396,8 +387,11 @@ const performMimbleTick = (): void =>
                 let errorService = vn.getService( "StdErrorHandling");
                 if (errorService)
                     errorService.reportError( err);
+
+                /// #if DEBUG
                 else
-                    console.error( "BUG: updateNode threw exception but StdErrorHandling service was not found.", err);
+                    console.error( "BUG: performChildrenOperation threw exception but StdErrorHandling service was not found.", err);
+                /// #endif
             }
         });
 

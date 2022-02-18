@@ -94,11 +94,11 @@ export interface EventPropInfo extends PropInfoBase
 	// Type of scheduling the Mimbl tick after the event handler function returns
 	schedulingType?: TickSchedulingType;
 
-	// Flag indicating whether the event bubbles. If the event doesn't bubble, the event handler
-	// must be set on the element itself; otherwise, the event handler can be set on the root
-	// anchor element, which allows having a single event handler registered for many elements,
-	// which is more performant.
-	isBubbling?: boolean;
+	// // Flag indicating whether the event bubbles. If the event doesn't bubble, the event handler
+	// // must be set on the element itself; otherwise, the event handler can be set on the root
+	// // anchor element, which allows having a single event handler registered for many elements,
+	// // which is more performant.
+	// isBubbling?: boolean;
 }
 
 
@@ -131,10 +131,11 @@ export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
  */
 
 const valToString = (val: any): string =>
-	typeof val === "string" ? val :
-	Array.isArray( val) ? val.map( item => valToString(item)).filter( item => !!item).join(" ") :
-	val == null ? "" :
-    val.toString();
+	typeof val === "string"
+        ? val
+        : Array.isArray( val)
+            ? val.map( item => valToString(item)).filter( item => !!item).join(" ")
+            : val == null ? "" : val.toString();
 
 
 
@@ -150,7 +151,7 @@ export function registerElmProp( propName: string, info: AttrPropInfo | EventPro
 
 
 // Registers information about the given property.
-export const getElmPropInfo = (propName: string): PropInfo | undefined => propInfos[propName];
+export const getElmPropInfo = (propName: string) => propInfos[propName];
 
 
 
@@ -183,7 +184,7 @@ export function setElmProp( elm: Element, propName: string, info: AttrPropInfo |
 // updated value to the element's attribute. Returns true if update has been performed and
 // false if no change in property value has been detected.
 export function updateElmProp( elm: Element, propName: string, info: AttrPropInfo | null,
-    oldPropVal: any, newPropVal: any): boolean
+    oldPropVal: any, newPropVal: any): void
 {
     // get property info object
     if (!info)
@@ -191,7 +192,7 @@ export function updateElmProp( elm: Element, propName: string, info: AttrPropInf
         // if this is not a special case (property is not in our list) just compare them and
         // if they are different set the attribute to the new value.
         if (oldPropVal === newPropVal)
-            return false;
+            return;
         else
         {
             elm.setAttribute( propName, valToString( newPropVal));
@@ -200,7 +201,7 @@ export function updateElmProp( elm: Element, propName: string, info: AttrPropInf
                 DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
             /// #endif
 
-            return true;
+            return;
         }
     }
 
@@ -214,12 +215,12 @@ export function updateElmProp( elm: Element, propName: string, info: AttrPropInf
 
         // if updateValue is undefined then no change has been detected.
         if (updateVal === undefined)
-            return false;
+            return;
     }
     else if (oldPropVal !== newPropVal)
         updateVal = newPropVal;
     else
-        return false;
+        return;
 
     // get actual attribute name to use
     let attrName = info.attrName || propName;
@@ -244,9 +245,6 @@ export function updateElmProp( elm: Element, propName: string, info: AttrPropInf
     /// #if USE_STATS
         DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
     /// #endif
-
-    // indicate that there was change in attribute value.
-    return true;
 }
 
 
@@ -434,7 +432,7 @@ function removeDefaultValueProp( elm: Element, attrName: string): void
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 function setCheckedProp( elm: Element, attrName: string, propVal: any): void
 {
-	// we need to cast elm to any, because generic Element doesn't have value property.
+	// we need to cast elm to any, because generic Element doesn't have the "checked" property.
 	(elm as any).checked = propVal;
 }
 
@@ -444,50 +442,134 @@ const diffCheckedProp = (attrName: string, oldPropValVal: any, newPropVal: any):
 
 function removeCheckedProp( elm: Element, attrName: string): void
 {
-	// we need to cast elm to any, because generic Element doesn't have value property.
+	// we need to cast elm to any, because generic Element doesn't have the "checked" property.
 	(elm as any).checked = false;
 }
 
 
 
+const StdFramworkPropInfo = { type: PropType.Framework };
+// const StdAttrPropInfo = { type: PropType.Attr };
+const StdEventPropInfo = { type: PropType.Event };
+
+
+
 // Object that maps property names to PropInfo-derived objects. Information about custom
 // attributes is added to this object when the registerProperty method is called.
-let propInfos: {[P:string]: PropInfo} =
+const propInfos: {[P:string]: PropInfo} =
 {
     // framework attributes.
-    key: { type: PropType.Framework },
-    ref: { type: PropType.Framework },
-    vnref: { type: PropType.Framework },
-    updateStrategy: { type: PropType.Framework },
+    key: StdFramworkPropInfo,
+    ref: StdFramworkPropInfo,
+    vnref: StdFramworkPropInfo,
+    updateStrategy: StdFramworkPropInfo,
 
     // attributes - only those attributes are listed that have non-trivial treatment or whose value
     // type is object or function. ID and class are present here because their value can be
     // specified as Mimcss IDRule and ClassRule objects respectively.
-    id: { type: PropType.Attr },
-    class: { type: PropType.Attr },
     style: { type: PropType.Attr, set: setStyleProp, diff: diffStyleProp, update: updateStyleProp },
     media: { type: PropType.Attr, set: setMediaProp, diff: diffMediaProp, update: updateMediaProp },
     value: { type: PropType.Attr, set: setValueProp, diff: diffValueProp, remove: removeValueProp },
     defaultValue: { type: PropType.Attr, set: setValueProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
     checked: { type: PropType.Attr, set: setCheckedProp, diff: diffCheckedProp, remove: removeCheckedProp },
     defaultChecked: { type: PropType.Attr, set: setCheckedProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
+    // id: { type: PropType.Attr },
+    // class: { type: PropType.Attr },
 
-    // frequently used events for speeding up the lookup
+    // events
+    abort: StdEventPropInfo,
+    animationcancel: StdEventPropInfo,
+    animationend: StdEventPropInfo,
+    animationiteration: StdEventPropInfo,
+    animationstart: StdEventPropInfo,
+    auxclick: StdEventPropInfo,
+    beforeinput: StdEventPropInfo,
+    blur: StdEventPropInfo,
+    canplay: StdEventPropInfo,
+    canplaythrough: StdEventPropInfo,
+    change: StdEventPropInfo,
     click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },
-    mousemove: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-    mouseover: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-    pointermove: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-    pointerover: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-    input: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-    scroll: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-    touchmove: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-    wheel: { type: PropType.Event, schedulingType: TickSchedulingType.None },
-
-    // // events
-    // mouseenter: { type: PropType.Event, isBubbling: false },
-    // mouseleave: { type: PropType.Event, isBubbling: false },
-    // pointerenter: { type: PropType.Event, isBubbling: false },
-    // pointerleave: { type: PropType.Event, isBubbling: false },
+    close: StdEventPropInfo,
+    compositionend: StdEventPropInfo,
+    compositionstart: StdEventPropInfo,
+    compositionupdate: StdEventPropInfo,
+    contextmenu: StdEventPropInfo,
+    cuechange: StdEventPropInfo,
+    dblclick: StdEventPropInfo,
+    drag: StdEventPropInfo,
+    dragend: StdEventPropInfo,
+    dragenter: StdEventPropInfo,
+    dragleave: StdEventPropInfo,
+    dragover: StdEventPropInfo,
+    dragstart: StdEventPropInfo,
+    drop: StdEventPropInfo,
+    durationchange: StdEventPropInfo,
+    emptied: StdEventPropInfo,
+    ended: StdEventPropInfo,
+    error: StdEventPropInfo,
+    focus: StdEventPropInfo,
+    focusin: StdEventPropInfo,
+    focusout: StdEventPropInfo,
+    formdata: StdEventPropInfo,
+    gotpointercapture: StdEventPropInfo,
+    input: StdEventPropInfo,
+    invalid: StdEventPropInfo,
+    keydown: StdEventPropInfo,
+    keypress: StdEventPropInfo,
+    keyup: StdEventPropInfo,
+    load: StdEventPropInfo,
+    loadeddata: StdEventPropInfo,
+    loadedmetadata: StdEventPropInfo,
+    loadstart: StdEventPropInfo,
+    lostpointercapture: StdEventPropInfo,
+    mousedown: StdEventPropInfo,
+    mouseenter: StdEventPropInfo,
+    mouseleave: StdEventPropInfo,
+    mousemove: StdEventPropInfo,
+    mouseout: StdEventPropInfo,
+    mouseover: StdEventPropInfo,
+    mouseup: StdEventPropInfo,
+    pause: StdEventPropInfo,
+    play: StdEventPropInfo,
+    playing: StdEventPropInfo,
+    pointercancel: StdEventPropInfo,
+    pointerdown: StdEventPropInfo,
+    pointerenter: StdEventPropInfo,
+    pointerleave: StdEventPropInfo,
+    pointermove: StdEventPropInfo,
+    pointerout: StdEventPropInfo,
+    pointerover: StdEventPropInfo,
+    pointerup: StdEventPropInfo,
+    progress: StdEventPropInfo,
+    ratechange: StdEventPropInfo,
+    reset: StdEventPropInfo,
+    resize: StdEventPropInfo,
+    scroll: StdEventPropInfo,
+    securitypolicyviolation: StdEventPropInfo,
+    seeked: StdEventPropInfo,
+    seeking: StdEventPropInfo,
+    select: StdEventPropInfo,
+    selectionchange: StdEventPropInfo,
+    selectstart: StdEventPropInfo,
+    stalled: StdEventPropInfo,
+    submit: StdEventPropInfo,
+    suspend: StdEventPropInfo,
+    timeupdate: StdEventPropInfo,
+    toggle: StdEventPropInfo,
+    touchcancel: StdEventPropInfo,
+    touchend: StdEventPropInfo,
+    touchmove: StdEventPropInfo,
+    touchstart: StdEventPropInfo,
+    transitioncancel: StdEventPropInfo,
+    transitionend: StdEventPropInfo,
+    transitionrun: StdEventPropInfo,
+    transitionstart: StdEventPropInfo,
+    volumechange: StdEventPropInfo,
+    waiting: StdEventPropInfo,
+    wheel: StdEventPropInfo,
+    copy: StdEventPropInfo,
+    cut: StdEventPropInfo,
+    paste: StdEventPropInfo,
 };
 
 
