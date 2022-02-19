@@ -2,7 +2,7 @@
 import {IHtmlIntrinsicElements} from "./HtmlTypes";
 import {ISvgIntrinsicElements} from "./SvgTypes";
 import {
-    PropType, EventSlot, mountRoot, unmountRoot, TextVN,
+    PropType, EventSlot, mountRoot, unmountRoot, TextVN, ITrigger,
     s_wrapCallback, registerElmProp, symJsxToVNs, shadowDecorator
 } from "../internal";
 
@@ -349,6 +349,9 @@ export type DropzonePropType = "copy" | "move" | "link";
 
 
 
+export type ExtendedElementProps<T extends IElementProps> = { [K in keyof T]?: T[K] | ITrigger<T[K]>};
+
+
 /**
  * The IElementProps interface defines standard properties (attributes and event listeners)
  * that can be used on all HTML and SVG elements.
@@ -494,7 +497,6 @@ export interface ICustomWebElements
 
 
 
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // JSX namespace defining how TypeScript performs type checks on JSX elements,components
@@ -605,58 +607,56 @@ export type RefFunc<T = any> = (newRef: T) => void;
 
 
 
-// Symbol used to keep the referenced object inside the Ref class instance.
-let symRef = Symbol("ref");
-
 /**
  * Reference class to use whenever a reference to an object is needed - for example, with JSX `ref`
  * attributes and services.
  */
 export class Ref<T = any>
 {
-	/** Event that is fired when the referenced value changes */
-	private changedEvent: EventSlot<RefFunc<T>>;
-
-	constructor( listener?: RefFunc<T>, initialReferene?: T)
+	constructor( listener?: RefFunc<T>, initialReference?: T)
 	{
-        if (listener !== undefined)
+        if (listener)
         {
-            this.changedEvent = new EventSlot<RefFunc<T>>();
-            this.changedEvent.attach( listener);
+            this.e = new EventSlot<RefFunc<T>>();
+            this.e.attach( listener);
         }
 
-		this[symRef] = initialReferene;
+		this.v = initialReference;
 	}
 
 	/** Adds a callback that will be invoked when the value of the reference changes. */
-	public addListener( listener: RefFunc<T>)
+	public attach( listener: RefFunc<T>): void
 	{
-        if (!this.changedEvent)
-            this.changedEvent = new EventSlot<RefFunc<T>>();
+        if (!this.e)
+            this.e = new EventSlot<RefFunc<T>>();
 
-        this.changedEvent.attach( listener);
+        this.e.attach( listener);
 	}
 
 	/** Removes a callback that was added with addListener. */
-	public removeListener( listener: RefFunc<T>)
+	public detach( listener: RefFunc<T>): void
 	{
-        if (this.changedEvent)
-		    this.changedEvent.detach( listener);
+        this.e?.detach( listener);
 	}
 
 	/** Get accessor for the reference value */
-	public get r(): T { return this[symRef]; }
+	public get r(): T { return this.v; }
 
 	/** Set accessor for the reference value */
 	public set r( v: T)
 	{
-		if (this[symRef] !== v)
+		if (this.v !== v)
 		{
-			this[symRef] = v;
-			if (this.changedEvent)
-		        this.changedEvent.fire( v);
+			this.v = v;
+			this.e?.fire( v);
 		}
 	}
+
+	/** Current referenced value */
+	private v: T;
+
+	/** Event that is fired when the referenced value changes */
+	private e: EventSlot<RefFunc<T>>;
 }
 
 
@@ -1079,7 +1079,7 @@ export interface IElmVN<T extends Element = Element> extends IVNode
 export interface ITextVN extends IVNode
 {
 	/** Text of the node. */
-	readonly text: string;
+	readonly text: string | ITrigger<string>;
 
 	/** Text DOM node. */
 	readonly textNode: Text;
@@ -1090,7 +1090,7 @@ export interface ITextVN extends IVNode
      * @param schedulingType Type determining whether the operation is performed immediately or
      * is scheduled to a Mimbl tick.
      */
-	setText( text: string, schedulingType?: TickSchedulingType): void;
+	setText( text: string | ITrigger<string>, schedulingType?: TickSchedulingType): void;
 }
 
 

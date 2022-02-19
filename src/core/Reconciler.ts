@@ -1,4 +1,5 @@
-﻿import {
+﻿import { isTrigger } from "..";
+import {
     ScheduledFuncType, Component, Fragment, FuncProxy, PromiseProxy, CallbackWrappingParams,
     TickSchedulingType, IComponent
 } from "../api/mim"
@@ -259,43 +260,6 @@ export const scheduleFuncCall = (func: ScheduledFuncType, beforeUpdate: boolean,
 		}
 	}
 }
-
-
-
-// // Performs the specified operation on the sub-nodes of the given node. This function is called
-// // when the operation is invoked synchronously; that is, without going through the Mimbl tick.
-// export const syncUpdate = (vn: VN, req: ChildrenUpdateRequest): void =>
-// {
-//     // it can happen that we encounter already unmounted virtual nodes - ignore them
-//     if (!vn.anchorDN)
-//         return;
-
-//     /// #if USE_STATS
-//         DetailedStats.start( `Sync update: `);
-//     /// #endif
-
-//     try
-//     {
-//         performChildrenOperation( vn, req);
-//     }
-//     catch( err)
-//     {
-//         // find the nearest error handling service. If nobody else, it is implemented
-//         // by the RootVN object.
-//         let errorService = vn.getService( "StdErrorHandling");
-//         if (errorService)
-//             errorService.reportError( err);
-
-//         /// #if DEBUG
-//         else
-//             console.error( "BUG: performChildrenOperation threw exception but StdErrorHandling service was not found.", err);
-//         /// #endif
-//     }
-
-//     /// #if USE_STATS
-//         DetailedStats.stop( true);
-//     /// #endif
-// }
 
 
 
@@ -1759,7 +1723,7 @@ const reconcileWithRecycling = (disp: VNDisp, oldKeyedMap: Map<any,VN>,
                     hasUpdates = true;
                 }
                 else if (oldVN.constructor === newVN.constructor &&
-                        (oldVN.isUpdatePossible === undefined || oldVN.isUpdatePossible( newVN)))
+                        (!oldVN.isUpdatePossible || oldVN.isUpdatePossible( newVN)))
                 {
                     // old node can be updated with information from the new node
                     subDisp.action = VNDispAction.Update;
@@ -2073,6 +2037,8 @@ Object.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
     let vn: VN;
     if (typeof this.render === "function")
         vn = this.vn ?? new IndependentCompVN( this);
+    else if (isTrigger(this))
+        vn = new TextVN( this);
     else
     {
         let s = this.toString();

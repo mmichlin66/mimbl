@@ -4,6 +4,8 @@
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+import {EventSlot} from "../internal";
+
 /** Type for functions that accept any number of parameters and return any type */
 export type AnyAnyFunc = (...args: any[]) => any;
 
@@ -12,6 +14,9 @@ export type NoneTypeFunc<T> = () => T;
 
 /** Type for functions that accept no parameters and don't return any value */
 export type NoneVoidFunc = () => void;
+
+/** Type for functions that accept one parameter of the given type and don't return any value */
+export type TypeVoidFunc<T> = (v: T) => void;
 
 
 
@@ -28,11 +33,17 @@ export type NoneVoidFunc = () => void;
  */
 export interface ITrigger<T = any>
 {
-    // Retrieves the current value
+    /** Retrieves the current value */
     get(): T;
 
-    // Sets a new value
+    /** Sets a new value */
     set( v: T): void;
+
+	/** Adds a callback that will be invoked when the value of the reference changes. */
+	attach( listener: TypeVoidFunc<T>): void;
+
+	/** Removes a callback that was added with addListener. */
+	detach( listener: TypeVoidFunc<T>): void;
 }
 
 
@@ -108,10 +119,26 @@ class Trigger<T = any> implements ITrigger<T>
         if (v === this.v)
             return;
 
-        this.v = triggerrize( v, this, this.depth);
+        this.v = this.depth > 0 ? triggerrize( v, this, this.depth) : v;
 
         notifyTriggerChanged(this);
+        this.e?.fire(v);
     }
+
+	/** Adds a callback that will be invoked when the value of the reference changes. */
+	public attach( listener: TypeVoidFunc<T>): void
+	{
+        if (!this.e)
+            this.e = new EventSlot();
+
+        this.e.attach( listener);
+	}
+
+	/** Removes a callback that was added with addListener. */
+	public detach( listener: TypeVoidFunc<T>): void
+	{
+        this.e?.detach( listener);
+	}
 
     public addWatcher( watcher: Watcher): void
     {
@@ -126,7 +153,7 @@ class Trigger<T = any> implements ITrigger<T>
 
 
     // Number indicating to what level the items of container types should be triggerrized.
-    public depth: number;
+    private depth: number;
 
     // Value being get and set
     private v: T;
@@ -134,7 +161,19 @@ class Trigger<T = any> implements ITrigger<T>
     // Set of watchers watching over this trigger's value. This member serves as a storage instead
     // of having the manager to map of triggers to the set of watchers.
     public watchers = new Set<Watcher>();
+
+	/** Event that is fired when the referenced value changes */
+	private e: EventSlot<TypeVoidFunc<T>>;
 }
+
+
+
+/**
+ * Checks whether the given object is a trigger.
+ * @param obj Object to check whether it is a trigger
+ * @returns True if the object is a trigger and false otherwise
+ */
+export const isTrigger = (obj: object): obj is ITrigger => obj instanceof Trigger;
 
 
 
@@ -247,7 +286,7 @@ class Watcher<T extends AnyAnyFunc = any>
         this.triggers = new Set();
 
         // install our watcher at the top of the watchers stack
-        pushWatcher( this)
+        let prevWatcher = setCurrentWatcher( this);
 
         // call the function
         try
@@ -257,7 +296,7 @@ class Watcher<T extends AnyAnyFunc = any>
         finally
         {
             // remove our watcher from the top of the watchers stack
-            popWatcher()
+            setCurrentWatcher( prevWatcher);
 
             // remove our watcher from those triggers in the old set that are not in the current set
             oldTriggers.forEach( trigger => !this.triggers.has(trigger) && trigger.removeWatcher(this));
@@ -288,10 +327,7 @@ class Watcher<T extends AnyAnyFunc = any>
         // check whether our watcher has been already disposed. It can happen if after all mutation
         // scopes exited the manager notifies multiple watchers and one of the watchers' responder
         // disposes of another watcher.
-        if (!this.responder)
-            return;
-
-        this.responder.apply( this.responderThis);
+        this.responder?.apply( this.responderThis);
     }
 
     /**
@@ -304,8 +340,8 @@ class Watcher<T extends AnyAnyFunc = any>
         this.triggers.forEach( trigger => trigger.removeWatcher( this));
         this.triggers.clear();
 
-        // ask the manager to forget about this watcher if it is currently in te deferred set
-        removeDeferredWatcher( this);
+        // remove this watcher from the deferred set
+        deferredWatchers.delete( this);
     }
 
 
@@ -457,11 +493,8 @@ class ComputedTrigger<T = any> extends Trigger<T>
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// Stack of watcher objects. Watchers are pushed on top before they call the watched
-// function and removed after this function returns. When a trigger notifies that its value
-// has been changed, all the watchers in the stack are attached to this trigger. This means
-// that the trigger's value is used by the watched functions.
-const watcherStack: Watcher[] = [];
+// Current watcher objects that will receive notification when trigger values are read.
+let currentWatcher: Watcher;
 
 // Number of currently active mutation scopes. When a trigger notifies that its value has been
 // changed while this number is not 0, the trigger will be remembered in the internal set.
@@ -478,27 +511,13 @@ const deferredWatchers = new Set<Watcher>();
 
 
 /**
- * Pushes the given watcher object to the top of the stack
+ * Sets the given watcher object as the current watcher and returns the previous watcher
  */
-const pushWatcher = (watcher: Watcher): void =>
+const setCurrentWatcher = (watcher: Watcher): Watcher =>
 {
-    watcherStack.push( watcher);
-}
-
-/**
- * Removes the watcher object currently on the top of the stack
- */
-const popWatcher = (): void =>
-{
-    watcherStack.pop();
-}
-
-/**
- * Removes the watcher object from the set of deferred watchers
- */
-const removeDeferredWatcher = (watcher: Watcher): void =>
-{
-    deferredWatchers.delete( watcher);
+    let prevWatcher = currentWatcher;
+    currentWatcher = watcher;
+    return prevWatcher;
 }
 
 /**
@@ -533,20 +552,11 @@ export const exitMutationScope = (): void =>
  */
 const notifyTriggerRead = (trigger: Trigger): void =>
 {
-    let len = watcherStack.length;
-    if (len > 0)
+    if (currentWatcher)
     {
-        let watcher = watcherStack[len -1];
-        watcher.triggers.add( trigger);
-        trigger.addWatcher( watcher);
+        currentWatcher.triggers.add( trigger);
+        trigger.addWatcher( currentWatcher);
     }
-
-    // // attach all watchers currently on the stack to the trigger
-    // for( let watcher of this.watcherStack)
-    // {
-    //     watcher.triggers.add( trigger);
-    //     trigger.addWatcher( watcher);
-    // }
 }
 
 /**

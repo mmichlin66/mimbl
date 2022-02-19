@@ -19,17 +19,20 @@ export interface IEventSlot<TFunc extends Function = Function>
 
 
 
+export type EventSlotFunc = (...args: any[]) => void;
+
+
 /**
  * The IEventSlotOwner interface represents an event slot from the point of view of the caller who
  * created it. The owner can fire events and clear event listeners.
  */
-export interface IEventSlotOwner<TFunc extends Function = Function> extends IEventSlot<TFunc>
+export interface IEventSlotOwner<TFunc extends EventSlotFunc = any> extends IEventSlot<TFunc>
 {
 	/**
 	 * Method that raises the event and calls all the listeners (if any). It has the signature
 	 * of the template function so only proper-types parameters can be passed to it.
 	 */
-	fire: TFunc;
+    fire( ...a: Parameters<TFunc>): void;
 
 	/** Removes all listeners to the event. */
 	clear(): void;
@@ -42,19 +45,25 @@ export interface IEventSlotOwner<TFunc extends Function = Function> extends IEve
  * need for the classes to derive from EventTarget and use string names for events. Multiple
  * listeners can be added/removed to/from an event.
  */
-export class EventSlot<TFunc extends Function = Function> implements IEventSlotOwner<TFunc>
+export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotOwner<TFunc>
 {
 	/**
 	 * Method that raises the event and calls all the listeners (if any). It has the signature
 	 * of the template function so only proper-types parameters can be passed to it.
 	 */
-	public fire: TFunc = this.realFire as any as TFunc;
+    public fire( ...args: Parameters<TFunc>): void
+    {
+		if (this.listeners?.size)
+		{
+			for( let listener of this.listeners)
+				listener( ...args);
+		}
+    }
 
 
 
 	/**
-	 * Adds the given function as a listener to the event. Note that this cannot be a lambda
-	 * function because there will be no way to remove a lambda function listener later.
+	 * Adds the given function as a listener to the event.
 	 */
 	public attach( listener: TFunc): void
 	{
@@ -69,18 +78,14 @@ export class EventSlot<TFunc extends Function = Function> implements IEventSlotO
 	/** Removes the given function as a listener to the event. */
 	public detach( listener: TFunc): void
 	{
-		if (this.listeners)
-		{
+		if (this.listeners?.size)
 			this.listeners.delete( listener);
-			if (this.listeners.size === 0)
-				this.listeners = null;
-		}
 	}
 
 
 
 	/** Returns the number of currently attached listeners. */
-    public get count(): number { return this.listeners ? this.listeners.size : 0; }
+    public get count(): number { return this.listeners?.size ?? 0; }
 
 
 
@@ -95,19 +100,6 @@ export class EventSlot<TFunc extends Function = Function> implements IEventSlotO
 	// Set of listener functions. When there are no listeners, this field is set to null to
 	// preserve space.
 	private listeners: Set<TFunc>;
-
-
-
-	// This method really calls the listeners in a loop. It deconstucts the "arguments" value
-	// in order to pass the proper parameters to the listeners.
-	private realFire(): void
-	{
-		if (this.listeners)
-		{
-			for( let listener of this.listeners)
-				listener( ...arguments);
-		}
-	}
 }
 
 
@@ -137,7 +129,7 @@ export class EventSlot<TFunc extends Function = Function> implements IEventSlotO
  */
 export type MultiEventSlot<T> =
 {
-	readonly [P in keyof T]: IEventSlot<Extract<T[P],Function>>;
+	readonly [P in keyof T]: IEventSlot<Extract<T[P],EventSlotFunc>>;
 }
 
 
@@ -167,7 +159,7 @@ export type MultiEventSlot<T> =
  */
 export type MultiEventSlotOwner<T> =
 {
-	readonly [P in keyof T]: IEventSlotOwner<Extract<T[P],Function>>;
+	readonly [P in keyof T]: IEventSlotOwner<Extract<T[P],EventSlotFunc>>;
 }
 
 
@@ -245,17 +237,15 @@ class EventSlotPretender implements IEventSlotOwner
 	 * Method that raises the event and calls all the listeners (if any). It has the signature
 	 * of the template function so only proper-types parameters can be passed to it.
 	 */
-    public fire()
+    public fire( ...args: unknown[])
     {
-        if (this.slot)
-            this.slot.fire( ...arguments);
+        this.slot?.fire( ...args);
     }
 
 	/** Removes all listeners to the event. */
 	public clear(): void
 	{
-        if (this.slot)
-            this.slot.clear();
+        this.slot?.clear();
 	}
 
 	/**
@@ -273,14 +263,13 @@ class EventSlotPretender implements IEventSlotOwner
 	/** Removes the given function as a listener to the event. */
 	public detach( listener: Function): void
 	{
-        if (this.slot)
-            this.slot.detach( listener);
+        this.slot?.detach( listener);
 	}
 
 	/** Returns the number of currently attached listeners. */
     public get count(): number
     {
-        return this.slot ? this.slot.count : 0;
+        return this.slot?.count ?? 0;
     }
 
 }
