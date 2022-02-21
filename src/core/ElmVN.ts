@@ -231,7 +231,13 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	public unmount( removeFromDOM: boolean): void
 	{
         if (removeFromDOM)
+        {
             this.ownDN.remove();
+
+            /// #if USE_STATS
+                DetailedStats.log( StatsCategory.Elm, StatsAction.Deleted);
+            /// #endif
+        }
 
         if (this.props)
         {
@@ -260,10 +266,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         this.ownDN = null;
 
         super.unmount( removeFromDOM);
-
-        /// #if USE_STATS
-			DetailedStats.log( StatsCategory.Elm, StatsAction.Deleted);
-		/// #endif
 	}
 
 
@@ -796,6 +798,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         }
         else
         {
+            if (!propVal.thisArg)
+                propVal.thisArg = this.creator;
             if (!propVal.schedulingType && info)
                 propVal.schedulingType = info?.schedulingType;
 

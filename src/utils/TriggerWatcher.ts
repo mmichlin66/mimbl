@@ -49,46 +49,15 @@ export interface ITrigger<T = any>
 
 
 /**
- * The TriggerDepth enumeration defines possible ways of how triggers deal with container data;
- * that is, objects, arrays, maps and sets. For triggers with values of non-container types
- * this enumeration is irrelevant.
- */
-enum TriggerDepth
-{
-    /**
-     * Only changes in the value itself are handled. Actions of adding, removing and modifying
-     * items in the container are ignored.
-     */
-    Value = 0,
-
-    /**
-     * Changes in the value itself and of the immediate container items are handled. Actions of
-     * adding and removing items in the container cause change to be triggerred; however actions
-     * of modifying items themselfs are ignored. For triggers with values of non-container types
-     * this value is equivalent to Value.
-     */
-    Shallow = 1,
-
-    /**
-     * Changes in the value itself and of items on all levels are handled. Items added to the
-     * container are converted to deep triggers. For triggers with values of non-container types
-     * this value is equivalent to Value.
-     */
-    Deep = 100,
-}
-
-
-
-/**
  * Creates a trigger object of the given depth with the given initial value.
  * @typeparam T Type of the trigger value.
  * @param depth Depth of the trigger, whcih determines how many levels of nested properties of
  * arrays, maps, sets and objects should trigger changes.
  * @param v Optional initial value
  */
-export function createTrigger<T = any>( depth: number, v?: T): ITrigger<T>
+export function createTrigger<T = any>( v?: T, depth?: number): ITrigger<T>
 {
-    return new Trigger( depth < 0 ? 0 : depth, v);
+    return new Trigger( v, depth);
 }
 
 
@@ -99,10 +68,10 @@ export function createTrigger<T = any>( depth: number, v?: T): ITrigger<T>
  */
 class Trigger<T = any> implements ITrigger<T>
 {
-    constructor( depth?: number, v?: T)
+    constructor( v?: T, depth?: number)
     {
         this.depth = depth;
-        this.v = depth > 0 ? triggerrize( v, this, depth) : v;
+        this.v = triggerrize( v, this, depth);
     }
 
     // Retrieves the current value
@@ -412,7 +381,7 @@ class ComputedTrigger<T = any> extends Trigger<T>
 {
     constructor( func: NoneTypeFunc<T>, funcThis?: any)
     {
-        super( TriggerDepth.Value);
+        super();
 
         this.func = func;
         this.funcThis = funcThis;
@@ -605,26 +574,27 @@ const notifyTriggerChanged = (trigger: Trigger): void =>
  * @param v Value to convert if necessary
  * @param trigger Trigger that will be notified when read or change events occur in the converted
  * values
- * @param depth The depth on the level (starting from the trigger)that called this function.
+ * @param depth The depth on the level (starting from the trigger) that called this function.
  * If this parameter is 0, no conversion occurs and the value is returned as is. When this function
  * is called from the trigger, this parameter can be undefined: in this case, we will assign the
- * depth depending on the type of the value. Arrays, maps and sets get depths of Shallow(1),
+ * depth depending on the type of the value. Arrays, objects, maps and sets get depths of 1,
  * meaning that operations that add or remove items will trigger events, but modifications to the
- * items will not. Objects get the depth of Deep (1000), which essentially means that any changes
- * to the object properties on any level will trigger events.
+ * items will not. Primitive types will be returned as is.
  */
 function triggerrize<T = any>( v: T, trigger: Trigger, depth?: number): T
 {
-    if (!v || depth === 0)
+    if (!v || depth === 0 || typeof v !== "object")
         return v;
-    else if (Array.isArray(v))
-        return new Proxy( v, new NonSlotHandler( trigger, (depth ? depth : TriggerDepth.Shallow) - 1)) as any as T;
+
+    let actDepth = depth ? depth - 1 : 0;
+    if (Array.isArray(v))
+        return new Proxy( v, new NonSlotHandler( trigger, actDepth)) as any as T;
     else if (v instanceof Map)
-        return new Proxy( v, new MapHandler( trigger, (depth ? depth : TriggerDepth.Shallow) - 1)) as any as T;
+        return new Proxy( v, new MapHandler( trigger, actDepth)) as any as T;
     else if (v instanceof Set)
-        return new Proxy( v, new SetHandler( trigger, (depth ? depth : TriggerDepth.Shallow) - 1)) as any as T;
+        return new Proxy( v, new SetHandler( trigger, actDepth)) as any as T;
     else if (v.constructor === Object)
-        return new Proxy( v, new NonSlotHandler( trigger, (depth ? depth : TriggerDepth.Deep) - 1)) as any as T;
+        return new Proxy( v, new NonSlotHandler( trigger, actDepth)) as any as T;
     else
         return v;
 }
@@ -933,7 +903,7 @@ const triggerDecoratorHelper = (depth: number, target: any, name: string): void 
         {
             let triggerObj = this[sym] as ITrigger;
             if (!triggerObj)
-                this[sym] = triggerObj = createTrigger( depth);
+                this[sym] = triggerObj = createTrigger( undefined, depth);
 
             return triggerObj.get();
         },
@@ -941,7 +911,7 @@ const triggerDecoratorHelper = (depth: number, target: any, name: string): void 
         {
             let triggerObj = this[sym] as ITrigger;
             if (!triggerObj)
-                this[sym] = triggerObj = createTrigger( depth, val);
+                this[sym] = triggerObj = createTrigger( val, depth);
             else
                 triggerObj.set( val)
         },

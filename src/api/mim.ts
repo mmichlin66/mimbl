@@ -243,16 +243,16 @@ export type UpdateStrategy =
 /** Type defining the information that can be supplied for a callback to be wrapped */
 export interface CallbackWrappingParams<T extends Function = Function>
 {
-	// Event handler function
+	/** Callback function */
 	func: T;
 
-	// Object that will be referenced by "this" within the event handler function
-	thisArg: any;
+	/** Object that will be referenced by "this" within the callback function */
+	thisArg?: any;
 
-	// Argument that can be retrieved from within the callback using the getCallbackArg function.
+	/** Argument that is supplied to the callback as a last parameter. */
 	arg?: any;
 
-	// Type of scheduling the Mimbl tick after the event handler function returns.
+	/** Type of scheduling the Mimbl tick after the callback function returns. */
 	schedulingType?: TickSchedulingType;
 };
 
@@ -276,8 +276,12 @@ export function wrapCallback<T extends Function>( params?: CallbackWrappingParam
 /**
  * Type of event handler function for DOM events of type T.
  * @typeparam T DOM event type, e.g. MouseEvent
+ * @param e Event object
+ * @param arg Optional parameter, which is defined only if it was passed when the callback was
+ * wrapped - that is, in the `arg` property of the EventObjectType object or 3rd item of the
+ * EventTupleType tuple.
  */
-export type EventFuncType<T extends Event = Event> = (e: T) => void;
+export type EventFuncType<T extends Event = Event> = (e: T, arg?: any) => void;
 
 /**
  * Type defining a tuple that can be supplied for an event listener.

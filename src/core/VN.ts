@@ -1,8 +1,15 @@
 ﻿import {IComponent, RefPropType, setRef, IVNode, UpdateStrategy, TickSchedulingType} from "../api/mim";
+
+/// #if USE_STATS
+    import {StatsCategory} from "../utils/Stats"
+/// #endif
+
 import {
     notifyServiceUnpublished, notifyServiceUnsubscribed, requestNodeUpdate,
     notifyServicePublished, notifyServiceSubscribed, getCurrentClassComp
 } from "../internal";
+
+
 
 
 
@@ -12,27 +19,26 @@ export type DN = Node;
 
 
 
-/// #if USE_STATS
-    import {StatsCategory} from "../utils/Stats"
-/// #endif
-
-/// #if DEBUG
-    let g_nextVNDebugID = 1;
-/// #endif
-
-
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // The VNBase class is a base class for all types of virtual nodes.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// #if DEBUG
+    let g_nextVNDebugID = 1;
+/// #endif
+
 export abstract class VN implements IVNode
 {
-    // constructor()
-    // {
-    //     this.creator = getCurrentClassComp();
-    // }
+    constructor()
+    {
+        /// #if DEBUG
+        this.debugID = g_nextVNDebugID++;
+        /// #endif
+
+        this.creator = getCurrentClassComp();
+    }
 
 	// String representation of the virtual node. This is used mostly for tracing and error
 	// reporting. The name can change during the lifetime of the virtual node; for example,
@@ -105,7 +111,9 @@ export abstract class VN implements IVNode
      */
 	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
     {
-        this.creator = creator;
+        if (!this.creator)
+            this.creator = creator;
+
         this.parent = parent;
         this.index = index;
         this.anchorDN = anchorDN;
@@ -261,8 +269,8 @@ export abstract class VN implements IVNode
 		if (this.publishedServices === undefined)
 			this.publishedServices = new Map<string,any>();
 
-		let existinService: any = this.publishedServices.get( id);
-		if (existinService !== service)
+		let existingService: any = this.publishedServices.get( id);
+		if (existingService !== service)
 		{
 			this.publishedServices.set( id, service);
 			notifyServicePublished( id, this);
@@ -296,12 +304,7 @@ export abstract class VN implements IVNode
 		if (this.subscribedServices === undefined)
 			this.subscribedServices = new Map<string,VNSubscribedServiceInfo>();
 
-		let info = new VNSubscribedServiceInfo();
-		info.ref = ref;
-		info.defaultService = defaultService;
-		info.useSelf = useSelf ? true : false;
-
-		this.subscribedServices.set( id, info);
+		this.subscribedServices.set( id, { ref, defaultService, useSelf: useSelf ? true : false });
 		notifyServiceSubscribed( id, this);
 		setRef( ref, this.getService( id, defaultService));
 }
@@ -312,10 +315,7 @@ export abstract class VN implements IVNode
 	// will be set to undefined.
 	public unsubscribeService( id: string): void
 	{
-		if (this.subscribedServices === undefined)
-			return;
-
-		let info = this.subscribedServices.get( id);
+		let info = this.subscribedServices?.get( id);
 		if (info === undefined)
 			return;
 
@@ -337,7 +337,7 @@ export abstract class VN implements IVNode
         // not that only undefined return value serves as the indication that the service was not
         // found. All other values including empty string, zero and false are valid service values.
 		let service = this.findService( id, useSelf);
-		return service !== undefined ? service : defaultService;
+		return service ?? defaultService;
 	}
 
 
@@ -348,16 +348,13 @@ export abstract class VN implements IVNode
 	{
 		if (useSelf)
 		{
-			if (this.publishedServices !== undefined)
-			{
-				let service = this.publishedServices.get( id);
-				if (service !== undefined)
-					return service;
-			}
+            let service = this.publishedServices?.get( id);
+            if (service !== undefined)
+                return service;
 		}
 
 		// go up the chain; note that we don't pass the useSelf parameter on.
-		return this.parent ? this.parent.findService( id, true) : undefined;
+		return this.parent?.findService( id, true);
 	}
 
 
@@ -366,10 +363,7 @@ export abstract class VN implements IVNode
 	// has previously subscribed) has changed.
 	public notifyServiceChanged( id: string): void
 	{
-		if (this.subscribedServices === undefined)
-			return;
-
-		let info = this.subscribedServices.get( id);
+		let info = this.subscribedServices?.get( id);
 		if (info === undefined)
 			return;
 
@@ -389,7 +383,7 @@ export abstract class VN implements IVNode
 	/// #endif
 
     /// #if DEBUG
-    private debugID = g_nextVNDebugID++;
+    private debugID: number;
 	/// #endif
 }
 
@@ -724,7 +718,7 @@ export type ChildrenUpdateRequest = SetRequest | SpliceRequest | MoveRequest | S
 // The VNSubscribedServiceInfo class keeps information about a subscription of a node to a service.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-class VNSubscribedServiceInfo
+type VNSubscribedServiceInfo =
 {
 	// Reference that will be filled in with the service value
 	ref: RefPropType<any>;

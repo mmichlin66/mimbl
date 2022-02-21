@@ -396,8 +396,7 @@ const performChildrenOperation = (vn: VN, req: ChildrenUpdateRequest): void =>
     {
         // We call the render method without try/catch. If it throws, the control goes to either the
         // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
-        let fn: Function = vn.render;
-        reconcile( s_currentClassComp, vn, {oldVN: vn}, fn && createVNChainFromContent( fn.call( vn)));
+        reconcile( s_currentClassComp, vn, {oldVN: vn}, vn.render?.());
     }
     else
     {
@@ -443,7 +442,7 @@ const setNodeChildren = (vn: VN, req: SetRequest): void =>
     {
         reconcile( vn.creator, vn,
             {oldVN: vn, oldStartIndex: startIndex, oldEndIndex: endIndex, updateStrategy: req.updateStrategy},
-            createVNChainFromContent( req.content));
+            req.content);
 
         return;
     }
@@ -455,22 +454,14 @@ const setNodeChildren = (vn: VN, req: SetRequest): void =>
         spliceNodeChildren( vn, {index: startIndex, countToDelete: rangeLen, contentToInsert: req.content});
     else
     {
-        let ownDN = vn.ownDN;
         if (oldSubNodes)
-        {
-            // if we are removing all sub-nodes under an element, we can optimize by setting
-            // textContent to null;
-            if (ownDN)
-                (ownDN as Element).textContent = null;
-
-            oldSubNodes.forEach( svn => svn.unmount( !ownDN));
-        }
+            removeAllSubNodes(vn);
 
         let newSubNodes = req.content && createVNChainFromContent( req.content);
         if (newSubNodes)
         {
-            let anchorDN = ownDN ? ownDN : vn.anchorDN;
-            let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
+            let anchorDN = vn.ownDN ?? vn.anchorDN;
+            let beforeDN = vn.ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
             mountSubNodes( vn.creator, vn, newSubNodes, anchorDN, beforeDN);
         }
 
@@ -747,13 +738,7 @@ const sliceNodeChildren = (vn: VN, req: SliceRequest): void =>
     // if the range is empty unmount all sub-nodes
     if (endIndex <= startIndex)
     {
-        // if we are removing all sub-nodes under an element, we can optimize by setting
-        // textContent to null;
-        let ownDN = vn.ownDN;
-        if (ownDN)
-            (ownDN as Element).textContent = null;
-
-        oldSubNodes.forEach( svn => svn.unmount( !ownDN));
+        removeAllSubNodes(vn);
         vn.subNodes = null;
         return;
     }
@@ -933,6 +918,23 @@ export const reconcile = (creator: IComponent, vn: VN, disp: VNDisp, content: an
 
 
 
+/**
+ * Unmounts all sub-nodes under the given node
+ */
+function removeAllSubNodes( vn: VN)
+{
+    // if we are removing all sub-nodes under an element, we can optimize by setting
+    // textContent to null;
+    let ownDN = vn.ownDN;
+    if (ownDN)
+        (ownDN as Element).textContent = null;
+
+    vn.subNodes?.forEach( svn => svn.unmount( !ownDN));
+
+}
+
+
+
 export const reconcileSubNodes = ( creator: IComponent, vn: VN, disp: VNDisp, newSubNodes: VN[]): void =>
 {
     // reconcile old and new sub-nodes
@@ -950,15 +952,7 @@ export const reconcileSubNodes = ( creator: IComponent, vn: VN, disp: VNDisp, ne
         if (disp.replaceAll)
         {
             if (disp.allProcessed)
-            {
-                // if we are removing all sub-nodes under an element, we can optimize by setting
-                // textContent to null;
-                let ownDN = vn.ownDN;
-                if (ownDN)
-                    (ownDN as Element).textContent = null;
-
-                oldSubNodes.forEach( svn => svn.unmount( !ownDN));
-            }
+                removeAllSubNodes(vn);
             else
             {
                 for( let i = disp.oldStartIndex; i < disp.oldEndIndex; i++)
