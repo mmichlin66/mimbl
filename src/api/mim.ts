@@ -247,7 +247,7 @@ export interface CallbackWrappingParams<T extends Function = Function>
 	func: T;
 
 	// Object that will be referenced by "this" within the event handler function
-	thisArg?: any;
+	thisArg: any;
 
 	// Argument that can be retrieved from within the callback using the getCallbackArg function.
 	arg?: any;

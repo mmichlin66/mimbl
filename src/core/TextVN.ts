@@ -70,15 +70,13 @@ export class TextVN extends VN implements ITextVN
         super.mount( creator, parent, index, anchorDN);
 
         // the text can actually be a trigger and we need to listen to its changes then
-        let val: string;
-        if (typeof this.text === "object")
+        let val = this.text;
+        if (typeof val === "object")
         {
-            val = this.text.get();
             this.onChange = onTriggerChanged.bind(this);
-            this.text.attach( this.onChange);
+            val.attach( this.onChange);
+            val = val.get();
         }
-        else
-            val = this.text;
 
         this.ownDN = document.createTextNode( val);
         anchorDN.insertBefore( this.ownDN, beforeDN);
@@ -94,23 +92,25 @@ export class TextVN extends VN implements ITextVN
     public unmount( removeFromDOM: boolean): void
     {
         if (removeFromDOM)
+        {
             this.ownDN.remove();
 
-		this.ownDN = null;
-
-        if (typeof this.text === "object")
-            this.text.detach( this.onChange);
-
-        super.unmount( removeFromDOM);
-
-        /// #if USE_STATS
+            /// #if USE_STATS
             DetailedStats.log( StatsCategory.Text, StatsAction.Deleted);
-        /// #endif
+            /// #endif
+        }
+
+        // the onChange is non-null only if this.text is a trigger
+        if (this.onChange)
+            (this.text as ITrigger).detach( this.onChange);
+
+		this.ownDN = null;
+        super.unmount( removeFromDOM);
     }
 
 
 
-	// Updated this node from the given node. This method is invoked only if update
+	// Updates this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node.
 	public update( newVN: TextVN, disp: VNDisp): void
@@ -125,29 +125,29 @@ export class TextVN extends VN implements ITextVN
         }
     }
 
-	// Updated this node from the given node. This method is invoked only if update
-	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node. The returned value indicates whether children
-	// should be updated (that is, this node's render method should be called).
+	// Update the text field and returns the new text value to be set as the node's value.
 	private updateText( text: string | ITrigger<string>): string
 	{
-        if (typeof this.text === "object")
-            this.text.detach( this.onChange);
+        // the onChange is non-null only if this.text is a trigger
+        let onChange = this.onChange;
+        if (onChange)
+            (this.text as ITrigger).detach( onChange);
 
         this.text = text;
 
-        let val: string;
         if (typeof text === "object")
         {
-            if (!this.onChange)
+            if (!onChange)
                 this.onChange = onTriggerChanged.bind(this);
-            text.attach( this.onChange);
-            val = text.get();
+            text.attach( onChange);
+            return text.get();
         }
         else
-            val = text;
-
-        return val;
+        {
+            if (onChange)
+                this.onChange = null;
+            return text;
+        }
     }
 
 

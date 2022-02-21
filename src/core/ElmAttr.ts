@@ -59,18 +59,18 @@ export interface AttrPropInfo extends PropInfoBase
 	// elm.setAttribute is called with propName as attribute name and propVal converted to string.
 	set?: (elm: Element, attrName: string, propVal: any) => void;
 
-	// Function that compares the old and the new value of the attribute and returns an object
-	// that will be passed to the updateFunc function. If undefined is returned, the value of the
-	// attribute will not change (that means the old and the new values are equal). If this
-	// function is not defined, property values are converted to string and compared as strings.
-	// If these strings are different, the string corresponding to the  new value is returned.
-	diff?: (attrName: string, oldPropVal: any, newPropVal: any) => any;
+	// // Function that compares the old and the new value of the attribute and returns an object
+	// // that will be passed to the updateFunc function. If undefined is returned, the value of the
+	// // attribute will not change (that means the old and the new values are equal). If this
+	// // function is not defined, property values are converted to string and compared as strings.
+	// // If these strings are different, the string corresponding to the  new value is returned.
+	// diff?: (attrName: string, oldPropVal: any, newPropVal: any) => any;
 
 	// Function that updates the value of the attribute based on the object that was returned
 	// from the diff function. If this function is not defined, then the set function is used. If
 	// the set function is not defined either, the DOM elm.setAttribute is called with propName as
 	// attribute name and updateVal converted to string.
-	update?: (elm: Element, attrName: string, updateVal: any) => void;
+	update?: (elm: Element, attrName: string, oldPropVal: any, newPropVal: any) => void;
 
 	// Function that removes the attribute. If this function is not defined, then the DOM
 	// elm.removeAttribute is called with propName as attribute name.
@@ -186,60 +186,22 @@ export function setElmProp( elm: Element, propName: string, info: AttrPropInfo |
 export function updateElmProp( elm: Element, propName: string, info: AttrPropInfo | null,
     oldPropVal: any, newPropVal: any): void
 {
-    // get property info object
+    // get property info object; if this is not a special case (property is not in our list)
+    // just set the new value to the attribute.
     if (!info)
-    {
-        // if this is not a special case (property is not in our list) just compare them and
-        // if they are different set the attribute to the new value.
-        if (oldPropVal === newPropVal)
-            return;
-        else
-        {
-            elm.setAttribute( propName, valToString( newPropVal));
-
-            /// #if USE_STATS
-                DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
-            /// #endif
-
-            return;
-        }
-    }
-
-    // compare old and new value using the update function if defined; if not, just compare
-    // the two values and if they are different use the new one as a value to update with.
-    // Note that the neither old nor new values can be undefined or null.
-    let updateVal: any;
-    if (info.diff)
-    {
-        updateVal = info.diff( propName, oldPropVal, newPropVal);
-
-        // if updateValue is undefined then no change has been detected.
-        if (updateVal === undefined)
-            return;
-    }
-    else if (oldPropVal !== newPropVal)
-        updateVal = newPropVal;
-    else
-        return;
-
-    // get actual attribute name to use
-    let attrName = info.attrName || propName;
-
-    // if update method is defined use it; otherwise, remove the old value and set the new one
-    if (info.update)
-        info.update( elm, attrName, updateVal);
+        elm.setAttribute( propName, valToString( newPropVal));
     else
     {
-        // if remove method is defined, use it. Note that if remove method is not defined
-        // we don't use elm.removeAttribute to save time (as the following info.set or
-        // elm.setAttribute will override it anyway).
-        if (info.remove && !info.set)
-            info.remove( elm, attrName);
+        // get actual attribute name to use
+        let attrName = info.attrName || propName;
 
-        if (info.set)
-            info.set( elm, attrName, updateVal);
+        // if update method is defined use it; otherwise, set the new value using setAttribute
+        if (info.update)
+            info.update( elm, attrName, oldPropVal, newPropVal);
+        else if (info.set)
+            info.set( elm, attrName, newPropVal);
         else
-            elm.setAttribute( attrName, valToString( updateVal));
+            elm.setAttribute( attrName, valToString( newPropVal));
     }
 
     /// #if USE_STATS
@@ -303,44 +265,19 @@ function setStyleProp( elm: Element, attrName: string, propVal: string | Stylese
         elm.setAttribute( attrName, propVal);
 }
 
-function diffStyleProp( attrName: string, oldPropVal: string | Styleset, newPropVal: string | Styleset): any
+function updateStyleProp( elm: Element, attrName: string, oldPropVal: string | Styleset,
+    newPropVal: string | Styleset): void
 {
-    if (oldPropVal === newPropVal)
-        return undefined;
-
     // if Mimcss library is not included, then style attributes can only be strings. If they are
     // not, this is an application bug and we canont handle it.
     if (!mimcss && (typeof oldPropVal !== "string" || typeof newPropVal !== "string"))
-        return undefined;
-    else if (typeof oldPropVal === "string" && typeof newPropVal === "string")
-        return newPropVal;
-    else if (typeof oldPropVal === "object" && typeof newPropVal === "object")
-    {
-        // we have to return undefined because null is considered a valid update value
-        let res = mimcss.diffStylesets( oldPropVal, newPropVal);
-        return res == null ? undefined : res;
-    }
-    else if (typeof oldPropVal === "string")
-    {
-        let newPropValAsString = mimcss.stylesetToString( newPropVal);
-        return oldPropVal !== newPropValAsString ? newPropValAsString : undefined;
-    }
-    else //if (typeof newPropVal === "string")
-    {
-        let oldPropValAsString = mimcss.stylesetToString( oldPropVal);
-        return oldPropValAsString !== newPropVal ? newPropVal : undefined;
-    }
-}
+        return;
 
-function updateStyleProp( elm: Element, attrName: string, updateVal: string | StringStyleset): void
-{
-    if (typeof updateVal === "object")
-    {
-        if (mimcss)
-            mimcss.setElementStringStyle( elm as HTMLElement, updateVal, SchedulerType.Sync);
-    }
-    else
-        elm.setAttribute( attrName, updateVal);
+    let oldPropValAsString = typeof oldPropVal === "string" ? oldPropVal :  mimcss.stylesetToString( oldPropVal);
+    let newPropValAsString = typeof newPropVal === "string" ? newPropVal :  mimcss.stylesetToString( newPropVal);
+
+    if (oldPropValAsString !== newPropValAsString)
+        elm.setAttribute( attrName, newPropValAsString);
 }
 
 
@@ -354,26 +291,20 @@ function updateStyleProp( elm: Element, attrName: string, updateVal: string | St
 const setMediaProp = (elm: Element, attrName: string, propVal: MediaStatement): void =>
    elm[attrName] = mimcss.mediaToString( propVal);
 
-const diffMediaProp = (attrName: string, oldPropVal: MediaStatement, newPropVal: MediaStatement): any =>
+function updateMediaProp( elm: Element, attrName: string, oldPropVal: MediaStatement,
+    newPropVal: MediaStatement): void
 {
-    if (oldPropVal === newPropVal)
-        return undefined;
-
     // if Mimcss library is not included, then media attributes can only be strings. If they are
     // not, this is an application bug and we canont handle it.
     if (!mimcss && (typeof oldPropVal !== "string" || typeof newPropVal !== "string"))
-        return undefined;
+        return;
 
     let oldString = mimcss.mediaToString( oldPropVal);
 	let newString = mimcss.mediaToString( newPropVal);
 
 	// we must return undefined because null is considered a valid update value
-	return newString === oldString ? undefined : newString;
-}
-
-function updateMediaProp( elm: Element, attrName: string, updateVal: string): void
-{
-    elm[attrName] = updateVal;
+	if (newString !== oldString)
+        elm[attrName] = newString;
 }
 
 
@@ -391,10 +322,10 @@ function setValueProp( elm: Element, attrName: string, propVal: any): void
 	(elm as any).value = propVal;
 }
 
-// by always returning the new property value we cause the value to always be updated to
-// that of the new property. We want always to set this value to the element because the
-// element's value may have chnged (by the user or programmatically).
-const diffValueProp = (attrName: string, oldPropValVal: any, newPropVal: any): boolean => newPropVal;
+// // by always returning the new property value we cause the value to always be updated to
+// // that of the new property. We want always to set this value to the element because the
+// // element's value may have chnged (by the user or programmatically).
+// const diffValueProp = (attrName: string, oldPropValVal: any, newPropVal: any): boolean => newPropVal;
 
 function removeValueProp( elm: Element, attrName: string): void
 {
@@ -407,19 +338,13 @@ function removeValueProp( elm: Element, attrName: string): void
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Handling of defaultValue property. The defaultValue property works as a value property when the
-// element is first mounted and is ignored upon updates and removals. This allows using
-// defaultValue to initialize the control value once.
+// element is first mounted and the new value is ignored upon updates and removals. This allows
+// using defaultValue to initialize the control value once.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// by returning undefined we indicate that no changes were made to the property and thus the
-// update will not be called
-const diffDefaultValueProp = (attrName: string, oldPropValVal: any, newPropVal: any): boolean => undefined;
-
-function removeDefaultValueProp( elm: Element, attrName: string): void
-{
-	// do nothing
-}
+function updateDefaultValueProp( elm: Element, attrName: string, newPropVal: any): void {}
+function removeDefaultValueProp( elm: Element, attrName: string): void {}
 
 
 
@@ -436,9 +361,9 @@ function setCheckedProp( elm: Element, attrName: string, propVal: any): void
 	(elm as any).checked = propVal;
 }
 
-// by always returning the new property value we cause the value to always be updated to
-// that of the new property.
-const diffCheckedProp = (attrName: string, oldPropValVal: any, newPropVal: any): boolean => newPropVal;
+// // by always returning the new property value we cause the value to always be updated to
+// // that of the new property.
+// const diffCheckedProp = (attrName: string, oldPropValVal: any, newPropVal: any): boolean => newPropVal;
 
 function removeCheckedProp( elm: Element, attrName: string): void
 {
@@ -448,8 +373,7 @@ function removeCheckedProp( elm: Element, attrName: string): void
 
 
 
-const StdFramworkPropInfo = { type: PropType.Framework };
-// const StdAttrPropInfo = { type: PropType.Attr };
+const StdFrameworkPropInfo = { type: PropType.Framework };
 const StdEventPropInfo = { type: PropType.Event };
 
 
@@ -459,22 +383,19 @@ const StdEventPropInfo = { type: PropType.Event };
 const propInfos: {[P:string]: PropInfo} =
 {
     // framework attributes.
-    key: StdFramworkPropInfo,
-    ref: StdFramworkPropInfo,
-    vnref: StdFramworkPropInfo,
-    updateStrategy: StdFramworkPropInfo,
+    key: StdFrameworkPropInfo,
+    ref: StdFrameworkPropInfo,
+    vnref: StdFrameworkPropInfo,
+    updateStrategy: StdFrameworkPropInfo,
 
     // attributes - only those attributes are listed that have non-trivial treatment or whose value
-    // type is object or function. ID and class are present here because their value can be
-    // specified as Mimcss IDRule and ClassRule objects respectively.
-    style: { type: PropType.Attr, set: setStyleProp, diff: diffStyleProp, update: updateStyleProp },
-    media: { type: PropType.Attr, set: setMediaProp, diff: diffMediaProp, update: updateMediaProp },
-    value: { type: PropType.Attr, set: setValueProp, diff: diffValueProp, remove: removeValueProp },
-    defaultValue: { type: PropType.Attr, set: setValueProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
-    checked: { type: PropType.Attr, set: setCheckedProp, diff: diffCheckedProp, remove: removeCheckedProp },
-    defaultChecked: { type: PropType.Attr, set: setCheckedProp, diff: diffDefaultValueProp, remove: removeDefaultValueProp },
-    // id: { type: PropType.Attr },
-    // class: { type: PropType.Attr },
+    // type is object or function.
+    style: { type: PropType.Attr, set: setStyleProp, update: updateStyleProp },
+    media: { type: PropType.Attr, set: setMediaProp, update: updateMediaProp },
+    value: { type: PropType.Attr, set: setValueProp, remove: removeValueProp },
+    defaultValue: { type: PropType.Attr, set: setValueProp, update: updateDefaultValueProp, remove: removeDefaultValueProp },
+    checked: { type: PropType.Attr, set: setCheckedProp, remove: removeCheckedProp },
+    defaultChecked: { type: PropType.Attr, set: setCheckedProp, update: updateDefaultValueProp, remove: removeDefaultValueProp },
 
     // events
     abort: StdEventPropInfo,

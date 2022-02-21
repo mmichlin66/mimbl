@@ -29,14 +29,10 @@ export type DN = Node;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export abstract class VN implements IVNode
 {
-    constructor()
-    {
-        this.creator = getCurrentClassComp();
-    }
-
-	/// #if USE_STATS
-        public abstract get statsCategory(): StatsCategory;
-	/// #endif
+    // constructor()
+    // {
+    //     this.creator = getCurrentClassComp();
+    // }
 
 	// String representation of the virtual node. This is used mostly for tracing and error
 	// reporting. The name can change during the lifetime of the virtual node; for example,
@@ -382,15 +378,19 @@ export abstract class VN implements IVNode
 
 
 
-    /// #if DEBUG
-    private debugID = g_nextVNDebugID++;
-	/// #endif
-
 	// Map of service IDs to service objects published by this node.
 	private publishedServices: Map<string,any>;
 
 	// Map of service IDs to objects constituting subscriptions made by this node.
 	private subscribedServices: Map<string,VNSubscribedServiceInfo>;
+
+	/// #if USE_STATS
+    public abstract get statsCategory(): StatsCategory;
+	/// #endif
+
+    /// #if DEBUG
+    private debugID = g_nextVNDebugID++;
+	/// #endif
 }
 
 

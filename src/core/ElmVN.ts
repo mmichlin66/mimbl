@@ -196,7 +196,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         if (this.props)
         {
             this.parseProps( this.props);
-            this.mountAttrs( this.attrs);
+
+            if (this.attrs)
+                this.mountAttrs( this.attrs);
 
             if (this.events)
                 this.addEvents();
@@ -243,13 +245,13 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             if (this.vnref)
                 setRef( this.vnref, undefined, this);
 
+            // if any attributes have triggers, detach from them
+            if (this.attrs)
+                this.unmountAttrs( this.attrs);
+
             // terminate custom property handlers
             if (this.customAttrs)
                 this.removeCustomAttrs();
-
-            // terminate custom property handlers
-            // if (this.attrs)
-            this.unmountAttrs( this.attrs);
         }
 
         if (this.subNodes)
@@ -376,7 +378,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         for( let name in newAttrValues)
 		{
             // get information about the attribute.
-            let rtd = this.attrs[name]
+            let rtd = this.attrs?.[name]
             if (rtd)
             {
                 let newVal = newAttrValues[name];
@@ -409,7 +411,12 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 				let propInfo = getElmPropInfo( propName);
                 let propType = propInfo?.type ?? PropType.Attr;
 				if (propType === PropType.Attr)
+                {
+                    if (!this.attrs)
+                        this.attrs = {};
+
 				    this.attrs[propName] = { info: propInfo, val: propVal };
+                }
 				else if (propType === PropType.Event)
 				{
 					let rtd = this.getEventRTD( propInfo, propVal as EventPropType);
@@ -488,20 +495,24 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         let val = rtd.val;
 
         // the value can actually be a trigger and we need to listen to its changes then
-        let actVal: any;
+        let actVal = val;
         if (isTrigger(val))
         {
             actVal = val.get();
-            rtd.onChange = this.onAttrTriggerChanged.bind( this, name);
+            rtd.onChange = onAttrTriggerChanged.bind( this, name);
             val.attach( rtd.onChange);
         }
-        else
-            actVal = val;
 
-        setElmProp( this.ownDN, name, rtd.info, actVal);
+        if (actVal != null && actVal !== false)
+            setElmProp( this.ownDN, name, rtd.info, actVal);
 
         if (isUpdate)
+        {
+            if (!this.attrs)
+                this.attrs = {};
+
             this.attrs[name] = rtd;
+        }
 	}
 
 
@@ -545,32 +556,36 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 this.unmountAttr( name, oldRTD, true);
             else
             {
-                let actOldVal: any;
+                let actOldVal = oldVal;
                 let onChange = oldRTD.onChange;
                 if (onChange)
                 {
+                    // if onChange is defined then oldVal is a trigger. We detach from it but
+                    // don't clear the onChange callback - because it can be used if the new value
+                    // is also a trigger.
                     actOldVal = oldVal.get();
                     oldVal.detach( onChange);
                 }
-                else
-                    actOldVal = oldVal;
 
-                // the value can actually be a trigger and we need to listen to its changes then
-                let actNewVal: any;
+                let actNewVal = newVal;
                 if (isTrigger(newVal))
                 {
                     actNewVal = newVal.get();
-                    oldRTD.onChange = onChange ?? this.onAttrTriggerChanged.bind( this, name);
+                    if (!onChange)
+                        oldRTD.onChange = onAttrTriggerChanged.bind( this, name);
                     newVal.attach( oldRTD.onChange);
                 }
                 else
-                {
-                    actNewVal = newVal;
                     oldRTD.onChange = null;
+
+                if (actNewVal !== actOldVal)
+                {
+                    if (actNewVal == null || actNewVal === false)
+                        removeElmProp( this.ownDN, name, oldRTD.info);
+                    else if (!s_deepCompare( actOldVal, actNewVal, 1))
+                        updateElmProp( this.ownDN, name, oldRTD.info, actOldVal, actNewVal);
                 }
 
-
-                updateElmProp( this.ownDN, name, oldRTD.info, actOldVal, actNewVal);
                 oldRTD.val = newVal;
             }
         }
@@ -641,24 +656,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 			DetailedStats.log( StatsCategory.Event, StatsAction.Added);
 		/// #endif
 	}
-
-
-
-	/// #if REMOVE_EVENT_LISTENERS
-		// remove listeners. Since modern browsers don't leak when listeners are not
-		// explicitly removed, we do it under the REMOVE_EVENT_LISTENERS macro (that is, we
-		// normally don't do it.)
-		private removeEvents(): void
-		{
-			/// #if DEBUG
-				if (!this.events)
-					throw new Error( "ElmVN.removeEvents called with this.events = null");
-			/// #endif
-
-			for( let name in this.events)
-				this.removeEvent( name, this.events[name]);
-		}
-	/// #endif
 
 
 
@@ -785,25 +782,25 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      */
     private getEventRTD( info: EventPropInfo, propVal: EventPropType): EventRunTimeData
     {
-        let rtd = typeof propVal === "function"
-            ? { func: propVal, thisArg: this.creator, schedulingType: info?.schedulingType }
-            : Array.isArray(propVal)
-                ? {
-                    func: propVal[0],
-                    thisArg: propVal[1] ?? this.creator,
-                    arg: propVal[2],
-                    schedulingType: propVal[3] ?? info?.schedulingType,
-                    useCapture: propVal[4]
-                }
-                : {
-                    func: propVal.func,
-                    thisArg: propVal.thisArg ?? this.creator,
-                    arg: propVal.arg,
-                    schedulingType: propVal.schedulingType ?? info?.schedulingType,
-                    useCapture: propVal.useCapture
-                };
+        if (typeof propVal === "function")
+            return { func: propVal, thisArg: this.creator, schedulingType: info?.schedulingType }
+        else if (Array.isArray(propVal))
+        {
+            return {
+                func: propVal[0],
+                thisArg: propVal[1],
+                arg: propVal[2],
+                schedulingType: propVal[3] ?? info?.schedulingType,
+                useCapture: propVal[4]
+            }
+        }
+        else
+        {
+            if (!propVal.schedulingType && info)
+                propVal.schedulingType = info?.schedulingType;
 
-        return rtd;
+            return propVal;
+        }
     }
 
 
@@ -967,27 +964,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 
-        /**
-         * Function reacting on the value change in an attribute's trigger. This function gets bounded to
-         * the instance of the ElmVN class and attribute RTD object; therefore, it can use "this".
-         */
-        private onAttrTriggerChanged( this: ElmVN, name: string, val: any): void
-        {
-            if (!this.attrsForPartialUpdate)
-                this.attrsForPartialUpdate = { [name]: val };
-            else
-                this.attrsForPartialUpdate[name] = val;
-
-            this.requestPartialUpdate();
-        }
-
-
-
      // Properties that were passed to the element.
 	private props: IElementProps<T>;
-
-	// If this virtual node was cloned from another node, points to the original node.
-	public clonedFrom: ElmVN<T>;
 
     // Redefine the ownDN property from VN to be of the Element type
 	public declare ownDN: T;
@@ -999,7 +977,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	private vnref: ElmRefType<T>;
 
 	// Object that serves as a map between attribute names and their current values.
-	private attrs: { [name: string]: AttrRunTimeData } = {};
+	private attrs: { [name: string]: AttrRunTimeData };
 
 	// Object that serves as a map between names of event listeners and their respective
 	// parameters.
@@ -1018,7 +996,25 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     // propsForPartialUpdate property because the latter allows changing trigger values to
     // non-trigger values and vice versa, while the attrsForPartialUpdate property only
     // indicates change in the triggers' values.
-    private attrsForPartialUpdate: any;
+    public attrsForPartialUpdate: any;
+}
+
+
+
+/**
+ * Function reacting on the value change in an attribute's trigger. This function gets bounded to
+ * the instance of the ElmVN class and attribute RTD object; therefore, it can use "this".
+ */
+function onAttrTriggerChanged( this: ElmVN, name: string, val: any): void
+{
+    if (!this.attrsForPartialUpdate)
+        this.attrsForPartialUpdate = { [name]: val };
+    else
+        this.attrsForPartialUpdate[name] = val;
+
+    this.performPartialUpdate();
+    this.attrsForPartialUpdate = null;
+    // this.requestPartialUpdate();
 }
 
 

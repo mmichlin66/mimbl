@@ -102,13 +102,15 @@ class Trigger<T = any> implements ITrigger<T>
     constructor( depth?: number, v?: T)
     {
         this.depth = depth;
-        this.v = triggerrize( v, this, depth);
+        this.v = depth > 0 ? triggerrize( v, this, depth) : v;
     }
 
     // Retrieves the current value
     public get(): T
     {
-        notifyTriggerRead(this);
+        if (currentWatcher)
+            notifyTriggerRead(this);
+
         return this.v;
     }
 
@@ -121,7 +123,9 @@ class Trigger<T = any> implements ITrigger<T>
 
         this.v = this.depth > 0 ? triggerrize( v, this, this.depth) : v;
 
-        notifyTriggerChanged(this);
+        if (this.watchers?.size)
+            notifyTriggerChanged(this);
+
         this.e?.fire(v);
     }
 
@@ -142,12 +146,15 @@ class Trigger<T = any> implements ITrigger<T>
 
     public addWatcher( watcher: Watcher): void
     {
+        if (!this.watchers)
+            this.watchers = new Set<Watcher>();
+
         this.watchers.add( watcher);
     }
 
     public removeWatcher( watcher: Watcher): void
     {
-        this.watchers.delete( watcher);
+        this.watchers?.delete( watcher);
     }
 
 
@@ -160,7 +167,7 @@ class Trigger<T = any> implements ITrigger<T>
 
     // Set of watchers watching over this trigger's value. This member serves as a storage instead
     // of having the manager to map of triggers to the set of watchers.
-    public watchers = new Set<Watcher>();
+    public watchers: Set<Watcher>;
 
 	/** Event that is fired when the referenced value changes */
 	private e: EventSlot<TypeVoidFunc<T>>;
@@ -568,18 +575,18 @@ const notifyTriggerRead = (trigger: Trigger): void =>
 const notifyTriggerChanged = (trigger: Trigger): void =>
 {
     // if the trigger doesn't have watchers, do nothing
-    if (trigger.watchers.size === 0)
-        return;
-
-    if (mutationScopesRefCount > 0)
-        trigger.watchers.forEach( watcher => deferredWatchers.add( watcher));
-    else
+    if (trigger.watchers?.size)
     {
-        // since when watchers respond, they can execute their watcher functions and that could
-        // mess with the same set of watchers we are iterating over. Therefore, we make a copy
-        // of this set first.
-        let watchers = Array.from( trigger.watchers.keys());
-        watchers.forEach( watcher => watcher.respond());
+        if (mutationScopesRefCount > 0)
+            trigger.watchers.forEach( watcher => deferredWatchers.add( watcher));
+        else
+        {
+            // since when watchers respond, they can execute their watcher functions and that could
+            // mess with the same set of watchers we are iterating over. Therefore, we make a copy
+            // of this set first.
+            let watchers = Array.from( trigger.watchers.keys());
+            watchers.forEach( watcher => watcher.respond());
+        }
     }
 }
 
@@ -834,7 +841,7 @@ class MapHandler extends SlotContainerHandler
         }
         else if (name === "set")
             return [orgMethod( args[0], triggerrize( args[1], this.trigger, this.depth)), true];
-        else if (name === "delete")
+        else // if (name === "delete")
         {
             let deleted = orgMethod( args[0]);
             return [deleted, deleted];
@@ -873,7 +880,7 @@ class SetHandler extends SlotContainerHandler
             orgMethod();
             return [undefined, isChanged];
         }
-        else if (name === "delete")
+        else // if (name === "delete")
         {
             let deleted = orgMethod( args[0]);
             return [deleted, deleted];

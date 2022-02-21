@@ -88,20 +88,11 @@ const enum SchedulerState
 
 /**
  * Wraps the given callback and returns a wrapper function which does the following things:
- *   - Sets the given "creator" object as the current creator so that JSX execution can use it.
- *   - Sets "current callback argument" to the one passed when the callback was wrapped.
  *   - Enters mutation scope for the duration of the callback execution.
- * @param func Callback to be wrapped.
- * @param funcThisArg Object that will be the value of "this" when the callback is executed.
- * @param creator Object that is set as the current creator to be used when JSX is parsed..
- * @param schedulingType Type of scheduling a Mimbl tick.
+ *   - Optinally schedules a tick after the callback returns
+ * @param params Callback wrapping parameters.
  * @returns The wrapper function that should be used instead of the original callback.
  */
-// export function s_wrapCallback<T extends Function>( func: T, funcThisArg?: any,
-//     creator?: any, schedulingType?: TickSchedulingType): T
-// {
-//     return CallbackWrapper.bind( creator, func, funcThisArg, schedulingType);
-// }
 export const s_wrapCallback = <T extends Function>( params: CallbackWrappingParams<T>): T =>
     CallbackWrapper.bind( params);
 
@@ -1800,7 +1791,7 @@ const buildSubNodeGroups = (disps: VNDisp[]): VNDispGroup[] =>
         // this method is not supposed to be called if the number of sub-nodes is less then
         // the pre-determined threshold
         if (count <= NO_GROUP_THRESHOLD || count === 0)
-            return;
+            return null;
     /// #endif
 
     // create array of groups and create the first group starting from the first node
