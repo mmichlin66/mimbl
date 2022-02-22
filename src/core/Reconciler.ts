@@ -396,7 +396,7 @@ const performChildrenOperation = (vn: VN, req: ChildrenUpdateRequest): void =>
     {
         // We call the render method without try/catch. If it throws, the control goes to either the
         // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
-        reconcile( s_currentClassComp, vn, {oldVN: vn}, vn.render?.());
+        reconcile( vn, {oldVN: vn}, vn.render?.());
     }
     else
     {
@@ -440,9 +440,8 @@ const setNodeChildren = (vn: VN, req: SetRequest): void =>
 
     if (req.update)
     {
-        reconcile( vn.creator, vn,
-            {oldVN: vn, oldStartIndex: startIndex, oldEndIndex: endIndex, updateStrategy: req.updateStrategy},
-            req.content);
+        reconcile( vn, {oldVN: vn, oldStartIndex: startIndex, oldEndIndex: endIndex,
+            updateStrategy: req.updateStrategy}, req.content);
 
         return;
     }
@@ -462,7 +461,7 @@ const setNodeChildren = (vn: VN, req: SetRequest): void =>
         {
             let anchorDN = vn.ownDN ?? vn.anchorDN;
             let beforeDN = vn.ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
-            mountSubNodes( vn.creator, vn, newSubNodes, anchorDN, beforeDN);
+            mountSubNodes( vn, newSubNodes, anchorDN, beforeDN);
         }
 
         vn.subNodes = newSubNodes;
@@ -528,7 +527,7 @@ const spliceNodeChildren = (vn: VN, req: SpliceRequest): void =>
         // mount new nodes
         let stopIndex = index + newSubNodes.length;
         for( let i = index; i < stopIndex; i++)
-            oldSubNodes[i].mount( vn.creator, vn, i, anchorDN, beforeDN);
+            oldSubNodes[i].mount( vn, i, anchorDN, beforeDN);
     }
 }
 
@@ -795,7 +794,7 @@ const growNodeChildren = (vn: VN, req: GrowRequest): void =>
             : newStartSubNodes || newEndSubNodes;
 
         let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
-        mountSubNodes( vn.creator, vn, vn.subNodes, anchorDN, beforeDN);
+        mountSubNodes( vn, vn.subNodes, anchorDN, beforeDN);
         return;
     }
 
@@ -811,7 +810,7 @@ const growNodeChildren = (vn: VN, req: GrowRequest): void =>
     if (newStartSubNodes)
     {
         let beforeDN = oldSubNodes[0].getFirstDN();
-        mountSubNodes( vn.creator, vn, newStartSubNodes, anchorDN, beforeDN);
+        mountSubNodes( vn, newStartSubNodes, anchorDN, beforeDN);
 
         // change indices of the old nodes
         let shift = newStartSubNodes.length;
@@ -821,12 +820,7 @@ const growNodeChildren = (vn: VN, req: GrowRequest): void =>
     // mount new sub-nodes at the end
     if (newEndSubNodes)
     {
-        // let beforeDN = ownDN ? null : (oldSubNodes[oldSubNodes.length - 1]).getLastDN();
-        // if (beforeDN)
-        //     beforeDN = beforeDN.nextSibling;
-
-        // mountSubNodes( vn, newEndSubNodes, anchorDN, beforeDN, vn.subNodes.length - newEndSubNodes.length);
-        mountSubNodes( vn.creator, vn, newEndSubNodes, anchorDN,
+        mountSubNodes( vn, newEndSubNodes, anchorDN,
             ownDN ? null : getNextDNUnderSameAnchorDN(vn, anchorDN),
             vn.subNodes.length - newEndSubNodes.length);
     }
@@ -885,12 +879,11 @@ const reverseNodeChildren = (vn: VN, req: ReverseRequest): void =>
 
 
 // Recursively mounts sub-nodes.
-export const mountContent = (creator: IComponent, vn: VN, content: any,
-    anchorDN: DN, beforeDN: DN, startIndex?: number): void =>
+export const mountContent = (vn: VN, content: any, anchorDN: DN, beforeDN: DN, startIndex?: number): void =>
 {
     let subNodes = createVNChainFromContent(content);
     if (subNodes)
-        mountSubNodes( creator, vn, subNodes, anchorDN, beforeDN, startIndex);
+        mountSubNodes( vn, subNodes, anchorDN, beforeDN, startIndex);
 
     vn.subNodes = subNodes;
 }
@@ -898,10 +891,8 @@ export const mountContent = (creator: IComponent, vn: VN, content: any,
 
 
 // Recursively mounts sub-nodes.
-export const mountSubNodes = (creator: IComponent, vn: VN, subNodes: VN[],
-    anchorDN: DN, beforeDN: DN, startIndex?: number): void =>
-        subNodes.forEach( (svn, i) =>
-            svn.mount( creator, vn, startIndex ? startIndex + i : i, anchorDN, beforeDN));
+export const mountSubNodes = (vn: VN, subNodes: VN[], anchorDN: DN, beforeDN: DN, startIndex?: number): void =>
+        subNodes.forEach( (svn, i) => svn.mount( vn, startIndex ? startIndex + i : i, anchorDN, beforeDN));
 
 
 
@@ -913,8 +904,8 @@ export const unmountSubNodes = (subNodes: VN[], removeFromDOM: boolean): void =>
 
 
 
-export const reconcile = (creator: IComponent, vn: VN, disp: VNDisp, content: any): void =>
-    reconcileSubNodes( creator, vn, disp, createVNChainFromContent(content));
+export const reconcile = (vn: VN, disp: VNDisp, content: any): void =>
+    reconcileSubNodes( vn, disp, createVNChainFromContent(content));
 
 
 
@@ -935,7 +926,7 @@ function removeAllSubNodes( vn: VN)
 
 
 
-export const reconcileSubNodes = ( creator: IComponent, vn: VN, disp: VNDisp, newSubNodes: VN[]): void =>
+export const reconcileSubNodes = (vn: VN, disp: VNDisp, newSubNodes: VN[]): void =>
 {
     // reconcile old and new sub-nodes
     buildSubNodeDispositions( disp, newSubNodes);
@@ -995,7 +986,7 @@ export const reconcileSubNodes = ( creator: IComponent, vn: VN, disp: VNDisp, ne
         // since we have sub-nodes, we need to create nodes for them and render. If our node
         // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
         // either the uncestor node that knows to handle errors or to the Mimbl tick loop.
-        updateSubNodes( creator, vn, disp, newSubNodes, anchorDN, beforeDN);
+        updateSubNodes( vn, disp, newSubNodes, anchorDN, beforeDN);
     }
 
     // indicate that the node was updated in this cycle - this will prevent it from
@@ -1007,7 +998,7 @@ export const reconcileSubNodes = ( creator: IComponent, vn: VN, disp: VNDisp, ne
 
 // Performs rendering phase of the update on the sub-nodes of the node, which is passed as
 // the oldVN member of the VNDisp structure.
-const updateSubNodes = (creator: IComponent, vn: VN, disp: VNDisp, newSubNodes: VN[],
+const updateSubNodes = (vn: VN, disp: VNDisp, newSubNodes: VN[],
     anchorDN: DN, beforeDN: DN): void =>
 {
     let oldSubNodes = vn.subNodes;
@@ -1016,7 +1007,7 @@ const updateSubNodes = (creator: IComponent, vn: VN, disp: VNDisp, newSubNodes: 
         if (disp.allProcessed)
         {
             vn.subNodes = newSubNodes;
-            mountSubNodes( creator, vn, newSubNodes, anchorDN, beforeDN);
+            mountSubNodes( vn, newSubNodes, anchorDN, beforeDN);
         }
         else
         {
@@ -1026,7 +1017,7 @@ const updateSubNodes = (creator: IComponent, vn: VN, disp: VNDisp, newSubNodes: 
             for( let i = disp.oldStartIndex + newSubNodes.length, len = oldSubNodes.length; i < len; i++)
                 oldSubNodes[i].index = i;
 
-            mountSubNodes( creator, vn, newSubNodes, anchorDN, beforeDN, oldStartIndex);
+            mountSubNodes( vn, newSubNodes, anchorDN, beforeDN, oldStartIndex);
         }
 
     }
@@ -1080,7 +1071,7 @@ const updateSubNodesByNodes = (parentVN: VN, disp: VNDisp, anchorDN: DN, beforeD
 
             // if mountNode clones the node, it puts the new node into the list of sub-nodes
             // and returns it; otherwise, it returns the original node.
-            newVN.mount( s_currentClassComp, parentVN, index, anchorDN, beforeDN);
+            newVN.mount( parentVN, index, anchorDN, beforeDN);
         }
         else // Update or NoChange
         {
@@ -1148,7 +1139,7 @@ const updateSubNodesByGroups = (parentVN: VN, disp: VNDisp, anchorDN: DN, before
                 // we must put the node in the list of sub-nodes before calling
                 // mountNode because it may use this info if the node is cloned
                 parentSubNodes[index] = newVN;
-                newVN.mount( s_currentClassComp, parentVN, index, anchorDN, currBeforeDN);
+                newVN.mount( parentVN, index, anchorDN, currBeforeDN);
             }
         }
         else if (group.action === VNDispAction.Update)

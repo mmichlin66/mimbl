@@ -65,9 +65,9 @@ export class TextVN extends VN implements ITextVN
      * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
      * and before the given node.
      */
-    public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+    public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
     {
-        super.mount( creator, parent, index, anchorDN);
+        super.mount( parent, index, anchorDN);
 
         // the text can actually be a trigger and we need to listen to its changes then
         let val = this.text;

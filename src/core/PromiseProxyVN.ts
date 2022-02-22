@@ -54,9 +54,9 @@ export class PromiseProxyVN extends VN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
 	{
-        super.mount( creator, parent, index, anchorDN);
+        super.mount( parent, index, anchorDN);
 
         this.watchPromise();
 
@@ -112,7 +112,7 @@ export class PromiseProxyVN extends VN
 		this.content = newVN.content;
 		this.errorContentFunc = newVN.errorContentFunc;
 
-        reconcile( this.creator, this, disp, this.render());
+        reconcile( this, disp, this.render());
 	}
 
 

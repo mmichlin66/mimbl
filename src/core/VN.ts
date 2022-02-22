@@ -109,10 +109,10 @@ export abstract class VN implements IVNode
      * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
      * and before the given node.
      */
-	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
     {
         if (!this.creator)
-            this.creator = creator;
+            this.creator = getCurrentClassComp();
 
         this.parent = parent;
         this.index = index;

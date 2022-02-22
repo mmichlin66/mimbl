@@ -41,9 +41,9 @@ export class RootVN extends VN implements IErrorHandlingService
      * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
      * and before the given node.
      */
-	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
     {
-        super.mount( creator, parent, index, anchorDN);
+        super.mount( parent, index, anchorDN);
     }
 
     /**

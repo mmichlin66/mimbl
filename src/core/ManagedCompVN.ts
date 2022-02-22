@@ -57,7 +57,7 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
     {
 		// create component instance
         this.comp = new this.compClass( this.props);
@@ -77,7 +77,7 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
         if (this.key != null)
             delete this.props.key;
 
-        super.mount( creator, parent, index, anchorDN, beforeDN);
+        super.mount( parent, index, anchorDN, beforeDN);
     }
 
 

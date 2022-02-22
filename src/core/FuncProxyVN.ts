@@ -96,13 +96,13 @@ export class FuncProxyVN extends VN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
 	{
-        super.mount( creator, parent, index, anchorDN);
+        super.mount( parent, index, anchorDN);
 
         this.prepareMount();
 
-        mountContent( creator, this, this.render(), anchorDN, beforeDN);
+        mountContent( this, this.render(), anchorDN, beforeDN);
 
         /// #if USE_STATS
 			DetailedStats.log( StatsCategory.Comp, StatsAction.Added);
@@ -193,7 +193,7 @@ export class FuncProxyVN extends VN
             this.prepareMount();
         }
 
-        reconcile( this.creator, this, disp, this.render());
+        reconcile( this, disp, this.render());
 	}
 
 

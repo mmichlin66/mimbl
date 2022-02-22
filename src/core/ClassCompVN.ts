@@ -102,9 +102,9 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
     {
-        super.mount( creator, parent, index, anchorDN);
+        super.mount( parent, index, anchorDN);
 
         let shadowOptions = this.compClass[symShadowOptions] as ComponentShadowOptions;
         if (shadowOptions)
@@ -131,12 +131,12 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         this.prepareMount( comp);
 
         if (!this.comp.handleError)
-            mountContent( comp, this, this.actRender(), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
+            mountContent( this, this.actRender(), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
         else
         {
             try
             {
-                mountContent( comp, this, this.actRender(), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
+                mountContent( this, this.actRender(), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
             }
             catch( err)
             {
@@ -148,7 +148,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
                 // content but we do it without try/catch this time; otherwise, we may end
                 // up in an infinite loop. We also set our component as current again.
                 setCurrentClassComp( comp);
-                mountContent( comp, this, this.comp.handleError( err), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
+                mountContent( this, this.comp.handleError( err), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
             }
         }
 
@@ -241,12 +241,12 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         let prevCreator = setCurrentClassComp( comp);
 
         if (!comp.handleError)
-            reconcile( comp, this, disp, this.actRender());
+            reconcile( this, disp, this.actRender());
         else
         {
             try
             {
-                reconcile( comp, this, disp, this.actRender());
+                reconcile( this, disp, this.actRender());
             }
             catch( err)
             {
@@ -257,7 +257,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
                 // let the node handle its own error and re-render; then we render the new
                 // content but we do it without try/catch this time; otherwise, we may end
                 // up in an infinite loop
-                reconcile( comp, this, {oldVN: disp.oldVN}, this.handleError( err));
+                reconcile( this, {oldVN: disp.oldVN}, this.handleError( err));
             }
         }
 

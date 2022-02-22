@@ -36,7 +36,7 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
     {
         // if the component is already connected to a node, we don't mount it again; instead, we
         // remember the new parameters and move it to a new location. This can happen when the
@@ -46,7 +46,7 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
         if (this.comp.vn)
         {
             this.ignoreUnmount = true;
-            this.creator = creator;
+            // this.creator = creator;
             this.parent = parent;
             this.index = index;
             this.anchorDN = anchorDN;
@@ -56,7 +56,7 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
                 moveNode( this, anchorDN, beforeDN);
         }
         else
-            super.mount( creator, parent, index, anchorDN, beforeDN);
+            super.mount( parent, index, anchorDN, beforeDN);
     }
 
 

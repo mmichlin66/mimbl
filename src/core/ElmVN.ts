@@ -167,9 +167,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount( creator: IComponent, parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
 	{
-        super.mount( creator, parent, index, anchorDN);
+        super.mount( parent, index, anchorDN);
 
         // create the element. If namespace is provided use it
         let ns = this.props?.xmlns;
@@ -215,7 +215,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
         // add sub-nodes
         if (this.subNodes)
-            mountSubNodes( creator, this, this.subNodes, this.ownDN, null);
+            mountSubNodes( this, this.subNodes, this.ownDN, null);
 
         // add element to DOM
         anchorDN.insertBefore( this.ownDN, beforeDN);
@@ -314,7 +314,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
         // update children if they exist either on our or on the new element
         if (this.subNodes || newVN.subNodes)
-            reconcileSubNodes( this.creator, this, disp, newVN.subNodes);
+            reconcileSubNodes( this, disp, newVN.subNodes);
 	}
 
 
