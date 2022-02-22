@@ -12,9 +12,6 @@ export interface IEventSlot<TFunc extends Function = Function>
 
 	/** Removes the given function as a listener to the event. */
 	detach( listener: TFunc): void;
-
-	/** Returns the number of currently attached listeners. */
-	readonly count: number;
 }
 
 
@@ -53,11 +50,8 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
 	 */
     public fire( ...args: Parameters<TFunc>): void
     {
-		if (this.listeners?.size)
-		{
-			for( let listener of this.listeners)
-				listener( ...args);
-		}
+        this.listener?.( ...args);
+        this.listeners?.forEach( listener => listener( ...args));
     }
 
 
@@ -67,10 +61,15 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
 	 */
 	public attach( listener: TFunc): void
 	{
-		if (!this.listeners)
-			this.listeners = new Set<TFunc>();
+        if (!this.listener)
+            this.listener = listener;
+        else
+        {
+            if (!this.listeners)
+                this.listeners = new Set<TFunc>();
 
-		this.listeners.add( listener);
+            this.listeners.add( listener);
+        }
 	}
 
 
@@ -78,28 +77,32 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
 	/** Removes the given function as a listener to the event. */
 	public detach( listener: TFunc): void
 	{
-		if (this.listeners?.size)
+        if (this.listener === listener)
+            this.listener = null;
+        else if (this.listeners?.size)
 			this.listeners.delete( listener);
 	}
-
-
-
-	/** Returns the number of currently attached listeners. */
-    public get count(): number { return this.listeners?.size ?? 0; }
 
 
 
 	/** Removes all listeners to the event. */
 	public clear(): void
 	{
+		this.listener = null;
 		this.listeners = null;
 	}
 
 
 
+	/**
+     * The first listener function. Since many times there is only one listener to an event, we
+     * optimize by not creating a set of listeners.
+     */
+	private listener?: TFunc;
+
 	// Set of listener functions. When there are no listeners, this field is set to null to
 	// preserve space.
-	private listeners: Set<TFunc>;
+	private listeners?: Set<TFunc>;
 }
 
 
@@ -265,12 +268,6 @@ class EventSlotPretender implements IEventSlotOwner
 	{
         this.slot?.detach( listener);
 	}
-
-	/** Returns the number of currently attached listeners. */
-    public get count(): number
-    {
-        return this.slot?.count ?? 0;
-    }
 
 }
 

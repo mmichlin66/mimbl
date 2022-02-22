@@ -4,7 +4,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-import {EventSlot} from "../internal";
+import {EventSlot, IEventSlot} from "../internal";
 
 /** Type for functions that accept any number of parameters and return any type */
 export type AnyAnyFunc = (...args: any[]) => any;
@@ -31,19 +31,13 @@ export type TypeVoidFunc<T> = (v: T) => void;
  * when this value changes.
  * @typeparam T Type of the trigger value.
  */
-export interface ITrigger<T = any>
+export interface ITrigger<T = any> extends IEventSlot<TypeVoidFunc<T>>
 {
     /** Retrieves the current value */
     get(): T;
 
     /** Sets a new value */
     set( v: T): void;
-
-	/** Adds a callback that will be invoked when the value of the reference changes. */
-	attach( listener: TypeVoidFunc<T>): void;
-
-	/** Removes a callback that was added with addListener. */
-	detach( listener: TypeVoidFunc<T>): void;
 }
 
 
@@ -66,10 +60,11 @@ export function createTrigger<T = any>( v?: T, depth?: number): ITrigger<T>
  * The Trigger class represents an object that keeps a value and notifies all attached watchers
  * when this value changes.
  */
-class Trigger<T = any> implements ITrigger<T>
+class Trigger<T = any> extends EventSlot<TypeVoidFunc<T>> implements ITrigger<T>
 {
     constructor( v?: T, depth?: number)
     {
+        super();
         this.depth = depth;
         this.v = triggerrize( v, this, depth);
     }
@@ -95,23 +90,8 @@ class Trigger<T = any> implements ITrigger<T>
         if (this.watchers?.size)
             notifyTriggerChanged(this);
 
-        this.e?.fire(v);
+        this.fire(v);
     }
-
-	/** Adds a callback that will be invoked when the value of the reference changes. */
-	public attach( listener: TypeVoidFunc<T>): void
-	{
-        if (!this.e)
-            this.e = new EventSlot();
-
-        this.e.attach( listener);
-	}
-
-	/** Removes a callback that was added with addListener. */
-	public detach( listener: TypeVoidFunc<T>): void
-	{
-        this.e?.detach( listener);
-	}
 
     public addWatcher( watcher: Watcher): void
     {
@@ -137,9 +117,6 @@ class Trigger<T = any> implements ITrigger<T>
     // Set of watchers watching over this trigger's value. This member serves as a storage instead
     // of having the manager to map of triggers to the set of watchers.
     public watchers: Set<Watcher>;
-
-	/** Event that is fired when the referenced value changes */
-	private e: EventSlot<TypeVoidFunc<T>>;
 }
 
 
@@ -190,9 +167,8 @@ function watcherExecute( this: Watcher, ...args: any[]): any
 }
 
 /**
- * This function bound to an instance of the Watcher class is set to the property of the
+ * This function bound to an instance of the Watcher class is set to the `dispose` property of the
  * bound watcherExecute function.
- * @param args
  * @returns
  */
 function watcherDispose( this: Watcher): void
@@ -255,7 +231,13 @@ class Watcher<T extends AnyAnyFunc = any>
     {
         // check whether our watcher has been already disposed
         if (!this.func)
-            throw new Error( "Disposed watcher was called.");
+        {
+            /// #if DEBUG
+            console.error( "Disposed watcher was called.");
+            /// #endif
+
+            return;
+        }
 
         // move all current triggers to a temporary set
         let oldTriggers = this.triggers;
@@ -510,7 +492,13 @@ export const enterMutationScope = (): void =>
 export const exitMutationScope = (): void =>
 {
     if (mutationScopesRefCount === 0)
-        throw Error( "Unpaired call to exitMutationScope");
+    {
+        /// #if DEBUG
+        console.error( "Unpaired call to exitMutationScope");
+        /// #endif
+
+        return;
+    }
 
     if (--mutationScopesRefCount === 0)
     {
@@ -934,7 +922,13 @@ export const computed = (target: any, name: string, propDescr: PropertyDescripto
     if (!propDescr.value)
     {
         if (!propDescr.get)
-            throw new Error("@computed property requires get() accessor");
+        {
+            /// #if DEBUG
+            console.error(`@computed property 'name' doesn't have get() accessor`);
+            /// #endif
+
+            return;
+        }
 
         let orgGet = propDescr.get;
         propDescr.get = function(): any
