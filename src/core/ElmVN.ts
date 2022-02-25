@@ -1,12 +1,12 @@
 ﻿import { isTrigger } from "..";
 import {
     IElmVN, EventFuncType, ICustomAttributeHandler, IElementProps, EventPropType, setRef, RefType,
-    ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy, IComponent
+    ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy, ICustomAttributeHandlerClass
 } from "../api/mim"
+import {Styleset, SchedulerType, MediaStatement} from "mimcss"
 import {
-    VN, s_deepCompare, PropType, CustomAttrPropInfo, AttrPropInfo, EventPropInfo, getElmPropInfo,
-    setElmProp, removeElmProp, updateElmProp, s_wrapCallback, ChildrenUpdateOperation,
-    DN, VNDisp, mountSubNodes, reconcileSubNodes, unmountSubNodes,
+    VN, DN, VNDisp, s_deepCompare, s_wrapCallback, ChildrenUpdateOperation,
+    mountSubNodes, reconcileSubNodes, unmountSubNodes, mimcss
 } from "../internal"
 
 /// #if USE_STATS
@@ -347,7 +347,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		{
             // get information about the property and determine its type.
             let propVal = props[propName];
-            let propInfo = getElmPropInfo( propName);
+            let propInfo = propInfos[propName];
             let propType = propInfo?.type ?? PropType.Attr;
 
             if (propType === PropType.Attr)
@@ -410,7 +410,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 // function or object (including array), then it is considered to be an event.
                 // Therefore, all regular attributes that can accept objects or arrays or functions
                 // must be explicitly registered.
-				let propInfo = getElmPropInfo( propName);
+				let propInfo = propInfos[propName];
                 let propType = propInfo?.type ?? PropType.Attr;
 				if (propType === PropType.Attr)
                 {
@@ -421,14 +421,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 }
 				else if (propType === PropType.Event)
 				{
-					let rtd = this.getEventRTD( propInfo, propVal as EventPropType);
-					if (rtd)
-					{
-						if (!this.events)
-							this.events = {};
+                    if (!this.events)
+                        this.events = {};
 
-                        this.events[propName] = rtd;
-					}
+                    this.events[propName] = this.getEventRTD( propInfo, propVal as EventPropType);
 				}
                 else if (propType === PropType.Framework)
                 {
@@ -790,20 +786,18 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         {
             return {
                 func: propVal[0],
-                thisArg: propVal[1],
-                arg: propVal[2],
-                schedulingType: propVal[3] ?? info?.schedulingType,
-                useCapture: propVal[4]
+                arg: propVal[1],
+                thisArg: propVal[2],
+                schedulingType: info?.schedulingType,
             }
         }
         else
         {
-            if (!propVal.thisArg)
-                propVal.thisArg = this.creator;
-            if (!propVal.schedulingType && info)
-                propVal.schedulingType = info?.schedulingType;
+            let rtd = Object.assign( {}, propVal);
+            if (!rtd.schedulingType && info)
+                rtd.schedulingType = info?.schedulingType;
 
-            return propVal;
+            return rtd;
         }
     }
 
@@ -1114,6 +1108,485 @@ const elmInfos: {[elmName:string]: ElmInfo} =
 
     math: ElementNamespace.MATHML,
 }
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Information about attributes and events and functions to set/update/remove them.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/** Type of properties that can be specified for an element. */
+export const enum PropType
+{
+    /**
+     * Built-in attribute that is used internally by the Mimbl infrastructure and is not set
+     * to the element.
+     */
+	Framework = 0,
+
+	/** Regular attributes set using Element.setAttribute */
+	Attr = 1,
+
+	/** Event listeners set using Element.addEventListener */
+	Event = 2,
+
+	/**  Custom attributes for which handler factories are registered*/
+	CustomAttr = 3,
+}
+
+
+
+/**
+ * Base interface describing information kept about property that can be specified for an element.
+ */
+interface PropInfoBase
+{
+	// Type of the property.
+	type: PropType;
+}
+
+
+
+/**
+ * Information about attributes that contains functions for setting, diffing, updating and removing
+ * attribute(s) corresponding to the property.
+ */
+interface AttrPropInfo extends PropInfoBase
+{
+	/**
+     * Function that sets the value of the attribute. If this function is not defined, then the DOM
+     * elm.setAttribute is called with propName as attribute name and propVal converted to string.
+     */
+	set?: (elm: Element, name: string, propVal: any) => void;
+
+	/**
+     * Function that updates the value of the attribute based on the object that was returned from
+     * the diff function. If this function is not defined, then the set function is used. If the
+     * set function is not defined either, the DOM elm.setAttribute is called with propName as
+     * attribute name and updateVal converted to string.
+     */
+	update?: (elm: Element, name: string, oldVal: any, newVal: any) => void;
+
+	/**
+     * Function that removes the attribute. If this function is not defined, then the DOM
+     * elm.removeAttribute is called with propName as attribute name.
+     */
+	remove?: (elm: Element, name: string) => void;
+
+	/**
+     * The actual name of the attribute/property. This is sometimes needed if the attribute name
+     * cannot be used as property name - for example, if attribute name contains characters not
+     * allowed in TypeScript identifier (e.g. dash). It is also used if instead of using the
+     * `setAttribute()` method we want to set the element's property directly and the property
+     * name is different from the attribute name. For example, `class` -> `className` or
+     * `for` -> `htmlFor`.
+     */
+	name?: string;
+}
+
+
+
+/** Information about events. */
+interface EventPropInfo extends PropInfoBase
+{
+	// Type of scheduling the Mimbl tick after the event handler function returns
+	schedulingType?: TickSchedulingType;
+
+	// // Flag indicating whether the event bubbles. If the event doesn't bubble, the event handler
+	// // must be set on the element itself; otherwise, the event handler can be set on the root
+	// // anchor element, which allows having a single event handler registered for many elements,
+	// // which is more performant.
+	// isBubbling?: boolean;
+}
+
+
+
+/** Information about custom attributes. */
+export interface CustomAttrPropInfo extends PropInfoBase
+{
+	// Class object that creates custom attribute handlers.
+	handlerClass: ICustomAttributeHandlerClass<any>;
+}
+
+
+
+/** Type combining information about regular attributes or events or custom attributes. */
+export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
+
+
+
+/**
+ * Helper function that converts the given value to string.
+ *   - strings are returned as is.
+ *   - null and undefined are converted to an empty string.
+ *   - arrays are converted by calling this function recursively on the elements and separating
+ *     them with spaces.
+ *   - everything else is converted by calling the toString method.
+ */
+
+const valToString = (val: any): string =>
+	typeof val === "string"
+        ? val
+        : Array.isArray( val)
+            ? val.map( item => valToString(item)).filter( item => !!item).join(" ")
+            : val == null ? "" : val.toString();
+
+
+
+/** Registers information about the given property. */
+export function registerElmProp( propName: string, info: AttrPropInfo | EventPropInfo | CustomAttrPropInfo): void
+{
+    /// #if DEBUG
+    if (propName in propInfos)
+        console.error( `Element property ${propName} is already registered.`);
+    /// #endif
+
+    propInfos[propName] = info;
+}
+
+
+
+/**
+ * Using the given property name and its value set the appropriate attribute(s) on the element.
+ * This method handles special cases of properties with non-trivial values.
+ */
+function setElmProp( elm: Element, name: string, info: AttrPropInfo | null, val: any): void
+{
+    // get property info object
+    if (!info)
+        elm.setAttribute( name, valToString( val));
+    else
+    {
+        // get actual attribute/property name to use
+        if (info.name)
+            name = info.name;
+
+        if (info.set)
+            info.set( elm, name, val);
+        else
+            elm.setAttribute( name, valToString( val));
+    }
+
+    /// #if USE_STATS
+        DetailedStats.log( StatsCategory.Attr, StatsAction.Added);
+    /// #endif
+}
+
+
+
+/**
+ * Determines whether the old and the new values of the property are different and sets the updated
+ * value to the element's attribute. Returns true if update has been performed and false if no
+ * change in property value has been detected.
+ */
+function updateElmProp( elm: Element, name: string, info: AttrPropInfo | null,
+    oldVal: any, newVal: any): void
+{
+    // get property info object; if this is not a special case (property is not in our list)
+    // just set the new value to the attribute.
+    if (!info)
+        elm.setAttribute( name, valToString( newVal));
+    else
+    {
+        // get actual attribute/property name to use
+        if (info.name)
+            name = info.name;
+
+        // if update method is defined use it; otherwise, set the new value using setAttribute
+        if (info.update)
+            info.update( elm, name, oldVal, newVal);
+        else if (info.set)
+            info.set( elm, name, newVal);
+        else
+            elm.setAttribute( name, valToString( newVal));
+    }
+
+    /// #if USE_STATS
+        DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
+    /// #endif
+}
+
+
+
+/** Removes the attribute(s) corresponding to the given property. */
+function removeElmProp( elm: Element, name: string, info: AttrPropInfo | null): void
+{
+    // get property info object
+    if (!info)
+        elm.removeAttribute( name);
+    else
+    {
+        // get actual attribute/property name to use
+        if (info.name)
+            name = info.name;
+
+        if (info.remove)
+            info.remove( elm, name);
+        else
+            elm.removeAttribute( name);
+    }
+
+    /// #if USE_STATS
+        DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
+    /// #endif
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Handling of attributes that are set using properties.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+function setAttrAsProp( elm: Element, name: string, val: any): void
+{
+    elm[name] = val;
+}
+
+function setAttrAsStringProp( elm: Element, name: string, val: any): void
+{
+    elm[name] = valToString(val);
+}
+
+function removeAttrAsProp( elm: Element, name: string): void
+{
+    elm[name] = undefined;
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Handling of value and checked properties. Instead of setting these properties as attributes we
+// set the value or checked property on the element.
+//
+// Handling of defaultValue and defaultChecked properties. These properties work when the
+// element is first mounted and the new value is ignored upon updates and removals. This allows
+// using defaultValue and defaultChecked to initialize the control value once.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+function setValueProp( elm: Element, name: string, val: any): void
+{
+	// we need to cast elm to any, because generic Element doesn't have value property.
+	(elm as any).value = val;
+}
+
+function setCheckedProp( elm: Element, name: string, val: any): void
+{
+	// we need to cast elm to any, because generic Element doesn't have the "checked" property.
+	(elm as any).checked = val;
+}
+
+function updatePropNoOp( elm: Element, name: string, newVal: any): void {}
+function removePropNoOp( elm: Element, name: string): void {}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Handling of style property. Style property can be specified either as a string or as the
+// Styleset object from the Mimcss library. If the old and new style property values are of
+// different types the diff function returns the new style value. If both are of the string type,
+// then the new string value is returned. If both are of the CSSStyleDeclaration type, then an
+// object is returned whose keys correspond to style items that should be changed. For updated
+// items, the key value is from the new style value; for removed items, the key value is undefined.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+function setStyleProp( elm: Element, name: string, val: string | Styleset): void
+{
+    if (mimcss)
+        mimcss.setElementStyle( elm as HTMLElement, val, SchedulerType.Sync);
+    else if (typeof val === "string")
+        elm.setAttribute( name, val);
+}
+
+function updateStyleProp( elm: Element, name: string, oldVal: string | Styleset,
+    newVal: string | Styleset): void
+{
+    // if Mimcss library is not included, then style attributes can only be strings. If they are
+    // not, this is an application bug and we canont handle it.
+    if (!mimcss && (typeof oldVal !== "string" || typeof newVal !== "string"))
+        return;
+
+    let oldPropValAsString = typeof oldVal === "string" ? oldVal :  mimcss.stylesetToString( oldVal);
+    let newPropValAsString = typeof newVal === "string" ? newVal :  mimcss.stylesetToString( newVal);
+
+    if (oldPropValAsString !== newPropValAsString)
+        elm.setAttribute( name, newPropValAsString);
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Handling of media property. Media property can be specified either as a string or as the
+// MediaStatement object from the Mimcss library.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+const setMediaProp = (elm: Element, name: string, val: MediaStatement): void =>
+   elm[name] = mimcss.mediaToString( val);
+
+function updateMediaProp( elm: Element, attrName: string, oldVal: MediaStatement,
+    newVal: MediaStatement): void
+{
+    // if Mimcss library is not included, then media attributes can only be strings. If they are
+    // not, this is an application bug and we canont handle it.
+    if (!mimcss && (typeof oldVal !== "string" || typeof newVal !== "string"))
+        return;
+
+    let oldString = mimcss.mediaToString( oldVal);
+	let newString = mimcss.mediaToString( newVal);
+
+	// we must return undefined because null is considered a valid update value
+	if (newString !== oldString)
+        elm[attrName] = newString;
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Mapping of attributes including framework-specific attributes, element attributes and event
+// attributes to objects defining their behavior.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+const StdFrameworkPropInfo = { type: PropType.Framework };
+const StdEventPropInfo = { type: PropType.Event };
+const AttrAsPropInfo = { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp };
+
+/**
+ * Object that maps property names to PropInfo-derived objects. Information about custom
+ * attributes is added to this object when the registerProperty method is called.
+ */
+const propInfos: {[P:string]: PropInfo} =
+{
+    // framework attributes.
+    key: StdFrameworkPropInfo,
+    ref: StdFrameworkPropInfo,
+    vnref: StdFrameworkPropInfo,
+    updateStrategy: StdFrameworkPropInfo,
+
+    // attributes - only those attributes are listed that have non-trivial treatment or whose value
+    // type is object or function.
+    class: { type: PropType.Attr, set: setAttrAsStringProp, remove: removeAttrAsProp, name: "className" },
+    for: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp, name: "htmlFor" },
+    id: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp },
+    value: { type: PropType.Attr, set: setValueProp, remove: removeAttrAsProp },
+    defaultValue: { type: PropType.Attr, set: setValueProp, update: updatePropNoOp, remove: removePropNoOp },
+    checked: { type: PropType.Attr, set: setCheckedProp, remove: removeAttrAsProp },
+    defaultChecked: { type: PropType.Attr, set: setCheckedProp, update: updatePropNoOp, remove: removePropNoOp },
+    style: { type: PropType.Attr, set: setStyleProp, update: updateStyleProp },
+    media: { type: PropType.Attr, set: setMediaProp, update: updateMediaProp },
+    disabled: AttrAsPropInfo,
+    form: AttrAsPropInfo,
+    name: AttrAsPropInfo,
+    required: AttrAsPropInfo,
+    selected: AttrAsPropInfo,
+    size: AttrAsPropInfo,
+    src: AttrAsPropInfo,
+    tabindex: AttrAsPropInfo,
+    target: AttrAsPropInfo,
+    title: AttrAsPropInfo,
+    type: AttrAsPropInfo,
+
+    // events
+    abort: StdEventPropInfo,
+    animationcancel: StdEventPropInfo,
+    animationend: StdEventPropInfo,
+    animationiteration: StdEventPropInfo,
+    animationstart: StdEventPropInfo,
+    auxclick: StdEventPropInfo,
+    beforeinput: StdEventPropInfo,
+    blur: StdEventPropInfo,
+    canplay: StdEventPropInfo,
+    canplaythrough: StdEventPropInfo,
+    change: StdEventPropInfo,
+    click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },
+    close: StdEventPropInfo,
+    compositionend: StdEventPropInfo,
+    compositionstart: StdEventPropInfo,
+    compositionupdate: StdEventPropInfo,
+    contextmenu: StdEventPropInfo,
+    cuechange: StdEventPropInfo,
+    dblclick: StdEventPropInfo,
+    drag: StdEventPropInfo,
+    dragend: StdEventPropInfo,
+    dragenter: StdEventPropInfo,
+    dragleave: StdEventPropInfo,
+    dragover: StdEventPropInfo,
+    dragstart: StdEventPropInfo,
+    drop: StdEventPropInfo,
+    durationchange: StdEventPropInfo,
+    emptied: StdEventPropInfo,
+    ended: StdEventPropInfo,
+    error: StdEventPropInfo,
+    focus: StdEventPropInfo,
+    focusin: StdEventPropInfo,
+    focusout: StdEventPropInfo,
+    formdata: StdEventPropInfo,
+    gotpointercapture: StdEventPropInfo,
+    input: StdEventPropInfo,
+    invalid: StdEventPropInfo,
+    keydown: StdEventPropInfo,
+    keypress: StdEventPropInfo,
+    keyup: StdEventPropInfo,
+    load: StdEventPropInfo,
+    loadeddata: StdEventPropInfo,
+    loadedmetadata: StdEventPropInfo,
+    loadstart: StdEventPropInfo,
+    lostpointercapture: StdEventPropInfo,
+    mousedown: StdEventPropInfo,
+    mouseenter: StdEventPropInfo,
+    mouseleave: StdEventPropInfo,
+    mousemove: StdEventPropInfo,
+    mouseout: StdEventPropInfo,
+    mouseover: StdEventPropInfo,
+    mouseup: StdEventPropInfo,
+    pause: StdEventPropInfo,
+    play: StdEventPropInfo,
+    playing: StdEventPropInfo,
+    pointercancel: StdEventPropInfo,
+    pointerdown: StdEventPropInfo,
+    pointerenter: StdEventPropInfo,
+    pointerleave: StdEventPropInfo,
+    pointermove: StdEventPropInfo,
+    pointerout: StdEventPropInfo,
+    pointerover: StdEventPropInfo,
+    pointerup: StdEventPropInfo,
+    progress: StdEventPropInfo,
+    ratechange: StdEventPropInfo,
+    reset: StdEventPropInfo,
+    resize: StdEventPropInfo,
+    scroll: StdEventPropInfo,
+    securitypolicyviolation: StdEventPropInfo,
+    seeked: StdEventPropInfo,
+    seeking: StdEventPropInfo,
+    select: StdEventPropInfo,
+    selectionchange: StdEventPropInfo,
+    selectstart: StdEventPropInfo,
+    stalled: StdEventPropInfo,
+    submit: StdEventPropInfo,
+    suspend: StdEventPropInfo,
+    timeupdate: StdEventPropInfo,
+    toggle: StdEventPropInfo,
+    touchcancel: StdEventPropInfo,
+    touchend: StdEventPropInfo,
+    touchmove: StdEventPropInfo,
+    touchstart: StdEventPropInfo,
+    transitioncancel: StdEventPropInfo,
+    transitionend: StdEventPropInfo,
+    transitionrun: StdEventPropInfo,
+    transitionstart: StdEventPropInfo,
+    volumechange: StdEventPropInfo,
+    waiting: StdEventPropInfo,
+    wheel: StdEventPropInfo,
+    copy: StdEventPropInfo,
+    cut: StdEventPropInfo,
+    paste: StdEventPropInfo,
+};
 
 
 

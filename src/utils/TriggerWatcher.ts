@@ -72,9 +72,7 @@ class Trigger<T = any> extends EventSlot<TypeVoidFunc<T>> implements ITrigger<T>
     // Retrieves the current value
     public get(): T
     {
-        if (currentWatcher)
-            notifyTriggerRead(this);
-
+        currentWatcher?.notifyTriggerRead(this);
         return this.v;
     }
 
@@ -85,38 +83,27 @@ class Trigger<T = any> extends EventSlot<TypeVoidFunc<T>> implements ITrigger<T>
         if (v === this.v)
             return;
 
-        this.v = this.depth > 0 ? triggerrize( v, this, this.depth) : v;
-
-        if (this.watchers?.size)
-            notifyTriggerChanged(this);
-
+        this.v = triggerrize( v, this, this.depth);
         this.fire(v);
     }
 
-    public addWatcher( watcher: Watcher): void
+    /** Notifies the current watcher (if exists) that trigger value has been read */
+    public notifyRead()
     {
-        if (!this.watchers)
-            this.watchers = new Set<Watcher>();
-
-        this.watchers.add( watcher);
+        currentWatcher?.notifyTriggerRead(this);
     }
 
-    public removeWatcher( watcher: Watcher): void
+    /** Fires the "change" event with the current value */
+    public notifyWrite()
     {
-        this.watchers?.delete( watcher);
+        this.fire( this.v);
     }
-
-
 
     // Number indicating to what level the items of container types should be triggerrized.
     private depth: number;
 
     // Value being get and set
     private v: T;
-
-    // Set of watchers watching over this trigger's value. This member serves as a storage instead
-    // of having the manager to map of triggers to the set of watchers.
-    public watchers: Set<Watcher>;
 }
 
 
@@ -244,7 +231,8 @@ class Watcher<T extends AnyAnyFunc = any>
         this.triggers = new Set();
 
         // install our watcher at the top of the watchers stack
-        let prevWatcher = setCurrentWatcher( this);
+        let prevWatcher = currentWatcher;
+        currentWatcher = this;
 
         // call the function
         try
@@ -254,10 +242,10 @@ class Watcher<T extends AnyAnyFunc = any>
         finally
         {
             // remove our watcher from the top of the watchers stack
-            setCurrentWatcher( prevWatcher);
+            currentWatcher = prevWatcher;
 
             // remove our watcher from those triggers in the old set that are not in the current set
-            oldTriggers.forEach( trigger => !this.triggers.has(trigger) && trigger.removeWatcher(this));
+            oldTriggers.forEach( trigger => !this.triggers.has(trigger) && trigger.detach(this.onTriggerChanged));
         }
     }
 
@@ -268,15 +256,33 @@ class Watcher<T extends AnyAnyFunc = any>
         if (!this.func)
             return;
 
-        // clear all triggers
-        this.clean();
+        // detaches this watcher from all the triggers and the triggers from this watcher.
+        this.triggers.forEach( trigger => trigger.detach( this.onTriggerChanged));
+        this.triggers.clear();
 
-        // set the func and responder properties to null to indicate that the watcher has been disposed
+        // remove this watcher from the deferred set
+        deferredWatchers.delete( this);
+
+        // indicate that the watcher has been disposed
         this.func = null;
         this.responder = null;
-        // this.funcThis = null;
-        // this.responderThis = null;
     }
+
+    /**
+     * Notifies that the value of the given trigger object has been read.
+     */
+    public notifyTriggerRead( trigger: Trigger): void
+    {
+        this.triggers.add( trigger);
+        trigger.attach( this.onTriggerChanged);
+    }
+
+    /**
+     * Handler for change events fired by all triggers this watcher is listening to. We don't need
+     * to distinguish between triggers and we also don't need the trigger's value.
+     */
+    private onTriggerChanged = () =>
+        mutationScopesRefCount ? deferredWatchers.add( this) : this.respond();
 
     // Notifies the watcher that it should call the responder function. This occurs when there
     // are triggers whose values have been changed
@@ -286,20 +292,6 @@ class Watcher<T extends AnyAnyFunc = any>
         // scopes exited the manager notifies multiple watchers and one of the watchers' responder
         // disposes of another watcher.
         this.responder?.apply( this.responderThis);
-    }
-
-    /**
-     * Cleans the state of the watcher, so that it is detached from any triggers and is removed
-     * from the manager's set of deferred watchers.
-     */
-    private clean(): void
-    {
-        // detaches this watcher from all the triggers and the triggers from this watcher.
-        this.triggers.forEach( trigger => trigger.removeWatcher( this));
-        this.triggers.clear();
-
-        // remove this watcher from the deferred set
-        deferredWatchers.delete( this);
     }
 
 
@@ -318,11 +310,9 @@ class Watcher<T extends AnyAnyFunc = any>
     // "this" value to apply to responder function when calling it.
     private responderThis: any;
 
-    // Set of triggers currently being watched by this watcher. This member is used by the
-    // manager. It is essentially a storage, which is used instead of the manager having a
-    // map of watchers to the sets of triggers. The purpose of knowing what triggers are used
-    // by what watcher is to remove the watcher from all these triggers before the watched
-    // function is called.
+    // Set of triggers currently being watched by this watcher. The purpose of knowing what
+    // triggers are used by what watcher is to remove the watcher from all these triggers when
+    // the watcher is disposed.
     public triggers = new Set<Trigger>();
 }
 
@@ -388,12 +378,12 @@ class ComputedTrigger<T = any> extends Trigger<T>
         return super.get();
     }
 
-    public removeWatcher( watcher: Watcher): void
+    public detach( listener: TypeVoidFunc<T>): void
     {
-        super.removeWatcher( watcher);
+        super.detach( listener);
 
         // we keep our function watcher only if we still have somebody watching us.
-        if (this.watchers.size === 0 && this.funcWatcher)
+        if (this.funcWatcher && this.has())
         {
             this.funcWatcher.dispose();
             this.funcWatcher = null;
@@ -511,44 +501,6 @@ export const exitMutationScope = (): void =>
     }
 }
 
-/**
- * Notifies that the value of the given trigger object has been read.
- */
-const notifyTriggerRead = (trigger: Trigger): void =>
-{
-    if (currentWatcher)
-    {
-        currentWatcher.triggers.add( trigger);
-        trigger.addWatcher( currentWatcher);
-    }
-}
-
-/**
- * Notifies that the value of the given trigger object has been changed. If this happens while
- * within a mutation scope, we don't notify the watchers of this trigger but put them in a
- * deferred set. If this happens outside of any mutation scope. In this case we notify the
- * watchers of this trigger right away.
- */
-const notifyTriggerChanged = (trigger: Trigger): void =>
-{
-    // if the trigger doesn't have watchers, do nothing
-    if (trigger.watchers?.size)
-    {
-        if (mutationScopesRefCount > 0)
-            trigger.watchers.forEach( watcher => deferredWatchers.add( watcher));
-        else
-        {
-            // since when watchers respond, they can execute their watcher functions and that could
-            // mess with the same set of watchers we are iterating over. Therefore, we make a copy
-            // of this set first.
-            let watchers = Array.from( trigger.watchers.keys());
-            watchers.forEach( watcher => watcher.respond());
-        }
-    }
-}
-
-
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Triggerizing containers
@@ -602,7 +554,7 @@ class NonSlotHandler implements ProxyHandler<any>
 
     get( target: any, prop: PropertyKey, receiver: any): any
     {
-        notifyTriggerRead( this.trigger);
+        this.trigger.notifyRead();
         return Reflect.get( target, prop, receiver);
     }
 
@@ -611,54 +563,56 @@ class NonSlotHandler implements ProxyHandler<any>
         let oldValue = Reflect.get( target, prop, receiver);
         if (oldValue != value)
         {
-            notifyTriggerChanged( this.trigger);
-            return Reflect.set( target, prop, triggerrize( value, this.trigger, this.depth), receiver);
+            let retVal = Reflect.set( target, prop, triggerrize( value, this.trigger, this.depth), receiver);
+            this.trigger.notifyWrite();
+            return retVal;
         }
         else
             return true;
     }
 
-    deleteProperty( target: any, prop: PropertyKey): boolean
-    {
-        notifyTriggerChanged( this.trigger);
-        return Reflect.deleteProperty( target, prop);
-    }
+    // deleteProperty( target: any, prop: PropertyKey): boolean
+    // {
+    //     notifyTriggerChanged( this.trigger);
+    //     return Reflect.deleteProperty( target, prop);
+    // }
 
-    defineProperty( target: any, prop: PropertyKey, attrs: PropertyDescriptor): boolean
-    {
-        notifyTriggerChanged( this.trigger);
-        return Reflect.defineProperty( target, prop, attrs);
-    }
+    // defineProperty( target: any, prop: PropertyKey, attrs: PropertyDescriptor): boolean
+    // {
+    //     notifyTriggerChanged( this.trigger);
+    //     return Reflect.defineProperty( target, prop, attrs);
+    // }
 
-    has( target: any, prop: PropertyKey): boolean
-    {
-        notifyTriggerRead( this.trigger);
-        return Reflect.has( target, prop);
-    }
+    // has( target: any, prop: PropertyKey): boolean
+    // {
+    //     currentWatcher?.notifyTriggerRead(this.trigger);
+    //     // notifyTriggerRead( this.trigger);
+    //     return Reflect.has( target, prop);
+    // }
 
-    getPrototypeOf( target: any): object | null
-    {
-        notifyTriggerRead( this.trigger);
-        return Reflect.getPrototypeOf( target);
-    }
+    // getPrototypeOf( target: any): object | null
+    // {
+    //     notifyTriggerRead( this.trigger);
+    //     return Reflect.getPrototypeOf( target);
+    // }
 
-    isExtensible( target: any): boolean
-    {
-        notifyTriggerRead( this.trigger);
-        return Reflect.isExtensible( target);
-    }
+    // isExtensible( target: any): boolean
+    // {
+    //     notifyTriggerRead( this.trigger);
+    //     return Reflect.isExtensible( target);
+    // }
 
-    getOwnPropertyDescriptor( target: any, prop: PropertyKey): PropertyDescriptor | undefined
-    {
-        notifyTriggerRead( this.trigger);
-        return Reflect.getOwnPropertyDescriptor( target, prop);
-    }
+    // getOwnPropertyDescriptor( target: any, prop: PropertyKey): PropertyDescriptor | undefined
+    // {
+    //     notifyTriggerRead( this.trigger);
+    //     return Reflect.getOwnPropertyDescriptor( target, prop);
+    // }
 
-    ownKeys( target: any): ArrayLike<string | symbol>
-    {
-        notifyTriggerRead( this.trigger);
-        return Reflect.ownKeys( target);
-    }
+    // ownKeys( target: any): ArrayLike<string | symbol>
+    // {
+    //     notifyTriggerRead( this.trigger);
+    //     return Reflect.ownKeys( target);
+    // }
 
 
 
@@ -693,7 +647,7 @@ abstract class SlotContainerHandler implements ProxyHandler<any>
     // method is a mutator.
     get( target: any, prop: PropertyKey, receiver: any): any
     {
-        notifyTriggerRead( this.trigger);
+        this.trigger.notifyRead();
 
         // in this context "this" is the handler; however, when the methods we return are called
         // the "this" will be the Proxy object. Therefore, we want these methods to capture and
@@ -721,7 +675,7 @@ abstract class SlotContainerHandler implements ProxyHandler<any>
                 method = function(): any {
                     let [val, changed] = handler.callMutator( target, prop, orgBoundMethod, ...arguments);
                     if (changed)
-                        notifyTriggerChanged( handler.trigger);
+                        handler.trigger.notifyWrite();
 
                     return val;
                 };
@@ -730,7 +684,7 @@ abstract class SlotContainerHandler implements ProxyHandler<any>
             {
                 // For non-mutator methods, we notify the read and invoke the original method.
                 method = function(): any {
-                    notifyTriggerRead( handler.trigger);
+                    handler.trigger.notifyRead();
                     return orgBoundMethod( ...arguments);
                 };
             }

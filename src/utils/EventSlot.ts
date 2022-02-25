@@ -12,6 +12,9 @@ export interface IEventSlot<TFunc extends Function = Function>
 
 	/** Removes the given function as a listener to the event. */
 	detach( listener: TFunc): void;
+
+	/** Determines whether this event slot has any listeners. */
+	has(): boolean;
 }
 
 
@@ -54,8 +57,6 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
         this.listeners?.forEach( listener => listener( ...args));
     }
 
-
-
 	/**
 	 * Adds the given function as a listener to the event.
 	 */
@@ -72,8 +73,6 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
         }
 	}
 
-
-
 	/** Removes the given function as a listener to the event. */
 	public detach( listener: TFunc): void
 	{
@@ -83,7 +82,11 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
 			this.listeners.delete( listener);
 	}
 
-
+	/** Determines whether this event slot has any listeners. */
+	public has(): boolean
+    {
+        return !!this.listener || this.listeners?.size > 0;
+    }
 
 	/** Removes all listeners to the event. */
 	public clear(): void
@@ -269,6 +272,11 @@ class EventSlotPretender implements IEventSlotOwner
         this.slot?.detach( listener);
 	}
 
+	/** Determines whether this event slot has any listeners. */
+	public has(): boolean
+    {
+        return this.slot.has();
+    }
 }
 
 

@@ -117,7 +117,6 @@ function CallbackWrapper( this: CallbackWrappingParams): any
         // to run immediately, so we enter mutation scope
         enterMutationScope();
 
-		// retVal = this.func.apply( this.funcThisArg, arguments);
 		retVal = this.func.call( this.thisArg, ...arguments, this.arg);
 	}
 	finally

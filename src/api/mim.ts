@@ -2,8 +2,8 @@
 import {IHtmlIntrinsicElements} from "./HtmlTypes";
 import {ISvgIntrinsicElements} from "./SvgTypes";
 import {
-    PropType, EventSlot, mountRoot, unmountRoot, TextVN, ITrigger,
-    s_wrapCallback, registerElmProp, symJsxToVNs, shadowDecorator
+    EventSlot, mountRoot, unmountRoot, TextVN, ITrigger,
+    s_wrapCallback, registerElmProp, symJsxToVNs, shadowDecorator, PropType
 } from "../internal";
 
 
@@ -288,7 +288,7 @@ export type EventFuncType<T extends Event = Event> = (e: T, arg?: any) => void;
  * @typeparam T DOM event type, e.g. MouseEvent
  */
 export type EventTupleType<T extends Event = Event> =
-    [func: EventFuncType<T>, thisArg: any, arg?: any, schedulingType?: TickSchedulingType, useCapture?: boolean]
+    [func: EventFuncType<T>, arg?: any, thisArg?: any]
 
 /**
  * Type defining an object that can be supplied for an event listener.
@@ -353,7 +353,8 @@ export type DropzonePropType = "copy" | "move" | "link";
 
 
 
-export type ExtendedElementProps<T extends IElementProps> = { [K in keyof T]?: T[K] | ITrigger<T[K]>};
+export type ExtendedElementProps<T extends IElementProps> =
+    { [K in keyof T]?: T[K] extends Function ? T[K] : T[K] | ITrigger<T[K]>};
 
 
 /**
@@ -410,6 +411,14 @@ export interface IElementProps<TRef extends Element = Element, TChildren = any> 
 	contextmenu?: EventPropType<MouseEvent>;
 	cuechange?: EventPropType<Event>;
 	dblclick?: EventPropType<MouseEvent>;
+	drag?: EventPropType<DragEvent>;
+	dragend?: EventPropType<DragEvent>;
+	dragenter?: EventPropType<DragEvent>;
+	//dragexit?: EventPropType<Event>;
+	dragleave?: EventPropType<DragEvent>;
+	dragover?: EventPropType<DragEvent>;
+	dragstart?: EventPropType<DragEvent>;
+	drop?: EventPropType<DragEvent>;
 	durationchange?: EventPropType<Event>;
 	emptied?: EventPropType<Event>;
 	ended?: EventPropType<Event>;
@@ -615,32 +624,16 @@ export type RefFunc<T = any> = (newRef: T) => void;
  * Reference class to use whenever a reference to an object is needed - for example, with JSX `ref`
  * attributes and services.
  */
-export class Ref<T = any>
+export class Ref<T = any> extends EventSlot<RefFunc<T>>
 {
 	constructor( listener?: RefFunc<T>, initialReference?: T)
 	{
+        super();
+
         if (listener)
-        {
-            this.e = new EventSlot<RefFunc<T>>();
-            this.e.attach( listener);
-        }
+            this.attach( listener);
 
 		this.v = initialReference;
-	}
-
-	/** Adds a callback that will be invoked when the value of the reference changes. */
-	public attach( listener: RefFunc<T>): void
-	{
-        if (!this.e)
-            this.e = new EventSlot<RefFunc<T>>();
-
-        this.e.attach( listener);
-	}
-
-	/** Removes a callback that was added with addListener. */
-	public detach( listener: RefFunc<T>): void
-	{
-        this.e?.detach( listener);
 	}
 
 	/** Get accessor for the reference value */
@@ -652,15 +645,12 @@ export class Ref<T = any>
 		if (this.v !== v)
 		{
 			this.v = v;
-			this.e?.fire( v);
+			this.fire( v);
 		}
 	}
 
 	/** Current referenced value */
 	private v: T;
-
-	/** Event that is fired when the referenced value changes */
-	private e: EventSlot<RefFunc<T>>;
 }
 
 
@@ -776,27 +766,26 @@ class RefProxyHandler implements ProxyHandler<any>
         // return Reflect.set( this.obj, prop, value, receiver);
     }
 
-    public deleteProperty( target: any, prop: PropertyKey): boolean
-        { return Reflect.deleteProperty( this.obj, prop); }
+    // public deleteProperty( target: any, prop: PropertyKey): boolean
+    //     { return Reflect.deleteProperty( this.obj, prop); }
 
-    public defineProperty( target: any, prop: PropertyKey, attrs: PropertyDescriptor): boolean
-        { return Reflect.defineProperty( this.obj, prop, attrs); }
+    // public defineProperty( target: any, prop: PropertyKey, attrs: PropertyDescriptor): boolean
+    //     { return Reflect.defineProperty( this.obj, prop, attrs); }
 
-    public has( target: any, prop: PropertyKey): boolean
-        { return Reflect.has( this.obj, prop); }
+    // public has( target: any, prop: PropertyKey): boolean
+    //     { return Reflect.has( this.obj, prop); }
 
-    public getPrototypeOf( target: any): object | null
-        { return Reflect.getPrototypeOf( this.obj); }
+    // public getPrototypeOf( target: any): object | null
+    //     { return Reflect.getPrototypeOf( this.obj); }
 
-    public isExtensible( target: any): boolean
-        { return Reflect.isExtensible( this.obj); }
+    // public isExtensible( target: any): boolean
+    //     { return Reflect.isExtensible( this.obj); }
 
-    public getOwnPropertyDescriptor( target: any, prop: PropertyKey): PropertyDescriptor | undefined
-        { return Reflect.getOwnPropertyDescriptor( this.obj, prop); }
+    // public getOwnPropertyDescriptor( target: any, prop: PropertyKey): PropertyDescriptor | undefined
+    //     { return Reflect.getOwnPropertyDescriptor( this.obj, prop); }
 
-    public ownKeys( target: any): ArrayLike<string | symbol>
-        { return Reflect.ownKeys( this.obj); }
-
+    // public ownKeys( target: any): ArrayLike<string | symbol>
+    //     { return Reflect.ownKeys( this.obj); }
 }
 
 

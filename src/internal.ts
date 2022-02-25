@@ -4,7 +4,6 @@ export * from "./utils/UtilFunc"
 export * from "./utils/EventSlot"
 export * from "./utils/TriggerWatcher"
 
-export * from "./core/ElmAttr"
 export * from "./core/VN"
 export * from "./core/ClassCompVN"
 export * from "./core/IndependentCompVN"

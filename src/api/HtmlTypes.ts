@@ -1,4 +1,4 @@
-﻿import {CssColor, MediaStatement} from "mimcss"
+﻿import {CssColor, MediaStatement, IIDRule} from "mimcss"
 import {
     IElementProps, EventPropType, ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType,
     FormenctypePropType, FormmethodPropType, ExtendedElementProps
@@ -48,16 +48,6 @@ export interface IHtmlElementProps<TRef extends HTMLElement = HTMLElement> exten
 	slot?: string;
 	title?: string;
 	translate?: boolean | "yes" | "no";
-
-	// events
-	drag?: EventPropType<DragEvent>;
-	dragend?: EventPropType<DragEvent>;
-	dragenter?: EventPropType<DragEvent>;
-	//dragexit?: EventPropType<Event>;
-	dragleave?: EventPropType<DragEvent>;
-	dragover?: EventPropType<DragEvent>;
-	dragstart?: EventPropType<DragEvent>;
-	drop?: EventPropType<DragEvent>;
 }
 
 
@@ -472,26 +462,6 @@ export interface IHtmlInputElementProps extends IHtmlElementProps<HTMLInputEleme
 	height?: number;
 	src?: string;
 	width?: number;
-
-	//// date and datetime-local
-	//maxDate?: Date | string;
-	//minDate?: Date | string;
-	//valueDate?: Date | string;
-
-	//// month
-	//maxMonth?: Date | string;
-	//minMonth?: Date | string;
-	//valueMonth?: Date | string;
-
-	//// week
-	//maxWeek?: Date | string;
-	//minWeek?: Date | string;
-	//valueWeek?: Date | string;
-
-	//// number and range
-	//maxNumber?: number | string;
-	//minNumber?: number | string;
-	//valueNumber?: number | string;
 }
 
 
@@ -508,7 +478,7 @@ export interface IHtmlInsElementProps extends IHtmlElementProps<HTMLModElement>
 // <label>
 export interface IHtmlLabelElementProps extends IHtmlElementProps<HTMLLabelElement>
 {
-	for?: string;
+	for?: string | IIDRule;
 	form?: string;
 }
 
