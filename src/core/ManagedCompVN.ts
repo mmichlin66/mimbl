@@ -1,5 +1,5 @@
-﻿import {IManagedCompVN, IComponentClass, setRef, RefPropType, Component, IComponent} from "../api/mim"
-import {ClassCompVN, DN, VN, VNDisp} from "../internal"
+﻿import {IManagedCompVN, IComponentClass, RefPropType, Component} from "../api/mim"
+import {ClassCompVN, DN, VN, VNDisp, setRef} from "../internal"
 
 
 

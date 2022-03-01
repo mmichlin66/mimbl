@@ -1,11 +1,11 @@
 ﻿import { isTrigger } from "..";
 import {
-    IElmVN, EventFuncType, ICustomAttributeHandler, IElementProps, EventPropType, setRef, RefType,
+    IElmVN, EventFuncType, ICustomAttributeHandler, IElementEvents, EventPropType, RefType, IElementProps,
     ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy, ICustomAttributeHandlerClass
 } from "../api/mim"
 import {Styleset, SchedulerType, MediaStatement} from "mimcss"
 import {
-    VN, DN, VNDisp, s_deepCompare, s_wrapCallback, ChildrenUpdateOperation,
+    VN, DN, VNDisp, setRef, s_deepCompare, s_wrapCallback, ChildrenUpdateOperation,
     mountSubNodes, reconcileSubNodes, unmountSubNodes, mimcss
 } from "../internal"
 
@@ -152,16 +152,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         this.requestUpdate( {op: ChildrenUpdateOperation.Reverse, startIndex, endIndex}, schedulingType);
     }
 
-    // // Either performs immediately or schedules the execution of a children operation defined by
-    // // the given request.
-    // private doChildrenOp( req: ChildrenUpdateRequest, schedulingType: TickSchedulingType)
-    // {
-    //     if (schedulingType === TickSchedulingType.Sync)
-    //         syncUpdate( this, req);
-    //     else
-    //         this.requestUpdate( req);
-    // }
-
 
 
 	// Initializes internal stuctures of the virtual node. This method is called right after the
@@ -171,26 +161,25 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	{
         super.mount( parent, index, anchorDN);
 
-        // create the element. If namespace is provided use it
-        let ns = this.props?.xmlns;
-        if (ns)
-            this.ownDN = document.createElementNS( ns, this.elmName) as any as T;
-        else
+        // create the element; if the element is in the list, use the provided namespace;
+        let info = elmInfos[this.elmName];
+        if (typeof info === "number")
         {
-            // if the element is in the list use the provided namespace; otherwise, use the
-            // namespace of the anchor element.
-            let info = elmInfos[this.elmName];
-            if (typeof info === "number")
-            {
-                this.ownDN = info === ElementNamespace.HTML
-                    ? document.createElement( this.elmName) as any as T
-                    : document.createElementNS( ElementNamespaceNames[info], this.elmName) as T;
-            }
-            else if (!info)
-                this.ownDN = document.createElementNS( (this.anchorDN as Element).namespaceURI, this.elmName) as T;
-            else
-                this.ownDN = document.createElementNS( ElementNamespaceNames[info.ns], info.name) as any as T;
+            this.ownDN = info === ElementNamespace.HTML
+                ? document.createElement( this.elmName) as any as T
+                : document.createElementNS( ElementNamespaceNames[info], this.elmName) as T;
         }
+        else if (!info)
+        {
+            // if namespace is provided use it; otherwise, use the namespace of the anchor element.
+            let ns = this.props?.xmlns;
+            if (ns)
+                this.ownDN = document.createElementNS( ns, this.elmName) as any as T;
+            else
+                this.ownDN = document.createElementNS( (this.anchorDN as Element).namespaceURI, this.elmName) as T;
+        }
+        else
+            this.ownDN = document.createElementNS( ElementNamespaceNames[info.ns], info.name) as any as T;
 
         // translate properties into attributes, events and custom attributes
         if (this.props)
@@ -401,49 +390,41 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         // loop over all properties ignoring the built-ins
         for( let propName in props)
 		{
-            // ignore properties with values undefined, null and false
+            // get information about the property and determine its type.
+            let propInfo = propInfos[propName];
+            let propType = propInfo?.type ?? PropType.Attr;
 			let propVal = props[propName];
-			if (propVal != null && propVal !== false)
-			{
-                // get information about the property and determine its type. If the property is
-                // not explicitly registered (in ElmAttr) and the type of the property is either
-                // function or object (including array), then it is considered to be an event.
-                // Therefore, all regular attributes that can accept objects or arrays or functions
-                // must be explicitly registered.
-				let propInfo = propInfos[propName];
-                let propType = propInfo?.type ?? PropType.Attr;
-				if (propType === PropType.Attr)
-                {
-                    if (!this.attrs)
-                        this.attrs = {};
+            if (propType === PropType.Attr)
+            {
+                if (!this.attrs)
+                    this.attrs = {};
 
-				    this.attrs[propName] = { info: propInfo, val: propVal };
-                }
-				else if (propType === PropType.Event)
-				{
-                    if (!this.events)
-                        this.events = {};
+                this.attrs[propName] = { info: propInfo, val: propVal };
+            }
+            else if (propType === PropType.Event)
+            {
+                if (!this.events)
+                    this.events = {};
 
-                    this.events[propName] = this.getEventRTD( propInfo, propVal as EventPropType);
-				}
-                else if (propType === PropType.Framework)
-                {
-                    if (propName === "ref")
-                        this.ref = propVal;
-                    if (propName === "vnref")
-                        this.vnref = propVal;
-                    else if (propName === "updateStrategy")
-                        this.updateStrategy = propVal;
-                }
-				else // if (propType === PropType.CustomAttr)
-				{
-					if (!this.customAttrs)
-						this.customAttrs = {};
+                this.events[propName] = this.getEventRTD( propInfo, propVal as EventPropType);
+            }
+            else if (propType === PropType.Framework)
+            {
+                if (propName === "ref")
+                    this.ref = propVal;
+                else if (propName === "vnref")
+                    this.vnref = propVal;
+                else if (propName === "updateStrategy")
+                    this.updateStrategy = propVal;
+            }
+            else // if (propType === PropType.CustomAttr)
+            {
+                if (!this.customAttrs)
+                    this.customAttrs = {};
 
-					// remember custom attributes value. Handler will be created later.
-					this.customAttrs[propName] = { info: propInfo as CustomAttrPropInfo, val: propVal, handler: undefined};
-				}
-			}
+                // remember custom attributes value. Handler will be created later.
+                this.customAttrs[propName] = { info: propInfo as CustomAttrPropInfo, val: propVal, handler: undefined};
+            }
 		}
 	}
 
@@ -494,15 +475,17 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
         // the value can actually be a trigger and we need to listen to its changes then
         let actVal = val;
-        if (isTrigger(val))
-        {
-            actVal = val.get();
-            rtd.onChange = onAttrTriggerChanged.bind( this, name);
-            val.attach( rtd.onChange);
-        }
-
         if (actVal != null && actVal !== false)
+        {
+            if (isTrigger(val))
+            {
+                actVal = val.get();
+                rtd.onChange = onAttrTriggerChanged.bind( this, name);
+                val.attach( rtd.onChange);
+            }
+
             setElmProp( this.ownDN, name, rtd.info, actVal);
+        }
 
         if (isUpdate)
         {
@@ -550,42 +533,37 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         let newVal = newRTD?.val;
         if (newVal !== oldVal)
         {
-            if (newVal == null || newVal === false)
-                this.unmountAttr( name, oldRTD, true);
-            else
+            let actOldVal = oldVal;
+            let onChange = oldRTD.onChange;
+            if (onChange)
             {
-                let actOldVal = oldVal;
-                let onChange = oldRTD.onChange;
-                if (onChange)
-                {
-                    // if onChange is defined then oldVal is a trigger. We detach from it but
-                    // don't clear the onChange callback - because it can be used if the new value
-                    // is also a trigger.
-                    actOldVal = oldVal.get();
-                    oldVal.detach( onChange);
-                }
-
-                let actNewVal = newVal;
-                if (isTrigger(newVal))
-                {
-                    actNewVal = newVal.get();
-                    if (!onChange)
-                        oldRTD.onChange = onAttrTriggerChanged.bind( this, name);
-                    newVal.attach( oldRTD.onChange);
-                }
-                else
-                    oldRTD.onChange = null;
-
-                if (actNewVal !== actOldVal)
-                {
-                    if (actNewVal == null || actNewVal === false)
-                        removeElmProp( this.ownDN, name, oldRTD.info);
-                    else if (!s_deepCompare( actOldVal, actNewVal, 1))
-                        updateElmProp( this.ownDN, name, oldRTD.info, actOldVal, actNewVal);
-                }
-
-                oldRTD.val = newVal;
+                // if onChange is defined then oldVal is a trigger. We detach from it but
+                // don't clear the onChange callback - because it can be used if the new value
+                // is also a trigger.
+                actOldVal = oldVal.get();
+                oldVal.detach( onChange);
             }
+
+            let actNewVal = newVal;
+            if (isTrigger(newVal))
+            {
+                actNewVal = newVal.get();
+                if (!onChange)
+                    oldRTD.onChange = onAttrTriggerChanged.bind( this, name);
+                newVal.attach( oldRTD.onChange);
+            }
+            else
+                oldRTD.onChange = null;
+
+            if (actNewVal !== actOldVal)
+            {
+                if (actNewVal == null || actNewVal === false)
+                    removeElmProp( this.ownDN, name, oldRTD.info);
+                else if (!s_deepCompare( actOldVal, actNewVal, 1))
+                    updateElmProp( this.ownDN, name, oldRTD.info, actOldVal, actNewVal);
+            }
+
+            oldRTD.val = newVal;
         }
     }
 
@@ -618,7 +596,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	private updateAttrOnly( name: string, info: AttrPropInfo, val: any ): void
 	{
         let oldRTD = this.attrs?.[name];
-        if (val == null || val === false)
+        if (val == null)
         {
             if (oldRTD)
                 this.unmountAttr( name, oldRTD, true);
@@ -1010,9 +988,9 @@ function onAttrTriggerChanged( this: ElmVN, name: string, val: any): void
     else
         this.attrsForPartialUpdate[name] = val;
 
-    this.performPartialUpdate();
-    this.attrsForPartialUpdate = null;
-    // this.requestPartialUpdate();
+    // this.performPartialUpdate();
+    // this.attrsForPartialUpdate = null;
+    this.requestPartialUpdate();
 }
 
 
@@ -1089,22 +1067,29 @@ const ElementNamespaceNames = {
 type ElmInfo = ElementNamespace | { ns: number, name: string};
 
 // Object that maps element names to ElmInfo. Elements that are not in this map are created using
-// the anchor's namespace URI with the document.createElementNS() call. Note that there are some
-// elements that can be created under different namespaces, e.g <a> can be used under HTML and
-// SVG. These elements SHOULD NOT be in this map.
+// the anchor's namespace URI with the document.createElementNS() call.
 const elmInfos: {[elmName:string]: ElmInfo} =
 {
     a: ElementNamespace.HTML,
     button: ElementNamespace.HTML,
+    dd: ElementNamespace.HTML,
     div: ElementNamespace.HTML,
+    dt: ElementNamespace.HTML,
+    i: ElementNamespace.HTML,
+    img: ElementNamespace.HTML,
     label: ElementNamespace.HTML,
     li: ElementNamespace.HTML,
+    p: ElementNamespace.HTML,
     span: ElementNamespace.HTML,
     tr: ElementNamespace.HTML,
     td: ElementNamespace.HTML,
 
     svg: ElementNamespace.SVG,
     colorProfile: { ns: ElementNamespace.SVG, name: "color-profile" },
+    svgA: { ns: ElementNamespace.SVG, name: "a" },
+    svgTitle: { ns: ElementNamespace.SVG, name: "title" },
+    svgScript: { ns: ElementNamespace.SVG, name: "script" },
+    svgStyle: { ns: ElementNamespace.SVG, name: "style" },
 
     math: ElementNamespace.MATHML,
 }
@@ -1339,6 +1324,10 @@ function removeElmProp( elm: Element, name: string, info: AttrPropInfo | null): 
 //
 // Handling of attributes that are set using properties.
 //
+// Handling of defaultValue and defaultChecked properties. These properties work when the
+// element is first mounted and the new value is ignored upon updates and removals. This allows
+// using defaultValue and defaultChecked to initialize the control value once.
+//
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 function setAttrAsProp( elm: Element, name: string, val: any): void
 {
@@ -1352,31 +1341,7 @@ function setAttrAsStringProp( elm: Element, name: string, val: any): void
 
 function removeAttrAsProp( elm: Element, name: string): void
 {
-    elm[name] = undefined;
-}
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Handling of value and checked properties. Instead of setting these properties as attributes we
-// set the value or checked property on the element.
-//
-// Handling of defaultValue and defaultChecked properties. These properties work when the
-// element is first mounted and the new value is ignored upon updates and removals. This allows
-// using defaultValue and defaultChecked to initialize the control value once.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-function setValueProp( elm: Element, name: string, val: any): void
-{
-	// we need to cast elm to any, because generic Element doesn't have value property.
-	(elm as any).value = val;
-}
-
-function setCheckedProp( elm: Element, name: string, val: any): void
-{
-	// we need to cast elm to any, because generic Element doesn't have the "checked" property.
-	(elm as any).checked = val;
+    elm[name] = null;
 }
 
 function updatePropNoOp( elm: Element, name: string, newVal: any): void {}
@@ -1387,11 +1352,8 @@ function removePropNoOp( elm: Element, name: string): void {}
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Handling of style property. Style property can be specified either as a string or as the
-// Styleset object from the Mimcss library. If the old and new style property values are of
-// different types the diff function returns the new style value. If both are of the string type,
-// then the new string value is returned. If both are of the CSSStyleDeclaration type, then an
-// object is returned whose keys correspond to style items that should be changed. For updated
-// items, the key value is from the new style value; for removed items, the key value is undefined.
+// Styleset object from the Mimcss library. Both the old and new style property values are
+// converted to strings and then compared.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 function setStyleProp( elm: Element, name: string, val: string | Styleset): void
@@ -1410,9 +1372,9 @@ function updateStyleProp( elm: Element, name: string, oldVal: string | Styleset,
     if (!mimcss && (typeof oldVal !== "string" || typeof newVal !== "string"))
         return;
 
+    // convert both old and new to strings and compare
     let oldPropValAsString = typeof oldVal === "string" ? oldVal :  mimcss.stylesetToString( oldVal);
     let newPropValAsString = typeof newVal === "string" ? newVal :  mimcss.stylesetToString( newVal);
-
     if (oldPropValAsString !== newPropValAsString)
         elm.setAttribute( name, newPropValAsString);
 }
@@ -1436,10 +1398,9 @@ function updateMediaProp( elm: Element, attrName: string, oldVal: MediaStatement
     if (!mimcss && (typeof oldVal !== "string" || typeof newVal !== "string"))
         return;
 
+    // convert both old and new to strings and compare
     let oldString = mimcss.mediaToString( oldVal);
 	let newString = mimcss.mediaToString( newVal);
-
-	// we must return undefined because null is considered a valid update value
 	if (newString !== oldString)
         elm[attrName] = newString;
 }
@@ -1455,6 +1416,8 @@ function updateMediaProp( elm: Element, attrName: string, oldVal: MediaStatement
 
 const StdFrameworkPropInfo = { type: PropType.Framework };
 const StdEventPropInfo = { type: PropType.Event };
+
+// sets and removes an attribute using element's property
 const AttrAsPropInfo = { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp };
 
 /**
@@ -1472,14 +1435,18 @@ const propInfos: {[P:string]: PropInfo} =
     // attributes - only those attributes are listed that have non-trivial treatment or whose value
     // type is object or function.
     class: { type: PropType.Attr, set: setAttrAsStringProp, remove: removeAttrAsProp, name: "className" },
+    className: { type: PropType.Attr, set: setAttrAsStringProp, remove: removeAttrAsProp },
     for: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp, name: "htmlFor" },
-    id: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp },
-    value: { type: PropType.Attr, set: setValueProp, remove: removeAttrAsProp },
-    defaultValue: { type: PropType.Attr, set: setValueProp, update: updatePropNoOp, remove: removePropNoOp },
-    checked: { type: PropType.Attr, set: setCheckedProp, remove: removeAttrAsProp },
-    defaultChecked: { type: PropType.Attr, set: setCheckedProp, update: updatePropNoOp, remove: removePropNoOp },
+    htmlFor: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp },
+    tabindex: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp, name: "tabIndex" },
+    tabIndex: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp },
+    defaultValue: { type: PropType.Attr, set: setAttrAsProp, update: updatePropNoOp, remove: removePropNoOp, name: "value" },
+    defaultChecked: { type: PropType.Attr, set: setAttrAsProp, update: updatePropNoOp, remove: removePropNoOp, name: "checked" },
     style: { type: PropType.Attr, set: setStyleProp, update: updateStyleProp },
     media: { type: PropType.Attr, set: setMediaProp, update: updateMediaProp },
+    id: AttrAsPropInfo,
+    value: AttrAsPropInfo,
+    checked: AttrAsPropInfo,
     disabled: AttrAsPropInfo,
     form: AttrAsPropInfo,
     name: AttrAsPropInfo,
@@ -1487,12 +1454,11 @@ const propInfos: {[P:string]: PropInfo} =
     selected: AttrAsPropInfo,
     size: AttrAsPropInfo,
     src: AttrAsPropInfo,
-    tabindex: AttrAsPropInfo,
     target: AttrAsPropInfo,
     title: AttrAsPropInfo,
     type: AttrAsPropInfo,
 
-    // events
+    // global events
     abort: StdEventPropInfo,
     animationcancel: StdEventPropInfo,
     animationend: StdEventPropInfo,
@@ -1583,6 +1549,8 @@ const propInfos: {[P:string]: PropInfo} =
     volumechange: StdEventPropInfo,
     waiting: StdEventPropInfo,
     wheel: StdEventPropInfo,
+	fullscreenchange: StdEventPropInfo,
+	fullscreenerror: StdEventPropInfo,
     copy: StdEventPropInfo,
     cut: StdEventPropInfo,
     paste: StdEventPropInfo,

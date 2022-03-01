@@ -459,16 +459,6 @@ const deferredWatchers = new Set<Watcher>();
 
 
 /**
- * Sets the given watcher object as the current watcher and returns the previous watcher
- */
-const setCurrentWatcher = (watcher: Watcher): Watcher =>
-{
-    let prevWatcher = currentWatcher;
-    currentWatcher = watcher;
-    return prevWatcher;
-}
-
-/**
  * Increments mutation scope reference count
  */
 export const enterMutationScope = (): void =>
@@ -571,48 +561,23 @@ class NonSlotHandler implements ProxyHandler<any>
             return true;
     }
 
-    // deleteProperty( target: any, prop: PropertyKey): boolean
-    // {
-    //     notifyTriggerChanged( this.trigger);
-    //     return Reflect.deleteProperty( target, prop);
-    // }
+    deleteProperty( target: any, prop: PropertyKey): boolean
+    {
+        this.trigger.notifyWrite();
+        return Reflect.deleteProperty( target, prop);
+    }
 
-    // defineProperty( target: any, prop: PropertyKey, attrs: PropertyDescriptor): boolean
-    // {
-    //     notifyTriggerChanged( this.trigger);
-    //     return Reflect.defineProperty( target, prop, attrs);
-    // }
+    has( target: any, prop: PropertyKey): boolean
+    {
+        this.trigger.notifyRead();
+        return Reflect.has( target, prop);
+    }
 
-    // has( target: any, prop: PropertyKey): boolean
-    // {
-    //     currentWatcher?.notifyTriggerRead(this.trigger);
-    //     // notifyTriggerRead( this.trigger);
-    //     return Reflect.has( target, prop);
-    // }
-
-    // getPrototypeOf( target: any): object | null
-    // {
-    //     notifyTriggerRead( this.trigger);
-    //     return Reflect.getPrototypeOf( target);
-    // }
-
-    // isExtensible( target: any): boolean
-    // {
-    //     notifyTriggerRead( this.trigger);
-    //     return Reflect.isExtensible( target);
-    // }
-
-    // getOwnPropertyDescriptor( target: any, prop: PropertyKey): PropertyDescriptor | undefined
-    // {
-    //     notifyTriggerRead( this.trigger);
-    //     return Reflect.getOwnPropertyDescriptor( target, prop);
-    // }
-
-    // ownKeys( target: any): ArrayLike<string | symbol>
-    // {
-    //     notifyTriggerRead( this.trigger);
-    //     return Reflect.ownKeys( target);
-    // }
+    ownKeys( target: any): ArrayLike<string | symbol>
+    {
+        this.trigger.notifyRead();
+        return Reflect.ownKeys( target);
+    }
 
 
 

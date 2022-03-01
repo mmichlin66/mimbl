@@ -2,7 +2,7 @@
 import {IHtmlIntrinsicElements} from "./HtmlTypes";
 import {ISvgIntrinsicElements} from "./SvgTypes";
 import {
-    EventSlot, mountRoot, unmountRoot, TextVN, ITrigger,
+    EventSlot, mountRoot, unmountRoot, TextVN, ITrigger, IEventSlot,
     s_wrapCallback, registerElmProp, symJsxToVNs, shadowDecorator, PropType
 } from "../internal";
 
@@ -319,25 +319,16 @@ export type IDPropType = string | number | IIDRule;
 
 /**
  * The ICommonProps interface defines standard properties that can be used on all JSX elements -
- * intrinsic (HTML and SVG) as well as functional and class-based components.
+ * intrinsic (HTML and SVG) as well as functional and class-based managed components.
  */
-export interface ICommonProps
+export interface ICommonProps<TRef = any>
 {
 	/** Unique key that distinguishes this JSX element from its siblings. The key can be of any type. */
 	key?: any;
-}
 
-
-
-/**
- * The IManagedCompProps interface adds to the ICommonProps the ability to obtain reference to
- * the managed components via the ref property.
- */
-export interface IManagedCompProps<T = any> extends ICommonProps
-{
     // Reference that will be set to the instance of the component after it is mounted. The
     // reference will be set to undefined after the component is unmounted.
-    readonly ref?: RefPropType<T>;
+    readonly ref?: RefPropType<TRef>;
 }
 
 
@@ -349,26 +340,37 @@ export type FormmethodPropType = "get" | "post" | "dialog";
 export type FormtargetPropType = string | "_self" | "_blank" | "_parent"| "_top";
 export type ReferrerPolicyPropType = "no-referrer" | "no-referrer-when-downgrade" | "origin" |
 		"origin-when-cross-origin" | "unsafe-url";
-export type DropzonePropType = "copy" | "move" | "link";
 
 
 
-export type ExtendedElementProps<T extends IElementProps> =
-    { [K in keyof T]?: T[K] extends Function ? T[K] : T[K] | ITrigger<T[K]>};
+export type ExtendedElementAttr<T> = T | ITrigger<T>;
+
+export type ExtendedElementProps<T extends IElementEvents> =
+    { [K in keyof T]?: T[K] | ITrigger<T[K]>};
+
+
+
+/** Global events that are common to all kind of HTML entities */
+export type IGlobalEvents =
+    { [K in keyof GlobalEventHandlersEventMap]?: EventPropType<GlobalEventHandlersEventMap[K]>}
+
+/** Events that are common to all kinds of elements */
+export type IElementEvents =
+    { [K in keyof DocumentAndElementEventHandlersEventMap]?: EventPropType<DocumentAndElementEventHandlersEventMap[K]>}
+
+/** Events that are common to elements and documents */
+export type IDocumentAndElementEvents =
+    { [K in keyof DocumentAndElementEventHandlersEventMap]?: EventPropType<DocumentAndElementEventHandlersEventMap[K]>}
+
 
 
 /**
  * The IElementProps interface defines standard properties (attributes and event listeners)
  * that can be used on all HTML and SVG elements.
  */
-export interface IElementProps<TRef extends Element = Element, TChildren = any> extends ICommonProps
+export interface IElementProps<TRef extends Element = Element, TChildren = any>
+    extends ICommonProps<TRef>, IGlobalEvents, IElementEvents, IDocumentAndElementEvents
 {
-	/**
-	 * Reference that will be set to the instance of the element after it is created (mounted). The
-	 * reference will be set to undefined after the element is unmounted.
-	 */
-	ref?: RefPropType<TRef>;
-
 	/**
 	 * Reference that will be set to the element's virtual node after it is created (mounted). The
 	 * reference will be set to undefined after the element is unmounted.
@@ -385,111 +387,16 @@ export interface IElementProps<TRef extends Element = Element, TChildren = any> 
 
     // standard HTML and SVG element properties
     xmlns?: string;
-	class?: ClassPropType;
-	draggable?: boolean;
-	dropzone ?: DropzonePropType;
-	id?: IDPropType;
-	lang?: string;
-	role?: string;
-	style?: string | Styleset;
-	tabindex?: number;
-
-	// global events
-	abort?: EventPropType<UIEvent>;
-	animationcancel?: EventPropType<AnimationEvent>;
-	animationend?: EventPropType<AnimationEvent>;
-	animationiteration?: EventPropType<AnimationEvent>;
-	animationstart?: EventPropType<AnimationEvent>;
-	auxclick?: EventPropType<Event>;
-	blur?: EventPropType<FocusEvent>;
-	cancel?: EventPropType<Event>;
-	canplay?: EventPropType<Event>;
-	canplaythrough?: EventPropType<Event>;
-	change?: EventPropType<Event>;
-	click?: EventPropType<MouseEvent>;
-	close?: EventPropType<Event>;
-	contextmenu?: EventPropType<MouseEvent>;
-	cuechange?: EventPropType<Event>;
-	dblclick?: EventPropType<MouseEvent>;
-	drag?: EventPropType<DragEvent>;
-	dragend?: EventPropType<DragEvent>;
-	dragenter?: EventPropType<DragEvent>;
-	//dragexit?: EventPropType<Event>;
-	dragleave?: EventPropType<DragEvent>;
-	dragover?: EventPropType<DragEvent>;
-	dragstart?: EventPropType<DragEvent>;
-	drop?: EventPropType<DragEvent>;
-	durationchange?: EventPropType<Event>;
-	emptied?: EventPropType<Event>;
-	ended?: EventPropType<Event>;
-	error?: EventPropType<ErrorEvent>;
-	focus?: EventPropType<FocusEvent>;
-	gotpointercapture?: EventPropType<PointerEvent>;
-	input?: EventPropType<Event>;
-	invalid?: EventPropType<Event>;
-	keydown?: EventPropType<KeyboardEvent>;
-	keypress?: EventPropType<KeyboardEvent>;
-	keyup?: EventPropType<KeyboardEvent>;
-	load?: EventPropType<Event>;
-	loadeddata?: EventPropType<Event>;
-	loadedmetadata?: EventPropType<Event>;
-	loadend?: EventPropType<ProgressEvent>;
-	loadstart?: EventPropType<Event>;
-	lostpointercapture?: EventPropType<PointerEvent>;
-	mousedown?: EventPropType<MouseEvent>;
-	mouseenter?: EventPropType<MouseEvent>;
-	mouseleave?: EventPropType<MouseEvent>;
-	mousemove?: EventPropType<MouseEvent>;
-	mouseout?: EventPropType<MouseEvent>;
-	mouseover?: EventPropType<MouseEvent>;
-	mouseup?: EventPropType<MouseEvent>;
-	pause?: EventPropType<Event>;
-	play?: EventPropType<Event>;
-	playing?: EventPropType<Event>;
-	pointercancel?: EventPropType<PointerEvent>;
-	pointerdown?: EventPropType<PointerEvent>;
-	pointerenter?: EventPropType<PointerEvent>;
-	pointerleave?: EventPropType<PointerEvent>;
-	pointermove?: EventPropType<PointerEvent>;
-	pointerout?: EventPropType<PointerEvent>;
-	pointerover?: EventPropType<PointerEvent>;
-	pointerup?: EventPropType<PointerEvent>;
-	progress?: EventPropType<ProgressEvent>;
-	ratechange?: EventPropType<Event>;
-	reset?: EventPropType<Event>;
-	resize?: EventPropType<UIEvent>;
-	scroll?: EventPropType<UIEvent>;
-	//securitypolicyviolation?: EventPropType<SecurityPolicyViolationEvent>;
-	seeked?: EventPropType<Event>;
-	seeking?: EventPropType<Event>;
-	select?: EventPropType<UIEvent>;
-	stalled?: EventPropType<Event>;
-	submit?: EventPropType<Event>;
-	suspend?: EventPropType<Event>;
-	timeupdate?: EventPropType<Event>;
-	toggle?: EventPropType<Event>;
-	touchcancel?: EventPropType<TouchEvent>;
-	touchend?: EventPropType<TouchEvent>;
-	touchenter?: EventPropType<TouchEvent>;
-	touchleave?: EventPropType<TouchEvent>;
-	touchmove?: EventPropType<TouchEvent>;
-	touchstart?: EventPropType<TouchEvent>;
-	transitioncancel?: EventPropType<TransitionEvent>;
-	transitionend?: EventPropType<TransitionEvent>;
-	transitionrun?: EventPropType<TransitionEvent>;
-	transitionstart?: EventPropType<TransitionEvent>;
-	volumechange?: EventPropType<Event>;
-	waiting?: EventPropType<Event>;
-	wheel?: EventPropType<WheelEvent>;
-
-	// Element's events
-	fullscreenchange?: EventPropType<Event>;
-	fullscreenerror?: EventPropType<Event>;
-
-	// Document's and Element's events
-	copy?: EventPropType<ClipboardEvent>;
-	cut?: EventPropType<ClipboardEvent>;
-	paste?: EventPropType<ClipboardEvent>;
+	id?: ExtendedElementAttr<IDPropType>;
+	lang?: ExtendedElementAttr<string>;
+	class?: ExtendedElementAttr<ClassPropType>;
+	className?: ExtendedElementAttr<ClassPropType>;
+	style?: ExtendedElementAttr<string | Styleset>;
+	tabindex?: ExtendedElementAttr<number>;
+	tabIndex?: ExtendedElementAttr<number>;
+	role?: ExtendedElementAttr<string>;
+	draggable?: ExtendedElementAttr<"auto" | "true" | "false">;
+	// dropzone?: ExtendedElementAttr<"copy" | "move" | "link">;
 }
 
 
@@ -522,26 +429,21 @@ export interface ICustomWebElements
  */
 export namespace JSX
 {
-	// tslint:disable-next-line:no-empty-interface
 	export type Element = any;
 
-	// tslint:disable-next-line:no-empty-interface
 	export interface ElementClass extends Component {}
 
 	export interface ElementAttributesProperty { props: {} }
 
 	export interface ElementChildrenAttribute { children: any }
 
-	// tslint:disable-next-line:no-empty-interface
 	export interface IntrinsicElements extends IHtmlIntrinsicElements, ISvgIntrinsicElements, ICustomWebElements {}
 
-	// tslint:disable-next-line:no-empty-interface
 	// Properties in this interface apply to intrinsic elements and to functional components.
 	export interface IntrinsicAttributes extends ICommonProps {}
 
-	// tslint:disable-next-line:no-empty-interface
 	// Properties in this interface apply to class-based components.
-	export interface IntrinsicClassAttributes<T> extends IManagedCompProps<T> {}
+	export interface IntrinsicClassAttributes<T> extends ICommonProps<T> {}
 }
 
 
@@ -618,13 +520,33 @@ export type ScheduledFuncType = () => void;
  */
 export type RefFunc<T = any> = (newRef: T) => void;
 
+/**
+ * Defines event handler that is invoked when reference value changes.
+ */
+export interface IRef<T = any> extends IEventSlot<RefFunc<T>>
+{
+    r: T;
+}
+
+/**
+ * Type of ref property that can be passed to JSX elements and components. This can be either the
+ * [[IRef]] interface or [[RefFunc]] function.
+ */
+ export type RefType<T = any> = IRef<T> | RefFunc<T>;
+
+ /**
+  * Type of ref property value. This can be either the [[IRef]] interface or [[RefFunc]] function
+  * or the type itself.
+  */
+ export type RefPropType<T = any> = T | RefType<T>;
+
 
 
 /**
  * Reference class to use whenever a reference to an object is needed - for example, with JSX `ref`
  * attributes and services.
  */
-export class Ref<T = any> extends EventSlot<RefFunc<T>>
+export class Ref<T = any> extends EventSlot<RefFunc<T>> implements IRef<T>
 {
 	constructor( listener?: RefFunc<T>, initialReference?: T)
 	{
@@ -654,34 +576,6 @@ export class Ref<T = any> extends EventSlot<RefFunc<T>>
 }
 
 
-
-/**
- * The ElmRef class represents a reference to the element virtual node. Such objects
- * can be created and passed to the `ref` property of an element. After the element is rendered
- * the object can be used to schedule updates to the element directly - that is, without updating
- * the component that rendered the element. This, for example, can be used to update properties
- * of the element without causing re-rendering of its children.
- */
-export class ElmRef<T extends Element = Element> extends Ref<IElmVN<T>> {}
-
-/**
- * Defines event handler that is invoked when reference value changes.
- */
-export type ElmRefFunc<T extends Element = Element> = RefFunc<IElmVN<T>>;
-
-
-
-/**
- * Type of ref property that can be passed to JSX elements and components. This can be either the
- * [[Ref]] class or [[RefFunc]] function.
- */
-export type RefType<T = any> = Ref<T> | RefFunc<T>;
-
-/**
- * Type of ref property value. This can be either the [[Ref]] class or [[RefFunc]] function or the
- * type itself.
- */
-export type RefPropType<T = any> = T | RefType<T>;
 
 /**
  * Type of the vnref property value.
@@ -762,50 +656,7 @@ class RefProxyHandler implements ProxyHandler<any>
             this.obj[prop] = value;
 
         return true;
-        // Reflect.set doesn't work but regular property set does
-        // return Reflect.set( this.obj, prop, value, receiver);
     }
-
-    // public deleteProperty( target: any, prop: PropertyKey): boolean
-    //     { return Reflect.deleteProperty( this.obj, prop); }
-
-    // public defineProperty( target: any, prop: PropertyKey, attrs: PropertyDescriptor): boolean
-    //     { return Reflect.defineProperty( this.obj, prop, attrs); }
-
-    // public has( target: any, prop: PropertyKey): boolean
-    //     { return Reflect.has( this.obj, prop); }
-
-    // public getPrototypeOf( target: any): object | null
-    //     { return Reflect.getPrototypeOf( this.obj); }
-
-    // public isExtensible( target: any): boolean
-    //     { return Reflect.isExtensible( this.obj); }
-
-    // public getOwnPropertyDescriptor( target: any, prop: PropertyKey): PropertyDescriptor | undefined
-    //     { return Reflect.getOwnPropertyDescriptor( this.obj, prop); }
-
-    // public ownKeys( target: any): ArrayLike<string | symbol>
-    //     { return Reflect.ownKeys( this.obj); }
-}
-
-
-
-/**
- * Helper function to set the value of the reference that takes care of the different types of
- * references. The optional `onlyIf` parameter may specify a value so that only if the reference
- * currently has the same value it will be replaced. This might be needed to not clear a
- * reference if it already points to a different object.
- * @param ref [[Ref]] object to which the new value will be set
- * @param val Reference value to set to the Ref object
- * @param onlyIf An optional value to which to compare the current (old) value of the reference.
- * The new value will be set only if the old value equals the `onlyIf` value.
- */
-export function setRef<T>( ref: RefType<T>, val: T, onlyIf?: T): void
-{
-	if (typeof ref === "function")
-		ref(val);
-	else if (!onlyIf || ref.r === onlyIf)
-        ref.r = val;
 }
 
 

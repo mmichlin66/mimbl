@@ -1,4 +1,4 @@
-﻿import {IComponent, RefPropType, setRef, IVNode, UpdateStrategy, TickSchedulingType} from "../api/mim";
+﻿import {IComponent, RefPropType, IVNode, UpdateStrategy, TickSchedulingType, RefType} from "../api/mim";
 
 /// #if USE_STATS
     import {StatsCategory} from "../utils/Stats"
@@ -385,6 +385,26 @@ export abstract class VN implements IVNode
     /// #if DEBUG
     private debugID: number;
 	/// #endif
+}
+
+
+
+/**
+ * Helper function to set the value of the reference that takes care of the different types of
+ * references. The optional `onlyIf` parameter may specify a value so that only if the reference
+ * currently has the same value it will be replaced. This might be needed to not clear a
+ * reference if it already points to a different object.
+ * @param ref [[Ref]] object to which the new value will be set
+ * @param val Reference value to set to the Ref object
+ * @param onlyIf An optional value to which to compare the current (old) value of the reference.
+ * The new value will be set only if the old value equals the `onlyIf` value.
+ */
+export function setRef<T>( ref: RefType<T>, val: T, onlyIf?: T): void
+{
+	if (typeof ref === "function")
+		ref(val);
+	else if (!onlyIf || ref.r === onlyIf)
+        ref.r = val;
 }
 
 
