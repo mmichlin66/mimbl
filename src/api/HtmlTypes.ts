@@ -15,7 +15,6 @@ export interface IHtmlElementProps<TRef extends HTMLElement = HTMLElement> exten
 	autocapitalize?: ExtendedElementAttr<"off" | "none" | "on" | "sentences" | "words" | "characters">;
 	autofocus?: ExtendedElementAttr<boolean>;
 	contenteditable?: ExtendedElementAttr<boolean>;
-	//conExtendedElementAttr<textmenu?: string;		// obsolet>e
 	dir?: ExtendedElementAttr<"ltr" | "rtl" | "auto">;
     enterkeyhint?: ExtendedElementAttr<string>;
 	hidden?: ExtendedElementAttr<boolean>;
@@ -327,9 +326,10 @@ export interface IHtmlIframeElementProps extends IHtmlElementProps<HTMLIFrameEle
 {
 	allow?: ExtendedElementAttr<string>;
 	allowfullscreen?: ExtendedElementAttr<boolean>;
+	allowpaymentrequest?: ExtendedElementAttr<boolean>;
 	csp?: ExtendedElementAttr<string>;
 	height?: ExtendedElementAttr<number>;
-	importance?: ExtendedElementAttr<"auto" | "high" | "low">;
+	loading?: ExtendedElementAttr<"eager" | "lazy">;
 	name?: ExtendedElementAttr<string>;
 	referrerpolicy?: ExtendedElementAttr<ReferrerPolicyPropType>;
 	sandbox?: ExtendedElementAttr<string>;
@@ -347,9 +347,9 @@ export interface IHtmlImgElementProps extends IHtmlElementProps<HTMLImageElement
 	crossorigin?: ExtendedElementAttr<CrossoriginPropType>;
 	decoding?: ExtendedElementAttr<"auto" | "sync" | "async">;
 	height?: ExtendedElementAttr<number>;
-	importance?: ExtendedElementAttr<"auto" | "high" | "low">;
 	intrinsicsize?: ExtendedElementAttr<boolean>;
 	ismap?: ExtendedElementAttr<boolean>;
+	loading?: ExtendedElementAttr<"eager" | "lazy">;
 	referrerpolicy?: ExtendedElementAttr<ReferrerPolicyPropType>;
 	sizes?: ExtendedElementAttr<string>;
 	src?: ExtendedElementAttr<string>;
@@ -455,7 +455,6 @@ export interface IHtmlLinkElementProps extends IHtmlElementProps<HTMLLinkElement
 	crossorigin?: ExtendedElementAttr<CrossoriginPropType>;
 	href?: ExtendedElementAttr<string>;
 	hrefLang?: ExtendedElementAttr<string>;
-	importance?: ExtendedElementAttr<"auto" | "high" | "low">;
 	integrity?: ExtendedElementAttr<string>;
 	media?: ExtendedElementAttr<MediaStatement>;
 	referrerpolicy?: ExtendedElementAttr<ReferrerPolicyPropType>;
