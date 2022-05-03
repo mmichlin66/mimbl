@@ -1,9 +1,9 @@
-﻿import { isTrigger } from "..";
-import {
-    IElmVN, EventFuncType, ICustomAttributeHandler, IElementEvents, EventPropType, RefType, IElementProps,
-    ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy, ICustomAttributeHandlerClass
+﻿import {
+    IElmVN, EventFuncType, ICustomAttributeHandler, EventPropType, RefType, IElementProps,
+    ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy, ICustomAttributeHandlerClass, PropType
 } from "../api/mim"
 import {Styleset, SchedulerType, MediaStatement} from "mimcss"
+import {isTrigger} from "../utils/TriggerWatcher"
 import {
     VN, DN, VNDisp, setRef, s_deepCompare, s_wrapCallback, ChildrenUpdateOperation,
     mountSubNodes, reconcileSubNodes, unmountSubNodes, mimcss
@@ -1101,27 +1101,6 @@ const elmInfos: {[elmName:string]: ElmInfo} =
 // Information about attributes and events and functions to set/update/remove them.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-/** Type of properties that can be specified for an element. */
-export const enum PropType
-{
-    /**
-     * Built-in attribute that is used internally by the Mimbl infrastructure and is not set
-     * to the element.
-     */
-	Framework = 0,
-
-	/** Regular attributes set using Element.setAttribute */
-	Attr = 1,
-
-	/** Event listeners set using Element.addEventListener */
-	Event = 2,
-
-	/**  Custom attributes for which handler factories are registered*/
-	CustomAttr = 3,
-}
-
-
 
 /**
  * Base interface describing information kept about property that can be specified for an element.

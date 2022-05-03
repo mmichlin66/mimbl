@@ -4,7 +4,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-import {EventSlot, IEventSlot} from "../internal";
+import {EventSlot, IEventSlot} from "./EventSlot";
 
 /** Type for functions that accept any number of parameters and return any type */
 export type AnyAnyFunc = (...args: any[]) => any;

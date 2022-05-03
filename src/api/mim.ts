@@ -1,9 +1,11 @@
 ﻿import {Styleset, IIDRule, ClassMoniker} from "mimcss"
 import {IHtmlIntrinsicElements} from "./HtmlTypes";
 import {ISvgIntrinsicElements} from "./SvgTypes";
+import {ITrigger} from "../utils/TriggerWatcher"
+import {EventSlot, IEventSlot} from "../utils/EventSlot"
 import {
-    EventSlot, mountRoot, unmountRoot, TextVN, ITrigger, IEventSlot,
-    s_wrapCallback, registerElmProp, symJsxToVNs, shadowDecorator, PropType
+    mountRoot, unmountRoot, TextVN,
+    s_wrapCallback, registerElmProp, symJsxToVNs, shadowDecorator
 } from "../internal";
 
 
@@ -1005,6 +1007,27 @@ export interface ICustomAttributeHandler<T = any>
 	 *   on element removal.
 	 */
 	terminate?( isRemoval: boolean): void;
+}
+
+
+
+/** Type of properties that can be specified for an element. */
+export const enum PropType
+{
+    /**
+     * Built-in attribute that is used internally by the Mimbl infrastructure and is not set
+     * to the element.
+     */
+	Framework = 0,
+
+	/** Regular attributes set using Element.setAttribute */
+	Attr = 1,
+
+	/** Event listeners set using Element.addEventListener */
+	Event = 2,
+
+	/**  Custom attributes for which handler factories are registered*/
+	CustomAttr = 3,
 }
 
 
