@@ -31,7 +31,7 @@ export const isSvgSvg = (elm: Element): boolean => s_isSvgSvg( elm);
 export type PromiseEx<T = any> = Promise<T> &
     {
         resolve: (value?: T | PromiseLike<T>) => void,
-        reject: (reason?: any) => void
+        reject: (reason?: any) => void;
     };
 
 
@@ -42,7 +42,8 @@ export type PromiseEx<T = any> = Promise<T> &
  */
 export function createPromiseEx<T = any>(): PromiseEx<T>
 {
-    let tempResolve, tempReject;
+    let tempResolve: (value?: T | PromiseLike<T>) => void;
+    let tempReject: (reason?: any) => void;
     let promise = new Promise<T>( function(resolve, reject) {
         tempResolve = resolve;
         tempReject = reject;

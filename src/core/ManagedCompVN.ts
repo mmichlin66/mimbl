@@ -1,4 +1,4 @@
-﻿import {IManagedCompVN, IComponentClass, RefPropType, Component} from "../api/mim"
+﻿import {IManagedCompVN, IComponentClass, RefPropType} from "../api/CompTypes"
 import {ClassCompVN, DN, VN, VNDisp, setRef} from "../internal"
 
 
@@ -139,16 +139,13 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 		let shouldRender = !comp.shouldUpdate || comp.shouldUpdate( newVN.props);
 
 		// remember the new properties
-        (comp as Component).props = this.props = newVN.props;
+        this.comp.props = this.props = newVN.props;
 
 		if (shouldRender)
             super.update( newVN, disp);
 	}
 
 
-
-	// Properties that were passed to the component.
-	private props: any;
 
 	// Reference to the component that is specified as a "ref" property. Reference object is
 	// set when analyzing properties in the constructor and during update. Reference value is

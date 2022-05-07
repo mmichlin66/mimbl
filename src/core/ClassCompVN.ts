@@ -1,10 +1,10 @@
 ﻿import {
-    IClassCompVN, symRenderNoWatcher, IComponent, RenderMethodType, ScheduledFuncType,
+    IClassCompVN, IComponent, RenderMethodType, ScheduledFuncType,
     IComponentClass, ComponentShadowOptions
-} from "../api/mim"
+} from "../api/CompTypes"
 import {
     DN, VN, setCurrentClassComp, FuncProxyVN, scheduleFuncCall, mountContent,
-    unmountSubNodes, VNDisp, reconcile, createWatcher, IWatcher
+    unmountSubNodes, VNDisp, reconcile, createWatcher, IWatcher, symRenderNoWatcher
 } from "../internal"
 
 /// #if USE_STATS
@@ -44,6 +44,9 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 	/** Component instance. */
 	public comp: IComponent;
+
+	// Properties that were passed to the component.
+	public props: any;
 
     /**
      * Optional element serving as a host for shadow root if the component specifies the `shadow`

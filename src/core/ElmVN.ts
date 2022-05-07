@@ -1,8 +1,9 @@
-﻿import {
+﻿import {Styleset, SchedulerType, MediaStatement} from "mimcss"
+import {
     IElmVN, EventFuncType, ICustomAttributeHandler, EventPropType, RefType, IElementProps,
-    ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy, ICustomAttributeHandlerClass, PropType
-} from "../api/mim"
-import {Styleset, SchedulerType, MediaStatement} from "mimcss"
+    ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy,
+    ICustomAttributeHandlerClass, PropType
+} from "../api/CompTypes"
 import {isTrigger} from "../utils/TriggerWatcher"
 import {
     VN, DN, VNDisp, setRef, s_deepCompare, CallbackWrapper, ChildrenUpdateOperation,

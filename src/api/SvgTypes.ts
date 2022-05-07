@@ -1,16 +1,14 @@
-﻿import {
+﻿import {MediaStatement} from "mimcss";
+import {
     IElementProps, ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType, ExtendedElementAttr
-} from "./mim";
-import {MediaStatement} from "mimcss";
+} from "./CompTypes";
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// The ISvgElementProps interface defines standard properties (attributes and event listeners)
-// that can be used on all SVG elements.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
+/**
+ * The ISvgElementProps interface defines standard properties (attributes and event listeners)
+ * that can be used on all SVG elements.
+ */
 export interface ISvgElementProps extends IElementProps<SVGElement>
 {
 }

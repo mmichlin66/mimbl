@@ -1,7 +1,7 @@
-﻿import {symRenderNoWatcher, RenderMethodType, IComponent} from "../api/mim"
+﻿import {RenderMethodType} from "../api/CompTypes"
 import {
     VN, createWatcher, IWatcher, DN, mountContent, unmountSubNodes,
-    VNDisp, reconcile
+    VNDisp, reconcile, symRenderNoWatcher
 } from "../internal"
 
 /// #if USE_STATS
@@ -37,7 +37,7 @@ let symFuncsToNodes = Symbol( "symFuncsToNodes");
  */
 export class FuncProxyVN extends VN
 {
-	constructor( func: RenderMethodType, funcThisArg?: any, arg?: any, key?: any)
+	constructor( func: RenderMethodType, thisArg?: any, arg?: any, key?: any)
 	{
 		super();
 
@@ -45,7 +45,7 @@ export class FuncProxyVN extends VN
         // to the node's creator component upon mounting. If there is no key specified, the arg
         // will be used (which may also be unspecified)
 		this.func = func;
-		this.funcThisArg = funcThisArg;
+		this.thisArg = thisArg;
 		this.arg = arg;
 		this.key = key || arg;
 	}
@@ -78,17 +78,17 @@ export class FuncProxyVN extends VN
     // corresponding to this virtual node.
 	public prepareMount(): void
 	{
-        if (!this.funcThisArg)
-            this.funcThisArg = this.creator;
+        if (!this.thisArg)
+            this.thisArg = this.creator;
 
 		this.linkNodeToFunc();
 
         // establish watcher if not disabled using the @noWatcher decorator
         let func = this.func as RenderMethodType;
         if (func[symRenderNoWatcher])
-            this.actFunc = func.bind( this.funcThisArg);
+            this.actFunc = func.bind( this.thisArg);
         else
-            this.actFunc = this.funcWatcher = createWatcher( func, this.requestUpdate, this.funcThisArg, this);
+            this.actFunc = this.watcher = createWatcher( func, this.requestUpdate, this.thisArg, this);
 	}
 
 
@@ -114,10 +114,10 @@ export class FuncProxyVN extends VN
     // Cleans up the node object before it is released.
     public prepareUnmount(): void
     {
-        if (this.funcWatcher)
+        if (this.watcher)
         {
-            this.funcWatcher.dispose();
-            this.funcWatcher = null;
+            this.watcher.dispose();
+            this.watcher = null;
         }
 
         this.unlinkNodeFromFunc();
@@ -168,15 +168,15 @@ export class FuncProxyVN extends VN
 	// should be updated (that is, this node's render method should be called).
 	public update( newVN: FuncProxyVN, disp: VNDisp): void
 	{
-        if (!newVN.funcThisArg)
-            newVN.funcThisArg = this.creator;
+        if (!newVN.thisArg)
+            newVN.thisArg = this.creator;
 
 		// remember the new value of the key property (even if it is the same)
 		this.key = newVN.key;
 
         // we allow any FuncProxyVN update; however, if the method of the object to
         // which this method belongs are different, we unmount the old
-        if (this.func === newVN.func && this.funcThisArg === newVN.funcThisArg)
+        if (this.func === newVN.func && this.thisArg === newVN.thisArg)
         {
             // we need to re-render only if the arguments are the same.
             if (this.arg !== newVN.arg)
@@ -188,7 +188,7 @@ export class FuncProxyVN extends VN
         {
             this.prepareUnmount();
             this.func = newVN.func;
-            this.funcThisArg = newVN.funcThisArg;
+            this.thisArg = newVN.thisArg;
             this.arg = newVN.arg;
             this.prepareMount();
         }
@@ -200,19 +200,17 @@ export class FuncProxyVN extends VN
 
     // We need to link our node to the function so that the static method findVN can work (this is
     // used when the IComponent.updateMe(func) method is called). We keep a map of function
-    // objects to VNs using the symFuncsToNodes symbol. If the node has funcThisArg we use the
-    // symbol on this object; otherwise, we use the symbol on the FuncProxyVN class object - this
-    // used for static functions.
+    // objects to VNs using the symFuncsToNodes symbol.
     private linkNodeToFunc(): void
 	{
-        if (!this.funcThisArg)
+        if (!this.thisArg)
             return;
 
-		let mapFuncsToNodes: Map<Function,FuncProxyVN> = this.funcThisArg[symFuncsToNodes];
+		let mapFuncsToNodes = this.thisArg[symFuncsToNodes] as Map<Function,FuncProxyVN>;
 		if (!mapFuncsToNodes)
 		{
 			mapFuncsToNodes = new Map<Function,FuncProxyVN>();
-			this.funcThisArg[symFuncsToNodes] = mapFuncsToNodes;
+			this.thisArg[symFuncsToNodes] = mapFuncsToNodes;
 		}
 
 		mapFuncsToNodes.set( this.func, this);
@@ -223,10 +221,10 @@ export class FuncProxyVN extends VN
     // Unlink this node from the function - opposite of what linkNodeToFunc does.
     private unlinkNodeFromFunc(): void
 	{
-        if (!this.funcThisArg)
+        if (!this.thisArg)
             return;
 
-		let mapFuncsToNodes: Map<Function,FuncProxyVN> = this.funcThisArg[symFuncsToNodes];
+		let mapFuncsToNodes = this.thisArg[symFuncsToNodes] as Map<Function,FuncProxyVN>;
 		if (mapFuncsToNodes)
 			mapFuncsToNodes.delete( this.func);
 	}
@@ -234,29 +232,29 @@ export class FuncProxyVN extends VN
 
 
     // Tries to find the node linked to the given function using the linkNodeToFunction method.
-    private static findVN( func: RenderMethodType, funcThisArg: any, key?: any): FuncProxyVN
+    private static findVN( func: RenderMethodType, thisArg: any, key?: any): FuncProxyVN
 	{
         /// #if DEBUG
-            if (!funcThisArg)
+            if (!thisArg)
             {
-                console.error("FuncProxVN.findVN was called with undefined funcThisArg");
+                console.error("FuncProxVN.findVN was called with undefined thisArg");
                 return undefined;
             }
         /// #endif
 
-        if (!funcThisArg)
+        if (!thisArg)
             return null;
 
-		let mapFuncsToNodes: Map<Function,FuncProxyVN> = funcThisArg[symFuncsToNodes];
+		let mapFuncsToNodes: Map<Function,FuncProxyVN> = thisArg[symFuncsToNodes];
 		return mapFuncsToNodes && mapFuncsToNodes.get( func);
 	}
 
 
 
-	public static update( func: RenderMethodType, funcThisArg?: any, key?: any): void
+	public static update( func: RenderMethodType, thisArg?: any, key?: any): void
 	{
 		// find the node
-		let vn = FuncProxyVN.findVN( func, funcThisArg, key);
+		let vn = FuncProxyVN.findVN( func, thisArg, key);
 		if (!vn)
 			return;
 
@@ -269,7 +267,7 @@ export class FuncProxyVN extends VN
 	private func: RenderMethodType;
 
 	// Object to be used as "this" when invoking the function.
-	private funcThisArg: any;
+	private thisArg: any;
 
 	// Optional arguments to be passed to the function.
 	private arg: any;
@@ -277,7 +275,7 @@ export class FuncProxyVN extends VN
     // Watcher function wrapping the original function. The watcher will notice any trigger objects
     // being read during the original function execution and will request update thus triggerring
     // re-rendering.
-	private funcWatcher?: IWatcher;
+	private watcher?: IWatcher;
 
     // Actual function to be invoked during the rendering - it can be either the original func or
     // the watcher.

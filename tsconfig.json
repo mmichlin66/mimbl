@@ -24,9 +24,9 @@
 		"lib": [ "esnext", "dom" ],
 		"rootDir": "src",
 		"outDir": "./lib/",
-		"jsx": "react",
-		"jsxFactory": "mim.jsx",
-        "jsxFragmentFactory": "mim.Fragment",
+		// "jsx": "react",
+		// "jsxFactory": "mim.jsx",
+        // "jsxFragmentFactory": "mim.Fragment",
         "types": []
 	},
 

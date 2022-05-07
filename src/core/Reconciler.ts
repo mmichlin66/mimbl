@@ -1,13 +1,12 @@
-﻿import { isTrigger } from "..";
-import {
-    ScheduledFuncType, Component, Fragment, FuncProxy, PromiseProxy, CallbackWrappingParams,
-    TickSchedulingType, IComponent, FuncProxyProps, PromiseProxyProps
-} from "../api/mim"
+﻿import {
+    ScheduledFuncType, CallbackWrappingParams, TickSchedulingType, IComponent
+} from "../api/CompTypes"
 import {
     VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN, FuncProxyVN,
-    ManagedCompVN, enterMutationScope, exitMutationScope, ChildrenUpdateRequest,
+    enterMutationScope, exitMutationScope, ChildrenUpdateRequest,
     ChildrenUpdateOperation, SetRequest, SpliceRequest, MoveRequest, SwapRequest,
-    SliceRequest, TrimRequest, GrowRequest, ReverseRequest, VNDisp, VNDispAction, VNDispGroup
+    SliceRequest, TrimRequest, GrowRequest, ReverseRequest, VNDisp, VNDispAction,
+    VNDispGroup, isTrigger, symToVNs, symJsxToVNs
 } from "../internal"
 
 /// #if USE_STATS
@@ -1872,14 +1871,6 @@ const createVNChainFromContent = (content: any): VN[] | null =>
 
 
 
-/**
- * Symbol used to set a "toVNs" function to certain classes. This function converts the instances
- * of these classes to a VN or an array of VNs.
- */
- export let symToVNs = Symbol("toVNs");
-
-
-
 // Add toVNs method to the String class. This method is invoked to convert rendered content to
 // virtual node or nodes.
 Boolean.prototype[symToVNs] = () => null
@@ -1899,21 +1890,6 @@ String.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 
     return vn;
 }
-
-
-
-// Add toVNs method to the Component class. This method is invoked to convert rendered content to
-// virtual node or nodes.
-Component.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
-{
-    // if the component (this can only be an Instance component) is already attached to VN,
-    // return this existing VN; otherwise create a new one.
-    let vn = this.vn ?? new IndependentCompVN( this);
-    if (nodes)
-        nodes.push( vn);
-
-    return vn;
-};
 
 
 
@@ -2007,14 +1983,6 @@ Object.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 
 
 
-/**
- * Symbol used to set a "jsxToVNs" function to certain classes. This function converts the instances
- * of these classes to a VN or an array of VNs.
- */
-export let symJsxToVNs = Symbol("jsxToVNs");
-
-
-
 // Add jsxToVNs method to the String class, which creates ElmVN with the given parameters. This
 // method is invoked by the JSX mechanism.
 String.prototype[symJsxToVNs] = function( props: any, children: VN[] | null): VN | VN[] | null
@@ -2022,31 +1990,6 @@ String.prototype[symJsxToVNs] = function( props: any, children: VN[] | null): VN
     return new ElmVN( this, props, children);
 };
 
-
-
-// Add jsxToVNs method to the Fragment class object. This method is invoked by the JSX mechanism.
-Fragment[symJsxToVNs] = (props: any, children: VN[] | null): VN | VN[] | null => children;
-
-
-
-// Add jsxToVNs method to the FuncProxy class object. This method is invoked by the JSX mechanism.
-FuncProxy[symJsxToVNs] = (props: FuncProxyProps, children: VN[] | null): VN | VN[] | null =>
-    new FuncProxyVN( props.func, props.funcThisArg, props.arg, props.key);
-
-
-
-// Add jsxToVNs method to the PromiseProxy class object. This method is invoked by the JSX mechanism.
-PromiseProxy[symJsxToVNs] = (props: PromiseProxyProps, children: VN[] | null): VN | VN[] | null =>
-    props?.promise ? new PromiseProxyVN( props, children) : null;
-
-
-
-// Add jsxToVNs method to the Component class object, which creates virtual node for managed
-// components. This method is invoked by the JSX mechanism.
-Component[symJsxToVNs] = function( props: any, children: VN[] | null): VN | VN[] | null
-{
-    return new ManagedCompVN( this, props, children);
-}
 
 
 // Add jsxToVNs method to the Function class, which works for functional components. This method

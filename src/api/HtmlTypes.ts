@@ -2,7 +2,7 @@
 import {
     IElementProps, ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType,
     FormenctypePropType, FormmethodPropType, ExtendedElementProps, ExtendedElementAttr
-} from "./mim"
+} from "./CompTypes"
 
 
 

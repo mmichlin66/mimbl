@@ -1,4 +1,4 @@
-﻿import {IComponent, IErrorHandlingService} from "../api/mim"
+﻿import {IErrorHandlingService} from "../api/CompTypes"
 import {VN, DN, scheduleFuncCall, VNDisp} from "../internal"
 
 /// #if USE_STATS

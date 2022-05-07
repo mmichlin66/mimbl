@@ -1,4 +1,4 @@
-﻿import {IComponent, RefPropType, IVNode, UpdateStrategy, TickSchedulingType, RefType} from "../api/mim";
+﻿import {IComponent, RefPropType, IVNode, UpdateStrategy, TickSchedulingType, RefType} from "../api/CompTypes";
 
 /// #if USE_STATS
     import {StatsCategory} from "../utils/Stats"
@@ -752,6 +752,30 @@ type VNSubscribedServiceInfo =
 	// implemented by an ancestor component.
 	useSelf: boolean;
 }
+
+
+
+/**
+ * Symbol that is attached to a render function to indicate that it should not be wrapped in a
+ * watcher.
+ */
+export let symRenderNoWatcher = Symbol();
+
+
+
+/**
+ * Symbol used to set a "toVNs" function to certain classes. This function converts the instances
+ * of these classes to a VN or an array of VNs.
+ */
+export let symToVNs = Symbol("toVNs");
+
+
+
+/**
+ * Symbol used to set a "jsxToVNs" function to certain classes. This function converts the instances
+ * of these classes to a VN or an array of VNs.
+ */
+export let symJsxToVNs = Symbol("jsxToVNs");
 
 
 

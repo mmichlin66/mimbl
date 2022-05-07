@@ -1,4 +1,4 @@
-﻿import {IComponent, PromiseProxyProps} from "../api/mim"
+﻿import {PromiseProxyProps} from "../api/CompTypes"
 import {DN, reconcile, VN, VNDisp} from "../internal"
 
 /// #if USE_STATS

@@ -1,4 +1,4 @@
-﻿import {IComponent, ITextVN, TickSchedulingType} from "../api/mim"
+﻿import {ITextVN, TickSchedulingType} from "../api/CompTypes"
 import {DN, ITrigger, VN, VNDisp} from "../internal"
 
 /// #if USE_STATS

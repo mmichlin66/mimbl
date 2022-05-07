@@ -37,6 +37,8 @@
 		"lib/utils/EventSlot.d.ts",
 		"lib/utils/TriggerWatcher.d.ts",
 		"lib/api/UtilAPI.d.ts",
+		"lib/api/CompTypes.d.ts",
+		"lib/api/CompAPI.d.ts",
 		"lib/api/HtmlTypes.d.ts",
 		"lib/api/SvgTypes.d.ts",
 		"lib/api/mim.d.ts"

@@ -1,4 +1,4 @@
-﻿import {IIndependentCompVN, IComponent, IComponentClass} from "../api/mim"
+﻿import {IIndependentCompVN, IComponent, IComponentClass} from "../api/CompTypes"
 import {ClassCompVN, DN, moveNode, VN, VNDisp} from "../internal"
 
 
