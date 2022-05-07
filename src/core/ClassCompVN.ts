@@ -16,7 +16,7 @@ import {
 /**
  * Symbol used on component class to specify shadow parameters (ComponentShadowParams)
  */
-const symShadowOptions = Symbol("shadowParam");
+const symShadowOptions = Symbol("shadowOptions");
 
 /**
  * Decorator function for component classes, which sets the symbol on the given class with the
@@ -309,13 +309,13 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
     /** This method is called by the component when it needs to be updated. */
-	public updateMe( func?: RenderMethodType, funcThisArg?: any, key?: any): void
+	public updateMe( func?: RenderMethodType, thisArg?: any, key?: any): void
     {
         // if no arguments are provided we request to update the entire component.
 		if (!func)
 			this.requestUpdate();
 		else
-            FuncProxyVN.update( func, funcThisArg || this.comp, key);
+            FuncProxyVN.update( func, thisArg ?? this.comp, key);
     }
 
 
@@ -324,14 +324,14 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	 * Schedules the given function to be called before any components scheduled to be updated in
 	 * the Mimbl tick are updated.
 	 * @param func Function to be called
-	 * @param funcThisArg Object that will be used as "this" value when the function is called. If this
+	 * @param thisArg Object that will be used as "this" value when the function is called. If this
 	 *   parameter is undefined, the component instance will be used (which allows scheduling
 	 *   regular unbound components' methods). This parameter will be ignored if the function
 	 *   is already bound or is an arrow function.
 	 */
-	public callMe( func: ScheduledFuncType, beforeUpdate: boolean, funcThisArg?: any): void
+	public callMe( func: ScheduledFuncType, beforeUpdate: boolean, thisArg?: any): void
 	{
-		scheduleFuncCall( func, beforeUpdate, funcThisArg || this.comp);
+		scheduleFuncCall( func, beforeUpdate, thisArg ?? this.comp, this.comp);
 	}
 
 

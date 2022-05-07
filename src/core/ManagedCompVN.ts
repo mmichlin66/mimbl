@@ -27,6 +27,9 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
             // get the key (if exists) because we will need id during update even before the
             // component is mounted
             this.key = props.key;
+
+            // remember the reference if specified
+            this.ref = props.ref;
 		}
 	};
 
@@ -107,13 +110,14 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 	{
         let comp = this.comp;
 
-		// let the component know about the new properties (if it is interested in them)
-		let shouldRender = comp.shouldUpdate && comp.shouldUpdate( newVN.props);
-
 		// if reference specification changed then set or unset it as necessary
 		if (newVN.ref !== this.ref)
 		{
-			// remember the new reference object
+            // clear our old reference (if exists)
+            if (this.ref)
+                setRef( this.ref, undefined, comp);
+
+            // remember the new reference object
 			this.ref = newVN.ref;
 
 			// if reference is now specified, set it now; note that we already determined that
@@ -121,11 +125,18 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 			if (this.ref)
 				setRef( this.ref, comp);
 		}
-		else if (this.ref)
-			setRef( this.ref, undefined, comp);
 
 		// remember the new value of the key property (even if it is the same)
 		this.key = newVN.key;
+
+        // remove ref and key from the new props so that they are not available to the component
+        if (newVN.ref)
+            delete newVN.props.ref;
+        if (newVN.key)
+            delete newVN.props.key;
+
+		// let the component know about the new properties (if it is interested in them)
+		let shouldRender = !comp.shouldUpdate || comp.shouldUpdate( newVN.props);
 
 		// remember the new properties
         (comp as Component).props = this.props = newVN.props;

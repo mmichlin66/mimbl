@@ -5,7 +5,7 @@ import {ITrigger} from "../utils/TriggerWatcher"
 import {EventSlot, IEventSlot} from "../utils/EventSlot"
 import {
     mountRoot, unmountRoot, TextVN,
-    s_wrapCallback, registerElmProp, symJsxToVNs, shadowDecorator
+    CallbackWrapper, registerElmProp, symJsxToVNs, shadowDecorator, symToVNs
 } from "../internal";
 
 
@@ -59,18 +59,19 @@ export type ComponentShadowOptions = boolean | string | ShadowRootInit |
 /**
  * Decorator function for components that allows them to use shadow DOM.
  *
- * **Example:**
+ * **Examples:**
+ *
  * ```typescript
  * // A `<div>` element will be created with shadow DOM in open mode
- * @css.withShadow
+ * @mim.withShadow
  * class MyComponent extends mim.Component {...}
  *
  * // A `<span>` element will be created with shadow DOM in open mode
- * @css.embedded("span")
+ * @mim.withShadow("span")
  * class SecondWidgetStyles extends css.StyleDefinition {...}
  *
- * // A `<span>` element will be created with shadow DOM in open mode
- * @css.embedded("span")
+ * // A `<span>` element will be created with shadow DOM in closed mode
+ * @mim.withShadow( {tag: "span", init: {mode: "closed"} })
  * class SecondWidgetStyles extends css.StyleDefinition {...}
  * ```
  */
@@ -84,7 +85,7 @@ export type ComponentShadowOptions = boolean | string | ShadowRootInit |
 /**
  * Interface that must be implemented by all components. Although it has many methods that
  * components can implement, in practice, there is only one mandatory method - `render()`.
- * Coponents should be ready to have the `vn` property set, although they don't have to declare
+ * Components should be ready to have the `vn` property set, although they don't have to declare
  * it.
  *
  * @typeparam TProps Type defining properties that can be passed to this class-based component.
@@ -134,6 +135,8 @@ export interface IComponent<TProps = {}, TChildren = any>
     didMount?(): void;
 
     /**
+	 * This method is only used by independent components.
+	 *
      * Notifies the component that it replaced the given old component. This allows the new
      * component to copy whatever internal state it needs from the old component.
      */
@@ -144,22 +147,6 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * this method returns the component is destroyed.
 	 */
 	willUnmount?(): void;
-
-	/**
-	 * Optional method that is called before any components that are scheduled to be updated in
-	 * a Mimbl tick, are updated. If implemented, this method will be called every time the
-	 * component is scheduled to be updated. This method can read DOM layout information (e.g.
-	 * element measurements) without the risk of causing forced layouts.
-	 */
-	beforeUpdate?(): void;
-
-	/**
-	 * Optional method that is called after all components that are scheduled to be updated in
-	 * a Mimbl tick, are updated. If implemented, this method will be called every time the
-	 * component is scheduled to be updated. This method is called after all modifications to
-	 * DOM resulting from updaing components have been already done.
-	 */
-	afterUpdate?(): void;
 
 	/**
 	 * This method is only used by managed components.
@@ -225,7 +212,7 @@ export type UpdateStrategy =
      * latter is false (or undefined). When the ignoreKeys flag is false (default) we try to match
      * new sub-nodes to old ones using keys. Setting the ignoreKeys flag to true completely
      * ignores keys and the matching is done by going through the lists of the new and
-     * old sub-nodes sequentially. Under certain circumstance this may speed up the reconciliation
+     * old sub-nodes sequentially. Under certain circumstances this may speed up the reconciliation
      * process
 	 *
 	 * The flag's default value is false, that is keys are used for matching the nodes.
@@ -254,6 +241,9 @@ export interface CallbackWrappingParams<T extends Function = Function>
 	/** Argument that is supplied to the callback as a last parameter. */
 	arg?: any;
 
+	/** Component that will be set as a current component when the callback is invoked. */
+	comp?: IComponent;
+
 	/** Type of scheduling the Mimbl tick after the callback function returns. */
 	schedulingType?: TickSchedulingType;
 };
@@ -264,7 +254,7 @@ export interface CallbackWrappingParams<T extends Function = Function>
  */
 export function wrapCallback<T extends Function>( params?: CallbackWrappingParams<T>): T
 {
-    return s_wrapCallback<T>( params);
+    return CallbackWrapper.bind( params);
 }
 
 
@@ -458,7 +448,7 @@ export namespace JSX
  * "compilerOptions":
  * {
  *     "jsx": "react",
- *     "jsxFactory": "jsx"
+ *     "jsxFactory": "mim.jsx"
  * }
  * ```
  *
@@ -469,7 +459,15 @@ export namespace JSX
  */
 export function jsx( tag: any, props: any, ...children: any[]): any
 {
-    return tag[symJsxToVNs]( props, children);
+    // The children parameter is always an array. A component can specify that its children are
+    // an array of a certain type, e.g. class A extends Component<{},T[]>. In this case
+    // there are two ways to specify children in JSX that would be accepted by the TypeScript
+    // compiler:
+    //	1) <A>{t1}{t2}</A>. In this case, children will be [t1, t2] (as expected by A).
+    //	2) <A>{[t1, t2]}</A>. In this case, children will be [[t1,t2]] (as NOT expected by A).
+    //		This looks like a TypeScript bug.
+    let realChildren = children.length === 1 && Array.isArray(children[0]) ? children[0] : children;
+    return tag[symJsxToVNs]( props, realChildren[symToVNs]());
 }
 
 
@@ -1092,7 +1090,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 {
 	/**
 	 * Component properties passed to the constructor. This is normally used only by managed
-	 * components and is usually undefined for independent coponents.
+	 * components and is usually undefined for independent components.
 	 */
 	public props: CompProps<TProps,TChildren>;
 
@@ -1121,8 +1119,6 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
     didMount?(): void;
     didReplace?( oldComp: IComponent<TProps, TChildren>): void;
 	willUnmount?(): void;
-	beforeUpdate?(): void;
-	afterUpdate?(): void;
 	shouldUpdate?( newProps: CompProps<TProps,TChildren>): boolean;
 	handleError?( err: any): any;
 	getUpdateStrategy?(): UpdateStrategy;
@@ -1146,7 +1142,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
      */
 	protected updateMe( func?: RenderMethodType, funcThisArg?: any, key?: any): void
 	{
-		this.vn?.updateMe( func, funcThisArg || this, key);
+		this.vn?.updateMe( func, funcThisArg, key);
 	}
 
 	/**
@@ -1184,8 +1180,6 @@ Component.prototype.willMount = undefined;
 Component.prototype.didMount = undefined;
 Component.prototype.didReplace = undefined;
 Component.prototype.willUnmount = undefined;
-Component.prototype.beforeUpdate = undefined;
-Component.prototype.afterUpdate = undefined;
 Component.prototype.shouldUpdate = undefined;
 Component.prototype.handleError = undefined;
 Component.prototype.getUpdateStrategy = undefined;
@@ -1234,9 +1228,6 @@ export type RenderMethodType = (arg: any) => any;
 
 /**
  * Properties to be used with the FuncProxy component. FuncProxy component cannot have children.
- * A key property can be used to distinguish between multiple uses of the same function. If the
- * function is used only once within a component, the key is not necessary; however, if the
- * function is used multiple times, key is mandatory - otherwise, the behavior is undetermined.
  */
 export interface FuncProxyProps extends ICommonProps
 {

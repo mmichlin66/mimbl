@@ -5,7 +5,7 @@
 import {Styleset, SchedulerType, MediaStatement} from "mimcss"
 import {isTrigger} from "../utils/TriggerWatcher"
 import {
-    VN, DN, VNDisp, setRef, s_deepCompare, s_wrapCallback, ChildrenUpdateOperation,
+    VN, DN, VNDisp, setRef, s_deepCompare, CallbackWrapper, ChildrenUpdateOperation,
     mountSubNodes, reconcileSubNodes, unmountSubNodes, mimcss
 } from "../internal"
 
@@ -625,7 +625,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// element. This method handles special cases of properties with non-trivial values.
 	private addEvent( name: string, rtd: EventRunTimeData): void
 	{
-		rtd.wrapper = s_wrapCallback( rtd);
+		rtd.wrapper = CallbackWrapper.bind( rtd);
 		this.ownDN.addEventListener( name, rtd.wrapper, rtd.useCapture);
 
 		/// #if USE_STATS
@@ -705,7 +705,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 			this.ownDN.removeEventListener( name, oldRTD.wrapper, oldRTD.useCapture);
 
 			// create new wrapper and add it as event listener
-            newRTD.wrapper = s_wrapCallback( newRTD);
+            newRTD.wrapper = CallbackWrapper.bind( newRTD);
 			this.ownDN.addEventListener( name, newRTD.wrapper, newRTD.useCapture);
 
 			/// #if USE_STATS
@@ -758,25 +758,27 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      */
     private getEventRTD( info: EventPropInfo, propVal: EventPropType): EventRunTimeData
     {
+        let rtd: EventRunTimeData;
         if (typeof propVal === "function")
-            return { func: propVal, thisArg: this.creator, schedulingType: info?.schedulingType }
+            rtd = { func: propVal, thisArg: this.creator, schedulingType: info?.schedulingType }
         else if (Array.isArray(propVal))
         {
-            return {
+            rtd = {
                 func: propVal[0],
                 arg: propVal[1],
-                thisArg: propVal[2],
+                thisArg: propVal[2] ?? this.creator,
                 schedulingType: info?.schedulingType,
             }
         }
         else
         {
-            let rtd = Object.assign( {}, propVal);
+            rtd = Object.assign( {}, propVal);
             if (!rtd.schedulingType && info)
                 rtd.schedulingType = info?.schedulingType;
-
-            return rtd;
         }
+
+        rtd.comp = this.creator;
+        return rtd;
     }
 
 

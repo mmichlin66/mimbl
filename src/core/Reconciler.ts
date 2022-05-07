@@ -1,7 +1,7 @@
 ﻿import { isTrigger } from "..";
 import {
     ScheduledFuncType, Component, Fragment, FuncProxy, PromiseProxy, CallbackWrappingParams,
-    TickSchedulingType, IComponent
+    TickSchedulingType, IComponent, FuncProxyProps, PromiseProxyProps
 } from "../api/mim"
 import {
     VN, DN, ElmVN, TextVN, IndependentCompVN, PromiseProxyVN, ClassCompVN, FuncProxyVN,
@@ -87,22 +87,10 @@ const enum SchedulerState
 
 
 /**
- * Wraps the given callback and returns a wrapper function which does the following things:
- *   - Enters mutation scope for the duration of the callback execution.
- *   - Optinally schedules a tick after the callback returns
- * @param params Callback wrapping parameters.
- * @returns The wrapper function that should be used instead of the original callback.
- */
-export const s_wrapCallback = <T extends Function>( params: CallbackWrappingParams<T>): T =>
-    CallbackWrapper.bind( params);
-
-
-
-/**
  * The CallbackWrapper function is used to wrap callbacks in order to have it executed in a Mimbl
  * context.
  */
-function CallbackWrapper( this: CallbackWrappingParams): any
+export function CallbackWrapper( this: CallbackWrappingParams): any
 {
     // if some scheduling type is set (that is, we are going to schedule a Mimbl tick after
     // the callback), we should ignore requests to schedule a tick made during the callback
@@ -110,17 +98,25 @@ function CallbackWrapper( this: CallbackWrappingParams): any
     let schedulingType = this.schedulingType;
     s_ignoreSchedulingRequest = !!schedulingType;
 
+    // set the current component while remembering the previously set one
+    let prevComponent = s_currentClassComp;
+    s_currentClassComp = this.comp;
+
+    // we don't want the triggers encountered during the callback execution to cause the watchers
+    // to run immediately, so we enter mutation scope
+    enterMutationScope();
+
     let retVal: any;
     try
 	{
-        // we don't want the triggers encountered during the callback execution to cause the watchers
-        // to run immediately, so we enter mutation scope
-        enterMutationScope();
-
 		retVal = this.func.call( this.thisArg, ...arguments, this.arg);
 	}
 	finally
 	{
+        // restore the previous component as the current one (if any)
+        s_currentClassComp = prevComponent;
+
+        // run all the accumulated trigger watchers
         exitMutationScope();
         s_ignoreSchedulingRequest = false;
     }
@@ -179,26 +175,6 @@ export const requestNodeUpdate = (vn: VN, req?: ChildrenUpdateRequest, schedulin
 	// matter how many times it calls requestUpdate().
 	s_vnsScheduledForUpdate.set( vn, req);
 
-	// if this is a class-based component and it has beforeUpdate and/or afterUpdate methods
-	// implemented, schedule their executions. Note that the "beforeUpdate" method is not
-	// scheduled if the current scheduler state is BeforeUpdate. This is because the component
-	// will be updated in the current cycle and there is already no time to execute the "before
-	// update" method.
-	if (vn instanceof ClassCompVN)
-	{
-        let comp = vn.comp;
-        let func = comp.afterUpdate;
-		if (func)
-            s_callsScheduledAfterUpdate.set( func, s_wrapCallback( {func, thisArg: comp}));
-
-        if (s_schedulerState !== SchedulerState.BeforeUpdate)
-        {
-            func = comp.beforeUpdate;
-            if (func)
-                s_callsScheduledBeforeUpdate.set( func, s_wrapCallback( {func, thisArg: comp}));
-        }
-	}
-
     // schedule Mimbl tick using animation frame. If this call comes from a wrapped callback, the
     // callback might schedule a tick using microtask. In this case, the animation frame will be
     // canceled. The update is scheduled in the next tick unless the request is made during a
@@ -212,7 +188,7 @@ export const requestNodeUpdate = (vn: VN, req?: ChildrenUpdateRequest, schedulin
 // Schedules to call the given function either before or after all the scheduled components
 // have been updated.
 export const scheduleFuncCall = (func: ScheduledFuncType, beforeUpdate: boolean,
-    funcThisArg?: any, schedulingType?: TickSchedulingType): void =>
+    thisArg?: any, comp?: IComponent, schedulingType?: TickSchedulingType): void =>
 {
 	/// #if DEBUG
 	if (!func)
@@ -226,7 +202,7 @@ export const scheduleFuncCall = (func: ScheduledFuncType, beforeUpdate: boolean,
 	{
 		if (!s_callsScheduledBeforeUpdate.has( func))
 		{
-			s_callsScheduledBeforeUpdate.set( func, s_wrapCallback( {func, thisArg: funcThisArg}));
+			s_callsScheduledBeforeUpdate.set( func, CallbackWrapper.bind({func, thisArg, comp}));
 
 			// a "before update" function is always scheduled in the next frame even if the
 			// call is made from another "before update" function.
@@ -238,7 +214,7 @@ export const scheduleFuncCall = (func: ScheduledFuncType, beforeUpdate: boolean,
 	{
 		if (!s_callsScheduledAfterUpdate.has( func))
 		{
-			s_callsScheduledAfterUpdate.set( func, s_wrapCallback( {func, thisArg: funcThisArg}));
+			s_callsScheduledAfterUpdate.set( func, CallbackWrapper.bind({func, thisArg, comp}));
 
 			// an "after update" function is scheduled in the next cycle unless the request is made
 			// either from a "before update" function execution or during a node update.
@@ -1900,7 +1876,7 @@ const createVNChainFromContent = (content: any): VN[] | null =>
  * Symbol used to set a "toVNs" function to certain classes. This function converts the instances
  * of these classes to a VN or an array of VNs.
  */
-let symToVNs = Symbol("toVNs");
+ export let symToVNs = Symbol("toVNs");
 
 
 
@@ -2041,98 +2017,46 @@ export let symJsxToVNs = Symbol("jsxToVNs");
 
 // Add jsxToVNs method to the String class, which creates ElmVN with the given parameters. This
 // method is invoked by the JSX mechanism.
-String.prototype[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+String.prototype[symJsxToVNs] = function( props: any, children: VN[] | null): VN | VN[] | null
 {
-    if (children.length === 0)
-        return new ElmVN( this, props, null);
-
-    // if we have children we process them right away so that we can create ElmVN with  list
-    // of sub-nodes.
-    let subNodes: VN[] = [];
-    children.forEach( item =>
-    {
-        if (item != null)
-        {
-            if (item instanceof VN)
-                subNodes.push( item)
-            else
-                item[symToVNs]( subNodes);
-        }
-    });
-
-    return new ElmVN( this, props, subNodes.length > 0 ? subNodes : null);
+    return new ElmVN( this, props, children);
 };
 
 
 
 // Add jsxToVNs method to the Fragment class object. This method is invoked by the JSX mechanism.
-Fragment[symJsxToVNs] = (props: any, children: any[]): VN | VN[] | null =>
-{
-    let nodes: VN[] = [];
-    children.forEach( item =>
-    {
-        if (item != null)
-        {
-            if (item instanceof VN)
-                nodes.push( item)
-            else
-                item[symToVNs]( nodes);
-        }
-    });
-
-    return nodes.length > 0 ? nodes : null;
-};
+Fragment[symJsxToVNs] = (props: any, children: VN[] | null): VN | VN[] | null => children;
 
 
 
 // Add jsxToVNs method to the FuncProxy class object. This method is invoked by the JSX mechanism.
-FuncProxy[symJsxToVNs] = (props: any, children: any[]): VN | VN[] | null =>
-{
-    /// #if DEBUG
-    if (!props || !props.func)
-    {
-        console.error("FuncProxy component doesn't have 'func' property");
-        return null;
-    }
-    /// #endif
-
-    return new FuncProxyVN( props.func, props.funcThisArg, props.arg, props.key);
-};
+FuncProxy[symJsxToVNs] = (props: FuncProxyProps, children: VN[] | null): VN | VN[] | null =>
+    new FuncProxyVN( props.func, props.funcThisArg, props.arg, props.key);
 
 
 
 // Add jsxToVNs method to the PromiseProxy class object. This method is invoked by the JSX mechanism.
-PromiseProxy[symJsxToVNs] = (props: any, children: any[]): VN | VN[] | null =>
+PromiseProxy[symJsxToVNs] = (props: PromiseProxyProps, children: VN[] | null): VN | VN[] | null =>
     props?.promise ? new PromiseProxyVN( props, children) : null;
 
 
 
 // Add jsxToVNs method to the Component class object, which creates virtual node for managed
 // components. This method is invoked by the JSX mechanism.
-// The children parameter is always an array. A component can specify that its children are
-// an array of a certain type, e.g. class A extends Component<{},T[]>. In this case
-// there are two ways to specify children in JSX that would be accepted by the TypeScript
-// compiler:
-//	1) <A>{t1}{t2}</A>. In this case, children will be [t1, t2] (as expected by A).
-//	2) <A>{[t1, t2]}</A>. In this case, children will be [[t1,t2]] (as NOT expected by A).
-//		This looks like a TypeScript bug.
-// The realChildren variable accommodates both cases.
-Component[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+Component[symJsxToVNs] = function( props: any, children: VN[] | null): VN | VN[] | null
 {
-    return new ManagedCompVN( this, props,
-        children.length === 1 && Array.isArray( children[0]) ? children[0] : children);
+    return new ManagedCompVN( this, props, children);
 }
 
 
 // Add jsxToVNs method to the Function class, which works for functional components. This method
 // is invoked by the JSX mechanism.
-Function.prototype[symJsxToVNs] = function( props: any, children: any[]): VN | VN[] | null
+Function.prototype[symJsxToVNs] = function( props: any, children: VN[] | null): VN | VN[] | null
 {
     // invoke the function right away. The return value is treated as rendered content. This way,
     // the function runs under the current Mimbl context (e.g. creator object used as "this" for
     // event handlers).
-    let content = this( props, children.length === 1 && Array.isArray( children[0]) ? children[0] : children);
-    return content?.[symToVNs]();
+    return this(props, children)?.[symToVNs]();
 };
 
 
