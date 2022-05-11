@@ -1,9 +1,12 @@
 ﻿import {ITextVN, TickSchedulingType} from "../api/CompTypes"
-import {DN, ITrigger, VN, VNDisp} from "../internal"
+import { ITrigger } from "../utils/TriggerWatcher";
+import { DN, VNDisp } from "./VNTypes";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
+
+import { VN } from "./VN";
 
 
 
@@ -24,7 +27,7 @@ export class TextVN extends VN implements ITextVN
 	{
 		super();
 		this.text = text;
-	};
+	}
 
 
 

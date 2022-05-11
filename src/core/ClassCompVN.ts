@@ -2,14 +2,16 @@
     IClassCompVN, IComponent, RenderMethodType, ScheduledFuncType,
     IComponentClass, ComponentShadowOptions
 } from "../api/CompTypes"
-import {
-    DN, VN, setCurrentClassComp, FuncProxyVN, scheduleFuncCall, mountContent,
-    unmountSubNodes, VNDisp, reconcile, createWatcher, IWatcher, symRenderNoWatcher
-} from "../internal"
+import { DN, VNDisp } from "./VNTypes";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
+
+import { createWatcher, IWatcher } from "../utils/TriggerWatcher";
+import { FuncProxyVN } from "./FuncProxyVN";
+import { setCurrentClassComp, mountContent, unmountSubNodes, reconcile, scheduleFuncCall } from "./Reconciler";
+import { symRenderNoWatcher, VN } from "./VN";
 
 
 

@@ -1,12 +1,13 @@
 ﻿import {RenderMethodType} from "../api/CompTypes"
-import {
-    VN, createWatcher, IWatcher, DN, mountContent, unmountSubNodes,
-    VNDisp, reconcile, symRenderNoWatcher
-} from "../internal"
+import { DN, VNDisp } from "./VNTypes";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
+
+import { createWatcher, IWatcher } from "../utils/TriggerWatcher";
+import { mountContent, unmountSubNodes, reconcile } from "./Reconciler";
+import { symRenderNoWatcher, VN } from "./VN";
 
 
 

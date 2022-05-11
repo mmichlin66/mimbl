@@ -1,5 +1,7 @@
 ﻿import {IManagedCompVN, IComponentClass, RefPropType} from "../api/CompTypes"
-import {ClassCompVN, DN, VN, VNDisp, setRef} from "../internal"
+import { ClassCompVN } from "./ClassCompVN";
+import { DN, VNDisp } from "./VNTypes";
+import { VN, setRef } from "./VN";
 
 
 

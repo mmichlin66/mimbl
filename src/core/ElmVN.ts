@@ -4,16 +4,17 @@ import {
     ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy,
     ICustomAttributeHandlerClass, PropType
 } from "../api/CompTypes"
-import {isTrigger} from "../utils/TriggerWatcher"
-import {
-    VN, DN, VNDisp, setRef, s_deepCompare, CallbackWrapper, ChildrenUpdateOperation,
-    mountSubNodes, reconcileSubNodes, unmountSubNodes, mimcss
-} from "../internal"
+import { ChildrenUpdateOperation, DN, VNDisp } from "./VNTypes";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
 
+import { s_deepCompare } from "../utils/UtilFunc";
+import {isTrigger} from "../utils/TriggerWatcher"
+import { mountSubNodes, unmountSubNodes, reconcileSubNodes, CallbackWrapper } from "./Reconciler";
+import { mimcss } from "./StyleScheduler";
+import { VN, setRef } from "./VN";
 
 
 

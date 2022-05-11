@@ -1,9 +1,12 @@
 ﻿import {IErrorHandlingService} from "../api/CompTypes"
-import {VN, DN, scheduleFuncCall, VNDisp} from "../internal"
 
 /// #if USE_STATS
 	import {StatsCategory} from "../utils/Stats"
 /// #endif
+
+import { scheduleFuncCall } from "./Reconciler";
+import { DN, VNDisp } from "./VNTypes";
+import { VN } from "./VN";
 
 
 

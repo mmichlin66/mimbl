@@ -1,9 +1,12 @@
 ﻿import {PromiseProxyProps} from "../api/CompTypes"
-import {DN, reconcile, VN, VNDisp} from "../internal"
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
+
+import { reconcile } from "./Reconciler";
+import { DN, VNDisp } from "./VNTypes";
+import { VN } from "./VN";
 
 
 

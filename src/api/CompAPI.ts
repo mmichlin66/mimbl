@@ -4,9 +4,18 @@
     RefFunc, RenderMethodType, ScheduledFuncType, UpdateStrategy
 } from "./CompTypes";
 import {EventSlot} from "../utils/EventSlot"
-import {
-    mountRoot, unmountRoot, TextVN, CallbackWrapper, registerElmProp, shadowDecorator, symRenderNoWatcher, VN, symToVNs, IndependentCompVN, symJsxToVNs, ManagedCompVN, FuncProxyVN, PromiseProxyVN,
-} from "../internal";
+import { shadowDecorator } from "../core/ClassCompVN";
+import { TextVN } from "../core/TextVN";
+import { ElmVN, registerElmProp } from "../core/ElmVN";
+import { IndependentCompVN } from "../core/IndependentCompVN";
+import { FuncProxyVN } from "../core/FuncProxyVN";
+import { ManagedCompVN } from "../core/ManagedCompVN";
+import { PromiseProxyVN } from "../core/PromiseProxyVN";
+import { mountRoot, unmountRoot } from "../core/RootVN";
+import { CallbackWrapper, symJsxToVNs, symToVNs } from "../core/Reconciler";
+import { s_initStyleScheduler } from "../core/StyleScheduler";
+import { isTrigger } from "../utils/TriggerWatcher";
+import { symRenderNoWatcher, VN } from "../core/VN";
 
 
 /**
@@ -381,15 +390,9 @@ export class PromiseProxy extends Component<PromiseProxyProps>
 
 
 
-// Add jsxToVNs method to the PromiseProxy class object. This method is invoked by the JSX mechanism.
-PromiseProxy[symJsxToVNs] = (props: PromiseProxyProps, children: VN[] | null): VN | VN[] | null =>
-    props?.promise ? new PromiseProxyVN( props, children) : null;
-
-
-
 /**
  * Renders the given content (usually result of JSX expression) under the given HTML element
-// asynchronously.
+ * asynchronously.
  * @param content Content to render.
  * @param anchorDN DOM element under which to render the content. If null or undefined,then
  *				render under the document.body tag.
@@ -424,6 +427,151 @@ export function noWatcher( target: any, name: string, propDescr: PropertyDescrip
 
     propDescr.value[symRenderNoWatcher] = true;
 }
+
+
+
+// Add toVNs method to the String class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+Boolean.prototype[symToVNs] = () => null
+
+
+
+// Add toVNs method to the String class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+String.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+{
+    if (this.length === 0)
+        return null;
+
+    let vn = new TextVN( this);
+    if (nodes)
+        nodes.push( vn);
+
+    return vn;
+}
+
+
+
+// Add toVNs method to the Function class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+Function.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+{
+    let vn = new FuncProxyVN( this);
+    if (nodes)
+        nodes.push( vn);
+
+    return vn;
+};
+
+
+
+// Add toVNs method to the Array class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+Array.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+{
+    if (this.length === 0)
+        return null;
+
+    if (!nodes)
+        nodes = [];
+
+    this.forEach( item =>
+    {
+        if (item != null)
+        {
+            if (item instanceof VN)
+                nodes.push( item)
+            else
+                item[symToVNs]( nodes);
+        }
+    });
+
+    return nodes.length > 0 ? nodes : null;
+};
+
+
+
+// Add toVNs method to the Object class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+Object.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+{
+    let vn: VN;
+    if (typeof this.render === "function")
+        vn = this.vn ?? new IndependentCompVN( this);
+    else if (isTrigger(this))
+        vn = new TextVN( this);
+    else
+    {
+        let s = this.toString();
+        if (!s)
+            return null;
+
+        vn = new TextVN( s);
+    }
+
+    if (nodes)
+        nodes.push( vn);
+
+    return vn;
+};
+
+
+
+// Add toVNs method to the VN class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+VN.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+{
+    if (nodes)
+        nodes.push( this);
+
+    return this;
+};
+
+
+
+// Add jsxToVNs method to the PromiseProxy class object. This method is invoked by the JSX mechanism.
+PromiseProxy[symJsxToVNs] = (props: PromiseProxyProps, children: VN[] | null): VN | VN[] | null =>
+    props?.promise ? new PromiseProxyVN( props, children) : null;
+
+
+
+// Add toVNs method to the Promise class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+Promise.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+{
+    let vn = new PromiseProxyVN( { promise: this});
+    if (nodes)
+        nodes.push( vn);
+
+    return vn;
+};
+
+
+
+// Add jsxToVNs method to the String class, which creates ElmVN with the given parameters. This
+// method is invoked by the JSX mechanism.
+String.prototype[symJsxToVNs] = function( props: any, children: VN[] | null): VN | VN[] | null
+{
+    return new ElmVN( this, props, children);
+};
+
+
+
+// Add jsxToVNs method to the Function class, which works for functional components. This method
+// is invoked by the JSX mechanism.
+Function.prototype[symJsxToVNs] = function( props: any, children: VN[] | null): VN | VN[] | null
+{
+    // invoke the function right away. The return value is treated as rendered content. This way,
+    // the function runs under the current Mimbl context (e.g. creator object used as "this" for
+    // event handlers).
+    return this(props, children)?.[symToVNs]();
+};
+
+
+
+/** Mimbl style scheduler as the default scheduler for style-related DOM-writing operations. */
+export let mimblStyleSchedulerType: number;
+s_initStyleScheduler().then( n => mimblStyleSchedulerType = n);
 
 
 

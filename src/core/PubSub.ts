@@ -1,4 +1,4 @@
-﻿import {VN} from "../internal"
+﻿import {VN} from "./VN"
 
 
 

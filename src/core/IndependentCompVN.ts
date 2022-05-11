@@ -1,5 +1,8 @@
 ﻿import {IIndependentCompVN, IComponent, IComponentClass} from "../api/CompTypes"
-import {ClassCompVN, DN, moveNode, VN, VNDisp} from "../internal"
+import { ClassCompVN } from "./ClassCompVN";
+import { moveNode } from "./Reconciler";
+import { DN, VNDisp } from "./VNTypes";
+import { VN } from "./VN";
 
 
 

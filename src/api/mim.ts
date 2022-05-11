@@ -1,7 +1,8 @@
 ﻿import {CompProps, ICommonProps, IComponent, ICustomWebElements} from "./CompTypes";
 import {IHtmlIntrinsicElements} from "./HtmlTypes";
 import {ISvgIntrinsicElements} from "./SvgTypes";
-import {symJsxToVNs, symToVNs, VN} from "../core/VN";
+import {IVN} from "../core/VNTypes";
+import { symJsxToVNs, symToVNs } from "../core/Reconciler";
 
 
 /**
@@ -88,7 +89,7 @@ export function Fragment( props: CompProps<{}>): any {}
 
 
 // Add jsxToVNs method to the Fragment class object. This method is invoked by the JSX mechanism.
-Fragment[symJsxToVNs] = (props: any, children: VN[] | null): VN | VN[] | null => children;
+Fragment[symJsxToVNs] = (props: any, children: IVN[] | null): IVN | IVN[] | null => children;
 
 
 

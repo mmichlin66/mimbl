@@ -1,6 +1,4 @@
 ﻿import {Styleset, IIDRule, ClassMoniker} from "mimcss"
-import {IHtmlIntrinsicElements} from "./HtmlTypes";
-import {ISvgIntrinsicElements} from "./SvgTypes";
 import {ITrigger} from "../utils/TriggerWatcher"
 import {IEventSlot} from "../utils/EventSlot"
 

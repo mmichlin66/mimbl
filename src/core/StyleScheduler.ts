@@ -1,5 +1,5 @@
 import {IScheduler} from "mimcss"
-import {scheduleFuncCall} from "../internal"
+import { scheduleFuncCall } from "./Reconciler";
 
 
 

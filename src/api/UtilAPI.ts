@@ -1,11 +1,6 @@
-import {s_isSvg, s_isSvgSvg} from "../internal";
+import { s_isSvg, s_isSvgSvg } from "../utils/UtilFunc";
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Utility functions for determining whether an element is an SVG.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
  * Determines whether the given element is one of the elements from the SVG spec; that is, <svg>
