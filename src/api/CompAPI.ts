@@ -3,7 +3,7 @@
     IComponent, ICustomAttributeHandlerClass, IRef, ITextVN, PromiseProxyProps, PropType,
     RefFunc, RenderMethodType, ScheduledFuncType, UpdateStrategy
 } from "./CompTypes";
-import {EventSlot} from "../utils/EventSlot"
+import {EventSlot} from "./EventSlotAPI"
 import { shadowDecorator } from "../core/ClassCompVN";
 import { TextVN } from "../core/TextVN";
 import { ElmVN, registerElmProp } from "../core/ElmVN";
@@ -14,7 +14,7 @@ import { PromiseProxyVN } from "../core/PromiseProxyVN";
 import { mountRoot, unmountRoot } from "../core/RootVN";
 import { CallbackWrapper, symJsxToVNs, symToVNs } from "../core/Reconciler";
 import { s_initStyleScheduler } from "../core/StyleScheduler";
-import { isTrigger } from "../utils/TriggerWatcher";
+import { isTrigger } from "./TriggerAPI";
 import { symRenderNoWatcher, VN } from "../core/VN";
 
 

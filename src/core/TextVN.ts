@@ -1,5 +1,5 @@
 ﻿import {ITextVN, TickSchedulingType} from "../api/CompTypes"
-import { ITrigger } from "../utils/TriggerWatcher";
+import { ITrigger } from "../api/TriggerTypes";
 import { DN, VNDisp } from "./VNTypes";
 
 /// #if USE_STATS

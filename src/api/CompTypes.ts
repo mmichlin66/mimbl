@@ -1,6 +1,6 @@
 ﻿import {Styleset, IIDRule, ClassMoniker} from "mimcss"
-import {ITrigger} from "../utils/TriggerWatcher"
-import {IEventSlot} from "../utils/EventSlot"
+import {ITrigger} from "./TriggerTypes"
+import {IEventSlot} from "./EventSlotTypes"
 
 
 /**

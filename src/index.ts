@@ -1,9 +1,10 @@
 // Type definitions for mimbl
 
-export * from "./utils/EventSlot"
-export * from "./utils/TriggerWatcher"
-
 export * from "./api/UtilAPI"
+export * from "./api/EventSlotTypes"
+export * from "./api/EventSlotAPI"
+export * from "./api/TriggerTypes"
+export * from "./api/TriggerAPI"
 export * from "./api/CompTypes"
 export * from "./api/CompAPI"
 export * from "./api/HtmlTypes"

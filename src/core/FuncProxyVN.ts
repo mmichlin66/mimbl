@@ -1,11 +1,12 @@
 ﻿import {RenderMethodType} from "../api/CompTypes"
 import { DN, VNDisp } from "./VNTypes";
+import { IWatcher } from "../api/TriggerTypes";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
 
-import { createWatcher, IWatcher } from "../utils/TriggerWatcher";
+import { createWatcher } from "../api/TriggerAPI";
 import { mountContent, unmountSubNodes, reconcile } from "./Reconciler";
 import { symRenderNoWatcher, VN } from "./VN";
 

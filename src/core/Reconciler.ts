@@ -11,7 +11,7 @@ import {
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
 
-import { enterMutationScope, exitMutationScope } from "../utils/TriggerWatcher";
+import { enterMutationScope, exitMutationScope } from "../api/TriggerAPI";
 
 
 

@@ -11,7 +11,7 @@ import { ChildrenUpdateOperation, DN, VNDisp } from "./VNTypes";
 /// #endif
 
 import { s_deepCompare } from "../utils/UtilFunc";
-import {isTrigger} from "../utils/TriggerWatcher"
+import { isTrigger } from "../api/TriggerAPI"
 import { mountSubNodes, unmountSubNodes, reconcileSubNodes, CallbackWrapper } from "./Reconciler";
 import { mimcss } from "./StyleScheduler";
 import { VN, setRef } from "./VN";
