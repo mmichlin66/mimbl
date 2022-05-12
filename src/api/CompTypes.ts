@@ -42,7 +42,7 @@ export interface IComponentClass<TProps = {}, TChildren = any>
  *   it with mode "open".
  * - ShadowRootInit - a `<div>` element will be created and shadow root attached to
  *   it with the given initialization prameters.
- * - two-item tuple - the first items is the name of the element to create and attach a  shadow
+ * - two-item tuple - the first item is the name of the element to create and attach a shadow
  *   root to; the second item specifies the shadow root initialization prameters.
  */
 export type ComponentShadowOptions = boolean | string | ShadowRootInit |
@@ -55,6 +55,9 @@ export type ComponentShadowOptions = boolean | string | ShadowRootInit |
  * components can implement, in practice, there is only one mandatory method - `render()`.
  * Components should be ready to have the `vn` property set, although they don't have to declare
  * it.
+ *
+ * Note that you normally don't need to implement this interface because your components will
+ * usually derive from the [[Component]] class that implements it.
  *
  * @typeparam TProps Type defining properties that can be passed to this class-based component.
  *		Default type is an empty object (no properties).
@@ -105,14 +108,14 @@ export interface IComponent<TProps = {}, TChildren = any>
     /**
 	 * This method is only used by independent components.
 	 *
-     * Notifies the component that it replaced the given old component. This allows the new
+     * Notifies the component that it replaced the given component. This allows the new
      * component to copy whatever internal state it needs from the old component.
      */
     didReplace?( oldComp: IComponent<TProps, TChildren>): void;
 
     /**
 	 * Notifies that the component's content is going to be removed from the DOM tree. After
-	 * this method returns the component is destroyed.
+	 * this method returns, a managed component is destroyed.
 	 */
 	willUnmount?(): void;
 
@@ -550,14 +553,14 @@ export interface IClassCompVN extends IVNode
 	 * Schedules the given function to be called before any components scheduled to be updated in
 	 * the Mimbl tick are updated.
 	 * @param func Function to be called
-     * @beforeUpdate Flag indicating whether the function will be called just before the Mimbl
+     * @param beforeUpdate Flag indicating whether the function will be called just before the Mimbl
      * tick (true) or right after (false)
-	 * @param funcThisArg Object that will be used as "this" value when the function is called. If this
+	 * @param thisArg Object that will be used as "this" value when the function is called. If this
 	 *   parameter is undefined, the component instance will be used (which allows scheduling
 	 *   regular unbound components' methods). This parameter will be ignored if the function
 	 *   is already bound or is an arrow function.
 	 */
-	callMe( func: ScheduledFuncType, beforeUpdate: boolean, funcThisArg?: any): void;
+	callMe( func: ScheduledFuncType, beforeUpdate: boolean, thisArg?: any): void;
 }
 
 

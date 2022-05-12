@@ -1,14 +1,16 @@
 {
-	"mode": "modules",
     "readme": "none",
     "name": "Mimbl Reference",
 	"excludeExternals": true,
-	"excludeNotExported": true,
+    "excludeInternal": true,
     "excludePrivate": true,
-    "ignoreCompilerErrors": true,
-	"out": "./reference",
-	"inputFiles": [
-        "src/api/mim.ts",
-        "src/comp/Popups.tsx"
+    "disableSources": true,
+    "hideGenerator": true,
+    "includeVersion": true,
+	"includes": "./src/typedoc",
+	"out": "./web/reference",
+    "entryPointStrategy": "expand",
+	"entryPoints": [
+		"./src/api/"
 	]
 }

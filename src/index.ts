@@ -9,6 +9,6 @@ export * from "./api/CompTypes"
 export * from "./api/CompAPI"
 export * from "./api/HtmlTypes"
 export * from "./api/SvgTypes"
-export * from "./api/mim"
+export * from "./jsx/mim"
 
 
