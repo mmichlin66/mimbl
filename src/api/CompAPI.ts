@@ -1,7 +1,7 @@
 ﻿import {
     CallbackWrappingParams, ComponentShadowOptions, CompProps, FuncProxyProps, IClassCompVN,
     IComponent, ICustomAttributeHandlerClass, IRef, ITextVN, PromiseProxyProps, PropType,
-    RefFunc, RenderMethodType, ScheduledFuncType, UpdateStrategy
+    RefFunc, RenderMethodType, ScheduledFuncType, TickSchedulingType, UpdateStrategy
 } from "./CompTypes";
 import {EventSlot} from "./EventSlotAPI"
 import { shadowDecorator } from "../core/ClassCompVN";
@@ -247,43 +247,61 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * provided, the entire component is requested to be updated. If arguments are provided, they
 	 * indicate what rendering functions should be updated.
      * @param func Optional rendering function to invoke
-     * @param funcThisArg Optional value to use as "this" when invoking the rendering function. If
+     * @param thisArg Optional value to use as "this" when invoking the rendering function. If
      * undefined, the component's "this" will be used.
      * @param key Optional key which distinguishes between multiple uses of the same function. This
      * can be either the "arg" or the "key" property originally passed to the FunProxy component.
      */
-	protected updateMe( func?: RenderMethodType, funcThisArg?: any, key?: any): void
+	protected updateMe( func?: RenderMethodType, thisArg?: any, key?: any): void
 	{
-		this.vn?.updateMe( func, funcThisArg, key);
+		this.vn?.updateMe( func, thisArg ?? this, key);
 	}
 
 	/**
 	 * Schedules the given function to be called before any components scheduled to be updated in
 	 * the Mimbl tick are updated.
 	 * @param func Function to be called
-	 * @param funcThisArg Object that will be used as "this" value when the function is called. If this
+	 * @param thisArg Object that will be used as "this" value when the function is called. If this
 	 *   parameter is undefined, the component instance will be used (which allows scheduling
 	 *   regular unbound components' methods). This parameter will be ignored if the function
 	 *   is already bound or is an arrow function.
 	 */
-	protected callMeBeforeUpdate( func: ScheduledFuncType, funcThisArg?: any): void
+	protected callMeBeforeUpdate( func: ScheduledFuncType, thisArg?: any): void
 	{
-		this.vn?.callMe( func, true, funcThisArg);
+		this.vn?.callMe( func, true, thisArg ?? this);
 	}
 
 	/**
 	 * Schedules the given function to be called after all components scheduled to be updated in
 	 * the Mimbl tick have already been updated.
 	 * @param func Function to be called
-	 * @param funcThisArg Object that will be used as "this" value when the function is called. If this
+	 * @param thisArg Object that will be used as "this" value when the function is called. If this
 	 *   parameter is undefined, the component instance will be used (which allows scheduling
 	 *   regular unbound components' methods). This parameter will be ignored if the the function
 	 *   is already bound or is an arrow function.
 	 */
-	protected callMeAfterUpdate( func: ScheduledFuncType, funcThisArg?: any): void
+	protected callMeAfterUpdate( func: ScheduledFuncType, thisArg?: any): void
 	{
-		this.vn?.callMe( func, false, funcThisArg);
+		this.vn?.callMe( func, false, thisArg ?? this);
 	}
+
+    /**
+     *
+     * @param func Callback function to be wrapped
+     * @param arg Optional argument to be passed to the callback in addition to the original
+     * callback arguments.
+     * @param thisArg Optional object to be used as `this` when calling the callback. If this
+     * parameter is not defined, the component instance is used, which allows wrapping regular
+     * unbound components' methods. This parameter will be ignored if the the function
+	 *   is already bound or is an arrow function.
+     * @param schedulingType Type of scheduling the Mimbl tick after the callback function returns.
+     * @returns Wrapped callback that will run the original callback in the proper context.
+     */
+    wrap<T extends Function>( func: T, arg?: any, thisArg?: any, schedulingType?: TickSchedulingType): T
+    {
+        return this.vn?.wrap( func, thisArg ?? this, arg, schedulingType);
+    }
+
 }
 
 // Make the methods that are invoked during component lifecycle undefined so that lookup is faster.

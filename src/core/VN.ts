@@ -1,11 +1,11 @@
-﻿import {IComponent, RefPropType, IVNode, UpdateStrategy, TickSchedulingType, RefType} from "../api/CompTypes";
+﻿import {IComponent, RefPropType, IVNode, UpdateStrategy, TickSchedulingType, RefType, ScheduledFuncType} from "../api/CompTypes";
 
 /// #if USE_STATS
     import {StatsCategory} from "../utils/Stats"
 /// #endif
 
 import { notifyServicePublished, notifyServiceUnpublished, notifyServiceSubscribed, notifyServiceUnsubscribed } from "./PubSub";
-import { getCurrentClassComp, requestNodeUpdate } from "./Reconciler";
+import { CallbackWrapper, getCurrentClassComp, requestNodeUpdate, scheduleFuncCall } from "./Reconciler";
 import { ChildrenUpdateRequest, DN, IVN, VNDisp } from "./VNTypes";
 
 
@@ -258,7 +258,39 @@ export abstract class VN implements IVN
 
 
 
-	// Registers an object of any type as a service with the given ID that will be available for
+	/**
+	 * Schedules the given function to be called before any components scheduled to be updated in
+	 * the Mimbl tick are updated.
+	 * @param func Function to be called
+	 * @param thisArg Object that will be used as "this" value when the function is called. If this
+	 *   parameter is undefined, the component instance will be used (which allows scheduling
+	 *   regular unbound components' methods). This parameter will be ignored if the function
+	 *   is already bound or is an arrow function.
+	 */
+	public callMe( func: ScheduledFuncType, beforeUpdate: boolean, thisArg?: any): void
+	{
+		scheduleFuncCall( func, beforeUpdate, thisArg ?? this.comp, this.comp);
+	}
+
+
+
+    /**
+     *
+     * @param callback Callback function to be wrapped
+     * @param thisArg Object to be used as `this` when calling the callback
+     * @param arg Optional argument to be passed to the callback in addition to the original
+     * callback arguments.
+     * @param schedulingType Type of scheduling the Mimbl tick after the callback function returns.
+     * @returns Wrapped callback that will run the original callback in the proper context.
+     */
+    wrap<T extends Function>( func: T, thisArg: any, arg?: any, schedulingType?: TickSchedulingType): T
+    {
+        return CallbackWrapper.bind( { func, thisArg, arg, schedulingType}) as T;
+    }
+
+
+
+    // Registers an object of any type as a service with the given ID that will be available for
 	// consumption by descendant nodes.
 	public publishService( id: string, service: any): void
 	{

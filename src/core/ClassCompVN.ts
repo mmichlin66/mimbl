@@ -326,22 +326,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
 
-	/**
-	 * Schedules the given function to be called before any components scheduled to be updated in
-	 * the Mimbl tick are updated.
-	 * @param func Function to be called
-	 * @param thisArg Object that will be used as "this" value when the function is called. If this
-	 *   parameter is undefined, the component instance will be used (which allows scheduling
-	 *   regular unbound components' methods). This parameter will be ignored if the function
-	 *   is already bound or is an arrow function.
-	 */
-	public callMe( func: ScheduledFuncType, beforeUpdate: boolean, thisArg?: any): void
-	{
-		scheduleFuncCall( func, beforeUpdate, thisArg ?? this.comp, this.comp);
-	}
-
-
-
     // Watcher function wrapping the component's render function. The watcher will notice any
     // trigger objects being read during the original function execution and will request update
     // thus triggerring re-rendering.

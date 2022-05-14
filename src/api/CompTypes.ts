@@ -482,6 +482,30 @@ export interface IVNode
 
 
 	/**
+	 * Schedules the given function to be called either before any components scheduled to be
+     * updated in the Mimbl tick are updated or after all components have been updated.
+	 * @param func Function to be called
+     * @param beforeUpdate Flag indicating whether the function will be called just before the Mimbl
+     * tick (true) or right after (false)
+	 * @param thisArg Object that will be used as "this" value when the function is called. If this
+	 *   parameter is undefined, the component instance will be used (which allows scheduling
+	 *   regular unbound components' methods). This parameter will be ignored if the function
+	 *   is already bound or is an arrow function.
+	 */
+	callMe( func: ScheduledFuncType, beforeUpdate: boolean, thisArg?: any): void;
+
+    /**
+     *
+     * @param func Callback function to be wrapped
+     * @param thisArg Object to be used as `this` when calling the callback
+     * @param arg Optional argument to be passed to the callback in addition to the original
+     * callback arguments.
+     * @param schedulingType Type of scheduling the Mimbl tick after the callback function returns.
+     * @returns Wrapped callback that will run the original callback in the proper context.
+     */
+    wrap<T extends Function>( func: T, thisArg: any, arg?: any, schedulingType?: TickSchedulingType): T;
+
+	/**
 	 * Registers an object of any type as a service with the given ID that will be available for
 	 * consumption by descendant components.
 	 */
@@ -535,6 +559,11 @@ export interface IClassCompVN extends IVNode
 	/** Gets the component instance. */
     readonly comp: IComponent;
 
+    /**
+     * Object that is used mainly by the managed components. It keeps the properties first passed
+     * to the componet's constructor and then changed when the component is updated through its
+     * parent updates.
+     */
 	readonly props: any;
 
     /**
@@ -547,20 +576,7 @@ export interface IClassCompVN extends IVNode
     readonly shadowRoot?: ShadowRoot;
 
 	/** This method is called by the component when it needs to be updated. */
-	updateMe( func?: RenderMethodType, funcThisArg?: any, key?: any): void;
-
-	/**
-	 * Schedules the given function to be called before any components scheduled to be updated in
-	 * the Mimbl tick are updated.
-	 * @param func Function to be called
-     * @param beforeUpdate Flag indicating whether the function will be called just before the Mimbl
-     * tick (true) or right after (false)
-	 * @param thisArg Object that will be used as "this" value when the function is called. If this
-	 *   parameter is undefined, the component instance will be used (which allows scheduling
-	 *   regular unbound components' methods). This parameter will be ignored if the function
-	 *   is already bound or is an arrow function.
-	 */
-	callMe( func: ScheduledFuncType, beforeUpdate: boolean, thisArg?: any): void;
+	updateMe( func?: RenderMethodType, thisArg?: any, key?: any): void;
 }
 
 
@@ -825,9 +841,9 @@ export const enum TickSchedulingType
 
 
 /**
- * Definition of type of  method that renders content.
+ * Definition of type of method that renders content.
  */
-export type RenderMethodType = (arg: any) => any;
+export type RenderMethodType = (arg?: any) => any;
 
 
 
