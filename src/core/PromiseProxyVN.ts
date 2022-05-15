@@ -1,21 +1,21 @@
 ﻿import {PromiseProxyProps} from "../api/CompTypes"
+import { DN, VNDisp } from "./VNTypes";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
 
 import { reconcile } from "./Reconciler";
-import { DN, VNDisp } from "./VNTypes";
 import { VN } from "./VN";
 
 
 
 /**
- * Encapsultes a Promise object.
+ * Encapsulates a Promise object.
  */
 export class PromiseProxyVN extends VN
 {
-	constructor( props: PromiseProxyProps, children?: any[])
+	constructor( props: PromiseProxyProps, children?: any)
 	{
 		super();
 

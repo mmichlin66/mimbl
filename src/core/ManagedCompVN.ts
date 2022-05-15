@@ -45,7 +45,7 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 		// components can define the displayName property; if they don't then the default name
 		// is the component's constructor name plus key if defined. Note that component instance
 		// might not be created yet when this method is called
-		if (this.comp && this.comp.displayName)
+		if (this.comp?.displayName)
 			return this.comp.displayName;
 		else
 		{
@@ -140,8 +140,9 @@ export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
 		// let the component know about the new properties (if it is interested in them)
 		let shouldRender = !comp.shouldUpdate || comp.shouldUpdate( newVN.props);
 
-		// remember the new properties
-        this.comp.props = this.props = newVN.props;
+		// let the component know about the new properties and remember them in our node
+        comp.updateProps?.(newVN.props);
+        this.props = newVN.props;
 
 		if (shouldRender)
             super.update( newVN, disp);

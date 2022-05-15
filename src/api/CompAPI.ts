@@ -201,11 +201,6 @@ export function registerCustomEvent( eventName: string): void
  */
 export abstract class Component<TProps = {}, TChildren = any> implements IComponent<TProps,TChildren>
 {
-	constructor( props?: CompProps<TProps,TChildren>)
-	{
-        this.props = props;
-	}
-
 	/**
 	 * Remembered virtual node object through which the component can request services. This
 	 * is undefined in the component's costructor but will be defined before the call to the
@@ -219,11 +214,26 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 */
 	public props: CompProps<TProps,TChildren>;
 
+	constructor( props?: CompProps<TProps,TChildren>)
+	{
+        this.props = props;
+	}
+
 	/**
      * Returns the component's content that will be ultimately placed into the DOM tree. This
      * method is abstract because it must be implemented by every component.
      */
 	public abstract render(): any;
+
+    /**
+     * Stores the new properties in the [[props]] field. If the component overrides this method
+     * it must call the parent's implementation.
+     * @param newProps
+     */
+	public updateProps( newProps: CompProps<TProps,TChildren>): void
+    {
+        this.props = newProps;
+    }
 
     // Declare the methods that are invoked during component lifecicle.
 	displayName?: string;
@@ -247,14 +257,11 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * provided, the entire component is requested to be updated. If arguments are provided, they
 	 * indicate what rendering functions should be updated.
      * @param func Optional rendering function to invoke
-     * @param thisArg Optional value to use as "this" when invoking the rendering function. If
-     * undefined, the component's "this" will be used.
-     * @param key Optional key which distinguishes between multiple uses of the same function. This
-     * can be either the "arg" or the "key" property originally passed to the FunProxy component.
+     * @param arg Optional argument to pass to the rendering function.
      */
-	protected updateMe( func?: RenderMethodType, thisArg?: any, key?: any): void
+	protected updateMe( func?: RenderMethodType, arg?: any): void
 	{
-		this.vn?.updateMe( func, thisArg ?? this, key);
+		this.vn?.updateMe( func, arg);
 	}
 
 	/**

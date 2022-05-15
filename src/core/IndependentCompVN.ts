@@ -31,7 +31,7 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 	{
 		// components can define the displayName property; if they don't then the default name
 		// is the component's constructor name
-		return this.comp.displayName ? this.comp.displayName : this.comp.constructor.name;
+		return this.comp.displayName ?? this.comp.constructor.name;
 	}
 
 

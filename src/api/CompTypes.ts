@@ -66,11 +66,11 @@ export type ComponentShadowOptions = boolean | string | ShadowRootInit |
  */
 export interface IComponent<TProps = {}, TChildren = any>
 {
-	/**
-	 * Component properties passed to the constructor. For managed components, the properties
-	 * are updated when the component's parent is updated.
-	 */
-	props?: CompProps<TProps,TChildren>;
+	// /**
+	//  * Component properties passed to the constructor. For managed components, the properties
+	//  * are updated when the component's parent is updated.
+	//  */
+	// props?: CompProps<TProps,TChildren>;
 
 	/**
 	 * Components can define display name for tracing purposes; if they don't the default name
@@ -133,6 +133,18 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 * @returns True if the component should have its render method called and false otherwise.
 	 */
 	shouldUpdate?( newProps: CompProps<TProps,TChildren>): boolean;
+
+	/**
+	 * This method is only used by managed components.
+	 *
+	 * Instructs the component to change the proprties object to the new one. This method is
+     * invoked after [[shouldUpdate]] (if specified) and before [[render]]. This gives the
+     * component the opportunity to save the new properties and also to do whatever processing
+     * the component needs. If implemented, this method is invoked regardless of whether the
+     * [[shouldUpdate]] method is implemented and whether it returned `true` or `false`.
+	 * @param newProps The new properties that the parent component provides to this component.
+	 */
+	updateProps?( newProps: CompProps<TProps,TChildren>): void;
 
 	/**
 	 * Handles an exception that occurred during the rendering of one of the component's children.
@@ -216,6 +228,28 @@ export interface CallbackWrappingParams<T extends Function = Function>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
+// Definitions of callback types used when passing callback functions to components.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Type that can be passed as a callback to a component's property. It allows passing a callback
+ * in one of the following forms:
+ * - as a function object. Note that if the function is a method of another component (or just a
+ *   class), then it should be wrapped (using the [[wrap]] method) so that the `this` parameter
+ *   is properly set up when the callback is invoked.
+ * - a two element tuple. The first element is the function to be called and the second element is
+ *   the value to be used as the `this` parameter.
+ * - an object with the properties `func` specifying the function to be called and `thisArg`
+ *   specifying the value to be used as the `this` parameter.
+ */
+export type CallbackPropType<T extends Function = Function> =
+    T | [func: T, thisArg?: any] | [func: T, thisArg?: any];
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
 // Definitions of property types used by HTML and SVG elements.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -225,7 +259,7 @@ export interface CallbackWrappingParams<T extends Function = Function>
  * @typeparam T DOM event type, e.g. MouseEvent
  * @param e Event object
  * @param arg Optional parameter, which is defined only if it was passed when the callback was
- * wrapped - that is, in the `arg` property of the EventObjectType object or 3rd item of the
+ * wrapped - that is, in the `arg` property of the EventObjectType object or in the 2nd item of the
  * EventTupleType tuple.
  */
 export type EventFuncType<T extends Event = Event> = (e: T, arg?: any) => void;
@@ -256,6 +290,8 @@ export interface EventObjectType<T extends Event> extends CallbackWrappingParams
  */
 export type EventPropType<T extends Event = Event> =
     EventFuncType<T> | EventTupleType<T> | EventObjectType<T>;
+
+
 
 /**
  * Type for defining the id property of HTML elements
@@ -316,7 +352,7 @@ export type IGlobalEvents =
 
 /** Events that are common to all kinds of elements */
 export type IElementEvents =
-    { [K in keyof DocumentAndElementEventHandlersEventMap]?: EventPropType<DocumentAndElementEventHandlersEventMap[K]>}
+    { [K in keyof ElementEventMap]?: EventPropType<ElementEventMap[K]>}
 
 /** Events that are common to elements and documents */
 export type IDocumentAndElementEvents =
@@ -585,8 +621,14 @@ export interface IClassCompVN extends IVNode
      */
     readonly shadowRoot?: ShadowRoot;
 
-	/** This method is called by the component when it needs to be updated. */
-	updateMe( func?: RenderMethodType, thisArg?: any, key?: any): void;
+	/**
+	 * This method is called by the component to request to be updated. If no arguments are
+	 * provided, the entire component is requested to be updated. If arguments are provided, they
+	 * indicate what rendering functions should be updated.
+     * @param func Optional rendering function to invoke
+     * @param arg Optional argument to pass to the rendering function.
+     */
+	updateMe( func?: RenderMethodType, arg?: any): void;
 }
 
 
