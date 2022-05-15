@@ -13,43 +13,44 @@ import { symRenderNoWatcher, VN } from "./VN";
 
 
 /**
- * A Symbol used to connect between the original function and the VNs created for it.
+ * A Symbol used to connect between the original function and the FuncProxyVN created for it.
  */
-let symFuncsToNodes = Symbol( "symFuncsToNodes");
+const symFuncsToNodes = Symbol( "symFuncsToNodes");
 
 
 
 /**
  * Encapsultes a rendering function, which is usually a method of a class-based component. This
  * object remembers the function, the "this" pointer to use when calling the function and the
- * arguments to pass to it. This allows re-rendering only the part of the parent component as
+ * argument to pass to it. This allows re-rendering only the part of the parent component as
  * though the method were a full blown independent component. Updating the nodes is accomplished
  * using the FuncProxy static update method accepting the function to be updated.
  *
- * The same function can be used multiple times within the parent component's render() method -
- * especially (but not necessarily) if it is called with different parameters. To distinguish
- * between multiple nodes when updating (using FuncProxy.update), a unique key must be assigned.
- * The node then creates a link between the function and the node. This link is removed when the
- * node is unmounted. The key is optional if the function is used only once in the parent's
- * render method. If the function is used more than once and keys are not provided or are the same
- * Mimble will issue an error.
+ * The same function can be used multiple times within the parent component's render() method if
+ * it is called with different arguments. The node creates a link between the function and the
+ * node. This link is removed when the node is unmounted.
  *
- * The link between the function and the nodes that use this function is kept in a map from the
- * keys to the nodes. The map is stored in a symbol on the function object itself.
+ * The links between the functions and the nodes that use theses functions are kept in a map from
+ * the function objects to the nodes. The map is stored in a symbol on the function itself.
+ * Normally, the render functions are component methods without arguments - in this case, the node
+ * will be mapped to the `undefined` value. If the function was used multiple times with different
+ * arguments, then the nodes will be mapped to these argument objects.
  */
 export class FuncProxyVN extends VN
 {
-	constructor( func: RenderMethodType, thisArg?: any, arg?: any, key?: any)
+	constructor( func: RenderMethodType, thisArg: any, arg?: any)
 	{
 		super();
 
-        // remember data from the props. Note that if funcThisArg is undefined it will be changed
-        // to the node's creator component upon mounting. If there is no key specified, the arg
-        // will be used (which may also be unspecified)
+        // remember data from the props.
 		this.func = func;
 		this.thisArg = thisArg;
 		this.arg = arg;
-		this.key = key || arg;
+
+        // the node's key is the object that most distinguishes the node from other similar nodes.
+        // So it is set either to the argument (if defined) or the `thisArg` (if defined) or to the
+        // function object itself
+        this.key = arg ?? thisArg ?? func;
 	}
 
 
@@ -63,15 +64,7 @@ export class FuncProxyVN extends VN
     // String representation of the virtual node. This is used mostly for tracing and error
 	// reporting. The name can change during the lifetime of the virtual node; for example,
 	// it can reflect an "id" property of an element (if any).
-	public get name(): string
-	{
-		// node name is the function's name plus key (or id) if specified.
-		let name = this.func.name;
-		if (this.key != null)
-			name += "@" + this.key;
-
-		return name;
-	}
+	public get name(): string { return this.func.name; }
 
 
 
@@ -166,8 +159,7 @@ export class FuncProxyVN extends VN
 
 	// Updated this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node. The returned value indicates whether children
-	// should be updated (that is, this node's render method should be called).
+	// point to a VN of the same type as this node.
 	public update( newVN: FuncProxyVN, disp: VNDisp): void
 	{
         if (!newVN.thisArg)
@@ -176,15 +168,15 @@ export class FuncProxyVN extends VN
 		// remember the new value of the key property (even if it is the same)
 		this.key = newVN.key;
 
-        // we allow any FuncProxyVN update; however, if the method of the object to
+        // we allow any FuncProxyVN update; however, if the method or the object to
         // which this method belongs are different, we unmount the old
         if (this.func === newVN.func && this.thisArg === newVN.thisArg)
         {
-            // we need to re-render only if the arguments are the same.
-            if (this.arg !== newVN.arg)
-                this.arg = newVN.arg;
-            else
+            // we need to re-render only if the arguments are not the same.
+            if (this.arg === newVN.arg)
                 return;
+
+            this.arg = newVN.arg;
         }
         else
         {
@@ -205,17 +197,14 @@ export class FuncProxyVN extends VN
     // objects to VNs using the symFuncsToNodes symbol.
     private linkNodeToFunc(): void
 	{
-        if (!this.thisArg)
-            return;
-
-		let mapFuncsToNodes = this.thisArg[symFuncsToNodes] as Map<Function,FuncProxyVN>;
-		if (!mapFuncsToNodes)
+		let mapArgsToNodes = this.func[symFuncsToNodes] as Map<any,FuncProxyVN>;
+		if (!mapArgsToNodes)
 		{
-			mapFuncsToNodes = new Map<Function,FuncProxyVN>();
-			this.thisArg[symFuncsToNodes] = mapFuncsToNodes;
+			mapArgsToNodes = new Map();
+			this.func[symFuncsToNodes] = mapArgsToNodes;
 		}
 
-		mapFuncsToNodes.set( this.func, this);
+		mapArgsToNodes.set( this.arg, this);
 	}
 
 
@@ -223,40 +212,26 @@ export class FuncProxyVN extends VN
     // Unlink this node from the function - opposite of what linkNodeToFunc does.
     private unlinkNodeFromFunc(): void
 	{
-        if (!this.thisArg)
-            return;
-
-		let mapFuncsToNodes = this.thisArg[symFuncsToNodes] as Map<Function,FuncProxyVN>;
+		let mapFuncsToNodes = this.func[symFuncsToNodes] as Map<any,FuncProxyVN>;
 		if (mapFuncsToNodes)
-			mapFuncsToNodes.delete( this.func);
+			mapFuncsToNodes.delete( this.arg);
 	}
 
 
 
     // Tries to find the node linked to the given function using the linkNodeToFunction method.
-    private static findVN( func: RenderMethodType, thisArg: any, key?: any): FuncProxyVN
+    private static findVN( func: RenderMethodType, arg: any): FuncProxyVN
 	{
-        /// #if DEBUG
-            if (!thisArg)
-            {
-                console.error("FuncProxVN.findVN was called with undefined thisArg");
-                return undefined;
-            }
-        /// #endif
-
-        if (!thisArg)
-            return null;
-
-		let mapFuncsToNodes: Map<Function,FuncProxyVN> = thisArg[symFuncsToNodes];
-		return mapFuncsToNodes && mapFuncsToNodes.get( func);
+		let mapFuncsToNodes = func[symFuncsToNodes] as Map<any,FuncProxyVN>;
+		return mapFuncsToNodes?.get( arg);
 	}
 
 
 
-	public static update( func: RenderMethodType, thisArg?: any, key?: any): void
+	public static update( func: RenderMethodType, arg?: any): void
 	{
 		// find the node
-		let vn = FuncProxyVN.findVN( func, thisArg, key);
+		let vn = FuncProxyVN.findVN( func, arg);
 		if (!vn)
 			return;
 

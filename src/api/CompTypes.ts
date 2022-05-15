@@ -267,11 +267,12 @@ export type IDPropType = string | number | IIDRule;
 /**
  * The ICommonProps interface defines standard properties that can be used on all JSX elements -
  * intrinsic (HTML and SVG) as well as functional and class-based managed components.
+ * @typeparam TRef Type of the element or component used as a reference type.
  */
 export interface ICommonProps<TRef = any>
 {
 	/** Unique key that distinguishes this JSX element from its siblings. The key can be of any type. */
-	key?: any;
+	readonly key?: any;
 
     // Reference that will be set to the instance of the component after it is mounted. The
     // reference will be set to undefined after the component is unmounted.
@@ -281,19 +282,31 @@ export interface ICommonProps<TRef = any>
 
 
 // Types for some common HTML and SVG properties
+
+/** Type for `crossorigin` attribute used for some HTML and SVG elements */
 export type CrossoriginPropType = "anonymous" | "use-credentials";
+
+/** Type for `formenctype` attribute used for some HTML and SVG elements */
 export type FormenctypePropType = "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain";
+
+/** Type for `formmethod` attribute used for some HTML and SVG elements */
 export type FormmethodPropType = "get" | "post" | "dialog";
+
+/** Type for `formtarget` attribute used for some HTML and SVG elements */
 export type FormtargetPropType = string | "_self" | "_blank" | "_parent"| "_top";
+
+/** Type for `referrerpolicy` attribute used for some HTML and SVG elements */
 export type ReferrerPolicyPropType = "no-referrer" | "no-referrer-when-downgrade" | "origin" |
 		"origin-when-cross-origin" | "unsafe-url";
 
 
 
+/**
+ * Type that allows defining attributes of HTML and SVG elements in terms of simple types (e.g.
+ * `string`), but allowing to pass triggers of this type to them. This is used to optimize
+ * re-rendering when the value of the attribute changes.
+ */
 export type ExtendedElementAttr<T> = T | ITrigger<T>;
-
-export type ExtendedElementProps<T extends IElementEvents> =
-    { [K in keyof T]?: T[K] | ITrigger<T[K]>};
 
 
 
@@ -314,6 +327,9 @@ export type IDocumentAndElementEvents =
 /**
  * The IElementProps interface defines standard properties (attributes and event listeners)
  * that can be used on all HTML and SVG elements.
+ * @typeparam TRef Type of the element used as a reference type.
+ * @typeparam TChildren Type of the children the element can have. By default, elements can have
+ * any children.
  */
 export interface IElementProps<TRef extends Element = Element, TChildren = any>
     extends ICommonProps<TRef>, IGlobalEvents, IElementEvents, IDocumentAndElementEvents
@@ -347,12 +363,6 @@ export interface IElementProps<TRef extends Element = Element, TChildren = any>
 }
 
 
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Custom Web Elements.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
  * This interface is intended to be augmented in order to add to it names of custom Web elements
@@ -844,30 +854,6 @@ export const enum TickSchedulingType
  * Definition of type of method that renders content.
  */
 export type RenderMethodType = (arg?: any) => any;
-
-
-
-/**
- * Properties to be used with the FuncProxy component. FuncProxy component cannot have children.
- */
-export interface FuncProxyProps extends ICommonProps
-{
-	/** Function that renders content. */
-	func: RenderMethodType;
-
-	/**
-	 * Value to be used as "this" when invoking the function. If this value is undefined, the
-	 * class based component that rendered the FuncProxy component will be used (which is the
-	 * most common case).
-	 */
-	thisArg?: any;
-
-	/**
-	 * Arguments to be passed to the function. Whenever the FuncProxy component is rendered, this
-	 * parameter is used when calling the wrapped function.
-	 */
-	arg?: any;
-}
 
 
 

@@ -1,7 +1,7 @@
 ﻿import {CssColor, MediaStatement, IIDRule} from "mimcss"
 import {
     IElementProps, ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType,
-    FormenctypePropType, FormmethodPropType, ExtendedElementProps, ExtendedElementAttr
+    FormenctypePropType, FormmethodPropType, ExtendedElementAttr
 } from "./CompTypes"
 
 

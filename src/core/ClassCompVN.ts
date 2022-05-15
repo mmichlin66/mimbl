@@ -315,13 +315,13 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
     /** This method is called by the component when it needs to be updated. */
-	public updateMe( func?: RenderMethodType, thisArg?: any, key?: any): void
+	public updateMe( func?: RenderMethodType, arg?: any): void
     {
         // if no arguments are provided we request to update the entire component.
 		if (!func)
 			this.requestUpdate();
 		else
-            FuncProxyVN.update( func, thisArg ?? this.comp, key);
+            FuncProxyVN.update( func, arg);
     }
 
 

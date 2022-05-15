@@ -1,6 +1,6 @@
 ﻿import {
-    CallbackWrappingParams, ComponentShadowOptions, CompProps, FuncProxyProps, IClassCompVN,
-    IComponent, ICustomAttributeHandlerClass, IRef, ITextVN, PromiseProxyProps, PropType,
+    CallbackWrappingParams, ComponentShadowOptions, CompProps, IClassCompVN,
+    IComponent, ICustomAttributeHandlerClass, IRef, ITextVN, IVNode, PromiseProxyProps, PropType,
     RefFunc, RenderMethodType, ScheduledFuncType, TickSchedulingType, UpdateStrategy
 } from "./CompTypes";
 import {EventSlot} from "./EventSlotAPI"
@@ -12,7 +12,7 @@ import { FuncProxyVN } from "../core/FuncProxyVN";
 import { ManagedCompVN } from "../core/ManagedCompVN";
 import { PromiseProxyVN } from "../core/PromiseProxyVN";
 import { mountRoot, unmountRoot } from "../core/RootVN";
-import { CallbackWrapper, symJsxToVNs, symToVNs } from "../core/Reconciler";
+import { CallbackWrapper, getCurrentClassComp, symJsxToVNs, symToVNs } from "../core/Reconciler";
 import { s_initStyleScheduler } from "../core/StyleScheduler";
 import { isTrigger } from "./TriggerAPI";
 import { symRenderNoWatcher, VN } from "../core/VN";
@@ -340,49 +340,37 @@ Component[symJsxToVNs] = function( props: any, children: VN[] | null): VN | VN[]
 
 
 /**
- * The FuncProxy component wraps a function that produces content. Proxies can wrap instance
- * methods of classes that have access to "this" thus allowing a single class to "host" multiple
- * components that can be updated separately. The FuncProxy component is not intended to be
- * created by developers; instead it is only used in its JSX form as the following:
+ * Creates a Function Proxy virtual node that wraps the given function with the given argument.
+ * This allows using the same component method with different arguments, for example:
  *
- * ```tsx
- * <FuncProxy func={this.renderSomething} key={...} args={...} thisArg={...} />
+ * ```typescript
+ * class ToDoList extends mim.Component
+ * {
+ *     // array of objects of some externally defined ToDo type
+ *     todos: ToDo[] = [];
+ *
+ *     render(): any
+ *     {
+ *         return <main>
+ *             {this.todos.map( todo => FuncProxy(renderTodo, todo))}
+ *         </main>
+ *     }
+ *
+ *     renderToDo( todo: ToDo): any
+ *     {
+ *         return <div>{todo.description}</div>
+ *     }
+ * }
  * ```
  *
- * There is a simpler method of specifying a rendering function in JSX, e.g.:
- *
- * ```tsx
- * <div>{this.renderSomething}</div>
- * ```
- *
- * The FuncProxy component is needed in the case where one (or more) of the following is true:
- * - There is a need to pass arguments to the function
- * - The same function is used multiple times and keys must be used to distinguish between the
- * invocations.
- * - The value of "this" inside the function is not the component that does the rendering. That
- * is, the function is not a method of this component.
- *
- * FuncProxy has a public static Update method that can be called to cause the rendering mechanism
- * to invoke the function wrapped by the FuncProxy.
+ * @param func Function (usually a component method) to be wrapped in a virtual node
+ * @param arg Argument distinguishing one function invocation from another
+ * @param thisArg Optional object to be used as `this` when invoking the function. If omitted,
+ * the component instance will be used.
+ * @returns
  */
-export class FuncProxy extends Component<FuncProxyProps,void>
-{
-	/**
-	 * Instances of the FuncProxy component are never actually created; istead, the parameters
-	 * passed to it via JSX are used by an internal virtual node that handles function
-	 * invocation.
-	 */
-	private constructor( props: FuncProxyProps) { super(props) }
-
-	/** The render method of the FuncProxy component is never actually called */
-	public render(): any {}
-}
-
-
-
-// Add jsxToVNs method to the FuncProxy class object. This method is invoked by the JSX mechanism.
-FuncProxy[symJsxToVNs] = (props: FuncProxyProps, children: VN[] | null): VN | VN[] | null =>
-    new FuncProxyVN( props.func, props.thisArg, props.arg, props.key);
+export const FuncProxy = (func: RenderMethodType, arg?: any, thisArg?: any): IVNode =>
+    new FuncProxyVN(func, thisArg ?? getCurrentClassComp(), arg);
 
 
 
@@ -448,8 +436,9 @@ export function noWatcher( target: any, name: string, propDescr: PropertyDescrip
 
 
 
-// Add toVNs method to the String class. This method is invoked to convert rendered content to
-// virtual node or nodes.
+// Add toVNs method to the Boolean class. This method is invoked to convert rendered content to
+// virtual node or nodes. For Booleans, it simply returns null, so neither true nor false create
+// any rendered content.
 Boolean.prototype[symToVNs] = () => null
 
 
@@ -474,7 +463,7 @@ String.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 // virtual node or nodes.
 Function.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 {
-    let vn = new FuncProxyVN( this);
+    let vn = new FuncProxyVN(this, getCurrentClassComp());
     if (nodes)
         nodes.push( vn);
 
