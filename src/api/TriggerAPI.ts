@@ -221,8 +221,11 @@ class Watcher<T extends AnyAnyFunc = any>
      */
     public notifyTriggerRead( trigger: Trigger): void
     {
-        this.triggers.add( trigger);
-        trigger.attach( this.onTriggerChanged);
+        if (!this.triggers.has(trigger))
+        {
+            this.triggers.add( trigger);
+            trigger.attach( this.onTriggerChanged);
+        }
     }
 
     /**

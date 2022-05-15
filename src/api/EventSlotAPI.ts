@@ -16,7 +16,7 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
     public fire( ...args: Parameters<TFunc>): void
     {
         this.listener?.( ...args);
-        this.listeners?.forEach( listener => listener( ...args));
+        this.listeners?.forEach( (rc, listener) => listener( ...args));
     }
 
 	/**
@@ -24,24 +24,46 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
 	 */
 	public attach( listener: TFunc): void
 	{
-        if (!this.listener)
+        if (!listener)
+            return;
+        else if (listener === this.listener)
+            this.rc++;
+        else if (!this.listener)
+        {
             this.listener = listener;
+            this.rc = 1;
+        }
         else
         {
             if (!this.listeners)
-                this.listeners = new Set<TFunc>();
+                this.listeners = new Map();
 
-            this.listeners.add( listener);
+            let rc = this.listeners.get(listener) ?? 0;
+            this.listeners.set( listener, rc + 1);
         }
 	}
 
 	/** Removes the given function as a listener to the event. */
 	public detach( listener: TFunc): void
 	{
-        if (this.listener === listener)
-            this.listener = null;
-        else if (this.listeners?.size)
-			this.listeners.delete( listener);
+        if (!listener)
+            return;
+        else if (this.listener === listener)
+        {
+            if (--this.rc === 0)
+                this.listener = null;
+        }
+        else
+        {
+			let rc = this.listeners?.get( listener);
+            if (rc != null)
+            {
+                if (--rc === 0)
+                    this.listeners.delete(listener);
+                else
+                    this.listeners.set( listener, rc);
+            }
+        }
 	}
 
 	/** Determines whether this event slot has any listeners. */
@@ -65,9 +87,14 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
      */
 	private listener?: TFunc;
 
-	// Set of listener functions. When there are no listeners, this field is set to null to
-	// preserve space.
-	private listeners?: Set<TFunc>;
+	/**
+     * Reference counter of the listener function.
+     */
+	private rc = 0;
+
+	// Map of listener functions to their respective reference counts. When there are no listeners,
+    // this field is set to null to preserve space.
+	private listeners?: Map<TFunc,number>;
 }
 
 
