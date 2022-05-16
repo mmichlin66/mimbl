@@ -91,7 +91,7 @@ export class FuncProxyVN extends VN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	public mount( parent: VN, index: number, anchorDN: DN, beforeDN: DN): void
 	{
         super.mount( parent, index, anchorDN);
 
@@ -112,7 +112,7 @@ export class FuncProxyVN extends VN
         if (this.watcher)
         {
             this.watcher.dispose();
-            this.watcher = null;
+            this.watcher = undefined;
         }
 
         this.unlinkNodeFromFunc();
@@ -129,7 +129,7 @@ export class FuncProxyVN extends VN
         if (this.subNodes)
         {
             unmountSubNodes( this.subNodes, removeFromDOM);
-            this.subNodes = null;
+            this.subNodes = undefined;
         }
 
         super.unmount( removeFromDOM);
@@ -152,7 +152,7 @@ export class FuncProxyVN extends VN
 			DetailedStats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-        return this.actFunc( this.arg);
+        return this.actFunc!( this.arg);
 	}
 
 
@@ -220,7 +220,7 @@ export class FuncProxyVN extends VN
 
 
     // Tries to find the node linked to the given function using the linkNodeToFunction method.
-    private static findVN( func: RenderMethodType, arg: any): FuncProxyVN
+    private static findVN( func: RenderMethodType, arg: any): FuncProxyVN | undefined
 	{
 		let mapFuncsToNodes = func[symFuncsToNodes] as Map<any,FuncProxyVN>;
 		return mapFuncsToNodes?.get( arg);
@@ -256,7 +256,7 @@ export class FuncProxyVN extends VN
 
     // Actual function to be invoked during the rendering - it can be either the original func or
     // the watcher.
-	private actFunc: RenderMethodType;
+	private actFunc?: RenderMethodType;
 }
 
 

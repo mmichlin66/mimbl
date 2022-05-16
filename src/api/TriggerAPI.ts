@@ -33,7 +33,7 @@ class Trigger<T = any> extends EventSlot<TypeVoidFunc<T>> implements ITrigger<T>
     {
         super();
         this.depth = depth;
-        this.v = triggerrize( v, this, depth);
+        this.v = triggerrize( v, this, depth) as T;
     }
 
     // Retrieves the current value
@@ -67,7 +67,7 @@ class Trigger<T = any> extends EventSlot<TypeVoidFunc<T>> implements ITrigger<T>
     }
 
     // Number indicating to what level the items of container types should be triggerrized.
-    private depth: number;
+    private depth?: number;
 
     // Value being get and set
     private v: T;
@@ -250,10 +250,10 @@ class Watcher<T extends AnyAnyFunc = any>
     // Function being watched; that is, during which we should listen to triggers being read, so
     // that we can remember them and later respond when they notify that their values have been
     // changed.
-    private func: T;
+    private func: T | null;
 
     // Function to be invoked when the the value of one of the triggers changes
-    private responder: NoneVoidFunc;
+    private responder: NoneVoidFunc | null;
 
     // "this" value to apply to the watched function when calling it.
     private funcThis: any;
@@ -365,7 +365,7 @@ class ComputedTrigger<T = any> extends Trigger<T>
     private funcThis: any;
 
     // Watcher over our function
-    private funcWatcher: IWatcher<NoneTypeFunc<T>>;
+    private funcWatcher: IWatcher<NoneTypeFunc<T>> | null;
 
     // Flag indicating that the value  kept by the trigger might not reflect the actual computed
     // value. This flag is true under the following circumstances:
@@ -474,7 +474,7 @@ function triggerrize<T = any>( v: T, trigger: Trigger, depth?: number): T
         return new Proxy( v, new MapHandler( trigger, actDepth)) as any as T;
     else if (v instanceof Set)
         return new Proxy( v, new SetHandler( trigger, actDepth)) as any as T;
-    else if (v.constructor === Object)
+    else if ((v as any).constructor === Object)
         return new Proxy( v, new NonSlotHandler( trigger, actDepth)) as any as T;
     else
         return v;
@@ -743,7 +743,7 @@ export const trigger = (targetOrDepth: any, name?: string): any =>
     {
         // undefined depth means that that the actual depth will be assigned dependig on the
         // value of the trigger: Shallow for maps, sets and arrays and Deep for objects.
-        return triggerDecoratorHelper( undefined, targetOrDepth, name);
+        return triggerDecoratorHelper( undefined, targetOrDepth, name!);
     }
 }
 
@@ -752,7 +752,7 @@ export const trigger = (targetOrDepth: any, name?: string): any =>
 /**
  * Helper function for defining `@trigger` decorators.
  */
-const triggerDecoratorHelper = (depth: number, target: any, name: string): void =>
+const triggerDecoratorHelper = (depth: number | undefined, target: any, name: string): void =>
 {
     let sym = Symbol( name + "_trigger");
 

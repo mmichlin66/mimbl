@@ -1,41 +1,36 @@
-﻿import {IComponent, RefPropType, IVNode, UpdateStrategy, TickSchedulingType, RefType} from "../api/CompTypes";
+﻿import {IComponent, IVNode, UpdateStrategy, TickSchedulingType} from "../api/CompTypes";
 
 /// #if USE_STATS
     import {StatsCategory} from "../utils/Stats"
 /// #endif
 
-import { notifyServicePublished, notifyServiceUnpublished, notifyServiceSubscribed, notifyServiceUnsubscribed } from "./PubSub";
-import { getCurrentClassComp, requestNodeUpdate } from "./Reconciler";
-
-
-
 
 
 // Use type DN to refer to DOM's Node class. The DOM nodes that we are dealing with are
 // either of type Element or Text.
-export type DN = Node;
+export type DN = Node | null;
 
 
 
 export interface IVN extends IVNode
 {
 	/** Gets node's parent. This is undefined for the top-level (root) nodes. */
-	parent?: IVN;
+	parent?: IVN | null;
 
 	/** Component that created this node in its render method (or undefined). */
-	creator?: IComponent;
+	creator?: IComponent | null;
 
 	/**
      * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the
      * root nodes that don't have parents.
      */
-	index?: number;
+	index: number;
 
 	/** List of sub-nodes. */
-	subNodes?: IVN[];
+	subNodes?: IVN[] | null;
 
     /** Only defined for class component nodes. */
-    comp?: IComponent;
+    comp?: IComponent | null;
 
 	// DOM node under which all content of this virtual node is rendered.
 	anchorDN?: DN;
@@ -80,7 +75,7 @@ export interface IVN extends IVNode
      * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
      * and before the given node.
      */
-	mount( parent: IVN, index: number, anchorDN: DN, beforeDN?: DN | null): void;
+	mount( parent: IVN | null, index: number, anchorDN: DN, beforeDN: DN): void;
 
     /**
      * Recursively removes the content of this virtual node from DOM.
@@ -247,10 +242,10 @@ export interface VNDispGroup
 	first: number;
 
 	/** Index of the last VNDisp in the group */
-	last?: number;
+	last: number;
 
 	/** Number of nodes in the group. */
-	count?: number;
+	count: number;
 
 	/** First DOM node in the group - will be known after the nodes are physically updated */
 	firstDN?: DN;
@@ -456,7 +451,7 @@ export type ReverseRequest =
     op?: ChildrenUpdateOperation.Reverse;
 
     // Index of the first sub-node in the range
-    startIndex: number;
+    startIndex?: number;
 
     // Index after the last sub-node in the range
     endIndex?: number;

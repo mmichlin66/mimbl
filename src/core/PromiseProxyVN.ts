@@ -57,7 +57,7 @@ export class PromiseProxyVN extends VN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	public mount( parent: VN, index: number, anchorDN: DN, beforeDN: DN): void
 	{
         super.mount( parent, index, anchorDN);
 
@@ -128,7 +128,7 @@ export class PromiseProxyVN extends VN
 		try
 		{
 			this.content = await this.promise;
-			this.promise = null;
+			this.promise = undefined;
 
 			// if the node is still mounted, request update
 			if (this.isMounted)
@@ -136,7 +136,7 @@ export class PromiseProxyVN extends VN
 		}
 		catch( err)
 		{
-			this.promise = null;
+			this.promise = undefined;
 			this.content = null;
 
 			// if the node is already unmounted, do nothing
@@ -162,7 +162,7 @@ export class PromiseProxyVN extends VN
 	}
 
 	// Promise that this node watches.
-	private promise: Promise<any>;
+	private promise?: Promise<any>;
 
 	// Content that this node displays. Initially this content is set to props.children. When
 	// the promise is resolved, the content is set to the resolved value. If the promise is

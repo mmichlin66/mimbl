@@ -8,7 +8,7 @@
 		"declaration": true,
 		"sourceMap": true,
 		"declarationMap": true,
-		"strictNullChecks": false,
+		"strictNullChecks": true,
 		"noImplicitAny": false,
 		"noImplicitReturns": true,
 		"noUnusedLocals": false,

@@ -31,7 +31,7 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 	{
 		// components can define the displayName property; if they don't then the default name
 		// is the component's constructor name
-		return this.comp.displayName ?? this.comp.constructor.name;
+		return this.comp!.displayName ?? this.comp!.constructor.name;
 	}
 
 
@@ -39,14 +39,14 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	public mount( parent: VN, index: number, anchorDN: DN, beforeDN: DN): void
     {
         // if the component is already connected to a node, we don't mount it again; instead, we
         // remember the new parameters and move it to a new location. This can happen when the
         // component is "moved" to a different place in the element hierarchy and the unmount
         // method will also be invoked in this Mimbl tick. In this case, we take note to not
         // unmount our node.
-        if (this.comp.vn)
+        if (this.comp!.vn)
         {
             this.ignoreUnmount = true;
             // this.creator = creator;
@@ -54,7 +54,7 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
             this.index = index;
             this.anchorDN = anchorDN;
             if (this.rootHost)
-                anchorDN.insertBefore( this.rootHost, beforeDN);
+                anchorDN!.insertBefore( this.rootHost, beforeDN);
             else
                 moveNode( this, anchorDN, beforeDN);
         }
@@ -87,16 +87,16 @@ export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
 
         // we are here if the component instances are different; we need to prepare the old
         // instance for unmounting and the new one for mounting.
-        let oldComp = this.comp;
+        let oldComp = this.comp!;
         this.prepareUnmount( oldComp);
         this.comp = this.key = newVN.comp;
-        this.prepareMount( newVN.comp);
+        this.prepareMount( newVN.comp!);
 
         super.update( this, disp);
 
         if (oldComp)
         {
-            let fn = this.comp.didReplace;
+            let fn = this.comp!.didReplace;
             fn && fn.call( this.comp, oldComp);
         }
 	}

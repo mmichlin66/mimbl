@@ -82,7 +82,7 @@ export class DetailedStats
 
 
 
-    private static instance: DetailedStats;
+    private static instance: DetailedStats | null;
 
 
 	private name: string;

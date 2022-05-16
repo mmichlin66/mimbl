@@ -30,7 +30,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 	// Instance of an Element. The instance is created when the node is rendered for the first
 	// time.
-	public get elm(): T { return this.ownDN; }
+	public get elm(): T | null { return this.ownDN; }
 
 
 
@@ -159,7 +159,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	public mount( parent: VN, index: number, anchorDN: DN, beforeDN: DN): void
 	{
         super.mount( parent, index, anchorDN);
 
@@ -209,7 +209,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             mountSubNodes( this, this.subNodes, this.ownDN, null);
 
         // add element to DOM
-        anchorDN.insertBefore( this.ownDN, beforeDN);
+        anchorDN!.insertBefore( this.ownDN, beforeDN);
 
         /// #if USE_STATS
 			DetailedStats.log( StatsCategory.Elm, StatsAction.Added);
@@ -223,7 +223,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	{
         if (removeFromDOM)
         {
-            this.ownDN.remove();
+            this.ownDN?.remove();
 
             /// #if USE_STATS
                 DetailedStats.log( StatsCategory.Elm, StatsAction.Deleted);
@@ -378,7 +378,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
                 // use setElmProp instead of updateElmProp because we don't have the old
                 // attribute value
-                setElmProp( this.ownDN, name, rtd.info, newVal);
+                setElmProp( this.ownDN!, name, rtd.info, newVal);
             }
 		}
 	}
@@ -483,10 +483,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             {
                 actVal = val.get();
                 rtd.onChange = onAttrTriggerChanged.bind( this, name);
-                val.attach( rtd.onChange);
+                val.attach( rtd.onChange!);
             }
 
-            setElmProp( this.ownDN, name, rtd.info, actVal);
+            setElmProp( this.ownDN!, name, rtd.info, actVal);
         }
 
         if (isUpdate)
@@ -552,17 +552,17 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 actNewVal = newVal.get();
                 if (!onChange)
                     oldRTD.onChange = onAttrTriggerChanged.bind( this, name);
-                newVal.attach( oldRTD.onChange);
+                newVal.attach( oldRTD.onChange!);
             }
             else
-                oldRTD.onChange = null;
+                oldRTD.onChange = undefined;
 
             if (actNewVal !== actOldVal)
             {
                 if (actNewVal == null || actNewVal === false)
-                    removeElmProp( this.ownDN, name, oldRTD.info);
+                    removeElmProp( this.ownDN!, name, oldRTD.info);
                 else if (!s_deepCompare( actOldVal, actNewVal, 1))
-                    updateElmProp( this.ownDN, name, oldRTD.info, actOldVal, actNewVal);
+                    updateElmProp( this.ownDN!, name, oldRTD.info, actOldVal, actNewVal);
             }
 
             oldRTD.val = newVal;
@@ -584,7 +584,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
         if (isUpdate)
         {
-            removeElmProp( this.ownDN, name, rtd.info)
+            removeElmProp( this.ownDN!, name, rtd.info)
             delete this.attrs[name];
         }
     }
@@ -628,7 +628,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	private addEvent( name: string, rtd: EventRunTimeData): void
 	{
 		rtd.wrapper = CallbackWrapper.bind( rtd);
-		this.ownDN.addEventListener( name, rtd.wrapper, rtd.useCapture);
+		this.ownDN!.addEventListener( name, rtd.wrapper!, rtd.useCapture);
 
 		/// #if USE_STATS
 			DetailedStats.log( StatsCategory.Event, StatsAction.Added);
@@ -640,7 +640,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// Removes the given event listener from the Element.
 	private removeEvent( name: string, rtd: EventRunTimeData): void
 	{
-		this.ownDN.removeEventListener( name, rtd.wrapper, rtd.useCapture);
+		this.ownDN!.removeEventListener( name, rtd.wrapper!, rtd.useCapture);
 
 		/// #if USE_STATS
 			DetailedStats.log( StatsCategory.Event, StatsAction.Deleted);
@@ -704,11 +704,11 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		else
 		{
 			// remove old event listener
-			this.ownDN.removeEventListener( name, oldRTD.wrapper, oldRTD.useCapture);
+			this.ownDN!.removeEventListener( name, oldRTD.wrapper!, oldRTD.useCapture);
 
 			// create new wrapper and add it as event listener
             newRTD.wrapper = CallbackWrapper.bind( newRTD);
-			this.ownDN.addEventListener( name, newRTD.wrapper, newRTD.useCapture);
+			this.ownDN!.addEventListener( name, newRTD.wrapper!, newRTD.useCapture);
 
 			/// #if USE_STATS
 				DetailedStats.log( StatsCategory.Event, StatsAction.Updated);
@@ -835,7 +835,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	{
         try
         {
-            customAttr.handler.terminate( isRemoval);
+            customAttr.handler!.terminate?.( isRemoval);
         }
         catch( err)
         {
@@ -896,7 +896,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         // update the custom property and remember the new value
         try
         {
-            oldCustomAttr.handler.update( newCustomAttr.val);
+            oldCustomAttr.handler!.update( newCustomAttr.val);
         }
         catch( err)
         {
@@ -948,7 +948,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	private props: IElementProps<T>;
 
     // Redefine the ownDN property from VN to be of the Element type
-	public declare ownDN: T;
+	public declare ownDN: T | null;
 
     // Reference to the element that is specified as a "ref" property.
 	private ref: RefType<T>;
@@ -1041,7 +1041,7 @@ interface CustomAttrRunTimeData
 	val: any;
 
 	// Handler object that knows to deal with the property values
-	handler: ICustomAttributeHandler;
+	handler?: ICustomAttributeHandler;
 };
 
 

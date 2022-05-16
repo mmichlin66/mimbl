@@ -44,8 +44,8 @@ export function createPromiseEx<T = any>(): PromiseEx<T>
         tempReject = reject;
     }) as PromiseEx<T>;
 
-    promise.resolve = tempResolve;
-    promise.reject = tempReject;
+    promise.resolve = tempResolve!;
+    promise.reject = tempReject!;
     return promise;
 }
 

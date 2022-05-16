@@ -39,19 +39,19 @@ export abstract class VN implements IVN
 	public abstract get name(): string;
 
 	// Parent node. This is null for the top-level (root) nodes.
-	public parent?: VN;
+	public parent?: VN | null;
 
     /** Only defined for class component nodes. */
     public comp?: IComponent;
 
     /** Class component that created this node in its render method (or undefined). */
-    public creator?: IComponent;
+    public creator?: IComponent | null;
 
 	/**
      * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the
      * root nodes that don't have parents.
      */
-	public index?: number;
+	public index: number;
 
 	// DOM node under which all content of this virtual node is rendered.
 	public anchorDN?: DN;
@@ -105,7 +105,7 @@ export abstract class VN implements IVN
      * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
      * and before the given node.
      */
-	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	public mount( parent: VN | null, index: number, anchorDN: DN, beforeDN: DN = null): void
     {
         if (!this.creator)
             this.creator = getCurrentClassComp();
@@ -348,10 +348,10 @@ export abstract class VN implements IVN
 			return;
 
         setRef( info.ref, undefined);
-		this.subscribedServices.delete( id);
+		this.subscribedServices!.delete( id);
 		notifyServiceUnsubscribed( id, this);
 
-		if (this.subscribedServices.size === 0)
+		if (this.subscribedServices!.size === 0)
 			this.subscribedServices = undefined;
 	}
 
@@ -401,10 +401,10 @@ export abstract class VN implements IVN
 
 
 	// Map of service IDs to service objects published by this node.
-	private publishedServices: Map<string,any>;
+	private publishedServices?: Map<string,any>;
 
 	// Map of service IDs to objects constituting subscriptions made by this node.
-	private subscribedServices: Map<string,VNSubscribedServiceInfo>;
+	private subscribedServices?: Map<string,VNSubscribedServiceInfo>;
 
 	/// #if USE_STATS
     public abstract get statsCategory(): StatsCategory;

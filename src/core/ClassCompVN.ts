@@ -2,7 +2,7 @@
     IClassCompVN, IComponent, RenderMethodType, ScheduledFuncType,
     IComponentClass, ComponentShadowOptions
 } from "../api/CompTypes"
-import { DN, VNDisp } from "./VNTypes";
+import { DN, IVN, VNDisp } from "./VNTypes";
 import { IWatcher } from "../api/TriggerTypes";
 
 /// #if USE_STATS
@@ -46,7 +46,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	public compClass: IComponentClass;
 
 	/** Component instance. */
-	public comp: IComponent;
+	public comp?: IComponent;
 
 	// Properties that were passed to the component.
 	public props: any;
@@ -67,7 +67,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
      * `shadowRoot` property will be undefined. Components can access the shadow root via their
      * `vn.shadowRoot` property.
      */
-    public get shadowRoot(): ShadowRoot { return this.ownDN; };
+    public get shadowRoot(): ShadowRoot | undefined { return this.ownDN; };
 
 
 
@@ -89,7 +89,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         comp.vn = this;
 
         // don't need try/catch because it will be caught up the chain
-        let fn: Function = comp.willMount;
+        let fn = comp.willMount;
         fn && fn.call( comp);
 
         // establish watcher if not disabled using the @noWatcher decorator
@@ -108,7 +108,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+	public mount( parent: VN | null, index: number, anchorDN: DN, beforeDN: DN): void
     {
         super.mount( parent, index, anchorDN);
 
@@ -134,9 +134,9 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         let comp = this.comp;
         let prevCreator = setCurrentClassComp( comp);
 
-        this.prepareMount( comp);
+        this.prepareMount( comp!);
 
-        if (!this.comp.handleError)
+        if (!this.comp!.handleError)
             mountContent( this, this.actRender(), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
         else
         {
@@ -154,14 +154,14 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
                 // content but we do it without try/catch this time; otherwise, we may end
                 // up in an infinite loop. We also set our component as current again.
                 setCurrentClassComp( comp);
-                mountContent( this, this.comp.handleError( err), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
+                mountContent( this, this.comp!.handleError( err), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
             }
         }
 
         setCurrentClassComp( prevCreator);
 
         if (this.rootHost)
-            anchorDN.insertBefore( this.rootHost, beforeDN);
+            anchorDN!.insertBefore( this.rootHost, beforeDN);
 
         /// #if USE_STATS
             DetailedStats.log( StatsCategory.Comp, StatsAction.Added);
@@ -176,7 +176,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         if (this.renderWatcher)
         {
             this.renderWatcher.dispose();
-            this.renderWatcher = null;
+            this.renderWatcher = undefined;
         }
 
         let fn = comp.willUnmount;
@@ -204,19 +204,19 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
     public unmount( removeFromDOM: boolean): void
     {
         let comp = this.comp;
-        this.prepareUnmount( comp);
+        this.prepareUnmount( comp!);
 
         if (this.rootHost)
         {
             this.rootHost.remove();
-            this.rootHost = null;
-            this.ownDN = null;
+            this.rootHost = undefined;
+            this.ownDN = undefined;
         }
 
         if (this.subNodes)
         {
             unmountSubNodes( this.subNodes, removeFromDOM);
-            this.subNodes = null;
+            this.subNodes = undefined;
         }
 
         super.unmount( removeFromDOM);
@@ -246,7 +246,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         let comp = this.comp;
         let prevCreator = setCurrentClassComp( comp);
 
-        if (!comp.handleError)
+        if (!comp!.handleError)
             reconcile( this, disp, this.actRender());
         else
         {
@@ -306,7 +306,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         // we can safely call the component's handleError method because our method is only
         // invoked if the component implements it.
         let prevCreator = setCurrentClassComp( this.comp);
-		let content = this.comp.handleError( err);
+		let content = this.comp!.handleError!( err);
         setCurrentClassComp( prevCreator);
 
         return content;

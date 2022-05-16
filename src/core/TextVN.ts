@@ -19,7 +19,7 @@ export class TextVN extends VN implements ITextVN
 	public text: string | ITrigger<string>;
 
 	// Text DOM node
-	public get textNode(): Text { return this.ownDN; }
+	public get textNode(): Text | null { return this.ownDN; }
 
 
 
@@ -54,7 +54,7 @@ export class TextVN extends VN implements ITextVN
 
         let val = this.updateText(text);
         if (schedulingType === TickSchedulingType.Sync)
-            this.ownDN.nodeValue = val;
+            this.ownDN!.nodeValue = val;
         else
         {
             this.textForPartialUpdate = val;
@@ -68,7 +68,7 @@ export class TextVN extends VN implements ITextVN
      * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
      * and before the given node.
      */
-    public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
+    public mount( parent: VN, index: number, anchorDN: DN, beforeDN: DN): void
     {
         super.mount( parent, index, anchorDN);
 
@@ -77,12 +77,12 @@ export class TextVN extends VN implements ITextVN
         if (typeof val === "object")
         {
             this.onChange = onTriggerChanged.bind(this);
-            val.attach( this.onChange);
+            val.attach( this.onChange!);
             val = val.get();
         }
 
         this.ownDN = document.createTextNode( val);
-        anchorDN.insertBefore( this.ownDN, beforeDN);
+        anchorDN!.insertBefore( this.ownDN, beforeDN);
 
         /// #if USE_STATS
             DetailedStats.log( StatsCategory.Text, StatsAction.Added);
@@ -96,7 +96,7 @@ export class TextVN extends VN implements ITextVN
     {
         if (removeFromDOM)
         {
-            this.ownDN.remove();
+            this.ownDN?.remove();
 
             /// #if USE_STATS
             DetailedStats.log( StatsCategory.Text, StatsAction.Deleted);
@@ -120,7 +120,7 @@ export class TextVN extends VN implements ITextVN
 	{
         if (this.text !== newVN.text)
         {
-            this.ownDN.nodeValue = this.updateText( newVN.text);
+            this.ownDN!.nodeValue = this.updateText( newVN.text);
 
             /// #if USE_STATS
                 DetailedStats.log( StatsCategory.Text, StatsAction.Updated);
@@ -142,13 +142,13 @@ export class TextVN extends VN implements ITextVN
         {
             if (!onChange)
                 this.onChange = onTriggerChanged.bind(this);
-            text.attach( onChange);
+            text.attach( onChange!);
             return text.get();
         }
         else
         {
             if (onChange)
-                this.onChange = null;
+                this.onChange = undefined;
             return text;
         }
     }
@@ -159,7 +159,7 @@ export class TextVN extends VN implements ITextVN
     // string value to set as node value.
     public performPartialUpdate(): void
     {
-        this.ownDN.nodeValue = this.textForPartialUpdate;
+        this.ownDN!.nodeValue = this.textForPartialUpdate!;
         this.textForPartialUpdate = undefined;
 
         /// #if USE_STATS
@@ -170,14 +170,14 @@ export class TextVN extends VN implements ITextVN
 
 
     // Text DOM node
-    public declare ownDN: Text;
+    public declare ownDN: Text | null;
 
     // Text waiting for the partial update operation
-    public textForPartialUpdate: string;
+    public textForPartialUpdate?: string;
 
     // Bound method reacting on the value change in the trigger. It is created only if the node
     // value is a trigger and not just text.
-    private onChange: (s: string) => void;
+    private onChange?: (s: string) => void;
 }
 
 

@@ -53,13 +53,13 @@ let s_ignoreSchedulingRequest: boolean = false;
 
 
 // Current object that is set as "creator" during rendering when instantiating certain virtual nodes.
-let s_currentClassComp: IComponent = null;
+let s_currentClassComp: IComponent | undefined | null = null;
 
 // Sets the given object as the current "creator" object.
-export const getCurrentClassComp = (): IComponent => s_currentClassComp;
+export const getCurrentClassComp = (): IComponent | undefined | null => s_currentClassComp;
 
 // Sets the given object as the current "creator" object.
-export const setCurrentClassComp = (comp: IComponent): IComponent =>
+export const setCurrentClassComp = (comp: IComponent | undefined | null): IComponent | undefined | null =>
 {
     let prevComp = s_currentClassComp;
     s_currentClassComp = comp;
@@ -294,7 +294,7 @@ const performMimbleTick = (): void =>
                 if (vn.partialUpdateRequested)
                 {
                     vn.partialUpdateRequested = false;
-                    vn.performPartialUpdate();
+                    vn.performPartialUpdate!();
                 }
 
                 // then perform normal update if requested
@@ -435,8 +435,8 @@ const setNodeChildren = (vn: IVN, req: SetRequest): void =>
         if (newSubNodes)
         {
             let anchorDN = vn.ownDN ?? vn.anchorDN;
-            let beforeDN = vn.ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
-            mountSubNodes( vn, newSubNodes, anchorDN, beforeDN);
+            let beforeDN = vn.ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN!);
+            mountSubNodes( vn, newSubNodes, anchorDN!, beforeDN);
         }
 
         vn.subNodes = newSubNodes;
@@ -463,7 +463,7 @@ const spliceNodeChildren = (vn: IVN, req: SpliceRequest): void =>
     /// #endif
 
     // calculate the number of sub-nodes to delete
-    countToDelete = Math.min( req.countToDelete, oldLen - index);
+    countToDelete = Math.min( countToDelete, oldLen - index);
 
     let newSubNodes = req.contentToInsert != null && createVNChainFromContent( req.contentToInsert);
     if (countToDelete === 0 && !newSubNodes)
@@ -475,14 +475,14 @@ const spliceNodeChildren = (vn: IVN, req: SpliceRequest): void =>
     {
         let stopIndex = index + countToDelete;
         for( let i = index; i < stopIndex; i++)
-            oldSubNodes[i].unmount( true);
+            oldSubNodes![i].unmount( true);
     }
 
     if (!newSubNodes)
     {
         // if we don't have new sub-nodes, we just delete the old ones (if any)
         if (countToDelete > 0)
-            oldSubNodes.splice( index, countToDelete);
+            oldSubNodes!.splice( index, countToDelete);
     }
     else
     {
@@ -497,12 +497,12 @@ const spliceNodeChildren = (vn: IVN, req: SpliceRequest): void =>
         let anchorDN = ownDN ? ownDN : vn.anchorDN;
         let beforeDN = index + newSubNodes.length < oldSubNodes.length
             ? oldSubNodes[index + newSubNodes.length].getFirstDN()
-            : ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
+            : ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN!);
 
         // mount new nodes
         let stopIndex = index + newSubNodes.length;
         for( let i = index; i < stopIndex; i++)
-            oldSubNodes[i].mount( vn, i, anchorDN, beforeDN);
+            oldSubNodes[i].mount( vn, i, anchorDN!, beforeDN);
     }
 }
 
@@ -591,9 +591,9 @@ const swapNodeChildren = (vn: IVN, req: SwapRequest): void =>
     {
         // only one range should be moved - move the smaller one: 1 after 2 or 2 before 1
         if (count1 < count2)
-            moveDOMRange( vn, oldSubNodes, index1, count1, index2 + count2, anchorDN);
+            moveDOMRange( vn, oldSubNodes!, index1, count1, index2 + count2, anchorDN!);
         else
-            moveDOMRange( vn, oldSubNodes, index2, count2, index1, anchorDN);
+            moveDOMRange( vn, oldSubNodes!, index2, count2, index1, anchorDN!);
     }
     else
     {
@@ -603,20 +603,20 @@ const swapNodeChildren = (vn: IVN, req: SwapRequest): void =>
         if (count1 <= count2 && count2 <= count3)
         {
             // 3 is the biggest: move 1 before 2 and move 2 before 3
-            moveDOMRange( vn, oldSubNodes, index1, count1, index2, anchorDN);
-            moveDOMRange( vn, oldSubNodes, index2, count2, index3, anchorDN);
+            moveDOMRange( vn, oldSubNodes!, index1, count1, index2, anchorDN!);
+            moveDOMRange( vn, oldSubNodes!, index2, count2, index3, anchorDN!);
         }
         else if (count1 <= count2 && count3 <= count2)
         {
             // 2 is the biggest: move 1 after 2 and move 3 before 1
-            moveDOMRange( vn, oldSubNodes, index1, count1, index2 + count2, anchorDN);
-            moveDOMRange( vn, oldSubNodes, index3, count3, index1, anchorDN);
+            moveDOMRange( vn, oldSubNodes!, index1, count1, index2 + count2, anchorDN!);
+            moveDOMRange( vn, oldSubNodes!, index3, count3, index1, anchorDN!);
         }
         else
         {
             // 1 is the biggest: move 2 before 1 and move 3 before 1
-            moveDOMRange( vn, oldSubNodes, index2, count2, index1, anchorDN);
-            moveDOMRange( vn, oldSubNodes, index3, count3, index1, anchorDN);
+            moveDOMRange( vn, oldSubNodes!, index2, count2, index1, anchorDN!);
+            moveDOMRange( vn, oldSubNodes!, index3, count3, index1, anchorDN!);
         }
     }
 
@@ -628,9 +628,9 @@ const swapNodeChildren = (vn: IVN, req: SwapRequest): void =>
         for( let i = 0; i < count1; i++)
         {
             let i1 = index1 + i, i2 = index2 + i;
-            let svn1 = oldSubNodes[i1], svn2 = oldSubNodes[i2];
-            oldSubNodes[i1] = svn2; svn2.index = i1;
-            oldSubNodes[i2] = svn1; svn1.index = i2;
+            let svn1 = oldSubNodes![i1], svn2 = oldSubNodes![i2];
+            oldSubNodes![i1] = svn2; svn2.index = i1;
+            oldSubNodes![i2] = svn1; svn1.index = i2;
         }
     }
     else
@@ -644,20 +644,20 @@ const swapNodeChildren = (vn: IVN, req: SwapRequest): void =>
         // copy range 2
         let stopIndex = index2 + count2;
         for( let i = index2; i < stopIndex; i++)
-            arr[targetIndex++] = oldSubNodes[i];
+            arr[targetIndex++] = oldSubNodes![i];
 
         // copy range 3 if not empty
         if (count3 > 0)
         {
             stopIndex = index3 + count3;
             for( let i = index3; i < stopIndex; i++)
-                arr[targetIndex++] = oldSubNodes[i];
+                arr[targetIndex++] = oldSubNodes![i];
         }
 
         // copy range 1
         stopIndex = index1 + count1;
         for( let i = index1; i < stopIndex; i++)
-            arr[targetIndex++] = oldSubNodes[i];
+            arr[targetIndex++] = oldSubNodes![i];
 
         // copy everything back and adjust indices
         let svn: IVN;
@@ -666,7 +666,7 @@ const swapNodeChildren = (vn: IVN, req: SwapRequest): void =>
         {
             svn = arr[i];
             svn.index = targetIndex;
-            oldSubNodes[targetIndex++] = svn;
+            oldSubNodes![targetIndex++] = svn;
         }
     }
 }
@@ -752,8 +752,8 @@ const trimNodeChildren = (vn: IVN, req: TrimRequest): void =>
 const growNodeChildren = (vn: IVN, req: GrowRequest): void =>
 {
     // convert content to arrays of sub-nodes. Note that arrays cannot be empty but can be null.
-    let newStartSubNodes = req.startContent != null && createVNChainFromContent( req.startContent);
-    let newEndSubNodes = req.endContent != null && createVNChainFromContent( req.endContent);
+    let newStartSubNodes = req.startContent != null ? createVNChainFromContent( req.startContent) : null;
+    let newEndSubNodes = req.endContent != null ? createVNChainFromContent( req.endContent) : null;
     if (!newStartSubNodes && !newEndSubNodes)
         return;
 
@@ -766,10 +766,10 @@ const growNodeChildren = (vn: IVN, req: GrowRequest): void =>
     {
         vn.subNodes = newStartSubNodes && newEndSubNodes
             ? newStartSubNodes.concat( newEndSubNodes)
-            : newStartSubNodes || newEndSubNodes;
+            : newStartSubNodes ?? newEndSubNodes;
 
-        let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
-        mountSubNodes( vn, vn.subNodes, anchorDN, beforeDN);
+        let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN!);
+        mountSubNodes( vn, vn.subNodes!, anchorDN!, beforeDN);
         return;
     }
 
@@ -779,13 +779,13 @@ const growNodeChildren = (vn: IVN, req: GrowRequest): void =>
         ? newStartSubNodes.concat( oldSubNodes, newEndSubNodes)
         : newStartSubNodes
             ? newStartSubNodes.concat( oldSubNodes)
-            : oldSubNodes.concat( newEndSubNodes);
+            : oldSubNodes.concat( newEndSubNodes!);
 
     // mount new sub-nodes at the start
     if (newStartSubNodes)
     {
         let beforeDN = oldSubNodes[0].getFirstDN();
-        mountSubNodes( vn, newStartSubNodes, anchorDN, beforeDN);
+        mountSubNodes( vn, newStartSubNodes, anchorDN!, beforeDN);
 
         // change indices of the old nodes
         let shift = newStartSubNodes.length;
@@ -795,8 +795,8 @@ const growNodeChildren = (vn: IVN, req: GrowRequest): void =>
     // mount new sub-nodes at the end
     if (newEndSubNodes)
     {
-        mountSubNodes( vn, newEndSubNodes, anchorDN,
-            ownDN ? null : getNextDNUnderSameAnchorDN(vn, anchorDN),
+        mountSubNodes( vn, newEndSubNodes, anchorDN!,
+            ownDN ? null : getNextDNUnderSameAnchorDN(vn, anchorDN!),
             vn.subNodes.length - newEndSubNodes.length);
     }
 }
@@ -827,14 +827,14 @@ const reverseNodeChildren = (vn: IVN, req: ReverseRequest): void =>
     let ownDN = vn.ownDN;
     let anchorDN = ownDN ? ownDN : vn.anchorDN;
     let beforeDN = endIndex === oldLen
-        ? ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN)
+        ? ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN!)
         : oldSubNodes[endIndex].getFirstDN();
 
     let svn: IVN;
     for( let i = endIndex - 2; i >= startIndex; i--)
     {
         svn = oldSubNodes[i];
-        moveNode( svn, anchorDN, beforeDN);
+        moveNode( svn, anchorDN!, beforeDN);
     }
 
     // now swap virtual nodes and update their indices
@@ -854,7 +854,7 @@ const reverseNodeChildren = (vn: IVN, req: ReverseRequest): void =>
 
 
 // Recursively mounts sub-nodes.
-export const mountContent = (vn: IVN, content: any, anchorDN: DN, beforeDN: DN, startIndex?: number): void =>
+export const mountContent = (vn: IVN, content: any, anchorDN: DN, beforeDN: DN = null, startIndex?: number): void =>
 {
     let subNodes = createVNChainFromContent(content);
     if (subNodes)
@@ -866,7 +866,7 @@ export const mountContent = (vn: IVN, content: any, anchorDN: DN, beforeDN: DN, 
 
 
 // Recursively mounts sub-nodes.
-export const mountSubNodes = (vn: IVN, subNodes: IVN[], anchorDN: DN, beforeDN: DN, startIndex?: number): void =>
+export const mountSubNodes = (vn: IVN, subNodes: IVN[], anchorDN: DN, beforeDN: DN = null, startIndex?: number): void =>
         subNodes.forEach( (svn, i) => svn.mount( vn, startIndex ? startIndex + i : i, anchorDN, beforeDN));
 
 
@@ -901,7 +901,7 @@ function removeAllSubNodes( vn: IVN)
 
 
 
-export const reconcileSubNodes = (vn: IVN, disp: VNDisp, newSubNodes: IVN[]): void =>
+export const reconcileSubNodes = (vn: IVN, disp: VNDisp, newSubNodes: IVN[] | null | undefined): void =>
 {
     // reconcile old and new sub-nodes
     buildSubNodeDispositions( disp, newSubNodes);
@@ -921,7 +921,7 @@ export const reconcileSubNodes = (vn: IVN, disp: VNDisp, newSubNodes: IVN[]): vo
                 removeAllSubNodes(vn);
             else
             {
-                for( let i = disp.oldStartIndex; i < disp.oldEndIndex; i++)
+                for( let i = disp.oldStartIndex!; i < disp.oldEndIndex!; i++)
                     oldSubNodes[i].unmount(true);
             }
         }
@@ -938,8 +938,8 @@ export const reconcileSubNodes = (vn: IVN, disp: VNDisp, newSubNodes: IVN[]): vo
             else
             {
                 // remove the portion of the sub-nodes that was updated and update indices
-                oldSubNodes.splice( disp.oldStartIndex, disp.oldLength)
-                for( let i = disp.oldStartIndex, len = oldSubNodes.length; i < len; i++)
+                oldSubNodes.splice( disp.oldStartIndex!, disp.oldLength)
+                for( let i = disp.oldStartIndex!, len = oldSubNodes.length; i < len; i++)
                     oldSubNodes[i].index = i;
             }
         }
@@ -956,12 +956,12 @@ export const reconcileSubNodes = (vn: IVN, disp: VNDisp, newSubNodes: IVN[]): vo
         // if this virtual node doesn't define its own DOM node (true for components), we will
         // need to find a DOM node before which to start inserting new nodes. Null means
         // append to the end of the anchor node's children.
-        let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
+        let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN!);
 
         // since we have sub-nodes, we need to create nodes for them and render. If our node
         // knows to handle errors, we do it under try/catch; otherwise, the exceptions go to
         // either the uncestor node that knows to handle errors or to the Mimbl tick loop.
-        updateSubNodes( vn, disp, newSubNodes, anchorDN, beforeDN);
+        updateSubNodes( vn, disp, newSubNodes, anchorDN!, beforeDN);
     }
 
     // indicate that the node was updated in this cycle - this will prevent it from
@@ -988,9 +988,9 @@ const updateSubNodes = (vn: IVN, disp: VNDisp, newSubNodes: IVN[],
         {
             // replace the portion of the sub-nodes that was updated and update indices
             let oldStartIndex = disp.oldStartIndex;
-            oldSubNodes.splice( oldStartIndex, disp.oldLength)
-            for( let i = disp.oldStartIndex + newSubNodes.length, len = oldSubNodes.length; i < len; i++)
-                oldSubNodes[i].index = i;
+            oldSubNodes!.splice( oldStartIndex!, disp.oldLength)
+            for( let i = disp.oldStartIndex! + newSubNodes.length, len = oldSubNodes!.length; i < len; i++)
+                oldSubNodes![i].index = i;
 
             mountSubNodes( vn, newSubNodes, anchorDN, beforeDN, oldStartIndex);
         }
@@ -1004,7 +1004,7 @@ const updateSubNodes = (vn: IVN, disp: VNDisp, newSubNodes: IVN[],
         // be changed
         if (!oldSubNodes)
             vn.subNodes = new Array<IVN>(newSubNodes.length);
-        else if (disp.oldLength > newSubNodes.length)
+        else if (disp.oldLength! > newSubNodes.length)
             oldSubNodes.splice( newSubNodes.length);
 
         // perform updates and inserts by either groups or individual nodes.
@@ -1020,8 +1020,8 @@ const updateSubNodes = (vn: IVN, disp: VNDisp, newSubNodes: IVN[],
 // Performs updates and inserts by individual nodes.
 const updateSubNodesByNodes = (parentVN: IVN, disp: VNDisp, anchorDN: DN, beforeDN: DN): void =>
 {
-    let parentSubNodes = parentVN.subNodes;
-    let subNodeDisps = disp.subDisps;
+    let parentSubNodes = parentVN.subNodes!;
+    let subNodeDisps = disp.subDisps!;
 
 	// perform DOM operations according to sub-node disposition. We need to decide for each
 	// node what node to use to insert or move it before. We go from the end of the list of
@@ -1033,7 +1033,7 @@ const updateSubNodesByNodes = (parentVN: IVN, disp: VNDisp, anchorDN: DN, before
         let oldVN = subNodeDisp.oldVN;
 
         // since we might be updating only a portion of the old sub-nodes, get the real index
-        let index = disp.oldStartIndex + i;
+        let index = disp.oldStartIndex! + i;
 
         // for the Update operation, the old node becomes a sub-node; for the Insert operation
         // the new node become a sub-node.
@@ -1042,32 +1042,32 @@ const updateSubNodesByNodes = (parentVN: IVN, disp: VNDisp, anchorDN: DN, before
         {
             // we must put the node in the list of sub-nodes before calling mountNode because it
             // may use this info if the node is cloned
-            parentSubNodes[index] = svn = newVN;
+            parentSubNodes[index] = svn = newVN!;
 
             // if mountNode clones the node, it puts the new node into the list of sub-nodes
             // and returns it; otherwise, it returns the original node.
-            newVN.mount( parentVN, index, anchorDN, beforeDN);
+            newVN!.mount( parentVN, index, anchorDN, beforeDN);
         }
         else // Update or NoChange
         {
-            parentSubNodes[index] = svn = oldVN;
+            parentSubNodes[index] = svn = oldVN!;
             if (oldVN !== newVN)
             {
                 // if the creator for the new element is not determined yet, use current component
-                if (!newVN.creator)
-                    newVN.creator = s_currentClassComp;
+                if (!newVN!.creator)
+                    newVN!.creator = s_currentClassComp;
 
                 /// #if VERBOSE_NODE
-                    console.debug( `Calling update() on node ${oldVN.name}`);
+                    console.debug( `Calling update() on node ${oldVN!.name}`);
                 /// #endif
 
                 // update method must exists for nodes with action Update
-                oldVN.update( newVN, subNodeDisp);
+                oldVN!.update( newVN!, subNodeDisp);
             }
 
             // determine whether all the nodes under this VN should be moved.
-            if (index !== oldVN.index)
-                moveNode( oldVN, anchorDN, beforeDN);
+            if (index !== oldVN!.index)
+                moveNode( oldVN!, anchorDN, beforeDN);
 
             // we must assign the new index after the comparison above because otherwise the
             // comparison will not work
@@ -1087,9 +1087,9 @@ const updateSubNodesByNodes = (parentVN: IVN, disp: VNDisp, anchorDN: DN, before
 // and on each iteration we decide the value of the "beforeDN".
 const updateSubNodesByGroups = (parentVN: IVN, disp: VNDisp, anchorDN: DN, beforeDN: DN): void =>
 {
-    let parentSubNodes = parentVN.subNodes;
-    let subNodeDisps = disp.subDisps;
-    let groups = disp.subGroups;
+    let parentSubNodes = parentVN.subNodes!;
+    let subNodeDisps = disp.subDisps!;
+    let groups = disp.subGroups!;
 
     let currBeforeDN = beforeDN;
     let subNodeDisp: VNDisp;
@@ -1106,10 +1106,10 @@ const updateSubNodesByGroups = (parentVN: IVN, disp: VNDisp, anchorDN: DN, befor
             for( let j = group.first; j <= groupLast; j++)
             {
                 subNodeDisp = subNodeDisps[j];
-                newVN = subNodeDisp.newVN;
+                newVN = subNodeDisp.newVN!;
 
                 // since we might be updating only a portion of the old sub-nodes, get the real index
-                let index = disp.oldStartIndex + j;
+                let index = disp.oldStartIndex! + j;
 
                 // we must put the node in the list of sub-nodes before calling
                 // mountNode because it may use this info if the node is cloned
@@ -1124,11 +1124,11 @@ const updateSubNodesByGroups = (parentVN: IVN, disp: VNDisp, anchorDN: DN, befor
             for( let j = group.last; j >= groupFirst; j--)
             {
                 subNodeDisp = subNodeDisps[j];
-                oldVN = subNodeDisp.oldVN;
-                newVN = subNodeDisp.newVN;
+                oldVN = subNodeDisp.oldVN!;
+                newVN = subNodeDisp.newVN!;
 
                 // since we might be updating only a portion of the old sub-nodes, get the real index
-                let index = disp.oldStartIndex + j;
+                let index = disp.oldStartIndex! + j;
                 oldVN.index = index;
                 parentSubNodes[index] = oldVN;
 
@@ -1154,12 +1154,12 @@ const updateSubNodesByGroups = (parentVN: IVN, disp: VNDisp, anchorDN: DN, befor
             // If this is not true, we just place every sub-node in the group into the parent's
             // sub-node array
             let groupFirst = group.first;
-            if (parentSubNodes[disp.oldStartIndex + groupFirst] !== subNodeDisps[groupFirst].oldVN)
+            if (parentSubNodes[disp.oldStartIndex! + groupFirst] !== subNodeDisps[groupFirst].oldVN)
             {
                 for( let j = group.last; j >= groupFirst; j--)
                 {
-                    oldVN = subNodeDisps[j].oldVN;
-                    let index = disp.oldStartIndex + j;
+                    oldVN = subNodeDisps[j].oldVN!;
+                    let index = disp.oldStartIndex! + j;
                     oldVN.index = index;
                     parentSubNodes[index] = oldVN;
                 }
@@ -1194,15 +1194,15 @@ const updateSubNodesByGroups = (parentVN: IVN, disp: VNDisp, anchorDN: DN, befor
 				// if the current group now resides before the previous group, then that means
 				// that we are swapping two groups. In this case we want to move the shorter one.
                 let prevGroup = groups[i-1];
-				if (group.lastDN.nextSibling === prevGroup.firstDN && group.count > prevGroup.count)
-					moveGroup( prevGroup, subNodeDisps, anchorDN, group.firstDN);
+				if (group.lastDN.nextSibling === prevGroup.firstDN && group.count! > prevGroup.count!)
+					moveGroup( prevGroup, subNodeDisps, anchorDN, group.firstDN!);
 				else
-					moveGroup( group, subNodeDisps, anchorDN, currBeforeDN);
+					moveGroup( group, subNodeDisps, anchorDN, currBeforeDN!);
 			}
 
 			// the group's first DN becomes the new beforeDN. Note that firstDN cannot be null
 			// because lastDN is not null
-			currBeforeDN = group.firstDN;
+			currBeforeDN = group.firstDN!;
 		}
 	}
 }
@@ -1218,12 +1218,12 @@ export const moveNode = (vn: IVN, anchorDN: DN, beforeDN: DN): void =>
         return;
     else if (Array.isArray(dns))
     {
-        if (dns[dns.length - 1].nextSibling === beforeDN)
+        if (dns[dns.length - 1]!.nextSibling === beforeDN)
             return;
 
         for( let dn of dns)
         {
-            anchorDN.insertBefore( dn, beforeDN);
+            anchorDN!.insertBefore( dn!, beforeDN);
 
             /// #if USE_STATS
                 DetailedStats.log( StatsCategory.Elm, StatsAction.Moved);
@@ -1235,7 +1235,7 @@ export const moveNode = (vn: IVN, anchorDN: DN, beforeDN: DN): void =>
         if (dns.nextSibling === beforeDN)
             return;
 
-        anchorDN.insertBefore( dns, beforeDN);
+        anchorDN!.insertBefore( dns, beforeDN);
 
         /// #if USE_STATS
             DetailedStats.log( StatsCategory.Elm, StatsAction.Moved);
@@ -1257,14 +1257,14 @@ const moveGroup = (group: VNDispGroup, disps: VNDisp[], anchorDN: DN, beforeDN: 
     let useNewVN = group.action === VNDispAction.Insert;
 	for( let i = group.first, last = group.last; i <= last; i++)
 	{
-        dns = (useNewVN ? disps[i].newVN : disps[i].oldVN).getImmediateDNs();
+        dns = (useNewVN ? disps[i].newVN! : disps[i].oldVN!).getImmediateDNs();
         if (!dns)
             continue;
         else if (Array.isArray(dns))
         {
             for( let dn of dns)
             {
-                anchorDN.insertBefore( dn, beforeDN);
+                anchorDN!.insertBefore( dn!, beforeDN);
 
                 /// #if USE_STATS
                     DetailedStats.log( StatsCategory.Elm, StatsAction.Moved);
@@ -1276,7 +1276,7 @@ const moveGroup = (group: VNDispGroup, disps: VNDisp[], anchorDN: DN, beforeDN: 
             if (dns.nextSibling === beforeDN)
                 return;
 
-            anchorDN.insertBefore( dns, beforeDN);
+            anchorDN!.insertBefore( dns, beforeDN);
 
             /// #if USE_STATS
                 DetailedStats.log( StatsCategory.Elm, StatsAction.Moved);
@@ -1284,7 +1284,7 @@ const moveGroup = (group: VNDispGroup, disps: VNDisp[], anchorDN: DN, beforeDN: 
         }
 
         /// #if USE_STATS
-            DetailedStats.log( (useNewVN ? disps[i].newVN : disps[i].oldVN).statsCategory, StatsAction.Moved);
+            DetailedStats.log( (useNewVN ? disps[i].newVN! : disps[i].oldVN!).statsCategory, StatsAction.Moved);
         /// #endif
 	}
 }
@@ -1306,9 +1306,9 @@ const NO_GROUP_THRESHOLD = 8;
  * into groups of consecutive nodes that should be updated and of nodes that should be inserted.
  * The groups are built in a way so that if a node should be moved, its entire group is moved.
  */
-const buildSubNodeDispositions = (disp: VNDisp, newChain: IVN[]): void =>
+const buildSubNodeDispositions = (disp: VNDisp, newChain: IVN[] | null | undefined): void =>
 {
-    let oldChain = disp.oldVN.subNodes;
+    let oldChain = disp.oldVN?.subNodes;
     let oldStartIndex = disp.oldStartIndex || (disp.oldStartIndex = 0);
     let oldEndIndex = disp.oldEndIndex || (disp.oldEndIndex = (oldChain ? oldChain.length : 0));
 
@@ -1332,7 +1332,7 @@ const buildSubNodeDispositions = (disp: VNDisp, newChain: IVN[]): void =>
         return;
     }
 
-    let updateStrategy = disp.updateStrategy || disp.oldVN.updateStrategy;
+    let updateStrategy = disp.updateStrategy ?? disp.oldVN?.updateStrategy;
 
     // determine whether recycling of non-matching old keyed sub-nodes by non-matching new
     // keyed sub-nodes is allowed. If update strategy is not defined for the node, the
@@ -1347,8 +1347,8 @@ const buildSubNodeDispositions = (disp: VNDisp, newChain: IVN[]): void =>
     // to avoid creating temporary structures
     if (newLen === 1 && oldLen === 1)
     {
-        let oldVN = oldChain[oldStartIndex]
-        let newVN = newChain[0];
+        let oldVN = oldChain![oldStartIndex]
+        let newVN = newChain![0];
         if (oldVN === newVN)
             disp.noChanges = true;
         else if ((allowKeyedNodeRecycling || ignoreKeys || newVN.key === oldVN.key) &&
@@ -1376,7 +1376,7 @@ const buildSubNodeDispositions = (disp: VNDisp, newChain: IVN[]): void =>
     // if we can ignore keys, we don't need to create a map of old sub-nodes; instead, we can
     // update old sub-nodes with new sub-nodes sequentially.
     if (ignoreKeys)
-        hasUpdates = reconcileWithoutKeys( disp, oldChain, newChain);
+        hasUpdates = reconcileWithoutKeys( disp, oldChain!, newChain!);
     else
     {
         // we are here if either old and new chains contain more than one node and we need to
@@ -1389,7 +1389,7 @@ const buildSubNodeDispositions = (disp: VNDisp, newChain: IVN[]): void =>
         let key: any;
         for( let i = oldStartIndex; i < oldEndIndex; i++)
         {
-            oldVN = oldChain[i];
+            oldVN = oldChain![i];
             key = oldVN.key;
             if (key != null && !oldKeyedMap.has( key))
                 oldKeyedMap.set( key, oldVN);
@@ -1399,10 +1399,10 @@ const buildSubNodeDispositions = (disp: VNDisp, newChain: IVN[]): void =>
 
         // if we didn't find any keys, we can run reconciliation that doesn't look at keys
         hasUpdates = oldKeyedMap.size === 0
-            ? reconcileWithoutKeys( disp, oldUnkeyedList, newChain)
+            ? reconcileWithoutKeys( disp, oldUnkeyedList, newChain!)
             : allowKeyedNodeRecycling
-                ? reconcileWithRecycling( disp, oldKeyedMap, oldUnkeyedList, newChain)
-                : reconcileWithoutRecycling( disp, oldKeyedMap, oldUnkeyedList, newChain);
+                ? reconcileWithRecycling( disp, oldKeyedMap, oldUnkeyedList, newChain!)
+                : reconcileWithoutRecycling( disp, oldKeyedMap, oldUnkeyedList, newChain!);
     }
 
     // if we don't have any updates, this means that all old nodes should be deleted and all new
@@ -1432,12 +1432,12 @@ const buildSubNodeDispositions = (disp: VNDisp, newChain: IVN[]): void =>
  */
 const reconcileWithoutKeys = (disp: VNDisp, oldChain: IVN[], newChain: IVN[]): boolean =>
 {
-    let oldStartIndex = disp.oldStartIndex;
-    let oldLen = disp.oldLength;
+    let oldStartIndex = disp.oldStartIndex!;
+    let oldLen = disp.oldLength!;
     let newLen = newChain.length;
     let commonLen = Math.min( oldLen, newLen);
 
-    let subNodeDisps = disp.subDisps;
+    let subNodeDisps = disp.subDisps!;
     let subNodesToRemove: IVN[] = [];
 
     // loop over new nodes and determine which ones should be updated, inserted or deleted
@@ -1504,14 +1504,14 @@ const reconcileWithoutKeys = (disp: VNDisp, oldChain: IVN[], newChain: IVN[]): b
 const reconcileWithoutRecycling = ( disp: VNDisp, oldKeyedMap: Map<any,IVN>,
     oldUnkeyedList: IVN[], newChain: IVN[]): boolean =>
 {
-    let subNodeDisps = disp.subDisps;
+    let subNodeDisps = disp.subDisps!;
     let subNodesToRemove: IVN[] = [];
     let oldUnkeyedListLength = oldUnkeyedList.length;
 
     // loop over new nodes and determine which ones should be updated, inserted or deleted
     let oldUnkeyedListIndex = 0;
     let hasUpdates = false;
-    let subDisp: VNDisp, oldVN: IVN, key: any;
+    let subDisp: VNDisp, oldVN: IVN | null | undefined, key: any;
     newChain.forEach( (newVN, subNodeIndex) =>
     {
         // try to look up the old node by the new node's key if exists
@@ -1585,14 +1585,14 @@ const reconcileWithoutRecycling = ( disp: VNDisp, oldKeyedMap: Map<any,IVN>,
 const reconcileWithRecycling = (disp: VNDisp, oldKeyedMap: Map<any,IVN>,
     oldUnkeyedList: IVN[], newChain: IVN[]): boolean =>
 {
-    let subNodeDisps = disp.subDisps;
+    let subNodeDisps = disp.subDisps!;
     let subNodesToRemove: IVN[] = [];
     let oldUnkeyedListLength = oldUnkeyedList.length;
 
     // loop over new nodes and determine which ones should be updated, inserted or deleted
     let oldUnkeyedListIndex = 0;
     let hasUpdates = false;
-    let subDisp: VNDisp, oldVN: IVN, key: any;
+    let subDisp: VNDisp | null, oldVN: IVN | null | undefined, key: any;
 
     // the array of unmatched disps will point to the VNDisp objects already in the subNodesDisps
     let unmatchedDisps: VNDisp[] = [];
@@ -1663,7 +1663,7 @@ const reconcileWithRecycling = (disp: VNDisp, oldKeyedMap: Map<any,IVN>,
                 subNodesToRemove.push( oldVN);
             else
             {
-                newVN = subDisp.newVN;
+                newVN = subDisp.newVN!;
                 if (oldVN === newVN)
                 {
                     subDisp.action = VNDispAction.NoChange;
@@ -1715,7 +1715,7 @@ const determineGroupDNs = (group: VNDispGroup, disps: VNDisp[]) =>
     let useNewVN = group.action === VNDispAction.Insert;
     if (group.count === 1)
     {
-        let vn = useNewVN ? disps[group.first].newVN : disps[group.first].oldVN;
+        let vn = useNewVN ? disps[group.first].newVN! : disps[group.first].oldVN!;
 
         group.firstDN = vn.getFirstDN();
         group.lastDN = vn.getLastDN();
@@ -1724,13 +1724,13 @@ const determineGroupDNs = (group: VNDispGroup, disps: VNDisp[]) =>
     {
         for( let i = group.first; i <= group.last; i++)
         {
-            if (group.firstDN = (useNewVN ? disps[i].newVN : disps[i].oldVN).getFirstDN())
+            if (group.firstDN = (useNewVN ? disps[i].newVN! : disps[i].oldVN!).getFirstDN())
                 break;
         }
 
         for( let i = group.last; i >= group.first; i--)
         {
-            if (group.lastDN = (useNewVN ? disps[i].newVN : disps[i].oldVN).getLastDN())
+            if (group.lastDN = (useNewVN ? disps[i].newVN! : disps[i].oldVN!).getLastDN())
                 break;
         }
     }
@@ -1742,20 +1742,13 @@ const determineGroupDNs = (group: VNDispGroup, disps: VNDisp[]) =>
  * From a flat list of new sub-nodes builds groups of consecutive nodes that should be either
  * updated or inserted.
  */
-const buildSubNodeGroups = (disps: VNDisp[]): VNDispGroup[] =>
+const buildSubNodeGroups = (disps: VNDisp[]): VNDispGroup[] | undefined =>
 {
     // we are here only if we have some number of sub-node dispositions
     let count = disps.length;
 
-    /// #if DEBUG
-        // this method is not supposed to be called if the number of sub-nodes is less then
-        // the pre-determined threshold
-        if (count <= NO_GROUP_THRESHOLD || count === 0)
-            return null;
-    /// #endif
-
     // create array of groups and create the first group starting from the first node
-    let group: VNDispGroup = { action: disps[0].action, first: 0 };
+    let group: VNDispGroup = { action: disps[0].action!, first: 0, last: 0, count: 1 };
     let subNodeGroups = [group];
 
     // loop over sub-nodes and on each iteration decide whether we need to open a new group
@@ -1767,7 +1760,7 @@ const buildSubNodeGroups = (disps: VNDisp[]): VNDispGroup[] =>
     for( let i = 1; i < count; i++)
     {
         disp = disps[i];
-        action = disp.action;
+        action = disp.action!;
         if (action !== group.action)
         {
             // close the group with the previous index. Decrement the iterating index so that
@@ -1777,7 +1770,7 @@ const buildSubNodeGroups = (disps: VNDisp[]): VNDispGroup[] =>
             group.count = i - group.first;
 
             // open new group
-            group = { action, first: i };
+            group = { action, first: i, last: i, count: 1 };
             subNodeGroups.push( group);
         }
         else if (action !== VNDispAction.Insert)
@@ -1785,15 +1778,15 @@ const buildSubNodeGroups = (disps: VNDisp[]): VNDispGroup[] =>
             // an "update" sub-node is out-of-order and should close the current group if the index
             // of its previous sibling + 1 isn't equal to the index of this sub-node.
             // The last node will close the last group after the loop.
-            prevOldVN = disps[i-1].oldVN;
-            if (!prevOldVN || prevOldVN.index + 1 !== disp.oldVN.index)
+            prevOldVN = disps[i-1].oldVN!;
+            if (!prevOldVN || prevOldVN.index + 1 !== disp.oldVN!.index)
             {
                 // close the group with the current index.
                 group.last = i - 1;
                 group.count = i - group.first;
 
                 // open new group
-                group = { action, first: i };
+                group = { action, first: i, last: i, count: 1 };
                 subNodeGroups.push( group);
             }
         }
@@ -1829,7 +1822,7 @@ const getNextDNUnderSameAnchorDN = (vn: IVN, anchorDN: DN): DN =>
         return null;
 
     // loop over our next siblings
-    let siblings = parent.subNodes;
+    let siblings = parent.subNodes!;
 	for( let i = vn.index + 1; i < siblings.length; i++)
 	{
         let nvn = siblings[i];
@@ -1854,8 +1847,8 @@ const getNextDNUnderSameAnchorDN = (vn: IVN, anchorDN: DN): DN =>
 const getVNPath = (vn: IVN): string[] =>
 {
 	let path: string[] = [];
-	for( let currVN = vn; currVN; currVN = currVN.parent)
-		path.push( currVN.name);
+	for( let currVN: IVN | null | undefined = vn; currVN; currVN = currVN.parent)
+		path.push( currVN.name ?? "");
 
 	return path;
 }

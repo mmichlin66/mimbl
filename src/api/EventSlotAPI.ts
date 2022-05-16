@@ -59,9 +59,9 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
             if (rc != null)
             {
                 if (--rc === 0)
-                    this.listeners.delete(listener);
+                    this.listeners!.delete(listener);
                 else
-                    this.listeners.set( listener, rc);
+                    this.listeners!.set( listener, rc);
             }
         }
 	}
@@ -69,7 +69,7 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
 	/** Determines whether this event slot has any listeners. */
 	public has(): boolean
     {
-        return !!this.listener || this.listeners?.size > 0;
+        return !!this.listener || !!this.listeners?.size;
     }
 
 	/** Removes all listeners to the event. */
@@ -85,7 +85,7 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
      * The first listener function. Since many times there is only one listener to an event, we
      * optimize by not creating a set of listeners.
      */
-	private listener?: TFunc;
+	private listener?: TFunc | null;
 
 	/**
      * Reference counter of the listener function.
@@ -94,7 +94,7 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
 
 	// Map of listener functions to their respective reference counts. When there are no listeners,
     // this field is set to null to preserve space.
-	private listeners?: Map<TFunc,number>;
+	private listeners?: Map<TFunc,number> | null;
 }
 
 
