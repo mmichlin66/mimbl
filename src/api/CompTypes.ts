@@ -492,6 +492,53 @@ export type ElmRefPropType<T extends Element = Element> = RefPropType<IElmVN<T>>
 
 
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Publishing and subscribing to services
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Represents a publication of a service.
+ */
+export interface IPublication<K extends keyof IServiceDefinitions>
+{
+    /** Returns the current value of the service */
+    value?: IServiceDefinitions[K];
+
+    /** Deletes this publication */
+    unpublish(): void;
+}
+
+
+
+/**
+ * Represents a subscription to a service. This interface allows getting the current value of the
+ * service and getting notifications on when the value is changed.
+ */
+export interface ISubscription<K extends keyof IServiceDefinitions>
+{
+    /** Returns the current value of the service */
+    readonly value?: IServiceDefinitions[K];
+
+    /**
+     * Attaches the given callback to the "change" event.
+     * @param callback Function that will be called when the value of the service changes.
+     */
+    attach( callback: (value?: IServiceDefinitions[K]) => void): void;
+
+    /**
+     * Detaches the given callback from the "change" event.
+     * @param callback Function that was attached to the "change" event by the [[aattach]] method.
+     */
+    detach( callback: (value?: IServiceDefinitions[K]) => void): void;
+
+    /** Deletes this subscription */
+    unsubscribe(): void;
+}
+
+
+
 /**
  * The IVNode interface represents a virtual node. Through this interface, callers can perform
  * most common actions that are available on every type of virtual node. Each type of virtual node
@@ -541,7 +588,8 @@ export interface IVNode
 	callMe( func: ScheduledFuncType, beforeUpdate: boolean, thisArg?: any): void;
 
     /**
-     *
+     * Returns a function that wraps the given callback so that when the return function is called
+     * the original callback is invoked in a proper context.
      * @param func Callback function to be wrapped
      * @param thisArg Object to be used as `this` when calling the callback
      * @param arg Optional argument to be passed to the callback in addition to the original
@@ -551,47 +599,55 @@ export interface IVNode
      */
     wrap<T extends Function>( func: T, thisArg: any, arg?: any, schedulingType?: TickSchedulingType): T;
 
-	/**
-	 * Registers an object of any type as a service with the given ID that will be available for
-	 * consumption by descendant components.
-	 */
-	publishService<K extends keyof IServiceDefinitions>( id: K, service: IServiceDefinitions[K]): void;
-
-	/** Unregisters a service with the given ID. */
-	unpublishService<K extends keyof IServiceDefinitions>( id: K): void;
+    /**
+	 * Registers the given value as a service with the given ID that will be available for
+     * consumption by descendant components.
+     * @param id Unique service identifier
+     * @param value Current value of the service
+     * @param depth Number of level to watch for changes. The default value is 1; that is, the
+     * subscribers will be notified if the service's value or the values of its properties have
+     * changed.
+     * @returns Publication object, which allows setting a new value of the service or changing
+     * values of its properties.
+     */
+	publishService<K extends keyof IServiceDefinitions>( id: K, value: IServiceDefinitions[K],
+        depth?: number): IPublication<K>
 
 	/**
 	 * Subscribes to a service with the given ID. If the service with the given ID is registered
-	 * by this or one of the ancestor components, the passed Ref object will reference it;
-	 * otherwise, the Ref object will be set to the defaultValue (if specified) or will remain
-	 * undefined. Whenever the value of the service that is registered by this or a closest
-	 * ancestor component is changed,the Ref object will receive the new value.
-	 * The useSelf optional parameter determines whether the component can subscribe to the
-	 * service published by itself. The default is false.
-	 * @param id
-	 * @param ref
-	 * @param defaultService
-	 * @param useSelf
+	 * by this or one of the ancestor components, the returned subscription object's `value`
+     * property will reference it; otherwise, the value will be set to the defaultValue (if
+     * specified) or will remain undefined. Whenever the value of the service that is registered by
+     * this or a closest ancestor component is changed, the subscription's `value` property will
+     * receive the new value.
+     *
+     * If the subscription object's `value` property is used in a component's rendering code, the
+     * component will be re-rendered every time the service value is changed.
+     *
+	 * @param id Unique service identifier
+	 * @param defaultValue Optional default value that will be assigned if the service is not
+     * published yet.
+	 * @param useSelf Flag indicating whether the search for the service should start from the
+     * virtual node that calls this method. The default value is `false` meaning the search starts
+     * from the parent virtual node.
+     * @returns Subscription object, which provides the value of the service and allowes attaching
+     * to the event fired when the value is changed.
 	 */
-	subscribeService<K extends keyof IServiceDefinitions>( id: K, ref: RefPropType<IServiceDefinitions[K]>,
-					defaultService?: IServiceDefinitions[K], useSelf?: boolean): void;
+	subscribeService<K extends keyof IServiceDefinitions>( id: K, defaultValue?: IServiceDefinitions[K],
+        useSelf?: boolean): ISubscription<K>;
 
-	/**
-	 * Unsubscribes from a service with the given ID. The Ref object that was used to subscribe
-	 * will be set to undefined.
-	 * @param id
-	 */
-	unsubscribeService<K extends keyof IServiceDefinitions>( id: K): void;
-
-	/**
+    /**
 	 * Retrieves the value for a service with the given ID registered by a closest ancestor
 	 * component or the default value if none of the ancestor components registered a service with
 	 * this ID. This method doesn't establish a subscription and only reflects the current state.
-	 * @param id
-	 * @param defaultService
-	 * @param useSelf
+	 * @param id Unique service identifier
+	 * @param defaultValue Default value to return if no publish service is found.
+	 * @param useSelf Flag indicating whether the search for the service should start from the
+     * virtual node that calls this method. The default value is `false` meaning the search starts
+     * from the parent virtual node.
+     * @returns Current value of the service or default value if no published service is found.
 	 */
-	getService<K extends keyof IServiceDefinitions>( id: K, defaultService?: IServiceDefinitions[K],
+	getService<K extends keyof IServiceDefinitions>( id: K, defaultValue?: IServiceDefinitions[K],
 					useSelf?: boolean): IServiceDefinitions[K];
 }
 

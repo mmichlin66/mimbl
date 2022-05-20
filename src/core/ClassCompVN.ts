@@ -1,8 +1,7 @@
 ﻿import {
-    IClassCompVN, IComponent, RenderMethodType, ScheduledFuncType,
-    IComponentClass, ComponentShadowOptions
+    IClassCompVN, IComponent, RenderMethodType, IComponentClass, ComponentShadowOptions
 } from "../api/CompTypes"
-import { DN, IVN, VNDisp } from "./VNTypes";
+import { DN, VNDisp } from "./VNTypes";
 import { IWatcher } from "../api/TriggerTypes";
 
 /// #if USE_STATS
@@ -11,7 +10,7 @@ import { IWatcher } from "../api/TriggerTypes";
 
 import { createWatcher } from "../api/TriggerAPI";
 import { FuncProxyVN } from "./FuncProxyVN";
-import { setCurrentClassComp, mountContent, unmountSubNodes, reconcile, scheduleFuncCall } from "./Reconciler";
+import { setCurrentClassComp, mountContent, unmountSubNodes, reconcile } from "./Reconciler";
 import { symRenderNoWatcher, VN } from "./VN";
 
 
@@ -46,7 +45,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	public compClass: IComponentClass;
 
 	/** Component instance. */
-	public comp?: IComponent;
+	declare public comp?: IComponent;
 
 	// Properties that were passed to the component.
 	public props: any;
@@ -82,9 +81,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
      */
 	public prepareMount( comp: IComponent): void
     {
-        // check whether the component is already connected to another node
-        let oldVN = comp.vn as ClassCompVN;
-
         // connect the component to this virtual node
         comp.vn = this;
 
@@ -131,18 +127,21 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
             this.ownDN = this.rootHost.attachShadow( init);
         }
 
-        let comp = this.comp;
+        let comp = this.comp!;
         let prevCreator = setCurrentClassComp( comp);
 
-        this.prepareMount( comp!);
+        this.prepareMount( comp);
 
-        if (!this.comp!.handleError)
-            mountContent( this, this.actRender(), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
+        let newAnchorDN = this.ownDN ?? anchorDN;
+        let newBeforeDN = this.ownDN ? null : beforeDN;
+
+        if (!comp.handleError)
+            mountContent( this, this.actRender(), newAnchorDN, newBeforeDN);
         else
         {
             try
             {
-                mountContent( this, this.actRender(), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
+                mountContent( this, this.actRender(), newAnchorDN, newBeforeDN);
             }
             catch( err)
             {
@@ -150,11 +149,11 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
                     console.debug( `Calling handleError() on node ${this.name}. Error:`, err);
                 /// #endif
 
-                // let the node handle the error and re-render; then we render the new
+                // let the component handle the error and re-render; then we render the new
                 // content but we do it without try/catch this time; otherwise, we may end
                 // up in an infinite loop. We also set our component as current again.
-                setCurrentClassComp( comp);
-                mountContent( this, this.comp!.handleError( err), this.ownDN ?? anchorDN, this.ownDN ? null : beforeDN);
+                setCurrentClassComp(comp);
+                mountContent( this, comp.handleError( err), newAnchorDN, newBeforeDN);
             }
         }
 
@@ -203,8 +202,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
     // Releases reference to the DOM node corresponding to this virtual node.
     public unmount( removeFromDOM: boolean): void
     {
-        let comp = this.comp;
-        this.prepareUnmount( comp!);
+        this.prepareUnmount( this.comp!);
 
         if (this.rootHost)
         {
@@ -243,10 +241,10 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	// point to a VN of the same type as this node.
 	public update( newVN: ClassCompVN, disp: VNDisp): void
 	{
-        let comp = this.comp;
+        let comp = this.comp!;
         let prevCreator = setCurrentClassComp( comp);
 
-        if (!comp!.handleError)
+        if (!comp.handleError)
             reconcile( this, disp, this.actRender());
         else
         {
@@ -260,10 +258,11 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
                     console.debug( `Calling handleError() on node ${this.name}. Error`, err);
                 /// #endif
 
-                // let the node handle its own error and re-render; then we render the new
+                // let the component handle the error and re-render; then we render the new
                 // content but we do it without try/catch this time; otherwise, we may end
                 // up in an infinite loop
-                reconcile( this, {oldVN: disp.oldVN}, this.handleError( err));
+                setCurrentClassComp(comp);
+                reconcile( this, {oldVN: disp.oldVN}, comp.handleError( err));
             }
         }
 
@@ -299,18 +298,18 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
 
-    // This method is called after an exception was thrown during rendering of the node's
-    // sub-nodes. The method returns the new content to display.
-	public handleError( err: any): any
-	{
-        // we can safely call the component's handleError method because our method is only
-        // invoked if the component implements it.
-        let prevCreator = setCurrentClassComp( this.comp);
-		let content = this.comp!.handleError!( err);
-        setCurrentClassComp( prevCreator);
+    // // This method is called after an exception was thrown during rendering of the node's
+    // // sub-nodes. The method returns the new content to display.
+	// public handleError( err: any): any
+	// {
+    //     // we can safely call the component's handleError method because our method is only
+    //     // invoked if the component implements it.
+    //     let prevCreator = setCurrentClassComp( this.comp);
+	// 	let content = this.comp!.handleError!( err);
+    //     setCurrentClassComp( prevCreator);
 
-        return content;
-	}
+    //     return content;
+	// }
 
 
 

@@ -1,10 +1,14 @@
-﻿import {IComponent, RefPropType, IVNode, UpdateStrategy, TickSchedulingType, RefType, ScheduledFuncType} from "../api/CompTypes";
+﻿import {
+    IComponent, RefPropType, UpdateStrategy, TickSchedulingType, RefType, ScheduledFuncType, ISubscription, IPublication
+} from "../api/CompTypes";
+import { IEventSlot, IEventSlotOwner } from "../api/EventSlotTypes";
+import { createTrigger } from "../api/TriggerAPI";
+import { ITrigger } from "../api/TriggerTypes";
 
 /// #if USE_STATS
     import {StatsCategory} from "../utils/Stats"
 /// #endif
 
-import { notifyServicePublished, notifyServiceUnpublished, notifyServiceSubscribed, notifyServiceUnsubscribed } from "./PubSub";
 import { CallbackWrapper, getCurrentClassComp, requestNodeUpdate, scheduleFuncCall } from "./Reconciler";
 import { ChildrenUpdateRequest, DN, IVN, VNDisp } from "./VNTypes";
 
@@ -95,6 +99,14 @@ export abstract class VN implements IVN
 
 
 
+	/// #if USE_STATS
+    public get statsCategory(): StatsCategory { return StatsCategory.Comp; }
+	/// #endif
+
+    /// #if DEBUG
+    private debugID: number;
+	/// #endif
+
 	///////////////////////////////////////////////////////////////////////////////////////////////
 	//
 	// Life cycle methods
@@ -120,6 +132,18 @@ export abstract class VN implements IVN
      */
 	public unmount( removeFromDOM: boolean): void
     {
+        if (this.pubs)
+        {
+            this.pubs?.forEach( publication => publication.unpublish());
+            this.pubs = undefined;
+        }
+
+        if (this.subs)
+        {
+            this.subs.forEach( subscription => subscription.unsubscribe());
+            this.subs = undefined;
+        }
+
         this.parent = null;
         this.anchorDN = null;
     }
@@ -275,13 +299,8 @@ export abstract class VN implements IVN
 
 
     /**
-     *
-     * @param callback Callback function to be wrapped
-     * @param thisArg Object to be used as `this` when calling the callback
-     * @param arg Optional argument to be passed to the callback in addition to the original
-     * callback arguments.
-     * @param schedulingType Type of scheduling the Mimbl tick after the callback function returns.
-     * @returns Wrapped callback that will run the original callback in the proper context.
+     * Returns a function that wraps the given callback so that when the return function is called
+     * the original callback is invoked in a proper context.
      */
     wrap<T extends Function>( func: T, thisArg: any, arg?: any, schedulingType?: TickSchedulingType): T
     {
@@ -290,70 +309,57 @@ export abstract class VN implements IVN
 
 
 
-    // Registers an object of any type as a service with the given ID that will be available for
-	// consumption by descendant nodes.
-	public publishService( id: string, service: any): void
+    /**
+	 * Registers the given value as a service with the given ID that will be available for
+     * consumption by descendant components.
+     */
+	public publishService( id: string, value: any, depth?: number): Publication
 	{
-		if (this.publishedServices === undefined)
-			this.publishedServices = new Map<string,any>();
+		if (!this.pubs)
+			this.pubs = new Map<string,any>();
+        else
+        {
+            let publication = this.pubs.get( id);
+            if (publication)
+            {
+                publication.value = value;
+                return publication;
+            }
+        }
 
-		let existingService: any = this.publishedServices.get( id);
-		if (existingService !== service)
-		{
-			this.publishedServices.set( id, service);
-			notifyServicePublished( id, this);
-		}
+        let publication = new Publication( id, this, value, depth);
+        this.pubs.set(id, publication);
+        return publication;
 	}
 
 
 
-	// Unregisters a service with the given ID.
-	public unpublishService( id: string): void
-	{
-		if (this.publishedServices === undefined)
-			return;
+	/**
+	 * Subscribes to a service with the given ID. If the service with the given ID is registered
+	 * by this or one of the ancestor components, the returned subscription object's `value`
+     * property will reference it; otherwise, the value will be set to the defaultValue (if
+     * specified) or will remain undefined. Whenever the value of the service that is registered by
+     * this or a closest ancestor component is changed, the subscription's `value` property will
+     * receive the new value.
+	 */
+    subscribeService( id: string, defaultValue?: any, useSelf?: boolean): ISubscription<any>
+    {
+		if (!this.subs)
+			this.subs = new Map();
+        else
+        {
+            let subscription = this.subs.get( id);
+            if (subscription)
+                return subscription;
+        }
 
-		this.publishedServices.delete( id);
-		notifyServiceUnpublished( id, this);
+        // find the service and create the subscription object
+        let publication = findPublication( this, id, useSelf);
+        let subscription = new Subscription( id, this, publication, defaultValue, useSelf);
+		this.subs.set( id, subscription);
 
-		if (this.publishedServices.size === 0)
-			this.publishedServices = undefined;
-	}
-
-
-
-	// Subscribes for a service with the given ID. If the service with the given ID is registered
-	// by one of the ancestor nodes, the passed Ref object will reference it; otherwise,
-	// the Ref object will be set to the defaultValue (if specified) or will remain undefined.
-	// Whenever the value of the service that is registered by a closest ancestor node is
-	// changed, the Ref object will receive the new value.
-	public subscribeService( id: string, ref: RefPropType, defaultService?: any, useSelf?: boolean): void
-	{
-		if (this.subscribedServices === undefined)
-			this.subscribedServices = new Map<string,VNSubscribedServiceInfo>();
-
-		this.subscribedServices.set( id, { ref, defaultService, useSelf: useSelf ? true : false });
-		notifyServiceSubscribed( id, this);
-		setRef( ref, this.getService( id, defaultService));
-}
-
-
-
-	// Unsubscribes from a service with the given ID. The Ref object that was used to subscribe,
-	// will be set to undefined.
-	public unsubscribeService( id: string): void
-	{
-		let info = this.subscribedServices?.get( id);
-		if (info === undefined)
-			return;
-
-        setRef( info.ref, undefined);
-		this.subscribedServices!.delete( id);
-		notifyServiceUnsubscribed( id, this);
-
-		if (this.subscribedServices!.size === 0)
-			this.subscribedServices = undefined;
-	}
+        return subscription;
+    }
 
 
 
@@ -364,55 +370,17 @@ export abstract class VN implements IVN
 	{
         // not that only undefined return value serves as the indication that the service was not
         // found. All other values including empty string, zero and false are valid service values.
-		let service = this.findService( id, useSelf);
-		return service ?? defaultService;
+        let publication = findPublication( this, id, useSelf);
+		return publication?.value ?? defaultService;
 	}
 
 
 
-	// Goes up the chain of nodes looking for a published service with the given ID. Returns
-	// undefined if the service is not found. Note that null might be a valid value.
-	private findService( id: string, useSelf?: boolean): any
-	{
-		if (useSelf)
-		{
-            let service = this.publishedServices?.get( id);
-            if (service !== undefined)
-                return service;
-		}
-
-		// go up the chain; note that we don't pass the useSelf parameter on.
-		return this.parent?.findService( id, true);
-	}
-
-
-
-	// Notifies the node that publication information about the given service (to which the node
-	// has previously subscribed) has changed.
-	public notifyServiceChanged( id: string): void
-	{
-		let info = this.subscribedServices?.get( id);
-		if (info === undefined)
-			return;
-
-		setRef( info.ref, this.getService( id, info.defaultService));
-	}
-
-
-
-	// Map of service IDs to service objects published by this node.
-	private publishedServices?: Map<string,any>;
+	// Map of service IDs to objects constituting publications made by this node.
+	public pubs?: Map<string,Publication>;
 
 	// Map of service IDs to objects constituting subscriptions made by this node.
-	private subscribedServices?: Map<string,VNSubscribedServiceInfo>;
-
-	/// #if USE_STATS
-    public abstract get statsCategory(): StatsCategory;
-	/// #endif
-
-    /// #if DEBUG
-    private debugID: number;
-	/// #endif
+	private subs?: Map<string,Subscription>;
 }
 
 
@@ -437,33 +405,261 @@ export function setRef<T>( ref: RefType<T>, val: T, onlyIf?: T): void
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// The VNSubscribedServiceInfo class keeps information about a subscription of a node to a service.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-type VNSubscribedServiceInfo =
-{
-	// Reference that will be filled in with the service value
-	ref: RefPropType<any>;
-
-	// Default value of the service that is used if none of the ancestor nodes publishes the
-	// service
-	defaultService: any;
-
-	// Flag indicating whether a node can subscribe to a service that it implements itself. This
-	// is useful in case where a service that is implemented by a component can chain to a service
-	// implemented by an ancestor component.
-	useSelf: boolean;
-}
-
-
-
 /**
  * Symbol that is attached to a render function to indicate that it should not be wrapped in a
  * watcher.
  */
 export let symRenderNoWatcher = Symbol();
+
+
+
+/**
+ * Represents a publication of a service held by a virtual node.
+ */
+class Publication implements IPublication<any>
+{
+    constructor( id: string, vn: VN, value?: any, depth?: number)
+    {
+        this.id = id;
+        this.vn = vn;
+        this.trigger = createTrigger( value, depth);
+        notifyServicePublished( this);
+    }
+
+    /** Returns the current value of the service */
+    public get value(): any { return this.trigger?.get(); }
+
+    /** Sets the new value of the service */
+    public set value( v: any) { this.trigger?.set(v); }
+
+    /** Deletes this publication */
+    public unpublish(): void
+    {
+        if (this.trigger)
+        {
+            // delete all attached callbacks from the publication's trigger.
+            (this.trigger as IEventSlot as IEventSlotOwner).clear();
+            notifyServiceUnpublished( this);
+            this.vn.pubs!.delete(this.id);
+            this.trigger = null;
+        }
+    }
+
+
+
+    /** ID of the published service */
+    public id: string;
+
+    /** Virtual node that created the publication */
+    public vn: VN;
+
+    /** Trigger containing the current service value */
+    public trigger: ITrigger | null;
+}
+
+
+
+/**
+ * Represents a subscription to a service held by a virtual node.
+ */
+class Subscription implements ISubscription<any>
+{
+    public constructor( id: string, vn: VN,
+        publication: Publication | undefined, defaultValue?: any, useSelf?: boolean)
+    {
+        this.id = id;
+        this.vn = vn;
+        this.defaultValue = defaultValue;
+        this.useSelf = useSelf;
+        this.setPublication(publication);
+        notifyServiceSubscribed( this);
+    }
+
+    /** Sets the trigger either from the given publication or creates a new one with the default value */
+    public setPublication( publication: Publication | undefined): void
+    {
+        if (this.trigger === publication?.trigger)
+            return;
+
+        // if we have callbacks attached to the trigger, detach them now and re-attach them to
+        // the new trigger
+        if (this.trigger && this.callbacks.size > 0)
+            this.callbacks.forEach( callback => this.trigger!.detach(callback));
+
+        this.trigger = publication?.trigger;
+        if (this.trigger)
+            this.callbacks.forEach( callback => this.trigger!.attach(callback));
+    }
+
+    /** Returns the current value of the service */
+    public get value(): any { return this.trigger?.get() ?? this.defaultValue; }
+
+	/**
+     * Notifies the node that publication information about the given service (to which the node
+     * has previously subscribed) has changed.
+     */
+	public notifyServiceChanged(): void
+	{
+        this.setPublication( findPublication( this.vn, this.id, this.useSelf));
+	}
+
+    /**
+     * Attaches the given callback to the "change" event.
+     * @param callback Function that will be called when the value of the service changes.
+     */
+    public attach( callback: (value?: any) => void): void
+    {
+        this.callbacks.add(callback);
+        this.trigger?.attach(callback);
+    }
+
+    /**
+     * Detaches the given callback from the "change" event.
+     * @param callback Function that was attached to the "change" event by the [[attach]] method.
+     */
+    public detach( callback: (value?: any) => void): void
+    {
+        this.trigger?.detach(callback);
+        this.callbacks.delete(callback);
+    }
+
+    /** Deletes this subscription */
+    public unsubscribe(): void
+    {
+        if (this.trigger)
+        {
+            // detach all our callbacks from the trigger (which belongs to the publication)
+            this.callbacks.forEach( callback => this.trigger!.detach(callback));
+            this.callbacks.clear();
+            notifyServiceUnsubscribed( this);
+            this.trigger = null;
+        }
+    }
+
+
+
+    /** ID of the subscribed service */
+    public id: string;
+
+    /** Virtual node that created the subscription */
+    public vn: VN;
+
+	/**
+     * Default value of the service that is used if none of the ancestor nodes publishes the
+     * service
+     */
+	public defaultValue: any;
+
+	/**
+     * Flag indicating whether a node can subscribe to a service that it implements itself. This
+     * is useful in case where a service that is implemented by a component can chain to a service
+     * implemented by an ancestor component.
+     */
+    public useSelf?: boolean;
+
+    /** Trigger containing the current service value */
+    public trigger?: ITrigger | null;
+
+    /**
+     * Set of attached callbacks. We need this in order to detach them from the publication's trigger.
+     */
+    private callbacks = new Set<(value?: any) => void>();
+}
+
+
+
+// Goes up the chain of nodes looking for a published service with the given ID. Returns
+// undefined if the service is not found. Note that null might be a valid value.
+function findPublication( vn: VN, id: string, useSelf?: boolean): Publication | undefined
+{
+    if (useSelf)
+    {
+        let publication = vn.pubs?.get( id);
+        if (publication !== undefined)
+            return publication;
+    }
+
+    // go up the chain; note that we don't pass the useSelf parameter on.
+    return vn.parent ? findPublication( vn.parent as VN, id, true) : undefined;
+}
+
+
+
+/**
+ * Information about service publications and subscriptions. The same service can be published
+ * and subscribed to by multiple nodes.
+ */
+class ServiceInfo
+{
+	pubs = new Map<VN,Publication>();
+	subs = new Map<VN,Subscription>();
+}
+
+// Map of service IDs to sets of virtual nodes that subscribed to this service.
+let s_serviceInfos = new Map<string,ServiceInfo>();
+
+
+
+/** Retrieves existing or creates new ServiceInfo object for the given service ID */
+function getOrCreateServiceInfo( id: string): ServiceInfo
+{
+	let info = s_serviceInfos.get( id);
+	if (!info)
+	{
+		info = new ServiceInfo();
+		s_serviceInfos.set( id, info);
+	}
+
+    return info;
+}
+
+
+
+/** Informs that a service with the given ID was published by the given node. */
+function notifyServicePublished( publication: Publication): void
+{
+	let info = getOrCreateServiceInfo( publication.id);
+	info.pubs.set( publication.vn, publication);
+
+	// notify all subscriptions that information about the service has changed
+	info.subs.forEach( subscription => subscription.notifyServiceChanged());
+}
+
+
+
+/** Informs that a service with the given ID was unpublished by the given node. */
+function notifyServiceUnpublished( publication: Publication): void
+{
+	let info = s_serviceInfos.get( publication.id);
+	if (!info)
+		return;
+
+	info.pubs.delete( publication.vn);
+
+    // notify all subscribed nodes that information about the service has changed
+	info.subs.forEach( subscription => subscription.notifyServiceChanged());
+}
+
+
+
+/** Informs that the given node has subscribed to a service with the given ID. */
+function notifyServiceSubscribed( subscription: Subscription): void
+{
+	let info = getOrCreateServiceInfo( subscription.id);
+	info.subs.set( subscription.vn, subscription);
+}
+
+
+
+/** Informs that the given node has unsubscribed from a service with the given ID. */
+function notifyServiceUnsubscribed( subscription: Subscription): void
+{
+	let info = s_serviceInfos.get( subscription.id);
+	if (!info)
+		return;
+
+	info.subs.delete( subscription.vn);
+}
 
 
 

@@ -76,6 +76,7 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
 	public clear(): void
 	{
 		this.listener = null;
+        this.rc = 0;
 		this.listeners = null;
 	}
 

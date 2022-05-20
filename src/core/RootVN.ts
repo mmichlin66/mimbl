@@ -1,4 +1,4 @@
-﻿import {IErrorHandlingService} from "../api/CompTypes"
+﻿import {IErrorHandlingService, IPublication} from "../api/CompTypes"
 
 /// #if USE_STATS
 	import {StatsCategory} from "../utils/Stats"
@@ -88,7 +88,7 @@ export class RootVN extends VN implements IErrorHandlingService
 	// This method is called right after the node has been constructed.
 	public willMount(): void
 	{
-		this.publishService( "StdErrorHandling", this);
+		this.errorHandlerPublication = this.publishService( "StdErrorHandling", this);
 	}
 
 
@@ -98,7 +98,7 @@ export class RootVN extends VN implements IErrorHandlingService
 	// This method is part of the render phase.
 	public willUnmount(): void
 	{
-		this.unpublishService( "StdErrorHandling");
+		this.errorHandlerPublication.unpublish();
 	}
 
 
@@ -158,6 +158,9 @@ export class RootVN extends VN implements IErrorHandlingService
 	}
 
 
+
+    /** Publication of the error handling service */
+    errorHandlerPublication: IPublication<"StdErrorHandling">;
 
 	// Content rendered under this root node.
 	private content: any;
