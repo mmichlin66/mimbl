@@ -1,4 +1,4 @@
-﻿import {IErrorHandlingService, IPublication} from "../api/CompTypes"
+﻿import {IErrorBoundary, IPublication} from "../api/CompTypes"
 
 /// #if USE_STATS
 	import {StatsCategory} from "../utils/Stats"
@@ -18,7 +18,7 @@ import { VN } from "./VN";
 // RootVN also manages service publishers and subscribers.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class RootVN extends VN implements IErrorHandlingService
+export class RootVN extends VN implements IErrorBoundary
 {
 	public constructor( anchorDN: DN)
 	{
@@ -59,8 +59,7 @@ export class RootVN extends VN implements IErrorHandlingService
 
 	/**
      * Recursively updates this node from the given node. This method is invoked only if update
-     * happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-     * point to a VN of the same type as this node.
+     * happens as a result of rendering the parent nodes.
      */
 	public update( disp: VNDisp): void
     {
@@ -79,7 +78,7 @@ export class RootVN extends VN implements IErrorHandlingService
 	// sub-nodes, null should be returned.
 	public render(): any
 	{
-		return this.error || this.waiting ? null : this.content;
+		return this.errMsg ?? this.waitMsg ?? this.content;
 	}
 
 
@@ -88,7 +87,7 @@ export class RootVN extends VN implements IErrorHandlingService
 	// This method is called right after the node has been constructed.
 	public willMount(): void
 	{
-		this.errorHandlerPublication = this.publishService( "StdErrorHandling", this);
+		this.errorHandlerPublication = this.publishService( "ErrorBoundary", this);
 	}
 
 
@@ -105,7 +104,15 @@ export class RootVN extends VN implements IErrorHandlingService
 
     // This method is called after an exception was thrown during rendering of the node's
     // sub-nodes. The method returns the new content to display.
-    public handleError( err: any): any
+    public reportError( err: unknown): void
+    {
+        this.handleError(err);
+        this.requestUpdate();
+    }
+
+    // This method is called after an exception was thrown during rendering of the node's
+    // sub-nodes.
+    public handleError( err: unknown): void
     {
 		if (err instanceof Promise)
 		{
@@ -113,15 +120,13 @@ export class RootVN extends VN implements IErrorHandlingService
 			this.thrownPromises.add( promise);
 			promise.then( () => { this.onPromiseFulfilled( promise); });
 			promise.catch( () => { this.onPromiseFulfilled( promise); });
-            this.waiting = true;
+            this.waitMsg = "Please wait...";
 		}
 		else
 		{
             console.error( `Unhandled error\n`, err);
-			this.error = true;
+			this.errMsg = (err as any).toString();
         }
-
-        return null;
 	}
 
 
@@ -130,16 +135,7 @@ export class RootVN extends VN implements IErrorHandlingService
 	public restart(): void
 	{
 		// clear the error and request to be updated
-		this.error = false;
-		this.requestUpdate();
-	}
-
-
-
-	// Informs that the given node has unsubscribed from a service with the given ID.
-	public reportError( err: any): void
-	{
-		this.handleError( err);
+		this.errMsg = null;
 		this.requestUpdate();
 	}
 
@@ -152,7 +148,7 @@ export class RootVN extends VN implements IErrorHandlingService
 		this.thrownPromises.delete( promise);
 		if (this.thrownPromises.size === 0)
 		{
-			this.waiting = false;
+			this.waitMsg = null;
 			this.requestUpdate();
 		}
 	}
@@ -160,18 +156,18 @@ export class RootVN extends VN implements IErrorHandlingService
 
 
     /** Publication of the error handling service */
-    errorHandlerPublication: IPublication<"StdErrorHandling">;
+    errorHandlerPublication: IPublication<"ErrorBoundary">;
 
-	// Content rendered under this root node.
+	/** Content rendered under this root node. */
 	private content: any;
 
-	// Flag indicating that an exception was caught from descendand nodes.
-	private error: boolean = false;
+	/** Message from the error that was caught from descendand nodes. */
+	private errMsg: string | null = null;
 
-	// Flag indicating that a promise thrown as exception was caught from descendand nodes.
-	private waiting: boolean = false;
+	/** Message about waiting for a promise thrown as exception that was caught from descendand nodes. */
+	private waitMsg: string | null = null;
 
-	// Set of promises thrown by descendant nodes and not yet fulfilled.
+	/** Set of promises thrown by descendant nodes and not yet fulfilled. */
 	private thrownPromises = new Set<Promise<any>>();
 }
 

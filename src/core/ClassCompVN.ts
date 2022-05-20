@@ -153,7 +153,8 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
                 // content but we do it without try/catch this time; otherwise, we may end
                 // up in an infinite loop. We also set our component as current again.
                 setCurrentClassComp(comp);
-                mountContent( this, comp.handleError( err), newAnchorDN, newBeforeDN);
+                comp.handleError(err);
+                mountContent( this, this.actRender(), newAnchorDN, newBeforeDN);
             }
         }
 
@@ -258,11 +259,11 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
                     console.debug( `Calling handleError() on node ${this.name}. Error`, err);
                 /// #endif
 
-                // let the component handle the error and re-render; then we render the new
-                // content but we do it without try/catch this time; otherwise, we may end
-                // up in an infinite loop
+                // let the component handle the error; then we render the new content but we do it
+                // without try/catch this time; otherwise, we may end up in an infinite loop.
                 setCurrentClassComp(comp);
-                reconcile( this, {oldVN: disp.oldVN}, comp.handleError( err));
+                comp.handleError(err);
+                reconcile( this, {oldVN: disp.oldVN}, this.actRender());
             }
         }
 
@@ -295,21 +296,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         setCurrentClassComp( prevCreator);
         return content;
 	}
-
-
-
-    // // This method is called after an exception was thrown during rendering of the node's
-    // // sub-nodes. The method returns the new content to display.
-	// public handleError( err: any): any
-	// {
-    //     // we can safely call the component's handleError method because our method is only
-    //     // invoked if the component implements it.
-    //     let prevCreator = setCurrentClassComp( this.comp);
-	// 	let content = this.comp!.handleError!( err);
-    //     setCurrentClassComp( prevCreator);
-
-    //     return content;
-	// }
 
 
 

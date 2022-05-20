@@ -151,11 +151,15 @@ export interface IComponent<TProps = {}, TChildren = any>
      * If this method is not implemented or if it throws an error, the error will be propagated up
      * the chain of components until it reaches a component that handles it. If none of the
      * components can handle the error, the entire tree will be unmounted.
-	 * @param err An exception that was thrown during the component's own rendering or rendering
+     *
+     * This method should only change the internal state of the component so that the [[render]]
+     * method, which will be invoked right after the `handleError` method returns, will return
+     * content reflecting the error.
+     *
+	 * @param err An error object that was thrown during the component's own rendering or rendering
 	 * of one of its descendants.
-	 * @returns New content to be displayed for the component.
 	 */
-	handleError?( err: any): any;
+	handleError?( err: unknown): void;
 
 	/**
 	 * Retrieves update strategy object that determines different aspects of component behavior
@@ -418,30 +422,24 @@ export interface ICustomWebElements
 export interface IServiceDefinitions
 {
 	/** Built-in error handling service. */
-	"StdErrorHandling": IErrorHandlingService;
-
-	/**
-	 * Built-in service for lazy people - can be used for quick prototypes without the need to
-	 * augment the interface.
-	 */
-	"any": any;
+	"ErrorBoundary": IErrorBoundary;
 }
 
 
 
 /**
- * The IErrorHandlingService interface represents a service that can be invoked when an error -
+ * The IErrorBoundary interface represents a service that can be invoked when an error -
  * usually an exception - is encountered but cannot be handled locally. A component that implements
- * this service would normally remember the error and request to update itself, so that in its
- * render method it will present the error to the user.
+ * this service would normally remember the error and update itself, so that in its render method
+ * it will present the error to the user.
  *
- * The IErrorHandlingService is implemented by the Root Virtual Node as a last resort for error
+ * The IErrorBoundary is implemented by the Root Virtual Node as a last resort for error
  * handling. The Root VN will display a simple UI showing the error and will allow the user to
  * restart - in the hope that the error will not repeat itself.
  */
-export interface IErrorHandlingService
+export interface IErrorBoundary
 {
-	reportError( err: any): void;
+	reportError( err: unknown): void;
 }
 
 

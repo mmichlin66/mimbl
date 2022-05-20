@@ -314,13 +314,13 @@ const performMimbleTick = (): void =>
             {
                 // find the nearest error handling service. If nobody else, it is implemented
                 // by the RootVN object.
-                let errorService = vn.getService( "StdErrorHandling");
+                let errorService = vn.getService( "ErrorBoundary");
                 if (errorService)
                     errorService.reportError( err);
 
                 /// #if DEBUG
                 else
-                    console.error( "BUG: performChildrenOperation threw exception but StdErrorHandling service was not found.", err);
+                    console.error( "BUG: performChildrenOperation threw exception but ErrorBoundary service was not found.", err);
                 /// #endif
             }
         });

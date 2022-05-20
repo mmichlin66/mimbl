@@ -243,7 +243,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
     didReplace?( oldComp: IComponent<TProps, TChildren>): void;
 	willUnmount?(): void;
 	shouldUpdate?( newProps: CompProps<TProps,TChildren>): boolean;
-	handleError?( err: any): any;
+	handleError?( err: unknown): void;
 	getUpdateStrategy?(): UpdateStrategy;
 
     /**

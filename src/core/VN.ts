@@ -302,7 +302,7 @@ export abstract class VN implements IVN
      * Returns a function that wraps the given callback so that when the return function is called
      * the original callback is invoked in a proper context.
      */
-    wrap<T extends Function>( func: T, thisArg: any, arg?: any, schedulingType?: TickSchedulingType): T
+    public wrap<T extends Function>( func: T, thisArg: any, arg?: any, schedulingType?: TickSchedulingType): T
     {
         return CallbackWrapper.bind( { func, thisArg, arg, schedulingType}) as T;
     }
@@ -342,7 +342,7 @@ export abstract class VN implements IVN
      * this or a closest ancestor component is changed, the subscription's `value` property will
      * receive the new value.
 	 */
-    subscribeService( id: string, defaultValue?: any, useSelf?: boolean): ISubscription<any>
+    public subscribeService( id: string, defaultValue?: any, useSelf?: boolean): ISubscription<any>
     {
 		if (!this.subs)
 			this.subs = new Map();
