@@ -364,6 +364,12 @@ export let symRenderNoWatcher = Symbol();
 
 
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Pub/Sub mechanism
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 /**
  * Represents a publication of a service held by a virtual node.
  */
@@ -519,8 +525,10 @@ class Subscription implements ISubscription<any>
 
 
 
-// Goes up the chain of nodes looking for a published service with the given ID. Returns
-// undefined if the service is not found. Note that null might be a valid value.
+/**
+ * Goes up the chain of nodes looking for a published service with the given ID. Returns undefined
+ * if the service is not found. Note that null might be a valid value.
+ */
 function findPublication( vn: VN, id: string, useSelf?: boolean): Publication | undefined
 {
     if (useSelf)
@@ -530,8 +538,12 @@ function findPublication( vn: VN, id: string, useSelf?: boolean): Publication | 
             return publication;
     }
 
-    // go up the chain; note that we don't pass the useSelf parameter on.
-    return vn.parent ? findPublication( vn.parent as VN, id, true) : undefined;
+    // go up the chain; note that we don't pass the useSelf parameter on bus pass `true`. If the
+    // parent is undefined (that is, this is a root VN), check whether it has a creator. If it
+    // does, this means that there is another, higher-level, component hierarchy, so we keep
+    // looking there.
+    let higherVN = vn.parent ?? vn.creator?.vn;
+    return higherVN ? findPublication( higherVN as VN, id, true) : undefined;
 }
 
 
