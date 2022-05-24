@@ -209,12 +209,9 @@ export type UpdateStrategy =
 
 
 
-/** Type defining the information that can be supplied for a callback to be wrapped */
-export interface CallbackWrappingParams<T extends Function = Function>
+/** Type defining the options that can be supplied for a callback to be wrapped */
+export type CallbackWrappingOptions =
 {
-	/** Callback function */
-	func: T;
-
 	/** Object that will be referenced by "this" within the callback function */
 	thisArg?: any;
 
@@ -226,6 +223,15 @@ export interface CallbackWrappingParams<T extends Function = Function>
 
 	/** Type of scheduling the Mimbl tick after the callback function returns. */
 	schedulingType?: TickSchedulingType;
+};
+
+
+
+/** Type defining the information that can be supplied for a callback to be wrapped */
+export type CallbackWrappingParams<T extends Function = Function> = CallbackWrappingOptions &
+{
+	/** Callback function */
+	func: T;
 };
 
 
@@ -434,8 +440,7 @@ export interface IServiceDefinitions
  * it will present the error to the user.
  *
  * The IErrorBoundary is implemented by the Root Virtual Node as a last resort for error
- * handling. The Root VN will display a simple UI showing the error and will allow the user to
- * restart - in the hope that the error will not repeat itself.
+ * handling.
  */
 export interface IErrorBoundary
 {
@@ -572,31 +577,6 @@ export interface IVNode
 
 
 
-	/**
-	 * Schedules the given function to be called either before any components scheduled to be
-     * updated in the Mimbl tick are updated or after all components have been updated.
-	 * @param func Function to be called
-     * @param beforeUpdate Flag indicating whether the function will be called just before the Mimbl
-     * tick (true) or right after (false)
-	 * @param thisArg Object that will be used as "this" value when the function is called. If this
-	 *   parameter is undefined, the component instance will be used (which allows scheduling
-	 *   regular unbound components' methods). This parameter will be ignored if the function
-	 *   is already bound or is an arrow function.
-	 */
-	callMe( func: ScheduledFuncType, beforeUpdate: boolean, thisArg?: any): void;
-
-    /**
-     * Returns a function that wraps the given callback so that when the return function is called
-     * the original callback is invoked in a proper context.
-     * @param func Callback function to be wrapped
-     * @param thisArg Object to be used as `this` when calling the callback
-     * @param arg Optional argument to be passed to the callback in addition to the original
-     * callback arguments.
-     * @param schedulingType Type of scheduling the Mimbl tick after the callback function returns.
-     * @returns Wrapped callback that will run the original callback in the proper context.
-     */
-    wrap<T extends Function>( func: T, thisArg: any, arg?: any, schedulingType?: TickSchedulingType): T;
-
     /**
 	 * Registers the given value as a service with the given ID that will be available for
      * consumption by descendant components.
@@ -683,26 +663,31 @@ export interface IClassCompVN extends IVNode
      * @param arg Optional argument to pass to the rendering function.
      */
 	updateMe( func?: RenderMethodType, arg?: any): void;
-}
 
+	/**
+	 * Schedules the given function to be called either before any components scheduled to be
+     * updated in the Mimbl tick are updated or after all components have been updated.
+	 * @param func Function to be called
+     * @param beforeUpdate Flag indicating whether the function will be called just before the Mimbl
+     * tick (true) or right after (false)
+	 * @param thisArg Object that will be used as "this" value when the function is called. If this
+	 *   parameter is undefined, the component instance will be used (which allows scheduling
+	 *   regular unbound components' methods). This parameter will be ignored if the function
+	 *   is already bound or is an arrow function.
+	 */
+    callMe( func: ScheduledFuncType, beforeUpdate: boolean, thisArg?: any): void;
 
-
-/**
- * The IManagedCompVN interface represents a virtual node for a JSX-based component.
- */
-export interface IManagedCompVN extends IClassCompVN
-{
-	/** Gets the component class. */
-	readonly compClass: IComponentClass;
-}
-
-
-
-/**
- * The IIndependentCompVN interface represents a virtual node for an independent component.
- */
-export interface IIndependentCompVN extends IClassCompVN
-{
+    /**
+     * Returns a function that wraps the given callback so that when the return function is called
+     * the original callback is invoked in a proper context.
+     * @param func Callback function to be wrapped
+     * @param thisArg Object to be used as `this` when calling the callback
+     * @param arg Optional argument to be passed to the callback in addition to the original
+     * callback arguments.
+     * @param schedulingType Type of scheduling the Mimbl tick after the callback function returns.
+     * @returns Wrapped callback that will run the original callback in the proper context.
+     */
+    wrap<T extends Function>( func: T, thisArg: any, arg?: any, schedulingType?: TickSchedulingType): T;
 }
 
 

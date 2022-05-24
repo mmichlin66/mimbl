@@ -1,11 +1,10 @@
-﻿import {IErrorBoundary, IPublication} from "../api/CompTypes"
+﻿import {IErrorBoundary} from "../api/CompTypes"
+import { DN } from "./VNTypes";
 
 /// #if USE_STATS
 	import {StatsCategory} from "../utils/Stats"
 /// #endif
 
-import { scheduleFuncCall } from "./Reconciler";
-import { DN, VNDisp } from "./VNTypes";
 import { VN } from "./VN";
 
 
@@ -14,8 +13,7 @@ import { VN } from "./VN";
 //
 // The RootVN class is used as a top-level virtual node for all rendered trees. RootVN serves
 // as an error boundary of last resort. When it catches an error that wasn't caught by any
-// descendand node, it displays a simple UI that shows the error and allows the user to restart.
-// RootVN also manages service publishers and subscribers.
+// descendand node, it displays a simple UI that shows the error.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export class RootVN extends VN implements IErrorBoundary
@@ -25,12 +23,12 @@ export class RootVN extends VN implements IErrorBoundary
 		super();
 
 		this.anchorDN = anchorDN;
-	};
+	}
 
 
 
 	/// #if USE_STATS
-		public get statsCategory(): StatsCategory { return StatsCategory.Root; }
+    public get statsCategory(): StatsCategory { return StatsCategory.Root; }
 	/// #endif
 
 	// String representation of the virtual node. This is used mostly for tracing and error
@@ -40,33 +38,8 @@ export class RootVN extends VN implements IErrorBoundary
 
 
 
-	/**
-     * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
-     * and before the given node.
-     */
-	public mount( parent: VN, index: number, anchorDN: DN, beforeDN?: DN | null): void
-    {
-        super.mount( parent, index, anchorDN);
-    }
-
-    /**
-     * Recursively removes the content of this virtual node from DOM.
-     */
-	public unmount( removeFromDOM: boolean): void
-    {
-        super.unmount( removeFromDOM);
-    }
-
-	/**
-     * Recursively updates this node from the given node. This method is invoked only if update
-     * happens as a result of rendering the parent nodes.
-     */
-	public update( disp: VNDisp): void
-    {
-    }
-
 	// Sets the content to be rendered under this root node and triggers update.
-	public setContent( content: any, sync: boolean): void
+	public setContent( content: any): void
 	{
 		this.content = content;
 		this.requestUpdate();
@@ -79,25 +52,6 @@ export class RootVN extends VN implements IErrorBoundary
 	public render(): any
 	{
 		return this.errMsg ?? this.waitMsg ?? this.content;
-	}
-
-
-
-	// Creates internal stuctures of the virtual node so that it is ready to produce children.
-	// This method is called right after the node has been constructed.
-	public willMount(): void
-	{
-		this.errorHandlerPublication = this.publishService( "ErrorBoundary", this);
-	}
-
-
-
-	// This method is called before the content of node and all its sub-nodes is removed from the
-	// DOM tree.
-	// This method is part of the render phase.
-	public willUnmount(): void
-	{
-		this.errorHandlerPublication.unpublish();
 	}
 
 
@@ -131,16 +85,6 @@ export class RootVN extends VN implements IErrorBoundary
 
 
 
-	// Displays the content originally passed in the constructor.
-	public restart(): void
-	{
-		// clear the error and request to be updated
-		this.errMsg = null;
-		this.requestUpdate();
-	}
-
-
-
 	// Removes the fulfilled promise from our internal list and if the list is empty asks to
 	// re-render
 	private onPromiseFulfilled( promise: Promise<any>): void
@@ -154,9 +98,6 @@ export class RootVN extends VN implements IErrorBoundary
 	}
 
 
-
-    /** Publication of the error handling service */
-    errorHandlerPublication: IPublication<"ErrorBoundary">;
 
 	/** Content rendered under this root node. */
 	private content: any;
@@ -181,21 +122,31 @@ let symRootMountPoint = Symbol("rootMountPoint");
 // under the given HTML element.
 export function mountRoot( content: any, anchorDN: DN): void
 {
-	let realAnchorDN: DN = anchorDN ? anchorDN : document.body;
+	let realAnchorDN = anchorDN ?? document.body;
+	if (!realAnchorDN)
+    {
+        /// #if DEBUG
+        console.error( `Trying to mount under non-existing '<body>' element`);
+        /// #endif
+
+		return;
+    }
 
 	// check whether we already have root node remembered in the anchor element's well-known
 	// property
-	let rootVN: RootVN = realAnchorDN[symRootMountPoint];
+	let rootVN = realAnchorDN[symRootMountPoint] as RootVN;
 	if (!rootVN)
 	{
 		// create root node and remember it in the anchor element's well-known property
 		rootVN = new RootVN( realAnchorDN);
         realAnchorDN[symRootMountPoint] = rootVN;
-        rootVN.willMount();
 	}
 
+    // publish ErrorBoundary service
+    rootVN.publishService( "ErrorBoundary", rootVN);
+
 	// set content to the root node, which will trigger update
-	rootVN.setContent( content, false);
+	rootVN.setContent(content);
 }
 
 
@@ -203,21 +154,29 @@ export function mountRoot( content: any, anchorDN: DN): void
 // Unmounts a root node that was created using mountRoot.
 export function unmountRoot( anchorDN: DN): void
 {
-	let realAnchorDN: DN = anchorDN ? anchorDN : document.body;
+	let realAnchorDN: DN = anchorDN ?? document.body;
 	if (!realAnchorDN)
+    {
+        /// #if DEBUG
+        console.error( `Trying to unmount under non-existing '<body>' element`);
+        /// #endif
+
 		return;
+    }
 
 	// get our root node from the anchor element's well-known property.
-	let rootVN: RootVN = realAnchorDN[symRootMountPoint];
+	let rootVN = realAnchorDN[symRootMountPoint] as RootVN;
 	if (!rootVN)
 		return;
+
+    // unpublish ErrorBoundary service
+    rootVN.clearPubSub();
 
 	// remove our root node from the anchor element's well-known property
 	delete realAnchorDN[symRootMountPoint];
 
 	// destruct the root node (asynchronously)
-	rootVN.setContent( null, false);
-    scheduleFuncCall( rootVN.willUnmount, false, rootVN);
+	rootVN.setContent(null);
 }
 
 

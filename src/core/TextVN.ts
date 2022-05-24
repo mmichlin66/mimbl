@@ -113,6 +113,11 @@ export class TextVN extends VN implements ITextVN
 
 
 
+	// Determines whether the update of this node from the given node is possible. The newVN
+	// parameter is guaranteed to point to a VN of the same type as this node. If this method is
+	// not implemented the update is considered possible - e.g. for text nodes.
+	isUpdatePossible?( newVN: VN): boolean;
+
 	// Updates this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node.
@@ -184,7 +189,6 @@ export class TextVN extends VN implements ITextVN
 // Define methods/properties that are invoked during mounting/unmounting/updating and which don't
 // have or have trivial implementation so that lookup is faster.
 
-TextVN.prototype.render = undefined;
 TextVN.prototype.isUpdatePossible = undefined; // this means that update is always possible
 
 

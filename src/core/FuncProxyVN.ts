@@ -261,9 +261,3 @@ export class FuncProxyVN extends VN
 
 
 
-// Define methods/properties that are invoked during mounting/unmounting/updating and which don't
-// have or have trivial implementation so that lookup is faster.
-FuncProxyVN.prototype.isUpdatePossible = undefined; // this means that update is always possible
-
-
-

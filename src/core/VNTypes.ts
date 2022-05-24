@@ -92,7 +92,7 @@ export interface IVN extends IVNode
      * happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
      * point to a VN of the same type as this node.
      */
-	update( newVN: IVN, disp: VNDisp): void;
+	update?( newVN: IVN, disp: VNDisp): void;
 
 	// Returns content that comprises the children of the node. If the node doesn't have
 	// sub-nodes, null should be returned. If this method is not implemented that means the node

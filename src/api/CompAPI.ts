@@ -1,4 +1,5 @@
 ﻿import {
+    CallbackWrappingOptions,
     CallbackWrappingParams, ComponentShadowOptions, CompProps, IClassCompVN,
     IComponent, ICustomAttributeHandlerClass, IRef, ITextVN, IVNode, PromiseProxyProps, PropType,
     RefFunc, RenderMethodType, ScheduledFuncType, TickSchedulingType, UpdateStrategy
@@ -38,7 +39,7 @@ import { DN } from "../core/VNTypes";
  * class SecondWidgetStyles extends css.StyleDefinition {...}
  * ```
  */
- export const withShadow = (options: Function | ComponentShadowOptions): any =>
+export const withShadow = (options: Function | ComponentShadowOptions): any =>
     typeof options === "function"
         ? shadowDecorator( true, options)
         : shadowDecorator.bind( undefined, options)
@@ -47,11 +48,18 @@ import { DN } from "../core/VNTypes";
 
 /**
  * Wraps the given callback and returns a function with identical signature.
- * @param params
+ * @param options
  */
-export function wrapCallback<T extends Function>( params?: CallbackWrappingParams<T>): T
+export function wrapCallback<T extends Function>( func: T, options?: CallbackWrappingOptions): T
 {
-    return CallbackWrapper.bind( params);
+    let comp = getCurrentClassComp();
+    return CallbackWrapper.bind( {
+        func,
+        thisArg: options?.thisArg ?? comp,
+        arg: options?.arg,
+        comp: options?.comp ?? comp,
+        schedulingType: options?.schedulingType
+    });
 }
 
 
@@ -236,16 +244,6 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
         this.props = newProps;
     }
 
-    // Declare the methods that are invoked during component lifecicle.
-	displayName?: string;
-    willMount?(): void;
-    didMount?(): void;
-    didReplace?( oldComp: IComponent<TProps, TChildren>): void;
-	willUnmount?(): void;
-	shouldUpdate?( newProps: CompProps<TProps,TChildren>): boolean;
-	handleError?( err: unknown): void;
-	getUpdateStrategy?(): UpdateStrategy;
-
     /**
      * Determines whether the component is currently mounted. If a component has asynchronous
      * functionality (e.g. fetching data from a server), component's code may be executed after
@@ -256,7 +254,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	/**
 	 * This method is called by the component to request to be updated. If no arguments are
 	 * provided, the entire component is requested to be updated. If arguments are provided, they
-	 * indicate what rendering functions should be updated.
+	 * indicate what rendering function should be updated.
      * @param func Optional rendering function to invoke
      * @param arg Optional argument to pass to the rendering function.
      */
@@ -285,7 +283,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * @param func Function to be called
 	 * @param thisArg Object that will be used as "this" value when the function is called. If this
 	 *   parameter is undefined, the component instance will be used (which allows scheduling
-	 *   regular unbound components' methods). This parameter will be ignored if the the function
+	 *   regular unbound components' methods). This parameter will be ignored if the function
 	 *   is already bound or is an arrow function.
 	 */
 	protected callMeAfterUpdate( func: ScheduledFuncType, thisArg?: any): void
@@ -309,18 +307,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
     {
         return this.vn?.wrap( func, thisArg ?? this, arg, schedulingType);
     }
-
 }
-
-// Make the methods that are invoked during component lifecycle undefined so that lookup is faster.
-Component.prototype.displayName = undefined;
-Component.prototype.willMount = undefined;
-Component.prototype.didMount = undefined;
-Component.prototype.didReplace = undefined;
-Component.prototype.willUnmount = undefined;
-Component.prototype.shouldUpdate = undefined;
-Component.prototype.handleError = undefined;
-Component.prototype.getUpdateStrategy = undefined;
 
 
 

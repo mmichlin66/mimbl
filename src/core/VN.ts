@@ -1,16 +1,16 @@
 ﻿import {
-    IComponent, RefPropType, UpdateStrategy, TickSchedulingType, RefType, ScheduledFuncType, ISubscription, IPublication
+    IComponent, UpdateStrategy, TickSchedulingType, RefType, ISubscription, IPublication
 } from "../api/CompTypes";
 import { IEventSlot, IEventSlotOwner } from "../api/EventSlotTypes";
 import { createTrigger } from "../api/TriggerAPI";
 import { ITrigger } from "../api/TriggerTypes";
+import { ChildrenUpdateRequest, DN, IVN } from "./VNTypes";
 
 /// #if USE_STATS
     import {StatsCategory} from "../utils/Stats"
 /// #endif
 
-import { CallbackWrapper, getCurrentClassComp, requestNodeUpdate, scheduleFuncCall } from "./Reconciler";
-import { ChildrenUpdateRequest, DN, IVN, VNDisp } from "./VNTypes";
+import { getCurrentClassComp, requestNodeUpdate } from "./Reconciler";
 
 
 
@@ -45,10 +45,7 @@ export abstract class VN implements IVN
 	// Parent node. This is null for the top-level (root) nodes.
 	public parent?: VN | null;
 
-    /** Only defined for class component nodes. */
-    public comp?: IComponent;
-
-    /** Class component that created this node in its render method (or undefined). */
+    /** Class component that created this node in its render method. */
     public creator?: IComponent | null;
 
 	/**
@@ -119,9 +116,6 @@ export abstract class VN implements IVN
      */
 	public mount( parent: VN | null, index: number, anchorDN: DN, beforeDN: DN = null): void
     {
-        if (!this.creator)
-            this.creator = getCurrentClassComp();
-
         this.parent = parent;
         this.index = index;
         this.anchorDN = anchorDN;
@@ -131,6 +125,15 @@ export abstract class VN implements IVN
      * Recursively removes the content of this virtual node from DOM.
      */
 	public unmount( removeFromDOM: boolean): void
+    {
+        this.parent = null;
+        this.anchorDN = null;
+    }
+
+    /**
+     * Removes all publications and subscriptions
+     */
+	public clearPubSub(): void
     {
         if (this.pubs)
         {
@@ -143,32 +146,7 @@ export abstract class VN implements IVN
             this.subs.forEach( subscription => subscription.unsubscribe());
             this.subs = undefined;
         }
-
-        this.parent = null;
-        this.anchorDN = null;
     }
-
-	// Determines whether the update of this node from the given node is possible. The newVN
-	// parameter is guaranteed to point to a VN of the same type as this node. If this method is
-	// not implemented the update is considered possible - e.g. for text nodes.
-	public isUpdatePossible?( newVN: IVN): boolean;
-
-	/**
-     * Recursively updates this node from the given node. This method is invoked only if update
-     * happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-     * point to a VN of the same type as this node.
-     */
-	public abstract update( newVN: IVN, disp: VNDisp): void;
-
-	// Returns content that comprises the children of the node. If the node doesn't have
-	// sub-nodes, null should be returned. If this method is not implemented that means the node
-	// never has children - for example text nodes.
-	public render?(): any;
-
-    // This method is called if the node requested a "partial" update. Different types of virtual
-    // nodes can keep different data for the partial updates; for example, ElmVN can keep new
-    // element properties that can be updated without re-rendering its children.
-	public performPartialUpdate?(): void;
 
 
 
@@ -246,15 +224,15 @@ export abstract class VN implements IVN
 
 
 
-	// Level of nesting at which the node resides relative to the root node.
-	public get depth(): number
-    {
-        let depth = 0;
-        for( let p = this.parent; p; p = p.parent)
-            depth++;
+	// // Level of nesting at which the node resides relative to the root node.
+	// public get depth(): number
+    // {
+    //     let depth = 0;
+    //     for( let p = this.parent; p; p = p.parent)
+    //         depth++;
 
-        return depth;
-    }
+    //     return depth;
+    // }
 
 
 
@@ -279,33 +257,6 @@ export abstract class VN implements IVN
 			this.partialUpdateRequested = true;
 		}
 	}
-
-
-
-	/**
-	 * Schedules the given function to be called before any components scheduled to be updated in
-	 * the Mimbl tick are updated.
-	 * @param func Function to be called
-	 * @param thisArg Object that will be used as "this" value when the function is called. If this
-	 *   parameter is undefined, the component instance will be used (which allows scheduling
-	 *   regular unbound components' methods). This parameter will be ignored if the function
-	 *   is already bound or is an arrow function.
-	 */
-	public callMe( func: ScheduledFuncType, beforeUpdate: boolean, thisArg?: any): void
-	{
-		scheduleFuncCall( func, beforeUpdate, thisArg ?? this.comp, this.comp);
-	}
-
-
-
-    /**
-     * Returns a function that wraps the given callback so that when the return function is called
-     * the original callback is invoked in a proper context.
-     */
-    public wrap<T extends Function>( func: T, thisArg: any, arg?: any, schedulingType?: TickSchedulingType): T
-    {
-        return CallbackWrapper.bind( { func, thisArg, arg, schedulingType}) as T;
-    }
 
 
 

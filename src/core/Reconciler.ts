@@ -1,5 +1,5 @@
 ﻿import {
-    ScheduledFuncType, CallbackWrappingParams, TickSchedulingType, IComponent
+    ScheduledFuncType, CallbackWrappingParams, TickSchedulingType, IComponent, IErrorBoundary
 } from "../api/CompTypes"
 import {
     ChildrenUpdateRequest, ChildrenUpdateOperation, SetRequest, SpliceRequest, MoveRequest,
@@ -312,8 +312,7 @@ const performMimbleTick = (): void =>
             }
             catch( err)
             {
-                // find the nearest error handling service. If nobody else, it is implemented
-                // by the RootVN object.
+                // find the nearest error handling service.
                 let errorService = vn.getService( "ErrorBoundary");
                 if (errorService)
                     errorService.reportError( err);
@@ -1029,8 +1028,7 @@ const updateSubNodesByNodes = (parentVN: IVN, disp: VNDisp, anchorDN: DN, before
     for( let i = subNodeDisps.length - 1; i >= 0; i--)
     {
         let subNodeDisp = subNodeDisps[i];
-        let newVN = subNodeDisp.newVN;
-        let oldVN = subNodeDisp.oldVN;
+        let newVN = subNodeDisp.newVN!;
 
         // since we might be updating only a portion of the old sub-nodes, get the real index
         let index = disp.oldStartIndex! + i;
@@ -1042,7 +1040,7 @@ const updateSubNodesByNodes = (parentVN: IVN, disp: VNDisp, anchorDN: DN, before
         {
             // we must put the node in the list of sub-nodes before calling mountNode because it
             // may use this info if the node is cloned
-            parentSubNodes[index] = svn = newVN!;
+            parentSubNodes[index] = svn = newVN;
 
             // if mountNode clones the node, it puts the new node into the list of sub-nodes
             // and returns it; otherwise, it returns the original node.
@@ -1050,24 +1048,25 @@ const updateSubNodesByNodes = (parentVN: IVN, disp: VNDisp, anchorDN: DN, before
         }
         else // Update or NoChange
         {
-            parentSubNodes[index] = svn = oldVN!;
+            let oldVN = subNodeDisp.oldVN!;
+            parentSubNodes[index] = svn = oldVN;
             if (oldVN !== newVN)
             {
-                // if the creator for the new element is not determined yet, use current component
-                if (!newVN!.creator)
-                    newVN!.creator = s_currentClassComp;
+                // // if the creator for the new element is not determined yet, use current component
+                // if (!newVN.creator)
+                //     newVN.creator = s_currentClassComp;
 
                 /// #if VERBOSE_NODE
-                    console.debug( `Calling update() on node ${oldVN!.name}`);
+                    console.debug( `Calling update() on node ${oldVN.name}`);
                 /// #endif
 
                 // update method must exists for nodes with action Update
-                oldVN!.update( newVN!, subNodeDisp);
+                oldVN.update!( newVN, subNodeDisp);
             }
 
             // determine whether all the nodes under this VN should be moved.
-            if (index !== oldVN!.index)
-                moveNode( oldVN!, anchorDN, beforeDN);
+            if (index !== oldVN.index)
+                moveNode( oldVN, anchorDN, beforeDN);
 
             // we must assign the new index after the comparison above because otherwise the
             // comparison will not work
@@ -1134,16 +1133,16 @@ const updateSubNodesByGroups = (parentVN: IVN, disp: VNDisp, anchorDN: DN, befor
 
                 if (oldVN !== newVN)
                 {
-                    // if the creator for the new element is not determined yet, use current component
-                    if (!newVN.creator)
-                        newVN.creator = s_currentClassComp;
+                    // // if the creator for the new element is not determined yet, use current component
+                    // if (!newVN.creator)
+                    //     newVN.creator = s_currentClassComp;
 
                     /// #if VERBOSE_NODE
                         console.debug( `Calling update() on node ${oldVN.name}`);
                     /// #endif
 
                     // update method must exists for nodes with action Update
-                    oldVN.update( newVN, subNodeDisp);
+                    oldVN.update!( newVN, subNodeDisp);
                 }
             }
         }
@@ -1194,10 +1193,10 @@ const updateSubNodesByGroups = (parentVN: IVN, disp: VNDisp, anchorDN: DN, befor
 				// if the current group now resides before the previous group, then that means
 				// that we are swapping two groups. In this case we want to move the shorter one.
                 let prevGroup = groups[i-1];
-				if (group.lastDN.nextSibling === prevGroup.firstDN && group.count! > prevGroup.count!)
+				if (group.lastDN.nextSibling === prevGroup.firstDN && group.count > prevGroup.count)
 					moveGroup( prevGroup, subNodeDisps, anchorDN, group.firstDN!);
 				else
-					moveGroup( group, subNodeDisps, anchorDN, currBeforeDN!);
+					moveGroup( group, subNodeDisps, anchorDN, currBeforeDN);
 			}
 
 			// the group's first DN becomes the new beforeDN. Note that firstDN cannot be null

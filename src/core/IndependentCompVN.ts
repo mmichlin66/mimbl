@@ -1,4 +1,4 @@
-﻿import {IIndependentCompVN, IComponent, IComponentClass} from "../api/CompTypes"
+﻿import {IComponent, IComponentClass} from "../api/CompTypes"
 import { ClassCompVN } from "./ClassCompVN";
 import { moveNode } from "./Reconciler";
 import { DN, VNDisp } from "./VNTypes";
@@ -12,7 +12,7 @@ import { VN } from "./VN";
 // object. The component instance also serves as the node's key.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class IndependentCompVN extends ClassCompVN implements IIndependentCompVN
+export class IndependentCompVN extends ClassCompVN
 {
 	constructor( comp: IComponent)
 	{

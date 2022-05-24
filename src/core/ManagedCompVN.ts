@@ -1,6 +1,6 @@
-﻿import {IManagedCompVN, IComponentClass, RefPropType} from "../api/CompTypes"
-import { ClassCompVN } from "./ClassCompVN";
+﻿import {IComponentClass, RefPropType} from "../api/CompTypes"
 import { DN, VNDisp } from "./VNTypes";
+import { ClassCompVN } from "./ClassCompVN";
 import { VN, setRef } from "./VN";
 
 
@@ -10,7 +10,7 @@ import { VN, setRef } from "./VN";
 // Represents a managed component implementing the IComponent<> interface.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class ManagedCompVN extends ClassCompVN implements IManagedCompVN
+export class ManagedCompVN extends ClassCompVN
 {
 	constructor( compClass: IComponentClass, props: any, children: any[])
 	{

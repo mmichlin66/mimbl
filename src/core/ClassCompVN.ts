@@ -1,5 +1,6 @@
 ﻿import {
-    IClassCompVN, IComponent, RenderMethodType, IComponentClass, ComponentShadowOptions
+    IClassCompVN, IComponent, RenderMethodType, IComponentClass, ComponentShadowOptions,
+    ScheduledFuncType, TickSchedulingType
 } from "../api/CompTypes"
 import { DN, VNDisp } from "./VNTypes";
 import { IWatcher } from "../api/TriggerTypes";
@@ -10,7 +11,10 @@ import { IWatcher } from "../api/TriggerTypes";
 
 import { createWatcher } from "../api/TriggerAPI";
 import { FuncProxyVN } from "./FuncProxyVN";
-import { setCurrentClassComp, mountContent, unmountSubNodes, reconcile } from "./Reconciler";
+import {
+    setCurrentClassComp, mountContent, unmountSubNodes, reconcile, scheduleFuncCall,
+    CallbackWrapper
+} from "./Reconciler";
 import { symRenderNoWatcher, VN } from "./VN";
 
 
@@ -195,6 +199,9 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
             setCurrentClassComp( prevCreator);
         }
 
+        // unpublish and unsubscribe
+        this.clearPubSub();
+
         comp.vn = undefined;
     }
 
@@ -307,6 +314,33 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 			this.requestUpdate();
 		else
             FuncProxyVN.update( func, arg);
+    }
+
+
+
+	/**
+	 * Schedules the given function to be called before any components scheduled to be updated in
+	 * the Mimbl tick are updated.
+	 * @param func Function to be called
+	 * @param thisArg Object that will be used as "this" value when the function is called. If this
+	 *   parameter is undefined, the component instance will be used (which allows scheduling
+	 *   regular unbound components' methods). This parameter will be ignored if the function
+	 *   is already bound or is an arrow function.
+	 */
+	public callMe( func: ScheduledFuncType, beforeUpdate: boolean, thisArg?: any): void
+	{
+		scheduleFuncCall( func, beforeUpdate, thisArg ?? this.comp, this.comp);
+	}
+
+
+
+    /**
+     * Returns a function that wraps the given callback so that when the return function is called
+     * the original callback is invoked in a proper context.
+     */
+    public wrap<T extends Function>( func: T, thisArg: any, arg?: any, schedulingType?: TickSchedulingType): T
+    {
+        return CallbackWrapper.bind( { func, thisArg: thisArg ?? this.comp, arg, comp: this, schedulingType}) as T;
     }
 
 
