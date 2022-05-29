@@ -1,10 +1,10 @@
 ﻿import {
-    IComponent, UpdateStrategy, TickSchedulingType, RefType, ISubscription, IPublication
+    DN, IComponent, UpdateStrategy, TickSchedulingType, RefType, ISubscription, IPublication
 } from "../api/CompTypes";
 import { IEventSlot, IEventSlotOwner } from "../api/EventSlotTypes";
 import { createTrigger } from "../api/TriggerAPI";
 import { ITrigger } from "../api/TriggerTypes";
-import { ChildrenUpdateRequest, DN, IVN } from "./VNTypes";
+import { ChildrenUpdateRequest, IVN } from "./VNTypes";
 
 /// #if USE_STATS
     import {StatsCategory} from "../utils/Stats"

@@ -1,5 +1,5 @@
-﻿import {IComponentClass, RefPropType} from "../api/CompTypes"
-import { DN, VNDisp } from "./VNTypes";
+﻿import {DN, IComponentClass, RefPropType} from "../api/CompTypes"
+import { VNDisp } from "./VNTypes";
 import { ClassCompVN } from "./ClassCompVN";
 import { VN, setRef } from "./VN";
 

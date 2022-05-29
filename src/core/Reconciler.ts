@@ -1,9 +1,9 @@
 ﻿import {
-    ScheduledFuncType, CallbackWrappingParams, TickSchedulingType, IComponent, IErrorBoundary
+    DN, ScheduledFuncType, CallbackWrappingParams, TickSchedulingType, IComponent,
 } from "../api/CompTypes"
 import {
     ChildrenUpdateRequest, ChildrenUpdateOperation, SetRequest, SpliceRequest, MoveRequest,
-    SwapRequest, DN, SliceRequest, TrimRequest, GrowRequest, ReverseRequest, VNDisp, VNDispAction,
+    SwapRequest, SliceRequest, TrimRequest, GrowRequest, ReverseRequest, VNDisp, VNDispAction,
     VNDispGroup, IVN
 } from "./VNTypes";
 

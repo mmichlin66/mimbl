@@ -1,14 +1,8 @@
-﻿import {IComponent, IVNode, UpdateStrategy, TickSchedulingType} from "../api/CompTypes";
+﻿import {DN, IComponent, IVNode, UpdateStrategy, TickSchedulingType} from "../api/CompTypes";
 
 /// #if USE_STATS
     import {StatsCategory} from "../utils/Stats"
 /// #endif
-
-
-
-// Use type DN to refer to DOM's Node class. The DOM nodes that we are dealing with are
-// either of type Element or Text.
-export type DN = Node | null;
 
 
 

@@ -1,8 +1,8 @@
 ﻿import {
-    IClassCompVN, IComponent, RenderMethodType, IComponentClass, ComponentShadowOptions,
+    DN, IClassCompVN, IComponent, RenderMethodType, IComponentClass, ComponentShadowOptions,
     ScheduledFuncType, TickSchedulingType
 } from "../api/CompTypes"
-import { DN, VNDisp } from "./VNTypes";
+import { VNDisp } from "./VNTypes";
 import { IWatcher } from "../api/TriggerTypes";
 
 /// #if USE_STATS

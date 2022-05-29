@@ -1,6 +1,6 @@
-﻿import {ITextVN, TickSchedulingType} from "../api/CompTypes"
+﻿import {DN, ITextVN, TickSchedulingType} from "../api/CompTypes"
 import { ITrigger } from "../api/TriggerTypes";
-import { DN, VNDisp } from "./VNTypes";
+import { VNDisp } from "./VNTypes";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"

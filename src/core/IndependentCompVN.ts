@@ -1,7 +1,7 @@
-﻿import {IComponent, IComponentClass} from "../api/CompTypes"
+﻿import {DN, IComponent, IComponentClass} from "../api/CompTypes"
 import { ClassCompVN } from "./ClassCompVN";
 import { moveNode } from "./Reconciler";
-import { DN, VNDisp } from "./VNTypes";
+import { VNDisp } from "./VNTypes";
 import { VN } from "./VN";
 
 

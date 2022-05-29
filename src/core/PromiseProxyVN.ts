@@ -1,5 +1,5 @@
-﻿import {PromiseProxyProps} from "../api/CompTypes"
-import { DN, VNDisp } from "./VNTypes";
+﻿import {DN, PromiseProxyProps} from "../api/CompTypes"
+import { VNDisp } from "./VNTypes";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"

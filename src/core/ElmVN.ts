@@ -2,9 +2,9 @@
 import {
     IElmVN, EventFuncType, ICustomAttributeHandler, EventPropType, RefType, IElementProps,
     ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy,
-    ICustomAttributeHandlerClass, PropType
+    ICustomAttributeHandlerClass, PropType, DN
 } from "../api/CompTypes"
-import { ChildrenUpdateOperation, DN, VNDisp } from "./VNTypes";
+import { ChildrenUpdateOperation, VNDisp } from "./VNTypes";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"

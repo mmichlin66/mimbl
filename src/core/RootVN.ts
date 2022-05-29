@@ -1,5 +1,4 @@
-﻿import {IErrorBoundary} from "../api/CompTypes"
-import { DN } from "./VNTypes";
+﻿import {DN, IErrorBoundary} from "../api/CompTypes"
 
 /// #if USE_STATS
 	import {StatsCategory} from "../utils/Stats"

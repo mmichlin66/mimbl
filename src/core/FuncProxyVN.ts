@@ -1,5 +1,5 @@
-﻿import {RenderMethodType} from "../api/CompTypes"
-import { DN, VNDisp } from "./VNTypes";
+﻿import {DN, RenderMethodType} from "../api/CompTypes"
+import { VNDisp } from "./VNTypes";
 import { IWatcher } from "../api/TriggerTypes";
 
 /// #if USE_STATS

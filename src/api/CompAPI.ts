@@ -1,10 +1,10 @@
 ﻿import {
-    CallbackWrappingOptions, ComponentShadowOptions, CompProps, IComponent, ICustomAttributeHandlerClass,
+    CallbackWrappingOptions, ComponentShadowOptions, CompProps, IClassCompVN, IComponent, ICustomAttributeHandlerClass,
     IPublication, IRef, IServiceDefinitions, ISubscription, ITextVN, IVNode, PromiseProxyProps, PropType,
-    RefFunc, RenderMethodType, ScheduledFuncType, TickSchedulingType
+    RefFunc, RenderMethodType, ScheduledFuncType, TickSchedulingType, DN
 } from "./CompTypes";
 import {EventSlot} from "./EventSlotAPI"
-import { ClassCompVN, shadowDecorator } from "../core/ClassCompVN";
+import { shadowDecorator } from "../core/ClassCompVN";
 import { TextVN } from "../core/TextVN";
 import { ElmVN, registerElmProp } from "../core/ElmVN";
 import { IndependentCompVN } from "../core/IndependentCompVN";
@@ -16,7 +16,6 @@ import { CallbackWrapper, getCurrentClassComp, symJsxToVNs, symToVNs } from "../
 import { s_initStyleScheduler } from "../core/StyleScheduler";
 import { isTrigger } from "./TriggerAPI";
 import { symRenderNoWatcher, VN } from "../core/VN";
-import { DN } from "../core/VNTypes";
 
 
 /**
@@ -214,7 +213,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * is undefined in the component's costructor but will be defined before the call to the
 	 * (optional) willMount method.
 	 */
-	public vn: ClassCompVN;
+	public vn: IClassCompVN;
 
 	/**
 	 * Component properties passed to the constructor. This is normally used only by managed
