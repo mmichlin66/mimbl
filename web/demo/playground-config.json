@@ -1,0 +1,70 @@
+﻿{
+    "wellcomeMessage": "Wellcome to Mimcss Playground!",
+
+    "extraLibs": [{
+            "libName": "mimcss",
+            "url": "/lib/mimcss",
+            "files": [
+                "index.d.ts",
+                "api/CoreTypes.d.ts",
+                "api/CoreAPI.d.ts",
+                "api/NumericTypes.d.ts",
+                "api/NumericAPI.d.ts",
+                "api/ColorTypes.d.ts",
+                "api/ColorAPI.d.ts",
+                "api/CounterTypes.d.ts",
+                "api/FontTypes.d.ts",
+                "api/ShapeTypes.d.ts",
+                "api/ShapeAPI.d.ts",
+                "api/MediaTypes.d.ts",
+                "api/RuleTypes.d.ts",
+                "api/RuleAPI.d.ts",
+                "api/SchedulingTypes.d.ts",
+                "api/SchedulingAPI.d.ts",
+                "api/ScrollTimelineTypes.d.ts",
+                "api/StyleTypes.d.ts",
+                "api/Stylesets.d.ts",
+                "api/StyleAPI.d.ts"
+            ],
+            "rootPath": "types/mimcss/"
+        },
+
+        {
+            "libName": "mimbl",
+            "url": "/lib/mimbl",
+            "files": [
+                "index.d.ts",
+                "api/UtilAPI.d.ts",
+                "api/EventSlotTypes.d.ts",
+                "api/EventSlotAPI.d.ts",
+                "api/TriggerTypes.d.ts",
+                "api/TriggerAPI.d.ts",
+                "api/CompTypes.d.ts",
+                "api/CompAPI.d.ts",
+                "api/HtmlTypes.d.ts",
+                "api/SvgTypes.d.ts",
+                "jsx/mim.d.ts"
+            ],
+            "rootPath": "types/mimbl/"
+        }
+    ],
+
+    "examples": [
+        { "name": "Templates" },
+        {
+            "name": "Basic Template",
+            "path": "examples/basic-template.tsx",
+            "description": "Empty component class"
+        },
+
+        { "name": "Basic" },
+        {
+            "name": "Hello World!",
+            "path": "examples/hello-world.tsx",
+            "description": "Simple but real component example"
+        }
+    ],
+
+    "firstExample": "examples/basic-template.tsx"
+
+}
