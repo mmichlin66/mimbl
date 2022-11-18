@@ -41,6 +41,8 @@
 		"lib/api/TriggerAPI.d.ts",
 		"lib/api/CompTypes.d.ts",
 		"lib/api/CompAPI.d.ts",
+		"lib/api/WebElmTypes.d.ts",
+		"lib/api/WebElmAPI.d.ts",
 		"lib/api/HtmlTypes.d.ts",
 		"lib/api/SvgTypes.d.ts",
 		"lib/jsx/mim.d.ts"

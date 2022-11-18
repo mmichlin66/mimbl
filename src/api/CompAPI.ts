@@ -1,7 +1,7 @@
 ﻿import {
     CallbackWrappingOptions, ComponentShadowOptions, CompProps, IClassCompVN, IComponent, ICustomAttributeHandlerClass,
     IPublication, IRef, IServiceDefinitions, ISubscription, ITextVN, IVNode, PromiseProxyProps, PropType,
-    RefFunc, RenderMethodType, ScheduledFuncType, TickSchedulingType, DN
+    RefFunc, RenderMethodType, ScheduledFuncType, TickSchedulingType, DN, IComponentEx
 } from "./CompTypes";
 import {EventSlot} from "./EventSlotAPI"
 import { shadowDecorator } from "../core/ClassCompVN";
@@ -206,7 +206,7 @@ export function registerCustomEvent( eventName: string): void
  * Base class for components. Components that derive from this class must implement the render
  * method.
  */
-export abstract class Component<TProps = {}, TChildren = any> implements IComponent<TProps,TChildren>
+export abstract class Component<TProps = {}, TChildren = any> implements IComponent<TProps,TChildren>, IComponentEx
 {
 	/**
 	 * Remembered virtual node object through which the component can request services. This
@@ -230,14 +230,14 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
      * Returns the component's content that will be ultimately placed into the DOM tree. This
      * method is abstract because it must be implemented by every component.
      */
-	public abstract render(): any;
+	abstract render(): any;
 
     /**
      * Stores the new properties in the [[props]] field. If the component overrides this method
      * it must call the parent's implementation.
      * @param newProps
      */
-	public updateProps( newProps: CompProps<TProps,TChildren>): void
+	updateProps( newProps: CompProps<TProps,TChildren>): void
     {
         this.props = newProps;
     }
@@ -247,7 +247,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
      * functionality (e.g. fetching data from a server), component's code may be executed after
      * it was alrady unmounted. This property allows the component to handle this situation.
      */
-	public get isMounted(): boolean { return this.vn != null; };
+	get isMounted(): boolean { return this.vn != null; };
 
 	/**
 	 * This method is called by the component to request to be updated. If no arguments are
@@ -256,7 +256,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
      * @param func Optional rendering function to invoke
      * @param arg Optional argument to pass to the rendering function.
      */
-	protected updateMe( func?: RenderMethodType, arg?: any): void
+	updateMe( func?: RenderMethodType, arg?: any): void
 	{
 		this.vn?.updateMe( func, arg);
 	}
@@ -270,7 +270,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 *   regular unbound components' methods). This parameter will be ignored if the function
 	 *   is already bound or is an arrow function.
 	 */
-	protected callMeBeforeUpdate( func: ScheduledFuncType, thisArg?: any): void
+	callMeBeforeUpdate( func: ScheduledFuncType, thisArg?: any): void
 	{
 		this.vn?.callMe( func, true, thisArg ?? this);
 	}
@@ -284,7 +284,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 *   regular unbound components' methods). This parameter will be ignored if the function
 	 *   is already bound or is an arrow function.
 	 */
-	protected callMeAfterUpdate( func: ScheduledFuncType, thisArg?: any): void
+	callMeAfterUpdate( func: ScheduledFuncType, thisArg?: any): void
 	{
 		this.vn?.callMe( func, false, thisArg ?? this);
 	}

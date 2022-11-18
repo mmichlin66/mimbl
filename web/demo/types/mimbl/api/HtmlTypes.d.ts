@@ -66,8 +66,9 @@ export interface IHtmlBlockquoteElementProps extends IHtmlElementProps<HTMLQuote
 export interface IHtmlBrElementProps extends IHtmlElementProps<HTMLBRElement> {
 }
 export interface IHtmlButtonElementProps extends IHtmlElementProps<HTMLButtonElement> {
+    autofocus?: ExtendedElementAttr<boolean>;
     disabled?: ExtendedElementAttr<boolean>;
-    form?: ExtendedElementAttr<string>;
+    form?: ExtendedElementAttr<string | IIDRule>;
     formaction?: ExtendedElementAttr<string>;
     formenctype?: ExtendedElementAttr<FormenctypePropType>;
     formmethod?: ExtendedElementAttr<FormmethodPropType>;
@@ -120,7 +121,7 @@ export interface IHtmlEmbedElementProps extends IHtmlElementProps<HTMLEmbedEleme
 }
 export interface IHtmlFieldsetElementProps extends IHtmlElementProps<HTMLFieldSetElement> {
     disabled?: ExtendedElementAttr<boolean>;
-    form?: ExtendedElementAttr<string>;
+    form?: ExtendedElementAttr<string | IIDRule>;
     name?: ExtendedElementAttr<string>;
 }
 export interface IHtmlFormElementProps extends IHtmlElementProps<HTMLFormElement> {
@@ -188,7 +189,7 @@ export interface IHtmlImgElementProps extends IHtmlElementProps<HTMLImageElement
 export interface IHtmlInputElementProps extends IHtmlElementProps<HTMLInputElement> {
     autocomplete?: ExtendedElementAttr<string | boolean>;
     disabled?: ExtendedElementAttr<boolean>;
-    form?: ExtendedElementAttr<string>;
+    form?: ExtendedElementAttr<string | IIDRule>;
     list?: ExtendedElementAttr<string>;
     name?: ExtendedElementAttr<string>;
     readonly?: ExtendedElementAttr<boolean>;
@@ -226,7 +227,7 @@ export interface IHtmlInsElementProps extends IHtmlElementProps<HTMLModElement> 
 export interface IHtmlLabelElementProps extends IHtmlElementProps<HTMLLabelElement> {
     for?: ExtendedElementAttr<string | IIDRule>;
     htmlFor?: ExtendedElementAttr<string | IIDRule>;
-    form?: ExtendedElementAttr<string>;
+    form?: ExtendedElementAttr<string> | IIDRule;
 }
 export interface IHtmlLegendElementProps extends IHtmlElementProps<HTMLLegendElement> {
 }
@@ -264,7 +265,7 @@ export interface IHtmlMetaElementProps extends IHtmlElementProps<HTMLMetaElement
     name?: ExtendedElementAttr<string>;
 }
 export interface IHtmlMeterElementProps extends IHtmlElementProps<HTMLMeterElement> {
-    form?: ExtendedElementAttr<string>;
+    form?: ExtendedElementAttr<string | IIDRule>;
     high?: ExtendedElementAttr<number>;
     low?: ExtendedElementAttr<number>;
     min?: ExtendedElementAttr<number>;
@@ -295,8 +296,8 @@ export interface IHtmlOptionElementProps extends IHtmlElementProps<HTMLOptionEle
     value?: ExtendedElementAttr<string>;
 }
 export interface IHtmlOutputElementProps extends IHtmlElementProps<HTMLOutputElement> {
-    forInputs?: ExtendedElementAttr<string>;
-    form?: ExtendedElementAttr<string>;
+    for?: ExtendedElementAttr<string | IIDRule | (string | IIDRule)[]>;
+    form?: ExtendedElementAttr<string | IIDRule>;
     name?: ExtendedElementAttr<string>;
 }
 export interface IHtmlPElementProps extends IHtmlElementProps<HTMLParagraphElement> {
@@ -330,7 +331,7 @@ export interface IHtmlScriptElementProps extends IHtmlElementProps<HTMLScriptEle
 export interface IHtmlSelectElementProps extends IHtmlElementProps<HTMLSelectElement> {
     autocomplete?: ExtendedElementAttr<string>;
     disabled?: ExtendedElementAttr<boolean>;
-    form?: ExtendedElementAttr<string>;
+    form?: ExtendedElementAttr<string | IIDRule>;
     multiple?: ExtendedElementAttr<boolean>;
     name?: ExtendedElementAttr<string>;
     required?: ExtendedElementAttr<boolean>;
@@ -354,14 +355,6 @@ export interface IHtmlStyleElementProps extends IHtmlElementProps<HTMLStyleEleme
     type?: ExtendedElementAttr<string>;
 }
 export interface IHtmlTableElementProps extends IHtmlElementProps<HTMLTableElement> {
-    data?: ExtendedElementAttr<string>;
-    form?: ExtendedElementAttr<string>;
-    hight?: ExtendedElementAttr<number>;
-    name?: ExtendedElementAttr<string>;
-    type?: ExtendedElementAttr<string>;
-    typemustmatch?: ExtendedElementAttr<boolean>;
-    usemap?: ExtendedElementAttr<string>;
-    width?: ExtendedElementAttr<number>;
 }
 export interface IHtmlTbodyElementProps extends IHtmlElementProps<HTMLTableSectionElement> {
 }
@@ -377,7 +370,7 @@ export interface IHtmlTextareaElementProps extends IHtmlElementProps<HTMLTextAre
     autocomplete?: ExtendedElementAttr<string>;
     cols?: ExtendedElementAttr<number>;
     disabled?: ExtendedElementAttr<boolean>;
-    form?: ExtendedElementAttr<string>;
+    form?: ExtendedElementAttr<string | IIDRule>;
     maxlength?: ExtendedElementAttr<number>;
     minlength?: ExtendedElementAttr<number>;
     name?: ExtendedElementAttr<string>;

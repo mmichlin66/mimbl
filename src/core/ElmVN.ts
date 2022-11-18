@@ -334,17 +334,16 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	public updatePropsOnly( props: any): void
 	{
         // loop over all properties
-        for( let propName in props)
+        for( let [propName, propVal] of Object.entries(props))
 		{
             // get information about the property and determine its type.
-            let propVal = props[propName];
             let propInfo = propInfos[propName];
-            let propType = propInfo?.type ?? PropType.Attr;
+            let propType = propInfo?.type ?? getPropTypeFromPropVal(propVal);
 
             if (propType === PropType.Attr)
                 this.updateAttrOnly( propName, propInfo as AttrPropInfo, propVal);
             else if (propType === PropType.Event)
-                this.updateEventOnly( propName, propInfo as EventPropInfo, propVal);
+                this.updateEventOnly( propName, propInfo as EventPropInfo, propVal as EventPropType);
             else if (propType === PropType.CustomAttr)
                 this.updateCustomAttrOnly( propName, propInfo as CustomAttrPropInfo, propVal);
             else // if (propType === PropType.Framework)
@@ -352,11 +351,11 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 if (propName === "key")
                     this.key = propVal;
                 else if (propName === "ref")
-                    this.updateRef( propVal)
+                    this.ref = propVal as RefType<T>;
                 else if (propName === "vnref")
-                    this.updateVNref( propVal)
+                    this.vnref = propVal as ElmRefType<T>;
                 else if (propName === "updateStrategy")
-                    this.updateStrategy = propVal;
+                    this.updateStrategy = propVal as UpdateStrategy;
             }
 		}
 	}
@@ -390,12 +389,11 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	private parseProps( props: any): void
 	{
         // loop over all properties ignoring the built-ins
-        for( let propName in props)
+        for( let [propName, propVal] of Object.entries(props))
 		{
             // get information about the property and determine its type.
             let propInfo = propInfos[propName];
-            let propType = propInfo?.type ?? PropType.Attr;
-			let propVal = props[propName];
+            let propType = propInfo?.type ?? getPropTypeFromPropVal(propVal);
             if (propType === PropType.Attr)
             {
                 if (!this.attrs)
@@ -413,11 +411,11 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             else if (propType === PropType.Framework)
             {
                 if (propName === "ref")
-                    this.ref = propVal;
+                    this.ref = propVal as RefType<T>;
                 else if (propName === "vnref")
-                    this.vnref = propVal;
+                    this.vnref = propVal as ElmRefType<T>;
                 else if (propName === "updateStrategy")
-                    this.updateStrategy = propVal;
+                    this.updateStrategy = propVal as UpdateStrategy;
             }
             else // if (propType === PropType.CustomAttr)
             {
@@ -982,6 +980,25 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 /**
+ * Determines property type (Attribute or Event) based on the property value
+ */
+function getPropTypeFromPropVal(propVal: any): PropType
+{
+    if (!propVal)
+        return PropType.Attr;
+    else
+    {
+        let t = typeof propVal;
+        return t === "string" || t === "number" || t === "boolean"
+            ? PropType.Attr
+            : t === "function" || typeof propVal[0] === "function" || typeof propVal?.func === "function"
+                ? PropType.Event : PropType.Attr;
+    }
+}
+
+
+
+/**
  * Function reacting on the value change in an attribute's trigger. This function gets bounded to
  * the instance of the ElmVN class and attribute RTD object; therefore, it can use "this".
  */
@@ -1398,7 +1415,6 @@ function updateMediaProp( elm: Element, attrName: string, oldVal: MediaStatement
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 const StdFrameworkPropInfo = { type: PropType.Framework };
-const StdEventPropInfo = { type: PropType.Event };
 
 // sets and removes an attribute using element's property
 const AttrAsPropInfo = { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp };
@@ -1442,101 +1458,7 @@ const propInfos: {[P:string]: PropInfo} =
     type: AttrAsPropInfo,
 
     // global events
-    abort: StdEventPropInfo,
-    animationcancel: StdEventPropInfo,
-    animationend: StdEventPropInfo,
-    animationiteration: StdEventPropInfo,
-    animationstart: StdEventPropInfo,
-    auxclick: StdEventPropInfo,
-    beforeinput: StdEventPropInfo,
-    blur: StdEventPropInfo,
-    canplay: StdEventPropInfo,
-    canplaythrough: StdEventPropInfo,
-    change: StdEventPropInfo,
     click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },
-    close: StdEventPropInfo,
-    compositionend: StdEventPropInfo,
-    compositionstart: StdEventPropInfo,
-    compositionupdate: StdEventPropInfo,
-    contextmenu: StdEventPropInfo,
-    cuechange: StdEventPropInfo,
-    dblclick: StdEventPropInfo,
-    drag: StdEventPropInfo,
-    dragend: StdEventPropInfo,
-    dragenter: StdEventPropInfo,
-    dragleave: StdEventPropInfo,
-    dragover: StdEventPropInfo,
-    dragstart: StdEventPropInfo,
-    drop: StdEventPropInfo,
-    durationchange: StdEventPropInfo,
-    emptied: StdEventPropInfo,
-    ended: StdEventPropInfo,
-    error: StdEventPropInfo,
-    focus: StdEventPropInfo,
-    focusin: StdEventPropInfo,
-    focusout: StdEventPropInfo,
-    formdata: StdEventPropInfo,
-    gotpointercapture: StdEventPropInfo,
-    input: StdEventPropInfo,
-    invalid: StdEventPropInfo,
-    keydown: StdEventPropInfo,
-    keypress: StdEventPropInfo,
-    keyup: StdEventPropInfo,
-    load: StdEventPropInfo,
-    loadeddata: StdEventPropInfo,
-    loadedmetadata: StdEventPropInfo,
-    loadstart: StdEventPropInfo,
-    lostpointercapture: StdEventPropInfo,
-    mousedown: StdEventPropInfo,
-    mouseenter: StdEventPropInfo,
-    mouseleave: StdEventPropInfo,
-    mousemove: StdEventPropInfo,
-    mouseout: StdEventPropInfo,
-    mouseover: StdEventPropInfo,
-    mouseup: StdEventPropInfo,
-    pause: StdEventPropInfo,
-    play: StdEventPropInfo,
-    playing: StdEventPropInfo,
-    pointercancel: StdEventPropInfo,
-    pointerdown: StdEventPropInfo,
-    pointerenter: StdEventPropInfo,
-    pointerleave: StdEventPropInfo,
-    pointermove: StdEventPropInfo,
-    pointerout: StdEventPropInfo,
-    pointerover: StdEventPropInfo,
-    pointerup: StdEventPropInfo,
-    progress: StdEventPropInfo,
-    ratechange: StdEventPropInfo,
-    reset: StdEventPropInfo,
-    resize: StdEventPropInfo,
-    scroll: StdEventPropInfo,
-    securitypolicyviolation: StdEventPropInfo,
-    seeked: StdEventPropInfo,
-    seeking: StdEventPropInfo,
-    select: StdEventPropInfo,
-    selectionchange: StdEventPropInfo,
-    selectstart: StdEventPropInfo,
-    stalled: StdEventPropInfo,
-    submit: StdEventPropInfo,
-    suspend: StdEventPropInfo,
-    timeupdate: StdEventPropInfo,
-    toggle: StdEventPropInfo,
-    touchcancel: StdEventPropInfo,
-    touchend: StdEventPropInfo,
-    touchmove: StdEventPropInfo,
-    touchstart: StdEventPropInfo,
-    transitioncancel: StdEventPropInfo,
-    transitionend: StdEventPropInfo,
-    transitionrun: StdEventPropInfo,
-    transitionstart: StdEventPropInfo,
-    volumechange: StdEventPropInfo,
-    waiting: StdEventPropInfo,
-    wheel: StdEventPropInfo,
-	fullscreenchange: StdEventPropInfo,
-	fullscreenerror: StdEventPropInfo,
-    copy: StdEventPropInfo,
-    cut: StdEventPropInfo,
-    paste: StdEventPropInfo,
 };
 
 

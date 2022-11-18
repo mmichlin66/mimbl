@@ -23,7 +23,6 @@ export declare type CompProps<TProps = {}, TChildren = any> = Readonly<TProps> &
  */
 export interface IComponentClass<TProps = {}, TChildren = any> {
     new (props?: CompProps<TProps>): IComponent<TProps, TChildren>;
-    render(): any;
 }
 /**
  * Type for the `shadow` property in the [[IComponent]] interface. This can be one of the following:
@@ -42,7 +41,7 @@ export declare type ComponentShadowOptions = boolean | string | ShadowRootInit |
 ];
 /**
  * Interface that must be implemented by all components. Although it has many methods that
- * components can implement, in practice, there is only one mandatory method - `render()`.
+ * components can implement, in practice, there is only one mandatory method - [[render]].
  * Components should be ready to have the `vn` property set, although they don't have to declare
  * it.
  *
@@ -141,6 +140,93 @@ export interface IComponent<TProps = {}, TChildren = any> {
     getUpdateStrategy?(): UpdateStrategy;
 }
 /**
+ * Represents component functionality that is implemented by the Mimbl built-in classes that
+ * implement component functionality. It contains convenience methods that can be called from the
+ * derived classes - regular comoponents and custom element implementations.
+ */
+export interface IComponentEx {
+    /**
+     * Determines whether the component is currently mounted. If a component has asynchronous
+     * functionality (e.g. fetching data from a server), component's code may be executed after
+     * it was alrady unmounted. This property allows the component to handle this situation.
+     */
+    readonly isMounted: boolean;
+    /**
+     * This method is called by the component to request to be updated. If no arguments are
+     * provided, the entire component is requested to be updated. If arguments are provided, they
+     * indicate what rendering function should be updated.
+     * @param func Optional rendering function to invoke
+     * @param arg Optional argument to pass to the rendering function.
+     */
+    updateMe(func?: RenderMethodType, arg?: any): void;
+    /**
+     * Schedules the given function to be called before any components scheduled to be updated in
+     * the Mimbl tick are updated.
+     * @param func Function to be called
+     * @param thisArg Object that will be used as "this" value when the function is called. If this
+     *   parameter is undefined, the component instance will be used (which allows scheduling
+     *   regular unbound components' methods). This parameter will be ignored if the function
+     *   is already bound or is an arrow function.
+     */
+    callMeBeforeUpdate(func: ScheduledFuncType, thisArg?: any): void;
+    /**
+     * Schedules the given function to be called after all components scheduled to be updated in
+     * the Mimbl tick have already been updated.
+     * @param func Function to be called
+     * @param thisArg Object that will be used as "this" value when the function is called. If this
+     *   parameter is undefined, the component instance will be used (which allows scheduling
+     *   regular unbound components' methods). This parameter will be ignored if the function
+     *   is already bound or is an arrow function.
+     */
+    callMeAfterUpdate(func: ScheduledFuncType, thisArg?: any): void;
+    /**
+     *
+     * @param func Callback function to be wrapped
+     * @param arg Optional argument to be passed to the callback in addition to the original
+     * callback arguments.
+     * @param thisArg Optional object to be used as `this` when calling the callback. If this
+     * parameter is not defined, the component instance is used, which allows wrapping regular
+     * unbound components' methods. This parameter will be ignored if the the function is already
+     * bound or is an arrow function.
+     * @param schedulingType Type of scheduling the Mimbl tick after the callback function returns.
+     * @returns Wrapped callback that will run the original callback in the proper context.
+     */
+    wrap<T extends Function>(func: T, arg?: any, thisArg?: any, schedulingType?: TickSchedulingType): T;
+    /**
+     * Registers the given value as a service with the given ID that will be available for
+     * consumption by descendant components.
+     * @param id Unique service identifier
+     * @param value Current value of the service
+     * @param depth Number of level to watch for changes. The default value is 1; that is, the
+     * subscribers will be notified if the service's value or the values of its properties have
+     * changed.
+     * @returns Publication object, which allows setting a new value of the service or changing
+     * values of its properties.
+     */
+    publishService<K extends keyof IServiceDefinitions>(id: K, value: IServiceDefinitions[K], depth?: number): IPublication<K>;
+    /**
+     * Subscribes to a service with the given ID. If the service with the given ID is registered
+     * by this or one of the ancestor components, the returned subscription object's `value`
+     * property will reference it; otherwise, the value will be set to the defaultValue (if
+     * specified) or will remain undefined. Whenever the value of the service that is registered by
+     * this or a closest ancestor component is changed, the subscription's `value` property will
+     * receive the new value.
+     *
+     * If the subscription object's `value` property is used in a component's rendering code, the
+     * component will be re-rendered every time the service value is changed.
+     *
+     * @param id Unique service identifier
+     * @param defaultValue Optional default value that will be assigned if the service is not
+     * published yet.
+     * @param useSelf Flag indicating whether the search for the service should start from the
+     * virtual node that calls this method. The default value is `false` meaning the search starts
+     * from the parent virtual node.
+     * @returns Subscription object, which provides the value of the service and allowes attaching
+     * to the event fired when the value is changed.
+     */
+    subscribeService<K extends keyof IServiceDefinitions>(id: K, defaultValue?: IServiceDefinitions[K], useSelf?: boolean): ISubscription<K>;
+}
+/**
  * The UpdateStrategy object specifies different aspects of update behavior of components and
  * elements.
  */
@@ -201,7 +287,10 @@ export declare type CallbackWrappingParams<T extends Function = Function> = Call
  * - an object with the properties `func` specifying the function to be called and `thisArg`
  *   specifying the value to be used as the `this` parameter.
  */
-export declare type CallbackPropType<T extends Function = Function> = T | [func: T, thisArg?: any] | [func: T, thisArg?: any];
+export declare type CallbackPropType<T extends Function = Function> = T | [func: T, thisArg?: any] | {
+    func: T;
+    thisArg?: any;
+};
 /**
  * Type of event handler function for DOM events of type T.
  * @typeparam T DOM event type, e.g. MouseEvent
@@ -266,6 +355,13 @@ export declare type ReferrerPolicyPropType = "no-referrer" | "no-referrer-when-d
  * re-rendering when the value of the attribute changes.
  */
 export declare type ExtendedElementAttr<T> = T | ITrigger<T>;
+/**
+ * Maps the ExtendedElementAttr type to every property of the template type; that is,
+ * every property of the template type now has the Trigger type added to its original type.
+ */
+export declare type ExtendedElementProps<T> = {
+    [K in keyof T]?: ExtendedElementAttr<T[K]>;
+};
 /** Global events that are common to all kind of HTML entities */
 export declare type IGlobalEvents = {
     [K in keyof GlobalEventHandlersEventMap]?: EventPropType<GlobalEventHandlersEventMap[K]>;
