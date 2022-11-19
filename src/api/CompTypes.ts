@@ -456,39 +456,118 @@ export type ReferrerPolicyPropType = "no-referrer" | "no-referrer-when-downgrade
  * `string`), but allowing to pass triggers of this type to them. This is used to optimize
  * re-rendering when the value of the attribute changes.
  */
-export type ExtendedElementAttr<T> = T | ITrigger<T>;
-
-/**
- * Maps the ExtendedElementAttr type to every property of the template type; that is,
- * every property of the template type now has the Trigger type added to its original type.
- */
-export type ExtendedElementProps<T> = { [K in keyof T]?: ExtendedElementAttr<T[K]>}
-
-
-
-/** Global events that are common to all kind of HTML entities */
-export type IGlobalEvents =
-    { [K in keyof GlobalEventHandlersEventMap]?: EventPropType<GlobalEventHandlersEventMap[K]>}
-
-/** Events that are common to all kinds of elements */
-export type IElementEvents =
-    { [K in keyof ElementEventMap]?: EventPropType<ElementEventMap[K]>}
-
-/** Events that are common to elements and documents */
-export type IDocumentAndElementEvents =
-    { [K in keyof DocumentAndElementEventHandlersEventMap]?: EventPropType<DocumentAndElementEventHandlersEventMap[K]>}
+export type ExtendedElementAttr<T> = T | ITrigger<T> | null | undefined;
 
 
 
 /**
- * The IElementProps interface defines standard properties (attributes and event listeners)
- * that can be used on all HTML and SVG elements.
- * @typeparam TRef Type of the element used as a reference type.
- * @typeparam TChildren Type of the children the element can have. By default, elements can have
- * any children.
+ * Converts the given interface T to a type that maps an extended attribute type to each property
+ * of T. The extended property contains the property type the [[ITrigger]] for this type as well as
+ * `null` and `undefined`. This is primarily useful for defining attributes of HTML elements - both
+ * built-in and custom.
+ *
+ * **Example:**
+ * ```typescript
+ * interface IMyAttrs
+ * {
+ *     foo: string;
+ *     bar: number;
+ * }
+ *
+ * type MyExtendedAttrs = ExtendedAttrs<IMyAttrs>;
+ *
+ * // the MyExtendedEvents is equivalent to the following interface
+ * interface MyExtendedAttrs
+ * {
+ *     foo: string | ITrigger<string> | null | undefined;
+ *     bar: number | ITrigger<number> | null | undefined;
+ * }
+ * ```
  */
-export interface IElementProps<TRef extends Element = Element, TChildren = any>
-    extends ICommonProps<TRef>, IGlobalEvents, IElementEvents, IDocumentAndElementEvents
+export type ExtendedAttrs<T> = { [K in keyof T]?: T[K] | ITrigger<T[K]> | null | undefined}
+
+
+
+/**
+ * Converts the given interface T to a type that maps an event type to each property of T. If
+ * the property is iself an event (that is, derives from the Event interface), this event
+ * becomes the type of the mapped property. Otherwise, the property is mapped to a CustomEvent
+ * type whose `detail` property is defined as the original property type.
+ *
+ * **Example:**
+ * ```typescript
+ * interface IMyEvents
+ * {
+ *     foo: string;
+ *     bar: number;
+ *     baz: MouseEvent;
+ * }
+ *
+ * type MyExtendedEvents = ExtendedEvents<IMyEvents>;
+ *
+ * // the MyExtendedEvents is equivalent to the following interface
+ * interface MyExtendedEvents
+ * {
+ *     foo: CustomEvent<string>;
+ *     bar: CustomEvent<number>;
+ *     baz: MouseEvent;
+ * }
+ * ```
+ */
+export type ExtendedEvents<T> = {
+    [K in keyof T]?: T[K] extends Event ? EventPropType<T[K]> : EventPropType<CustomEvent<T[K]>>
+}
+
+
+
+/**
+ * Represents standard element properties present on all HTML and SVG elements
+ */
+export interface IElementAttrs
+{
+    xmlns?: string;
+	id?: IDPropType;
+	lang?: string;
+	class?: ClassMoniker;
+	className?: ClassMoniker;
+	style?: string | Styleset;
+	tabindex?: number;
+	tabIndex?: number;
+	role?: string;
+	draggable?: "auto" | "true" | "false";
+}
+
+
+
+/**
+ * Represents standard element events that can be fired by all HTML and SVG elements.
+ */
+export interface IElementEvents extends GlobalEventHandlersEventMap, ElementEventMap, DocumentAndElementEventHandlersEventMap
+{
+}
+
+
+
+/**
+ * Represents an HTML or SVG element attributes and events known to Mimbl infrastucture. Each
+ * built-in or custom element is defined as a JSX intrinsic element using the `ExtendedElement`
+ * type by passing the correct attribute and event types.
+ *
+ * @typeparam TRef - Type that can be passed to the `ref` attribute to get a reference to the
+ * element.
+ * @typeparam TAttr Type listing element's attribute names mapped to attribute types.
+ * @typeparam TEvents Type listing element's event names mapped to event types. Most elements
+ * don't need to specify this type parameter as they only implement standard events; however,
+ * there are some elements - e.g. <video> - that define additional events. Custom Web elements
+ * can also define their own events - in this case, they must be specified here.
+ * @typeparam TChildren Type that determines what children are allowed under the element. It
+ * defaults to `any` and usually doesn't eed to be specified.
+ */
+export type ExtendedElement<TRef extends Element = Element,
+    TAttrs extends IElementAttrs = IElementAttrs,
+    TEvents extends IElementEvents = IElementEvents,
+    TChildren = any> =
+ICommonProps<TRef> & ExtendedAttrs<TAttrs> & ExtendedEvents<TEvents> &
 {
 	/**
 	 * Reference that will be set to the element's virtual node after it is created (mounted). The
@@ -503,20 +582,8 @@ export interface IElementProps<TRef extends Element = Element, TChildren = any>
 
 	/** Children that can be supplied to the element */
 	children?: TChildren;
-
-    // standard HTML and SVG element properties
-    xmlns?: string;
-	id?: ExtendedElementAttr<IDPropType>;
-	lang?: ExtendedElementAttr<string>;
-	class?: ExtendedElementAttr<ClassMoniker>;
-	className?: ExtendedElementAttr<ClassMoniker>;
-	style?: ExtendedElementAttr<string | Styleset>;
-	tabindex?: ExtendedElementAttr<number>;
-	tabIndex?: ExtendedElementAttr<number>;
-	role?: ExtendedElementAttr<string>;
-	draggable?: ExtendedElementAttr<"auto" | "true" | "false">;
-	// dropzone?: ExtendedElementAttr<"copy" | "move" | "link">;
 }
+
 
 
 
@@ -819,7 +886,7 @@ export interface IElmVN<T extends Element = Element> extends IVNode
      * @param schedulingType Type determining whether the operation is performed immediately or
      * is scheduled to a Mimbl tick.
      */
-	setProps( props: IElementProps<T>, schedulingType?: TickSchedulingType): void;
+	setProps( props: ExtendedElement<T>, schedulingType?: TickSchedulingType): void;
 
     /**
      * Replaces the given range of sub-nodes with the new content. The update parameter determines

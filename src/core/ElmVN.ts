@@ -1,6 +1,6 @@
 ﻿import {Styleset, SchedulerType, MediaStatement} from "mimcss"
 import {
-    IElmVN, EventFuncType, ICustomAttributeHandler, EventPropType, RefType, IElementProps,
+    IElmVN, EventFuncType, ICustomAttributeHandler, EventPropType, RefType, ExtendedElement,
     ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy,
     ICustomAttributeHandlerClass, PropType, DN
 } from "../api/CompTypes"
@@ -34,7 +34,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 
-	constructor( tagName: string, props: IElementProps<T>, subNodes: VN[])
+	constructor( tagName: string, props: ExtendedElement<T>, subNodes: VN[])
 	{
 		super();
 
@@ -71,7 +71,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
     // Requests update of the element properties without re-rendering of its children.
-	public setProps( props: IElementProps<T>, schedulingType?: TickSchedulingType): void
+	public setProps( props: ExtendedElement<T>, schedulingType?: TickSchedulingType): void
     {
         if (!props)
             return;
@@ -174,7 +174,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         else if (!info)
         {
             // if namespace is provided use it; otherwise, use the namespace of the anchor element.
-            let ns = this.props?.xmlns;
+            let ns = this.props?.xmlns as string;
             if (ns)
                 this.ownDN = document.createElementNS( ns, this.elmName) as any as T;
             else
@@ -943,7 +943,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
      // Properties that were passed to the element.
-	private props: IElementProps<T>;
+	private props: ExtendedElement<T>;
 
     // Redefine the ownDN property from VN to be of the Element type
 	public declare ownDN: T | null;

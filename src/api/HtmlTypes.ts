@@ -1,819 +1,835 @@
 ﻿import {CssColor, MediaStatement, IIDRule} from "mimcss"
 import {
-    IElementProps, ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType,
-    FormenctypePropType, FormmethodPropType, ExtendedElementAttr
+    ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType, FormenctypePropType,
+    FormmethodPropType, ICustomWebElements, IElementAttrs, IElementEvents, ExtendedElement
 } from "./CompTypes"
 
 
 
 /**
- * Contains global HTML attributes
+ * Defines attributes common to all HTML elements
  */
-export interface IHtmlElementProps<TRef extends HTMLElement = HTMLElement> extends IElementProps<TRef>
+export interface IHtmlElementAttrs extends IElementAttrs
 {
-	accesskey?: ExtendedElementAttr<string>;
-	autocapitalize?: ExtendedElementAttr<"off" | "none" | "on" | "sentences" | "words" | "characters">;
-	autofocus?: ExtendedElementAttr<boolean>;
-	contenteditable?: ExtendedElementAttr<boolean>;
-	dir?: ExtendedElementAttr<"ltr" | "rtl" | "auto">;
-    enterkeyhint?: ExtendedElementAttr<string>;
-	hidden?: ExtendedElementAttr<boolean>;
-	inputmode?: ExtendedElementAttr<"none" | "text" | "decimal" | "numeric" | "tel" | "search" | "email" | "url">;
-	is?: ExtendedElementAttr<string>;
-	itemid?: ExtendedElementAttr<string>;
-	itemprop?: ExtendedElementAttr<string>;
-	itemref?: ExtendedElementAttr<string>;
-	itemscope?: ExtendedElementAttr<boolean>;
-	itemtype?: ExtendedElementAttr<string>;
-    nonce?: ExtendedElementAttr<string>;
-    part?: ExtendedElementAttr<string>;
-	slot?: ExtendedElementAttr<string>;
-	spellcheck?: ExtendedElementAttr<boolean | "default">;
-	title?: ExtendedElementAttr<string>;
-	translate?: ExtendedElementAttr<boolean | "yes" | "no">;
+	accesskey?: string;
+	autocapitalize?: "off" | "none" | "on" | "sentences" | "words" | "characters";
+	autofocus?: boolean;
+	contenteditable?: boolean;
+	dir?: "ltr" | "rtl" | "auto";
+    enterkeyhint?: string;
+    exportparts?: string | string[];
+	hidden?: boolean;
+	inputmode?: "none" | "text" | "decimal" | "numeric" | "tel" | "search" | "email" | "url";
+	is?: keyof ICustomWebElements;
+	itemid?: string;
+	itemprop?: string;
+	itemref?: string;
+	itemscope?: boolean;
+	itemtype?: string;
+    nonce?: string;
+    part?: string | string[];
+	slot?: string;
+	spellcheck?: boolean | "true" | "false";
+	title?: string;
+	translate?: boolean | "yes" | "no";
+}
+
+
+
+/**
+ * Defines events common to all HTML elements
+ */
+export interface IHtmlElementEvents extends IElementEvents
+{
+}
+
+
+
+/**
+ * Represents elements that can be used as fields in a form; that is, they can be associated with
+ * a form.
+ */
+export interface IHtmlFormFieldElementAttrs extends IHtmlElementAttrs
+{
+	form?: string | IIDRule;
 }
 
 
 
 // <a>
-export interface IHtmlAElementProps extends IHtmlElementProps<HTMLAnchorElement>
+export interface IHtmlAElementAttrs extends IHtmlElementAttrs
 {
-	download?: ExtendedElementAttr<string>;
-	href?: ExtendedElementAttr<string>;
-	hreflang?: ExtendedElementAttr<string>;
-	ping?: ExtendedElementAttr<string | string[]>;
-	referrerpolicy?: ExtendedElementAttr<ReferrerPolicyPropType>;
-	rel?: ExtendedElementAttr<string>;
-	target?: ExtendedElementAttr<FormtargetPropType>;
-	type?: ExtendedElementAttr<string>;
+	download?: string;
+	href?: string;
+	hreflang?: string;
+	ping?: string | string[];
+	referrerpolicy?: ReferrerPolicyPropType;
+	rel?: string;
+	target?: FormtargetPropType;
+	type?: string;
 }
 
 
 
 // <area>
-export interface IHtmlAreaElementProps extends IHtmlElementProps<HTMLAreaElement>
+export interface IHtmlAreaElementAttrs extends IHtmlElementAttrs
 {
-	alt?: ExtendedElementAttr<string>;
-	coords?: ExtendedElementAttr<string | number[]>;
-	download?: ExtendedElementAttr<string>;
-	href?: ExtendedElementAttr<string>;
-	hreflang?: ExtendedElementAttr<string>;
-	ping?: ExtendedElementAttr<string>;
-	referrerpolicy?: ExtendedElementAttr<ReferrerPolicyPropType>;
-	rel?: ExtendedElementAttr<string>;
-	shape?: ExtendedElementAttr<"rect" | "circle" | "poly" | "default">;
-	target?: ExtendedElementAttr<FormtargetPropType>;
+	alt?: string;
+	coords?: string | number[];
+	download?: string;
+	href?: string;
+	hreflang?: string;
+	ping?: string;
+	referrerpolicy?: ReferrerPolicyPropType;
+	rel?: string;
+	shape?: "rect" | "circle" | "poly" | "default";
+	target?: FormtargetPropType;
 }
 
 
 
 // <audio>
-export interface IHtmlAudioElementProps extends IHtmlElementProps<HTMLAudioElement>
+export interface IHtmlAudioElementAttrs extends IHtmlElementAttrs
 {
-	autoplay?: ExtendedElementAttr<boolean>;
-	controls?: ExtendedElementAttr<boolean>;
-	crossorigin?: ExtendedElementAttr<CrossoriginPropType>;
-	loop?: ExtendedElementAttr<boolean>;
-	muted?: ExtendedElementAttr<boolean>;
-	preload?: ExtendedElementAttr<"none" | "metadata" | "auto" | "">;
-	src?: ExtendedElementAttr<string>;
+	autoplay?: boolean;
+	controls?: boolean;
+	crossorigin?: CrossoriginPropType;
+	loop?: boolean;
+	muted?: boolean;
+	preload?: "none" | "metadata" | "auto" | "";
+	src?: string;
 }
 
 
 
 // <base>
-export interface IHtmlBaseElementProps extends IHtmlElementProps<HTMLBaseElement>
+export interface IHtmlBaseElementAttrs extends IHtmlElementAttrs
 {
-	href?: ExtendedElementAttr<string>
-	target?: ExtendedElementAttr<FormtargetPropType>
+	href?: string;
+	target?: FormtargetPropType
 }
 
 
 
 // <blockquote>
-export interface IHtmlBlockquoteElementProps extends IHtmlElementProps<HTMLQuoteElement>
+export interface IHtmlBlockquoteElementAttrs extends IHtmlElementAttrs
 {
-	cite?: ExtendedElementAttr<string>;
+	cite?: string;
 }
 
 
 
 // <br>
-export interface IHtmlBrElementProps extends IHtmlElementProps<HTMLBRElement>
+export interface IHtmlBrElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <button>
-export interface IHtmlButtonElementProps extends IHtmlElementProps<HTMLButtonElement>
+export interface IHtmlButtonElementAttrs extends IHtmlFormFieldElementAttrs
 {
-	autofocus?: ExtendedElementAttr<boolean>;
-	disabled?: ExtendedElementAttr<boolean>;
-	form?: ExtendedElementAttr<string | IIDRule>;
-	formaction?: ExtendedElementAttr<string>;
-	formenctype?: ExtendedElementAttr< FormenctypePropType>;
-	formmethod?: ExtendedElementAttr<FormmethodPropType>;
-	formnovalidate?: ExtendedElementAttr<boolean>;
-	formtarget?: ExtendedElementAttr<FormtargetPropType>;
-	name?: ExtendedElementAttr<string>;
-	type?: ExtendedElementAttr<"submit" | "reset" | "button">;
-	value?: ExtendedElementAttr<string>;
+	autofocus?: boolean;
+	disabled?: boolean;
+	formaction?: string;
+	formenctype?:  FormenctypePropType;
+	formmethod?: FormmethodPropType;
+	formnovalidate?: boolean;
+	formtarget?: FormtargetPropType;
+	name?: string;
+	type?: "submit" | "reset" | "button";
+	value?: string;
 }
 
 
 
 // <canvas>
-export interface IHtmlCanvasElementProps extends IHtmlElementProps<HTMLCanvasElement>
+export interface IHtmlCanvasElementAttrs extends IHtmlElementAttrs
 {
-	height?: ExtendedElementAttr<number>;
-	width?: ExtendedElementAttr<number>;
+	height?: number;
+	width?: number;
 }
 
 
 
 // <caption>
-export interface IHtmlCaptionElementProps extends IHtmlElementProps<HTMLTableCaptionElement>
+export interface IHtmlCaptionElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <col>
-export interface IHtmlColElementProps extends IHtmlElementProps<HTMLTableColElement>
+export interface IHtmlColElementAttrs extends IHtmlElementAttrs
 {
-	span?: ExtendedElementAttr<number>;
+	span?: number;
 }
 
 
 
 // <colgroup>
-export interface IHtmlColgroupElementProps extends IHtmlElementProps<HTMLTableColElement>
+export interface IHtmlColgroupElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <data>
-export interface IHtmlDataElementProps extends IHtmlElementProps<HTMLDataElement>
+export interface IHtmlDataElementAttrs extends IHtmlElementAttrs
 {
-	value?: ExtendedElementAttr<string | number | boolean>;
+	value?: string | number | boolean;
 }
 
 
 
 // <datalist>
-export interface IHtmlDataListElementProps extends IHtmlElementProps<HTMLDataListElement>
+export interface IHtmlDataListElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <dd>
-export interface IHtmlDdElementProps extends IHtmlElementProps
+export interface IHtmlDdElementAttrs extends IHtmlElementAttrs
 {
-	nowrap?: ExtendedElementAttr<boolean>;
+	nowrap?: boolean;
 }
 
 
 
 // <del>
-export interface IHtmlDelElementProps extends IHtmlElementProps<HTMLModElement>
+export interface IHtmlDelElementAttrs extends IHtmlElementAttrs
 {
-	cite?: ExtendedElementAttr<string>;
-	datetime?: ExtendedElementAttr<string | Date>;
+	cite?: string;
+	datetime?: string | Date;
 }
 
 
 
 // <details>
-export interface IHtmlDetailsElementProps extends IHtmlElementProps<HTMLDetailsElement>
+export interface IHtmlDetailsElementAttrs extends IHtmlElementAttrs
 {
-	open?: ExtendedElementAttr<boolean>;
+	open?: boolean;
 }
 
 
 
 // <dialog>
-export interface IHtmlDialogElementProps extends IHtmlElementProps<HTMLDialogElement>
+export interface IHtmlDialogElementAttrs extends IHtmlElementAttrs
 {
-	open?: ExtendedElementAttr<boolean>;
+	open?: boolean;
 }
 
 
 
 // <div>
-export interface IHtmlDivElementProps extends IHtmlElementProps<HTMLDivElement>
+export interface IHtmlDivElementAttrs extends IHtmlElementAttrs
 {
-	noWrap?: ExtendedElementAttr<boolean>;
+	noWrap?: boolean;
 }
 
 
 
 // <dl>
-export interface IHtmlDlElementProps extends IHtmlElementProps<HTMLDListElement>
+export interface IHtmlDlElementAttrs extends IHtmlElementAttrs
 {
-	compact?: ExtendedElementAttr<boolean>;
+	compact?: boolean;
 }
 
 
 
 // <embed>
-export interface IHtmlEmbedElementProps extends IHtmlElementProps<HTMLEmbedElement>
+export interface IHtmlEmbedElementAttrs extends IHtmlElementAttrs
 {
-	height?: ExtendedElementAttr<number>;
-	src?: ExtendedElementAttr<string>;
-	type?: ExtendedElementAttr<string>;
-	width?: ExtendedElementAttr<number>;
+	height?: number;
+	src?: string;
+	type?: string;
+	width?: number;
 }
 
 
 
 // <fieldset>
-export interface IHtmlFieldsetElementProps extends IHtmlElementProps<HTMLFieldSetElement>
+export interface IHtmlFieldsetElementAttrs extends IHtmlFormFieldElementAttrs
 {
-	disabled?: ExtendedElementAttr<boolean>;
-	form?: ExtendedElementAttr<string | IIDRule>;
-	name?: ExtendedElementAttr<string>;
+	disabled?: boolean;
+	name?: string;
 }
 
 
 
 // <form>
-export interface IHtmlFormElementProps extends IHtmlElementProps<HTMLFormElement>
+export interface IHtmlFormElementAttrs extends IHtmlElementAttrs
 {
-	acceptCharset?: ExtendedElementAttr<string | "UNKNOWN">;
-	action?: ExtendedElementAttr<string>;
-	autocomplete?: ExtendedElementAttr<boolean>;
-	enctype?: ExtendedElementAttr<FormenctypePropType>;
-	method?: ExtendedElementAttr<FormmethodPropType>;
-	name?: ExtendedElementAttr<string>;
-	novalidate?: ExtendedElementAttr<boolean>;
-	target?: ExtendedElementAttr<string | FormtargetPropType>;
+	acceptCharset?: string | "UNKNOWN";
+	action?: string;
+	autocomplete?: boolean;
+	enctype?: FormenctypePropType;
+	method?: FormmethodPropType;
+	name?: string;
+	novalidate?: boolean;
+	target?: string | FormtargetPropType;
 }
 
 
 
 // <h1>
-export interface IHtmlH1ElementProps extends IHtmlElementProps<HTMLHeadingElement>
+export interface IHtmlH1ElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <h2>
-export interface IHtmlH2ElementProps extends IHtmlElementProps<HTMLHeadingElement>
+export interface IHtmlH2ElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <h3>
-export interface IHtmlH3ElementProps extends IHtmlElementProps<HTMLHeadingElement>
+export interface IHtmlH3ElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <h4>
-export interface IHtmlH4ElementProps extends IHtmlElementProps<HTMLHeadingElement>
+export interface IHtmlH4ElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <h5>
-export interface IHtmlH5ElementProps extends IHtmlElementProps<HTMLHeadingElement>
+export interface IHtmlH5ElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <h6>
-export interface IHtmlH6ElementProps extends IHtmlElementProps<HTMLHeadingElement>
+export interface IHtmlH6ElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <head>
-export interface IHtmlHeadElementProps extends IHtmlElementProps<HTMLHeadElement>
+export interface IHtmlHeadElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <hr>
-export interface IHtmlHrElementProps extends IHtmlElementProps<HTMLHRElement>
+export interface IHtmlHrElementAttrs extends IHtmlElementAttrs
 {
-	align?: ExtendedElementAttr<string>;
-	color?: ExtendedElementAttr<CssColor>;
-	noshade?: ExtendedElementAttr<boolean>;
-	size?: ExtendedElementAttr<number>;
-	width?: ExtendedElementAttr<number>;
+	align?: string;
+	color?: CssColor;
+	noshade?: boolean;
+	size?: number;
+	width?: number;
 }
 
 
 
 // <html>
-export interface IHtmlHtmlElementProps extends IHtmlElementProps<HTMLHtmlElement>
+export interface IHtmlHtmlElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <iframe>
-export interface IHtmlIframeElementProps extends IHtmlElementProps<HTMLIFrameElement>
+export interface IHtmlIframeElementAttrs extends IHtmlElementAttrs
 {
-	allow?: ExtendedElementAttr<string>;
-	allowfullscreen?: ExtendedElementAttr<boolean>;
-	allowpaymentrequest?: ExtendedElementAttr<boolean>;
-	csp?: ExtendedElementAttr<string>;
-	height?: ExtendedElementAttr<number>;
-	loading?: ExtendedElementAttr<"eager" | "lazy">;
-	name?: ExtendedElementAttr<string>;
-	referrerpolicy?: ExtendedElementAttr<ReferrerPolicyPropType>;
-	sandbox?: ExtendedElementAttr<string>;
-	src?: ExtendedElementAttr<string | "about:blank">;
-	srcdoc?: ExtendedElementAttr<string>;
-	width?: ExtendedElementAttr<number>;
+	allow?: string;
+	allowfullscreen?: boolean;
+	allowpaymentrequest?: boolean;
+	csp?: string;
+	height?: number;
+	loading?: "eager" | "lazy";
+	name?: string;
+	referrerpolicy?: ReferrerPolicyPropType;
+	sandbox?: string;
+	src?: string | "about:blank";
+	srcdoc?: string;
+	width?: number;
 }
 
 
 
 // <img>
-export interface IHtmlImgElementProps extends IHtmlElementProps<HTMLImageElement>
+export interface IHtmlImgElementAttrs extends IHtmlElementAttrs
 {
-	alt?: ExtendedElementAttr<string>;
-	crossorigin?: ExtendedElementAttr<CrossoriginPropType>;
-	decoding?: ExtendedElementAttr<"auto" | "sync" | "async">;
-	height?: ExtendedElementAttr<number>;
-	intrinsicsize?: ExtendedElementAttr<boolean>;
-	ismap?: ExtendedElementAttr<boolean>;
-	loading?: ExtendedElementAttr<"eager" | "lazy">;
-	referrerpolicy?: ExtendedElementAttr<ReferrerPolicyPropType>;
-	sizes?: ExtendedElementAttr<string>;
-	src?: ExtendedElementAttr<string>;
-	srcset?: ExtendedElementAttr<string>;
-	width?: ExtendedElementAttr<number>;
-	usemap?: ExtendedElementAttr<string>;
+	alt?: string;
+	crossorigin?: CrossoriginPropType;
+	decoding?: "auto" | "sync" | "async";
+	height?: number;
+	intrinsicsize?: boolean;
+	ismap?: boolean;
+	loading?: "eager" | "lazy";
+	referrerpolicy?: ReferrerPolicyPropType;
+	sizes?: string;
+	src?: string;
+	srcset?: string;
+	width?: number;
+	usemap?: string;
 }
 
 
 
 // <input>
-export interface IHtmlInputElementProps extends IHtmlElementProps<HTMLInputElement>
+export interface IHtmlInputElementAttrs extends IHtmlFormFieldElementAttrs
 {
-	autocomplete?: ExtendedElementAttr<string | boolean>;
-	disabled?: ExtendedElementAttr<boolean>;
-	form?: ExtendedElementAttr<string | IIDRule>;
-	list?: ExtendedElementAttr<string>;
-	name?: ExtendedElementAttr<string>;
-	readonly?: ExtendedElementAttr<boolean>;
-	required?: ExtendedElementAttr<boolean>;
-	type?: ExtendedElementAttr<"button" | "checkbox" | "color" | "date" | "datetime" | "datetime-local" |
+	autocomplete?: string | boolean;
+	disabled?: boolean;
+	list?: string;
+	name?: string;
+	readonly?: boolean;
+	required?: boolean;
+	type?: "button" | "checkbox" | "color" | "date" | "datetime" | "datetime-local" |
         "email" | "file" | "hidden" | "image" | "month" | "number" | "password" | "radio" |
-        "range" | "reset" | "search" | "submit" | "tel" | "text" | "time" | "url" | "week">;
-	value?: ExtendedElementAttr<string>;
+        "range" | "reset" | "search" | "submit" | "tel" | "text" | "time" | "url" | "week";
+	value?: string;
 
 	// checkbox and radio
-	checked?: ExtendedElementAttr<boolean>;
+	checked?: boolean;
 
     // special properties to set value only first time
-    defaultValue?: ExtendedElementAttr<string>;
-    defaultChecked?: ExtendedElementAttr<boolean>;
+    defaultValue?: string;
+    defaultChecked?: boolean;
 
 	// multiple types
-	max?: ExtendedElementAttr<string | number>;
-	min?: ExtendedElementAttr<string | number>;
-	step?: ExtendedElementAttr<number | "any">;
-	multiple?: ExtendedElementAttr<boolean>;
-	placeholder?: ExtendedElementAttr<string>;
-	maxlength?: ExtendedElementAttr<number>;
-	minlength?: ExtendedElementAttr<string>;
-	size?: ExtendedElementAttr<number>;
-	pattern?: ExtendedElementAttr<string>;
+	max?: string | number;
+	min?: string | number;
+	step?: number | "any";
+	multiple?: boolean;
+	placeholder?: string;
+	maxlength?: number;
+	minlength?: string;
+	size?: number;
+	pattern?: string;
 
 	// file
-	accept?: ExtendedElementAttr<string>;
-	capture?: ExtendedElementAttr<"user" | "environment">;
+	accept?: string;
+	capture?: "user" | "environment";
 
 	// submit and image
-	formaction?: ExtendedElementAttr<string>;
-	formenctype?: ExtendedElementAttr<FormenctypePropType>;
-	formmethod?: ExtendedElementAttr<FormmethodPropType>;
-	formnovalidate?: ExtendedElementAttr<boolean>;
-	formtarget?: ExtendedElementAttr<string | FormtargetPropType>;
+	formaction?: string;
+	formenctype?: FormenctypePropType;
+	formmethod?: FormmethodPropType;
+	formnovalidate?: boolean;
+	formtarget?: string | FormtargetPropType;
 
 	// image
-	alt?: ExtendedElementAttr<string>;
-	height?: ExtendedElementAttr<number>;
-	src?: ExtendedElementAttr<string>;
-	width?: ExtendedElementAttr<number>;
+	alt?: string;
+	height?: number;
+	src?: string;
+	width?: number;
 }
 
 
 
 // <ins>
-export interface IHtmlInsElementProps extends IHtmlElementProps<HTMLModElement>
+export interface IHtmlInsElementAttrs extends IHtmlElementAttrs
 {
-	cite?: ExtendedElementAttr<string>;
-	datetime?: ExtendedElementAttr<string | Date>;
+	cite?: string;
+	datetime?: string | Date;
 }
 
 
 
 // <label>
-export interface IHtmlLabelElementProps extends IHtmlElementProps<HTMLLabelElement>
+export interface IHtmlLabelElementAttrs extends IHtmlFormFieldElementAttrs
 {
-	for?: ExtendedElementAttr<string | IIDRule>;
-	htmlFor?: ExtendedElementAttr<string | IIDRule>;
-	form?: ExtendedElementAttr<string> | IIDRule;
+	for?: string | IIDRule;
+	htmlFor?: string | IIDRule;
 }
 
 
 
 // <legend>
-export interface IHtmlLegendElementProps extends IHtmlElementProps<HTMLLegendElement>
+export interface IHtmlLegendElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <li>
-export interface IHtmlLiElementProps extends IHtmlElementProps<HTMLLIElement>
+export interface IHtmlLiElementAttrs extends IHtmlElementAttrs
 {
-	value?: ExtendedElementAttr<number>;
-	type?: ExtendedElementAttr<"a" | "A" | "i" | "vsides" | "I" | "1">;
+	value?: number;
+	type?: "a" | "A" | "i" | "vsides" | "I" | "1";
 }
 
 
 
 // <link>
-export interface IHtmlLinkElementProps extends IHtmlElementProps<HTMLLinkElement>
+export interface IHtmlLinkElementAttrs extends IHtmlElementAttrs
 {
-	as?: ExtendedElementAttr<string>;
-	crossorigin?: ExtendedElementAttr<CrossoriginPropType>;
-	href?: ExtendedElementAttr<string>;
-	hrefLang?: ExtendedElementAttr<string>;
-	integrity?: ExtendedElementAttr<string>;
-	media?: ExtendedElementAttr<MediaStatement>;
-	referrerpolicy?: ExtendedElementAttr<ReferrerPolicyPropType>;
-	rel?: ExtendedElementAttr<string>;
-	sizes?: ExtendedElementAttr<string>;
-	type?: ExtendedElementAttr<string>;
-	disabled?: ExtendedElementAttr<boolean>;
-	methods?: ExtendedElementAttr<string>;
-	prefetch?: ExtendedElementAttr<string>;
-	target?: ExtendedElementAttr<string>;
+	as?: string;
+	crossorigin?: CrossoriginPropType;
+	href?: string;
+	hrefLang?: string;
+	integrity?: string;
+	media?: MediaStatement;
+	referrerpolicy?: ReferrerPolicyPropType;
+	rel?: string;
+	sizes?: string;
+	type?: string;
+	disabled?: boolean;
+	methods?: string;
+	prefetch?: string;
+	target?: string;
 }
 
 
 
 // <listing>
-export interface IHtmlListingElementProps extends IHtmlElementProps<HTMLPreElement>
+export interface IHtmlListingElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <map>
-export interface IHtmlMapElementProps extends IHtmlElementProps<HTMLMapElement>
+export interface IHtmlMapElementAttrs extends IHtmlElementAttrs
 {
-	name?: ExtendedElementAttr<string>;
+	name?: string;
 }
 
 
 
 // <menu>
-export interface IHtmlMenuElementProps extends IHtmlElementProps<HTMLMenuElement>
+export interface IHtmlMenuElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <meta>
-export interface IHtmlMetaElementProps extends IHtmlElementProps<HTMLMetaElement>
+export interface IHtmlMetaElementAttrs extends IHtmlElementAttrs
 {
-	charset?: ExtendedElementAttr<string>;
-	content?: ExtendedElementAttr<string>;
-	httpEquiv?: ExtendedElementAttr<string>;
-	name?: ExtendedElementAttr<string>;
+	charset?: string;
+	content?: string;
+	httpEquiv?: string;
+	name?: string;
 }
 
 
 
 // <meter>
-export interface IHtmlMeterElementProps extends IHtmlElementProps<HTMLMeterElement>
+export interface IHtmlMeterElementAttrs extends IHtmlFormFieldElementAttrs
 {
-	form?: ExtendedElementAttr<string | IIDRule>;
-	high?: ExtendedElementAttr<number>;
-	low?: ExtendedElementAttr<number>;
-	min?: ExtendedElementAttr<number>;
-	max?: ExtendedElementAttr<number>;
-	optimum?: ExtendedElementAttr<number>;
-	value?: ExtendedElementAttr<number>;
+	high?: number;
+	low?: number;
+	min?: number;
+	max?: number;
+	optimum?: number;
+	value?: number;
 }
 
 
 
 // <object>
-export interface IHtmlObjectElementProps extends IHtmlElementProps<HTMLObjectElement>
+export interface IHtmlObjectElementAttrs extends IHtmlElementAttrs
 {
-	charset?: ExtendedElementAttr<string>;
-	content?: ExtendedElementAttr<string>;
-	httpEquiv?: ExtendedElementAttr<string>;
-	name?: ExtendedElementAttr<string>;
+	charset?: string;
+	content?: string;
+	httpEquiv?: string;
+	name?: string;
 }
 
 
 
 // <ol>
-export interface IHtmlOlElementProps extends IHtmlElementProps<HTMLOListElement>
+export interface IHtmlOlElementAttrs extends IHtmlElementAttrs
 {
-	reversed?: ExtendedElementAttr<boolean>;
-	start?: ExtendedElementAttr<number>;
-	type?: ExtendedElementAttr<"a" | "A" | "i" | "I" | "1">;
-	name?: ExtendedElementAttr<string>;
+	reversed?: boolean;
+	start?: number;
+	type?: "a" | "A" | "i" | "I" | "1";
+	name?: string;
 }
 
 
 
 // <optgroup>
-export interface IHtmlOptgroupElementProps extends IHtmlElementProps<HTMLOptGroupElement>
+export interface IHtmlOptgroupElementAttrs extends IHtmlElementAttrs
 {
-	disabled?: ExtendedElementAttr<boolean>;
-	label: ExtendedElementAttr<string>;	// mandatory
+	disabled?: boolean;
+	label: string;	// mandatory
 }
 
 
 
 // <option>
-export interface IHtmlOptionElementProps extends IHtmlElementProps<HTMLOptionElement>
+export interface IHtmlOptionElementAttrs extends IHtmlElementAttrs
 {
-	disabled?: ExtendedElementAttr<boolean>;
-	label?: ExtendedElementAttr<string>;
-	selected?: ExtendedElementAttr<boolean>;
-	value?: ExtendedElementAttr<string>;
+	disabled?: boolean;
+	label?: string;
+	selected?: boolean;
+	value?: string;
 }
 
 
 
 // <output>
-export interface IHtmlOutputElementProps extends IHtmlElementProps<HTMLOutputElement>
+export interface IHtmlOutputElementAttrs extends IHtmlFormFieldElementAttrs
 {
-	for?: ExtendedElementAttr<string | IIDRule | (string | IIDRule)[]>; // attrName is "for" but is in conflict with label's "for"
-	form?: ExtendedElementAttr<string | IIDRule>;
-	name?: ExtendedElementAttr<string>;
+	for?: string | IIDRule | (string | IIDRule)[];
+	htmlFor?: string | IIDRule | (string | IIDRule)[];
+	name?: string;
 }
 
 
 
 // <p>
-export interface IHtmlPElementProps extends IHtmlElementProps<HTMLParagraphElement>
+export interface IHtmlPElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <param>
-export interface IHtmlParamElementProps extends IHtmlElementProps<HTMLParamElement>
+export interface IHtmlParamElementAttrs extends IHtmlElementAttrs
 {
-	name?: ExtendedElementAttr<string>;
-	value?: ExtendedElementAttr<string>;
+	name?: string;
+	value?: string;
 }
 
 
 
 // <picture>
-export interface IHtmlPictureElementProps extends IHtmlElementProps<HTMLPictureElement>
+export interface IHtmlPictureElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <pre>
-export interface IHtmlPreElementProps extends IHtmlElementProps<HTMLPreElement>
+export interface IHtmlPreElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <progress>
-export interface IHtmlProgressElementProps extends IHtmlElementProps<HTMLProgressElement>
+export interface IHtmlProgressElementAttrs extends IHtmlElementAttrs
 {
-	max?: ExtendedElementAttr<number>;
-	value?: ExtendedElementAttr<number>;
+	max?: number;
+	value?: number;
 }
 
 
 
 // <q>
-export interface IHtmlQElementProps extends IHtmlElementProps<HTMLQuoteElement>
+export interface IHtmlQElementAttrs extends IHtmlElementAttrs
 {
-	cite?: ExtendedElementAttr<string>;
+	cite?: string;
 }
 
 
 
 // <script>
-export interface IHtmlScriptElementProps extends IHtmlElementProps<HTMLScriptElement>
+export interface IHtmlScriptElementAttrs extends IHtmlElementAttrs
 {
-	async?: ExtendedElementAttr<boolean>;
-	crossorigin?: ExtendedElementAttr<CrossoriginPropType>;
-	defer?: ExtendedElementAttr<boolean>;
-	integrity?: ExtendedElementAttr<string>;
-	nomodule?: ExtendedElementAttr<boolean>;
-	nonce?: ExtendedElementAttr<string>;
-	src?: ExtendedElementAttr<string>;
-	text?: ExtendedElementAttr<string>;
-	type?: ExtendedElementAttr<string>;
+	async?: boolean;
+	crossorigin?: CrossoriginPropType;
+	defer?: boolean;
+	integrity?: string;
+	nomodule?: boolean;
+	nonce?: string;
+	src?: string;
+	text?: string;
+	type?: string;
 }
 
 
 
 // <select>
-export interface IHtmlSelectElementProps extends IHtmlElementProps<HTMLSelectElement>
+export interface IHtmlSelectElementAttrs extends IHtmlFormFieldElementAttrs
 {
-	autocomplete?: ExtendedElementAttr<string>;
-	disabled?: ExtendedElementAttr<boolean>;
-	form?: ExtendedElementAttr<string | IIDRule>;
-	multiple?: ExtendedElementAttr<boolean>;
-	name?: ExtendedElementAttr<string>;
-	required?: ExtendedElementAttr<boolean>;
-	size?: ExtendedElementAttr<number>;
+	autocomplete?: string;
+	disabled?: boolean;
+	multiple?: boolean;
+	name?: string;
+	required?: boolean;
+	size?: number;
 }
 
 
 
 // <slot>
-export interface IHtmlSlotElementProps extends IHtmlElementProps<HTMLSlotElement>
+export interface IHtmlSlotElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <source>
-export interface IHtmlSourceElementProps extends IHtmlElementProps<HTMLSourceElement>
+export interface IHtmlSourceElementAttrs extends IHtmlElementAttrs
 {
-	media?: ExtendedElementAttr<MediaStatement>;
-	sizes?: ExtendedElementAttr<string>;
-	src?: ExtendedElementAttr<string>;
-	srcset?: ExtendedElementAttr<string>;
-	type?: ExtendedElementAttr<string>;
+	media?: MediaStatement;
+	sizes?: string;
+	src?: string;
+	srcset?: string;
+	type?: string;
 }
 
 
 
 // <span>
-export interface IHtmlSpanElementProps extends IHtmlElementProps<HTMLSpanElement>
+export interface IHtmlSpanElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <style>
-export interface IHtmlStyleElementProps extends IHtmlElementProps<HTMLStyleElement>
+export interface IHtmlStyleElementAttrs extends IHtmlElementAttrs
 {
-	media?: ExtendedElementAttr<MediaStatement>;
-	nonce?: ExtendedElementAttr<string>;
-	title?: ExtendedElementAttr<string>;
-	type?: ExtendedElementAttr<string>;
+	media?: MediaStatement;
+	nonce?: string;
+	title?: string;
+	type?: string;
 }
 
 
 
 // <table>
-export interface IHtmlTableElementProps extends IHtmlElementProps<HTMLTableElement>
+export interface IHtmlTableElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
-export interface IHtmlTbodyElementProps extends IHtmlElementProps<HTMLTableSectionElement>
+// <tbody>
+export interface IHtmlTbodyElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <td>
-export interface IHtmlTdElementProps extends IHtmlElementProps<HTMLTableDataCellElement>
+export interface IHtmlTdElementAttrs extends IHtmlElementAttrs
 {
-	colspan?: ExtendedElementAttr<number>;
-	headers?: ExtendedElementAttr<string>;
-	rowspan?: ExtendedElementAttr<number>;
-	width?: ExtendedElementAttr<number>;
+	colspan?: number;
+	headers?: string;
+	rowspan?: number;
+	width?: number;
 }
 
 
 
-export interface IHtmlTemplateElementProps extends IHtmlElementProps<HTMLTemplateElement>
+// <template>
+export interface IHtmlTemplateElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <textarea>
-export interface IHtmlTextareaElementProps extends IHtmlElementProps<HTMLTextAreaElement>
+export interface IHtmlTextareaElementAttrs extends IHtmlFormFieldElementAttrs
 {
-	autocomplete?: ExtendedElementAttr<string>;
-	cols?: ExtendedElementAttr<number>;
-	disabled?: ExtendedElementAttr<boolean>;
-	form?: ExtendedElementAttr<string | IIDRule>;
-	maxlength?: ExtendedElementAttr<number>;
-	minlength?: ExtendedElementAttr<number>;
-	name?: ExtendedElementAttr<string>;
-	placeholder?: ExtendedElementAttr<string>;
-	readonly?: ExtendedElementAttr<boolean>;
-	required?: ExtendedElementAttr<boolean>;
-	rows?: ExtendedElementAttr<number>;
-	wrap?: ExtendedElementAttr<"hard" | "soft" | "off">;
+	autocomplete?: string;
+	cols?: number;
+	disabled?: boolean;
+	maxlength?: number;
+	minlength?: number;
+	name?: string;
+	placeholder?: string;
+	readonly?: boolean;
+	required?: boolean;
+	rows?: number;
+	wrap?: "hard" | "soft" | "off";
 }
 
 
 
 // <tfoot>
-export interface IHtmlTfootElementProps extends IHtmlElementProps<HTMLTableSectionElement>
+export interface IHtmlTfootElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <thead>
-export interface IHtmlTHeadElementProps extends IHtmlElementProps<HTMLTableSectionElement>
+export interface IHtmlTHeadElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <th>
-export interface IHtmlThElementProps extends IHtmlElementProps<HTMLTableHeaderCellElement>
+export interface IHtmlThElementAttrs extends IHtmlElementAttrs
 {
-	abbr?: ExtendedElementAttr<string>;
-	colspan?: ExtendedElementAttr<number>;
-	headers?: ExtendedElementAttr<string>;
-	rowspan?: ExtendedElementAttr<number>;
-	scope?: ExtendedElementAttr<"row" | "col" | "rowgroup" | "colgroup" | "auto">;
-	wrap?: ExtendedElementAttr<"hard" | "soft" | "off">;
+	abbr?: string;
+	colspan?: number;
+	headers?: string;
+	rowspan?: number;
+	scope?: "row" | "col" | "rowgroup" | "colgroup" | "auto";
+	wrap?: "hard" | "soft" | "off";
 }
 
 
 
 // <time>
-export interface IHtmlTimeElementProps extends IHtmlElementProps<HTMLTimeElement>
+export interface IHtmlTimeElementAttrs extends IHtmlElementAttrs
 {
-	datetime?: ExtendedElementAttr<string | Date>;
+	datetime?: string | Date;
 }
 
 
 
 // <title>
-export interface IHtmlTitleElementProps extends IHtmlElementProps<HTMLTitleElement>
+export interface IHtmlTitleElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <tr>
-export interface IHtmlTrElementProps extends IHtmlElementProps<HTMLTableRowElement>
+export interface IHtmlTrElementAttrs extends IHtmlElementAttrs
 {
 }
 
 
 
 // <track>
-export interface IHtmlTrackElementProps extends IHtmlElementProps<HTMLTrackElement>
+export interface IHtmlTrackElementAttrs extends IHtmlElementAttrs
 {
-	default?: ExtendedElementAttr<boolean>;
-	kind?: ExtendedElementAttr<"subtitles" | "captions" | "descriptions" | "chapters" | "metadata">;
-	label?: ExtendedElementAttr<string>;
-	src?: ExtendedElementAttr<string>;
-	srclang?: ExtendedElementAttr<string>;
+	default?: boolean;
+	kind?: "subtitles" | "captions" | "descriptions" | "chapters" | "metadata";
+	label?: string;
+	src?: string;
+	srclang?: string;
 }
 
 
 
 // <video>
-export interface IHtmlVideoElementProps extends IHtmlElementProps<HTMLVideoElement>
+export interface IHtmlVideoElementAttrs extends IHtmlElementAttrs
 {
-	autoplay?: ExtendedElementAttr<boolean>;
-	buffered?: ExtendedElementAttr<boolean>;
-	controls?: ExtendedElementAttr<boolean>;
-	crossorigin?: ExtendedElementAttr<CrossoriginPropType>;
-	height?: ExtendedElementAttr<number>;
-	loop?: ExtendedElementAttr<boolean>;
-	muted?: ExtendedElementAttr<boolean>;
-	playsinline?: ExtendedElementAttr<boolean>;
-	preload?: ExtendedElementAttr<"none" | "metadata" | "auto" | "">;
-	intrinsicsize?: ExtendedElementAttr<boolean>;
-	poster?: ExtendedElementAttr<string>;
-	src?: ExtendedElementAttr<string>;
+	autoplay?: boolean;
+	buffered?: boolean;
+	controls?: boolean;
+	crossorigin?: CrossoriginPropType;
+	height?: number;
+	loop?: boolean;
+	muted?: boolean;
+	playsinline?: boolean;
+	preload?: "none" | "metadata" | "auto" | "";
+	intrinsicsize?: boolean;
+	poster?: string;
+	src?: string;
 }
 
 
 
 // <ul>
-export interface IHtmlUlElementProps extends IHtmlElementProps<HTMLUListElement>
+export interface IHtmlUlElementAttrs extends IHtmlElementAttrs
 {
 }
 
@@ -821,122 +837,122 @@ export interface IHtmlUlElementProps extends IHtmlElementProps<HTMLUListElement>
 
 export interface IHtmlIntrinsicElements
 {
-    a: IHtmlAElementProps;
-    abbr: IHtmlElementProps;
-    address: IHtmlElementProps;
-    area: IHtmlAreaElementProps;
-    article: IHtmlElementProps;
-    aside: IHtmlElementProps;
-    audio: IHtmlAudioElementProps;
-    b: IHtmlElementProps;
-    base: IHtmlBaseElementProps;
-    bdi: IHtmlElementProps;
-    bdo: IHtmlElementProps;
-    blockquote: IHtmlBlockquoteElementProps;
-    body: IHtmlElementProps;
-    br: IHtmlBrElementProps;
-    button: IHtmlButtonElementProps;
-    canvas: IHtmlCanvasElementProps;
-    caption: IHtmlCaptionElementProps;
-    cite: IHtmlElementProps;
-    code: IHtmlElementProps;
-    col: IHtmlColElementProps;
-    colgroup: IHtmlColgroupElementProps;
-    data: IHtmlDataElementProps;
-    datalist: IHtmlDataListElementProps;
-    dd: IHtmlDdElementProps;
-    del: IHtmlDelElementProps;
-    details: IHtmlDetailsElementProps;
-    dfn: IHtmlElementProps;
-    dialog: IHtmlDialogElementProps;
-    div: IHtmlDivElementProps;
-    dl: IHtmlDlElementProps;
-    dt: IHtmlElementProps;
-    em: IHtmlElementProps;
-    embed: IHtmlEmbedElementProps;
-    fieldset: IHtmlFieldsetElementProps;
-    figcaption: IHtmlElementProps;
-    figure: IHtmlElementProps;
-    footer: IHtmlElementProps;
-    form: IHtmlFormElementProps;
-    h1: IHtmlH1ElementProps;
-    h2: IHtmlH2ElementProps;
-    h3: IHtmlH3ElementProps;
-    h4: IHtmlH4ElementProps;
-    h5: IHtmlH5ElementProps;
-    h6: IHtmlH6ElementProps;
-    head: IHtmlHeadElementProps;
-    header: IHtmlElementProps;
-    hgroup: IHtmlElementProps;
-    hr: IHtmlHrElementProps;
-    html: IHtmlHtmlElementProps;
-    i: IHtmlElementProps;
-    iframe: IHtmlIframeElementProps;
-    img: IHtmlImgElementProps;
-    input: IHtmlInputElementProps;
-    ins: IHtmlInsElementProps;
-    kbd: IHtmlElementProps;
-    keygen: IHtmlElementProps;
-    label: IHtmlLabelElementProps;
-    legend: IHtmlLegendElementProps;
-    li: IHtmlLiElementProps;
-    link: IHtmlLinkElementProps;
-    listing: IHtmlListingElementProps;
-    main: IHtmlElementProps;
-    map: IHtmlMapElementProps;
-    mark: IHtmlElementProps;
-    menu: IHtmlMenuElementProps;
-    menuitem: IHtmlElementProps;
-    meta: IHtmlMetaElementProps;
-    meter: IHtmlMeterElementProps;
-    nav: IHtmlElementProps;
-    noscript: IHtmlElementProps;
-    object: IHtmlObjectElementProps;
-    ol: IHtmlOlElementProps;
-    optgroup: IHtmlOptgroupElementProps;
-    option: IHtmlOptionElementProps;
-    output: IHtmlOutputElementProps;
-    p: IHtmlPElementProps;
-    param: IHtmlParamElementProps;
-    picture: IHtmlPictureElementProps;
-    pre: IHtmlPreElementProps;
-    progress: IHtmlProgressElementProps;
-    q: IHtmlQElementProps;
-    rp: IHtmlElementProps;
-    rt: IHtmlElementProps;
-    rtc: IHtmlElementProps;
-    ruby: IHtmlElementProps;
-    s: IHtmlElementProps;
-    samp: IHtmlElementProps;
-    script: IHtmlScriptElementProps;
-    section: IHtmlElementProps;
-    select: IHtmlSelectElementProps;
-    slot: IHtmlSlotElementProps;
-    small: IHtmlElementProps;
-    source: IHtmlSourceElementProps;
-    span: IHtmlSpanElementProps;
-    strong: IHtmlElementProps;
-    style: IHtmlStyleElementProps;
-    sub: IHtmlElementProps;
-    summary: IHtmlElementProps;
-    sup: IHtmlElementProps;
-    table: IHtmlTableElementProps;
-    tbody: IHtmlTbodyElementProps;
-    td: IHtmlTdElementProps;
-    template: IHtmlTemplateElementProps;
-    textarea: IHtmlTextareaElementProps;
-    tfoot: IHtmlTfootElementProps;
-    th: IHtmlThElementProps;
-    thead: IHtmlTHeadElementProps;
-    time: IHtmlTimeElementProps;
-    title: IHtmlTitleElementProps;
-    tr: IHtmlTrElementProps;
-    track: IHtmlTrackElementProps;
-    u: IHtmlElementProps;
-    ul: IHtmlUlElementProps;
-    var: IHtmlElementProps;
-    video: IHtmlVideoElementProps;
-    wbr: IHtmlElementProps;
+    a: ExtendedElement<HTMLAnchorElement, IHtmlAElementAttrs>;
+    abbr: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    address: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    area: ExtendedElement<HTMLAreaElement, IHtmlAreaElementAttrs>;
+    article: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    aside: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    audio: ExtendedElement<HTMLAudioElement, IHtmlAudioElementAttrs>;
+    b: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    base: ExtendedElement<HTMLBaseElement, IHtmlBaseElementAttrs>;
+    bdi: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    bdo: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    blockquote: ExtendedElement<HTMLQuoteElement, IHtmlBlockquoteElementAttrs>;
+    body: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    br: ExtendedElement<HTMLBRElement, IHtmlBrElementAttrs>;
+    button: ExtendedElement<HTMLButtonElement, IHtmlButtonElementAttrs>;
+    canvas: ExtendedElement<HTMLCanvasElement, IHtmlCanvasElementAttrs>;
+    caption: ExtendedElement<HTMLTableCaptionElement, IHtmlCaptionElementAttrs>;
+    cite: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    code: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    col: ExtendedElement<HTMLTableColElement, IHtmlColElementAttrs>;
+    colgroup: ExtendedElement<HTMLTableColElement, IHtmlColgroupElementAttrs>;
+    data: ExtendedElement<HTMLDataElement, IHtmlDataElementAttrs>;
+    datalist: ExtendedElement<HTMLDataListElement, IHtmlDataListElementAttrs>;
+    dd: ExtendedElement<HTMLElement, IHtmlDdElementAttrs>;
+    del: ExtendedElement<HTMLModElement, IHtmlDelElementAttrs>;
+    details: ExtendedElement<HTMLDetailsElement, IHtmlDetailsElementAttrs>;
+    dfn: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    dialog: ExtendedElement<HTMLDialogElement, IHtmlDialogElementAttrs>;
+    div: ExtendedElement<HTMLDivElement, IHtmlDivElementAttrs>;
+    dl: ExtendedElement<HTMLDListElement, IHtmlDlElementAttrs>;
+    dt: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    em: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    embed: ExtendedElement<HTMLEmbedElement, IHtmlEmbedElementAttrs>;
+    fieldset: ExtendedElement<HTMLFieldSetElement, IHtmlFieldsetElementAttrs>;
+    figcaption: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    figure: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    footer: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    form: ExtendedElement<HTMLFormElement, IHtmlFormElementAttrs>;
+    h1: ExtendedElement<HTMLHeadingElement, IHtmlH1ElementAttrs>;
+    h2: ExtendedElement<HTMLHeadingElement, IHtmlH2ElementAttrs>;
+    h3: ExtendedElement<HTMLHeadingElement, IHtmlH3ElementAttrs>;
+    h4: ExtendedElement<HTMLHeadingElement, IHtmlH4ElementAttrs>;
+    h5: ExtendedElement<HTMLHeadingElement, IHtmlH5ElementAttrs>;
+    h6: ExtendedElement<HTMLHeadingElement, IHtmlH6ElementAttrs>;
+    head: ExtendedElement<HTMLHeadElement, IHtmlHeadElementAttrs>;
+    header: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    hgroup: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    hr: ExtendedElement<HTMLHRElement, IHtmlHrElementAttrs>;
+    html: ExtendedElement<HTMLHtmlElement, IHtmlHtmlElementAttrs>;
+    i: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    iframe: ExtendedElement<HTMLIFrameElement, IHtmlIframeElementAttrs>;
+    img: ExtendedElement<HTMLImageElement, IHtmlImgElementAttrs>;
+    input: ExtendedElement<HTMLInputElement, IHtmlInputElementAttrs>;
+    ins: ExtendedElement<HTMLModElement, IHtmlInsElementAttrs>;
+    kbd: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    keygen: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    label: ExtendedElement<HTMLLabelElement, IHtmlLabelElementAttrs>;
+    legend: ExtendedElement<HTMLLegendElement, IHtmlLegendElementAttrs>;
+    li: ExtendedElement<HTMLLIElement, IHtmlLiElementAttrs>;
+    link: ExtendedElement<HTMLLinkElement, IHtmlLinkElementAttrs>;
+    listing: ExtendedElement<HTMLPreElement, IHtmlListingElementAttrs>;
+    main: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    map: ExtendedElement<HTMLMapElement, IHtmlMapElementAttrs>;
+    mark: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    menu: ExtendedElement<HTMLMenuElement, IHtmlMenuElementAttrs>;
+    menuitem: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    meta: ExtendedElement<HTMLMetaElement, IHtmlMetaElementAttrs>;
+    meter: ExtendedElement<HTMLMeterElement, IHtmlMeterElementAttrs>;
+    nav: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    noscript: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    object: ExtendedElement<HTMLObjectElement, IHtmlObjectElementAttrs>;
+    ol: ExtendedElement<HTMLOListElement, IHtmlOlElementAttrs>;
+    optgroup: ExtendedElement<HTMLOptGroupElement, IHtmlOptgroupElementAttrs>;
+    option: ExtendedElement<HTMLOptionElement, IHtmlOptionElementAttrs>;
+    output: ExtendedElement<HTMLOutputElement, IHtmlOutputElementAttrs>;
+    p: ExtendedElement<HTMLParagraphElement, IHtmlPElementAttrs>;
+    param: ExtendedElement<HTMLElement, IHtmlParamElementAttrs>;
+    picture: ExtendedElement<HTMLPictureElement, IHtmlPictureElementAttrs>;
+    pre: ExtendedElement<HTMLPreElement, IHtmlPreElementAttrs>;
+    progress: ExtendedElement<HTMLProgressElement, IHtmlProgressElementAttrs>;
+    q: ExtendedElement<HTMLQuoteElement, IHtmlQElementAttrs>;
+    rp: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    rt: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    rtc: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    ruby: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    s: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    samp: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    script: ExtendedElement<HTMLScriptElement, IHtmlScriptElementAttrs>;
+    section: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    select: ExtendedElement<HTMLSelectElement, IHtmlSelectElementAttrs>;
+    slot: ExtendedElement<HTMLSlotElement, IHtmlSlotElementAttrs>;
+    small: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    source: ExtendedElement<HTMLSourceElement, IHtmlSourceElementAttrs>;
+    span: ExtendedElement<HTMLSpanElement, IHtmlSpanElementAttrs>;
+    strong: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    style: ExtendedElement<HTMLStyleElement, IHtmlStyleElementAttrs>;
+    sub: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    summary: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    sup: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    table: ExtendedElement<HTMLTableElement, IHtmlTableElementAttrs>;
+    tbody: ExtendedElement<HTMLTableSectionElement, IHtmlTbodyElementAttrs>;
+    td: ExtendedElement<HTMLTableCellElement, IHtmlTdElementAttrs>;
+    template: ExtendedElement<HTMLTemplateElement, IHtmlTemplateElementAttrs>;
+    textarea: ExtendedElement<HTMLTextAreaElement, IHtmlTextareaElementAttrs>;
+    tfoot: ExtendedElement<HTMLTableSectionElement, IHtmlTfootElementAttrs>;
+    th: ExtendedElement<HTMLTableCellElement, IHtmlThElementAttrs>;
+    thead: ExtendedElement<HTMLTableSectionElement, IHtmlTHeadElementAttrs>;
+    time: ExtendedElement<HTMLTimeElement, IHtmlTimeElementAttrs>;
+    title: ExtendedElement<HTMLTitleElement, IHtmlTitleElementAttrs>;
+    tr: ExtendedElement<HTMLTableRowElement, IHtmlTrElementAttrs>;
+    track: ExtendedElement<HTMLTrackElement, IHtmlTrackElementAttrs>;
+    u: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    ul: ExtendedElement<HTMLUListElement, IHtmlUlElementAttrs>;
+    var: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
+    video: ExtendedElement<HTMLVideoElement, IHtmlVideoElementAttrs, HTMLMediaElementEventMap>;
+    wbr: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
 }
 
 
