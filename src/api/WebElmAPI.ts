@@ -1,5 +1,5 @@
 ﻿import {
-    IClassCompVN, IComponent, IPublication, IServiceDefinitions, ISubscription, RenderMethodType,
+    IClassCompVN, IPublication, IServiceDefinitions, ISubscription, RenderMethodType,
     ScheduledFuncType, TickSchedulingType
 } from "./CompTypes";
 import {
@@ -83,7 +83,7 @@ const symWebElmDef = Symbol("webElmDef");
  * @returns Class that inherits from the given HTMLElement-derived class that imlements all
  * the internal logic of custom Web elements.
  */
-export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs = {}, TEvents = {}>(
+export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends {} = {}, TEvents extends {} = {}>(
     elmClass: new() => TElm): WebElmConstructor<TElm,TAttrs,TEvents>
 {
     // dynamically build the actual element class and implement the necessary interfaces
@@ -152,7 +152,7 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs = {}, TE
             let actNewValue: any = newValue;
             let fromHtml = options?.fromHtml;
             if (fromHtml)
-                actNewValue = fromHtml.call(this, actNewValue, attrName, propName);
+                actNewValue = fromHtml.call(this, actNewValue, attrName);
 
             // set the new value to the property. Since by default properties with the @attr
             // decorators are reactive, this will trigger re-rendering. Note that property may not
@@ -170,7 +170,7 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs = {}, TE
         /** Returns true if the component is mounted and false otherwise */
         get isMounted(): boolean { return this.vn && this.isConnected; };
 
-        /** The render() function must be overridden in the derived class */
+        /** The render() function should be overridden in the derived class */
         render(): any {}
 
         // Necessary IComponentEx members
@@ -207,36 +207,65 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs = {}, TE
         }
 
         // Necessary IWebElm members
-        processStyles(func: () => void)
+        processStyles(flagOrFunc: boolean | (() => void), func?: () => void)
         {
+            let useAdoption = true;
+            if (typeof flagOrFunc === "boolean")
+                useAdoption = flagOrFunc;
+            else
+                func = flagOrFunc;
+
             if (!mimcss || !this.#shadowRoot)
-                func();
+                func!();
             else
             {
-                mimcss.pushAdoptionContext(this.#shadowRoot);
-                try { func(); }
-                finally {mimcss.popAdoptionContext(this.#shadowRoot)}
+                mimcss.pushRootContext(this.#shadowRoot, useAdoption);
+                try
+                {
+                    func!();
+                }
+                finally
+                {
+                    mimcss.popRootContext(this.#shadowRoot, useAdoption)
+                }
             }
         }
 
-        /**
-         * Sets the value of the given attribute converting it to string if necessary.
-         * @param attrName Attribute name, which is a key from the IAttrs type
-         * @param value Value to set to the attribute. It is converted to string if necessary.
-         */
-        setAttr<K extends string & keyof TAttrs>( attrName: K, value: TAttrs[K]): void
+        setAttr<K extends string & keyof TAttrs>( attrName: K, value: TAttrs[K] | null | undefined): void
         {
+            let stringValue: string | null = null;
+
+            // if conversion function is defined in the attribute options, use it
+            let toHtml = this.#definition.attrs[attrName]?.options?.toHtml;
+            if (toHtml)
+                stringValue = toHtml.call(this, value, attrName);
+            else
+            {
+                if (value)
+                    stringValue = (value as any).toString();
+            }
+
+            if (!stringValue)
+                this.removeAttribute(attrName);
+            else
+                this.setAttribute( attrName, stringValue);
         }
 
-        /**
-         * Gets the current value of the given attribute converting it from string to the
-         * attributes type.
-         * @param attrName Attribute name, which is a key from the IAttrs type
-         * @returns value The current value of the attribute.
-         */
-        getAttr<K extends string & keyof TAttrs>( attrName: K): TAttrs[K]
+        getAttr<K extends string & keyof TAttrs>( attrName: K): TAttrs[K] | string | null
         {
-            return null as unknown as TAttrs[K];
+            let actNewValue: TAttrs[K] | string | null = this.getAttribute(attrName);
+
+            // if conversion function is defined in the attribute options, use it
+            let fromHtml = this.#definition.attrs[attrName]?.options?.fromHtml;
+            if (fromHtml)
+                actNewValue = fromHtml.call(this, actNewValue, attrName);
+
+            return actNewValue;
+        }
+
+        hasAttr<K extends string & keyof TAttrs>( attrName: K): boolean
+        {
+            return this.hasAttribute(attrName);
         }
 
         fireEvent<K extends string & keyof TEvents>( key: K, detail: TEvents[K]): boolean
@@ -252,14 +281,16 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs = {}, TE
 
 
 /**
- * Function that returns a class from which custom Web elements, which don't need to customize
- * existing built-in element, should inherit. The return class derives directly from HTMLElement.
+ * Function that returns a class from which regular custom Web elements (which don't need to
+ * customize existing built-in elements) should inherit. The return class derives directly from
+ * HTMLElement.
  *
  * @typeparam TAttrs Type or interface mapping attribute names to attribute types.
  * @typeparam TEvents Type or interface mapping event types (names) to the types of the `detail`
  * property of the `CustomEvent` objects for the events.
  */
-export const WebElm = <TAttrs = {}, TEvents = {}>() => WebElmEx<HTMLElement,TAttrs,TEvents>(HTMLElement);
+export const WebElm = <TAttrs extends {} = {}, TEvents extends {} = {}>() =>
+    WebElmEx<HTMLElement,TAttrs,TEvents>(HTMLElement);
 
 
 
@@ -356,7 +387,7 @@ export function registerWebElm(webElmClass: WebElmConstructor, name?: string,
     if (!definition.name)
         throw new Error("WebElm name is not defined.");
 
-    // loop over attribute definitions and try to find `onchaged_${propName}` methods in the class
+    // loop over attribute definitions and try to find `onchanged_${propName}` methods in the class
     // prototype.
     for( let [propName, attrDef] of Object.entries(definition.props))
     {
@@ -470,7 +501,7 @@ function addWebElmAttr(definition: WebElmDefinition, attrDef: WebElmAttrDefiniti
 /**
  * Built-in attribute converter that converts string value to a number.
  */
-export const NumberConverter: WebElmFromHtmlConverter = (stringValue: string | null): number =>
+export const NumberConverter: WebElmFromHtmlConverter = (stringValue: string | null | undefined): number =>
     stringValue ? parseFloat(stringValue) : NaN;
 
 
@@ -478,7 +509,7 @@ export const NumberConverter: WebElmFromHtmlConverter = (stringValue: string | n
 /**
  * Built-in attribute converter that converts string value to an integer number.
  */
-export const IntConverter: WebElmFromHtmlConverter = (stringValue: string | null): number =>
+export const IntConverter: WebElmFromHtmlConverter = (stringValue: string | null | undefined): number =>
     stringValue ? parseInt(stringValue) : NaN;
 
 
@@ -486,7 +517,7 @@ export const IntConverter: WebElmFromHtmlConverter = (stringValue: string | null
 /**
  * Built-in attribute converter that converts string value to a Boolean value.
  */
-export const BoolConverter: WebElmFromHtmlConverter = (stringValue: string | null): boolean =>
+export const BoolConverter: WebElmFromHtmlConverter = (stringValue: string | null | undefined): boolean =>
     !!stringValue
 
 

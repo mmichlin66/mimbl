@@ -3,16 +3,26 @@ import { IComponent, IComponentEx } from "./CompTypes";
  * Defines function signature for converting an attribute string value to the corresponding
  * property's type. Converter functions are specified as part of attribute options, e.g. in the
  * [[attr]] decorator.
+ *
+ * The converter functions are called as part of custom Web element functionality and the
+ * `this` parameter points to the instance of the element whose attribute is bein converted.
+ *
  * @param stringValue Attribute's string value to convert to the corresponding type.
- * @param attrName Name of the attribute
+ * @param attrName Name of the attribute whose value is being converted from string
  */
-export declare type WebElmFromHtmlConverter = (stringValue: string | null, attrName: string) => any;
+export declare type WebElmFromHtmlConverter = (this: HTMLElement, stringValue: string | null | undefined, attrName: string) => any;
 /**
- * Defines function signature for converting a property value to the corresponding attributes's
+ * Defines function signature for converting a value to the corresponding attributes's
  * string. Converter functions are specified as part of attribute options, e.g. in the
  * [[attr]] decorator.
+ *
+ * The converter functions are called as part of custom Web element functionality and the
+ * `this` parameter points to the instance of the element whose attribute is bein converted.
+ *
+ * @param value Value to convert to string.
+ * @param attrName Name of the attribute whose value is being converted to string
  */
-export declare type WebElmToHtmlConverter = (value: any, attrName: string) => string | null;
+export declare type WebElmToHtmlConverter = (this: HTMLElement, value: any, attrName: string) => string | null;
 /**
  * Defines function signature for attribute change notification handler.
  */
@@ -28,6 +38,8 @@ export declare type WebElmAttrOptions = {
     noTrigger?: boolean;
     /** Converter function that converts the string attribute value to a property native type */
     fromHtml?: WebElmFromHtmlConverter;
+    /** Converter function that converts a value to a string that can be set to the HTML attribute */
+    toHtml?: WebElmToHtmlConverter;
     /** Notification function that is called when the attribute value changes */
     onchanged?: WebElmAttrChangeHandler;
 };
@@ -60,14 +72,32 @@ export declare type OnPropChangeHandlers<T> = {
  * @typeparam TEvents Type or interface mapping event names to the types of the `detail`
  * property of the `CustomEvent` objects for the events.
  */
-export interface IWebElm<TAttrs = {}, TEvents = {}> extends IComponent, IComponentEx {
+export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}> extends IComponent, IComponentEx {
     /**
      * Invokes the given function in the "style adoption context"; which allows all Mimcss style
      * manipulations to be reflected in the adoption context of the element's shadow DOM.
+     *
      * @param func Function that is called while Mimcss adoption context related to the element's
      * shadow root is set.
      */
     processStyles(func: () => void): void;
+    /**
+     * Invokes the given function in the "style adoption context"; which allows all Mimcss style
+     * manipulations to be reflected in the adoption context of the element's shadow DOM. The
+     * `useAdoption` parameter can be set to false if the intention is to create styles under
+     * the shadow root element instead of using adoption. This can be useful if the styles are
+     * intended to be manipulated directly by the custom element's code, in which case each
+     * custom element instance should have its own style sheet (while adoption allows sharing the
+     * same style sheet between multiple instances of custom elements).
+     *
+     * @param useAdoption Flag indicating that stylesheets should be adopted by instead of
+     * created under the shadow root. The flag is ignored if the adoption is not supported or if
+     * the shadow root does not exist.
+     * @param func Function that is called while Mimcss adoption context related to the element's
+     * shadow root is set.
+     */
+    processStyles(useAdoption: boolean, func: () => void): void;
+    processStyles(flagOrFunc: boolean | (() => void), func?: () => void): void;
     /**
      * Sets the value of the given attribute converting it to string if necessary.
      * @param attrName Attribute name, which is a key from the `TAttrs` type
@@ -76,13 +106,22 @@ export interface IWebElm<TAttrs = {}, TEvents = {}> extends IComponent, ICompone
     setAttr<K extends string & keyof TAttrs>(attrName: K, value: TAttrs[K]): void;
     /**
      * Gets the current value of the given attribute converting it from string to the
-     * attributes type.
+     * attributes type if possible.
      * @param attrName Attribute name, which is a key from the `TAttrs` type
-     * @returns value The current value of the attribute.
+     * @returns The current value of the attribute.
      */
-    getAttr<K extends string & keyof TAttrs>(attrName: K): TAttrs[K];
+    getAttr<K extends string & keyof TAttrs>(attrName: K): TAttrs[K] | string | null;
     /**
-     * Fires a custom event with `details` of appropriate type.
+     * Determines whether the element has the attribute with the given name.
+     * @param attrName Attribute name, which is a key from the `TAttrs` type
+     * @returns True if the attribute with the given name exists on the element.
+     */
+    hasAttr<K extends string & keyof TAttrs>(attrName: K): boolean;
+    /**
+     * Fires an event of the given type. The `detail` parameter is interpreted differently for
+     * built-in and custom events. For built-in events (that is, events whose type derives from
+     * Event), this is the event object itself. For custom events, it becomes the value of the
+     * `detail` property of the CustomEvent object.
      * @param eventType Event type name, which is a key from the `TEvents` type
      * @param detail Event data, whose type is defined by the type mapped to the key
      * in the `TEvents` type.
@@ -97,7 +136,7 @@ export interface IWebElm<TAttrs = {}, TEvents = {}> extends IComponent, ICompone
  * @typeparam TEvents Type or interface mapping event names to the types of the `detail`
  * property of the `CustomEvent` objects for the events.
  */
-export interface WebElmConstructor<TElm extends HTMLElement = HTMLElement, TAttrs = {}, TEvents = {}> {
+export interface WebElmConstructor<TElm extends HTMLElement = HTMLElement, TAttrs extends {} = {}, TEvents extends {} = {}> {
     new (): TElm & IWebElm<TAttrs, TEvents>;
 }
 //# sourceMappingURL=WebElmTypes.d.ts.map

@@ -452,17 +452,16 @@ export type ReferrerPolicyPropType = "no-referrer" | "no-referrer-when-downgrade
 
 
 /**
- * Type that allows defining attributes of HTML and SVG elements in terms of simple types (e.g.
- * `string`), but allowing to pass triggers of this type to them. This is used to optimize
- * re-rendering when the value of the attribute changes.
+ * Internal type containing names of attributes that are not "triggerized" when applying
+ * the [[ExtendedAttrs]] type to the element attributes interface.
  */
-export type ExtendedElementAttr<T> = T | ITrigger<T> | null | undefined;
+export type NoTriggerAttrNames = "xmlns";
 
 
 
 /**
  * Converts the given interface T to a type that maps an extended attribute type to each property
- * of T. The extended property contains the property type the [[ITrigger]] for this type as well as
+ * of T. The extended property contains the property type, the [[ITrigger]] for this type as well as
  * `null` and `undefined`. This is primarily useful for defining attributes of HTML elements - both
  * built-in and custom.
  *
@@ -484,7 +483,9 @@ export type ExtendedElementAttr<T> = T | ITrigger<T> | null | undefined;
  * }
  * ```
  */
-export type ExtendedAttrs<T> = { [K in keyof T]?: T[K] | ITrigger<T[K]> | null | undefined}
+export type ExtendedAttrs<T> = {
+    [K in keyof T]?: T[K] | null | undefined | (K extends NoTriggerAttrNames ? never : ITrigger<T[K]>)
+}
 
 
 
@@ -569,7 +570,7 @@ export type ExtendedElement<TRef extends Element = Element,
     TChildren = any> =
 ICommonProps<TRef> & ExtendedAttrs<TAttrs> & ExtendedEvents<TEvents> &
 {
-	/**
+    /**
 	 * Reference that will be set to the element's virtual node after it is created (mounted). The
 	 * reference will be set to undefined after the element is unmounted.
 	 */

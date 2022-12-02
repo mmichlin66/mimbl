@@ -48,7 +48,7 @@ export interface ISvgPresentationAttrs extends ISvgElementAttrs
 	"clip-rule"?: "nonzero" | "evenodd" | "inherit";
 	"color"?: string;
 	"color-interpolation"?: "auto" | "sRGB" | "linearRGB" | "inherit";
-	"color-interpolationFilters"?: "auto" | "sRGB" | "linearRGB" | "inherit";
+	"color-interpolation-filters"?: "auto" | "sRGB" | "linearRGB" | "inherit";
 	"color-profile"?: string | "auto" | "sRGB" | "<name>" | "inherit";
 	"color-rendering"?: "auto" | "optimizeSpeed" | "optimizeQuality" | "inherit";
 	"cursor"?: "auto" | "crosshair" | "default" | "pointer" | "move" | "e-resize" | "ne-resize" | "nw-resize" | "n-resize" | "se-resize" | "sw-resize" | "s-resize" | "w-resize| text" | "wait" | "help" | "inherit";
@@ -67,8 +67,8 @@ export interface ISvgPresentationAttrs extends ISvgElementAttrs
 	"font-style"?: "normal" | "italic" | "oblique" | "inherit";
 	"font-variant"?: "normal" | "small-caps" | "inherit";
 	"font-weight"?: "normal" | "bold" | "bolder" | "lighter" | "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "inherit";
-	"glyph-orientationHorizontal"?: string;
-	"glyph-orientationVertical"?: string;
+	"glyph-orientation-horizontal"?: string;
+	"glyph-orientation-vertical"?: string;
 	"image-rendering"?: "auto" | "optimizeSpeed" | "optimizeQuality" | "inherit";
 	"kerning"?: string | number | "auto" | "inherit";
 	"letter-spacing"?: string | number | "normal" | "inherit";

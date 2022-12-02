@@ -543,7 +543,7 @@ export interface IHtmlIntrinsicElements {
     u: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
     ul: ExtendedElement<HTMLUListElement, IHtmlUlElementAttrs>;
     var: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
-    video: ExtendedElement<HTMLVideoElement, IHtmlVideoElementAttrs, HTMLMediaElementEventMap>;
+    video: ExtendedElement<HTMLVideoElement, IHtmlVideoElementAttrs, HTMLVideoElementEventMap>;
     wbr: ExtendedElement<HTMLElement, IHtmlElementAttrs>;
 }
 //# sourceMappingURL=HtmlTypes.d.ts.map

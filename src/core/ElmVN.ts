@@ -174,7 +174,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         else if (!info)
         {
             // if namespace is provided use it; otherwise, use the namespace of the anchor element.
-            let ns = this.props?.xmlns as string;
+            let ns = this.props?.xmlns;
             if (ns)
                 this.ownDN = document.createElementNS( ns, this.elmName) as any as T;
             else
@@ -1016,7 +1016,7 @@ function onAttrTriggerChanged( this: ElmVN, name: string, val: any): void
 
 
 
-// Type defining the information we keep about each regular attribute
+/** Type defining the information we keep about each regular attribute */
 interface AttrRunTimeData
 {
 	// Information about this attribute - can be undefined
@@ -1032,7 +1032,7 @@ interface AttrRunTimeData
 
 
 
-// Type defining the information we keep about each event listener
+/** Type defining the information we keep about each event listener */
 interface EventRunTimeData extends CallbackWrappingParams<EventFuncType>
 {
 	// Flag indicating whether this event should be used as Capturing (true) or Bubbling (false)
@@ -1048,7 +1048,7 @@ interface EventRunTimeData extends CallbackWrappingParams<EventFuncType>
 
 
 
-// Type defining the information we keep about each custom property.
+/** Type defining the information we keep about each custom property. */
 interface CustomAttrRunTimeData
 {
 	// Information about this custom attribute - cannot be null
@@ -1063,8 +1063,10 @@ interface CustomAttrRunTimeData
 
 
 
-// Numeric indicators of namespaces that can be mapped to element names for speeding up the
-// decision on how to create elements
+/**
+ * Numeric indicators of namespaces that can be mapped to element names for speeding up the
+ *  decision on how to create elements
+ */
 const enum ElementNamespace
 {
     HTML = 1,
@@ -1072,6 +1074,7 @@ const enum ElementNamespace
     MATHML = 3,
 }
 
+/** Object containing namespace URIs of known namespaces */
 const ElementNamespaceNames = {
     [ElementNamespace.HTML]: "http://www.w3.org/1999/xhtml",
     [ElementNamespace.SVG]: "http://www.w3.org/2000/svg",
@@ -1087,8 +1090,9 @@ const ElementNamespaceNames = {
 //    the HTML document, while JSX will be using a camel-formatted name (e.g. "colorProfile").
 type ElmInfo = ElementNamespace | { ns: number, name: string};
 
-// Object that maps element names to ElmInfo. Elements that are not in this map are created using
-// the anchor's namespace URI with the document.createElementNS() call.
+/** Object that maps element names to ElmInfo. Elements that are not in this map are created using
+ * the anchor's namespace URI with the document.createElementNS() call.
+ */
 const elmInfos: {[elmName:string]: ElmInfo} =
 {
     a: ElementNamespace.HTML,
@@ -1436,9 +1440,9 @@ const propInfos: {[P:string]: PropInfo} =
     class: { type: PropType.Attr, set: setAttrAsStringProp, remove: removeAttrAsProp, name: "className" },
     className: { type: PropType.Attr, set: setAttrAsStringProp, remove: removeAttrAsProp },
     for: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp, name: "htmlFor" },
-    htmlFor: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp },
+    htmlFor: AttrAsPropInfo,
     tabindex: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp, name: "tabIndex" },
-    tabIndex: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp },
+    tabIndex: AttrAsPropInfo,
     defaultValue: { type: PropType.Attr, set: setAttrAsProp, update: updatePropNoOp, remove: removePropNoOp, name: "value" },
     defaultChecked: { type: PropType.Attr, set: setAttrAsProp, update: updatePropNoOp, remove: removePropNoOp, name: "checked" },
     style: { type: PropType.Attr, set: setStyleProp, update: updateStyleProp },

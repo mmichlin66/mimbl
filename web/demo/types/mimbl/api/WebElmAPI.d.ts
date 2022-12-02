@@ -34,16 +34,17 @@ declare type WebElmAttrDefinition = {
  * @returns Class that inherits from the given HTMLElement-derived class that imlements all
  * the internal logic of custom Web elements.
  */
-export declare function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs = {}, TEvents = {}>(elmClass: new () => TElm): WebElmConstructor<TElm, TAttrs, TEvents>;
+export declare function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends {} = {}, TEvents extends {} = {}>(elmClass: new () => TElm): WebElmConstructor<TElm, TAttrs, TEvents>;
 /**
- * Function that returns a class from which custom Web elements, which don't need to customize
- * existing built-in element, should inherit. The return class derives directly from HTMLElement.
+ * Function that returns a class from which regular custom Web elements (which don't need to
+ * customize existing built-in elements) should inherit. The return class derives directly from
+ * HTMLElement.
  *
  * @typeparam TAttrs Type or interface mapping attribute names to attribute types.
  * @typeparam TEvents Type or interface mapping event types (names) to the types of the `detail`
  * property of the `CustomEvent` objects for the events.
  */
-export declare const WebElm: <TAttrs = {}, TEvents = {}>() => WebElmConstructor<HTMLElement, TAttrs, TEvents>;
+export declare const WebElm: <TAttrs extends {} = {}, TEvents extends {} = {}>() => WebElmConstructor<HTMLElement, TAttrs, TEvents>;
 /**
  * Decorator function for custom element components.
  *
