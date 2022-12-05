@@ -1165,6 +1165,12 @@ interface AttrPropInfo extends PropInfoBase
 	remove?: (elm: Element, name: string) => void;
 
 	/**
+     * Function that converts attribute value to string. Usually only needed for complex attribute
+     * types.
+     */
+	v2s?: (v: any, name: string, elm: Element) => string;
+
+	/**
      * The actual name of the attribute/property. This is sometimes needed if the attribute name
      * cannot be used as property name - for example, if attribute name contains characters not
      * allowed in TypeScript identifier (e.g. dash). It is also used if instead of using the
@@ -1209,30 +1215,60 @@ export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
 /**
  * Helper function that converts the given value to string.
  *   - strings are returned as is.
+ *   - true is converted to an empty string.
+ *   - false is converted to "false".
  *   - null and undefined are converted to an empty string.
  *   - arrays are converted by calling this function recursively on the elements and separating
  *     them with spaces.
  *   - everything else is converted by calling the toString method.
+ *
+ * Note that although this functiondoes handles null, undefined and false, it is normally should
+ * not be called with these values as the proper action is to remove attributes with such values.
  */
 
 const valToString = (val: any): string =>
-	typeof val === "string"
-        ? val
-        : Array.isArray( val)
-            ? val.map( item => valToString(item)).filter( item => !!item).join(" ")
-            : val == null ? "" : val.toString();
+    // attribute will be created without alue
+    val == null || val === true ? "" :
+
+    // set string value as is
+	typeof val === "string" ? val :
+
+    // by defalt array elements are joined with space
+    Array.isArray( val) ? val.map( item => valToString(item)).filter( item => !!item).join(" ") :
+
+    // call toString() for all other values (including numbers and objects)
+    val.toString();
 
 
 
 /** Registers information about the given property. */
 export function registerElmProp( propName: string, info: AttrPropInfo | EventPropInfo | CustomAttrPropInfo): void
 {
-    /// #if DEBUG
     if (propName in propInfos)
+    {
+        /// #if DEBUG
         console.error( `Element property ${propName} is already registered.`);
-    /// #endif
+        /// #endif
+
+        return;
+    }
 
     propInfos[propName] = info;
+}
+
+
+
+/**
+ * Sets the value of the given attribute on the given element. This method handles special cases
+ * of properties with non-trivial values.
+ */
+export function setAttrValue( elm: Element, name: string, val: any): void
+{
+    let info = propInfos[name];
+    if(info && info.type !== PropType.Attr)
+        return;
+
+    setElmProp(elm, name, info, val);
 }
 
 
@@ -1254,8 +1290,8 @@ function setElmProp( elm: Element, name: string, info: AttrPropInfo | null, val:
 
         if (info.set)
             info.set( elm, name, val);
-        else
-            elm.setAttribute( name, valToString( val));
+        else if (info.v2s)
+            elm.setAttribute( name, info.v2s ? info.v2s(val, name, elm) : valToString( val));
     }
 
     /// #if USE_STATS
@@ -1328,10 +1364,6 @@ function removeElmProp( elm: Element, name: string, info: AttrPropInfo | null): 
 //
 // Handling of attributes that are set using properties.
 //
-// Handling of defaultValue and defaultChecked properties. These properties work when the
-// element is first mounted and the new value is ignored upon updates and removals. This allows
-// using defaultValue and defaultChecked to initialize the control value once.
-//
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 function setAttrAsProp( elm: Element, name: string, val: any): void
 {
@@ -1348,65 +1380,74 @@ function removeAttrAsProp( elm: Element, name: string): void
     elm[name] = null;
 }
 
-function updatePropNoOp( elm: Element, name: string, newVal: any): void {}
-function removePropNoOp( elm: Element, name: string): void {}
-
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// Handling of style property. Style property can be specified either as a string or as the
-// Styleset object from the Mimcss library. Both the old and new style property values are
-// converted to strings and then compared.
+// Handling of some special properties.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/** we set the deafultValue and also the value properties */
+function setDefaultValueProp( elm: HTMLInputElement, name: string, val: string): void
+{
+    elm.value = elm.defaultValue = val;
+}
+
+
+
+/** we set the defaultChecked and also the checked properties */
+function setDefaultCheckedProp( elm: HTMLInputElement, name: string, val: boolean): void
+{
+    elm.checked = elm.defaultChecked = val;
+}
+
+
+
+/** we set the defaultChecked and also the checked properties */
+const array2sWithComma = (val: any[]): string =>
+    val == null ? "" : val.map( item => valToString(item)).filter( item => !!item).join(",");
+
+
+
+/**
+ * If Mimcss library is not included, then value can only be a string. If it is not,
+ * we return empty string.
+ */
+const mimcssStylePropToString = (val: any, name: string): string =>
+    mimcss ? mimcss.stylePropValueToString(val, name) : typeof val === "string" ? val : "";
+
+
+
+/**
+ * Handling of style property. Style property can be specified either as a string or as the
+ * Styleset object from the Mimcss library. Both the old and new style property values are
+ * converted to strings and then compared.
+ */
 function setStyleProp( elm: Element, name: string, val: string | Styleset): void
 {
+    // if Mimcss library is not included, then style attributes can only be strings. If they are
+    // not, this is an application bug and we cannot handle it.
     if (mimcss)
-        mimcss.setElementStyle( elm as HTMLElement, val, SchedulerType.Sync);
+        mimcss.setElementStyle( elm as unknown as ElementCSSInlineStyle, val, SchedulerType.Sync);
     else if (typeof val === "string")
         elm.setAttribute( name, val);
 }
 
-function updateStyleProp( elm: Element, name: string, oldVal: string | Styleset,
-    newVal: string | Styleset): void
-{
-    // if Mimcss library is not included, then style attributes can only be strings. If they are
-    // not, this is an application bug and we canont handle it.
-    if (!mimcss && (typeof oldVal !== "string" || typeof newVal !== "string"))
-        return;
-
-    // convert both old and new to strings and compare
-    let oldPropValAsString = typeof oldVal === "string" ? oldVal :  mimcss.stylesetToString( oldVal);
-    let newPropValAsString = typeof newVal === "string" ? newVal :  mimcss.stylesetToString( newVal);
-    if (oldPropValAsString !== newPropValAsString)
-        elm.setAttribute( name, newPropValAsString);
-}
 
 
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Handling of media property. Media property can be specified either as a string or as the
-// MediaStatement object from the Mimcss library.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
+/**
+ * Handling of media property. Media property can be specified either as a string or as the
+ * MediaStatement object from the Mimcss library.
+ */
 const setMediaProp = (elm: Element, name: string, val: MediaStatement): void =>
-   elm[name] = mimcss.mediaToString( val);
-
-function updateMediaProp( elm: Element, attrName: string, oldVal: MediaStatement,
-    newVal: MediaStatement): void
 {
-    // if Mimcss library is not included, then media attributes can only be strings. If they are
-    // not, this is an application bug and we canont handle it.
-    if (!mimcss && (typeof oldVal !== "string" || typeof newVal !== "string"))
-        return;
-
-    // convert both old and new to strings and compare
-    let oldString = mimcss.mediaToString( oldVal);
-	let newString = mimcss.mediaToString( newVal);
-	if (newString !== oldString)
-        elm[attrName] = newString;
+    // if Mimcss library is not included, then the media attribute can only be a string. If it is
+    // not, this is an application bug and we cannot handle it.
+    if (mimcss)
+       elm[name] = mimcss.mediaToString( val);
+    else if (typeof val === "string")
+       elm[name] = val;
 }
 
 
@@ -1422,6 +1463,12 @@ const StdFrameworkPropInfo = { type: PropType.Framework };
 
 // sets and removes an attribute using element's property
 const AttrAsPropInfo = { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp };
+
+// Produces comma-separate list from array of values
+const ArrayWithCommaPropInfo = { type: PropType.Attr, v2s: array2sWithComma };
+
+// Handles conversion of Mimcss style properties to strings
+const MimcssPropInfo = { type: PropType.Attr, v2s: mimcssStylePropToString };
 
 /**
  * Object that maps property names to PropInfo-derived objects. Information about custom
@@ -1443,26 +1490,41 @@ const propInfos: {[P:string]: PropInfo} =
     htmlFor: AttrAsPropInfo,
     tabindex: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp, name: "tabIndex" },
     tabIndex: AttrAsPropInfo,
-    defaultValue: { type: PropType.Attr, set: setAttrAsProp, update: updatePropNoOp, remove: removePropNoOp, name: "value" },
-    defaultChecked: { type: PropType.Attr, set: setAttrAsProp, update: updatePropNoOp, remove: removePropNoOp, name: "checked" },
-    style: { type: PropType.Attr, set: setStyleProp, update: updateStyleProp },
-    media: { type: PropType.Attr, set: setMediaProp, update: updateMediaProp },
-    id: AttrAsPropInfo,
     value: AttrAsPropInfo,
     checked: AttrAsPropInfo,
-    disabled: AttrAsPropInfo,
-    form: AttrAsPropInfo,
-    name: AttrAsPropInfo,
-    required: AttrAsPropInfo,
-    selected: AttrAsPropInfo,
-    size: AttrAsPropInfo,
-    src: AttrAsPropInfo,
-    target: AttrAsPropInfo,
-    title: AttrAsPropInfo,
-    type: AttrAsPropInfo,
+    defaultValue: { type: PropType.Attr, set: setDefaultValueProp, update: setAttrAsProp, remove: (elm: HTMLInputElement) => elm.defaultValue = "" },
+    defaultChecked: { type: PropType.Attr, set: setDefaultCheckedProp, update: setAttrAsProp, remove: removeAttrAsProp },
+    style: { type: PropType.Attr, set: setStyleProp },
+    media: { type: PropType.Attr, set: setMediaProp },
+    coords: ArrayWithCommaPropInfo,
+    sizes: ArrayWithCommaPropInfo,
+    srcset: ArrayWithCommaPropInfo,
 
-    // global events
-    click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },
+    // SVG presentational attributes that require special conversion to string
+	"baseline-shift": MimcssPropInfo,
+	"color": MimcssPropInfo,
+	"cursor": MimcssPropInfo,
+	"fill": MimcssPropInfo,
+	"fill-opacity": MimcssPropInfo,
+	// "filter": MimcssPropInfo,
+	"flood-color": MimcssPropInfo,
+	"flood-opacity": MimcssPropInfo,
+	"font-size": MimcssPropInfo,
+	"font-stretch": MimcssPropInfo,
+	"letter-spacing": MimcssPropInfo,
+	"lighting-color": MimcssPropInfo,
+	"marker-end": MimcssPropInfo,
+	"marker-mid": MimcssPropInfo,
+	"marker-start": MimcssPropInfo,
+	"mask": MimcssPropInfo,
+	"stop-color": MimcssPropInfo,
+	"stop-opacity": MimcssPropInfo,
+	"stroke": MimcssPropInfo,
+	"stroke-opacity": MimcssPropInfo,
+	"transform": MimcssPropInfo,
+
+    // // global events
+    // click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },
 };
 
 

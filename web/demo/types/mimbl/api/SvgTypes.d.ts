@@ -1,10 +1,16 @@
-import { MediaStatement } from "mimcss";
-import { ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType, IElementAttrs, ExtendedElement } from "./CompTypes";
+import { ExtendedElement } from "./CompTypes";
+import { ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType, IElementAttrs, IElementEvents } from "./ElementTypes";
+import { AlignmentBaselineKeywords, BaselineShift_StyleType, ClipPath_StyleType, ClipRule_StyleType, ColorInterpolation_StyleType, CssColor, CssLength, CssNumber, CssPercent, Cursor_StyleType, Direction, Display_StyleType, DominantBaseline_StyleType, FillRule, FontSize, FontStretch, FontWeight_StyleType, ImageRendering_StyleType, LetterSpacing_StyleType, Marker_StyleType, MediaStatement, PointerEvents_StyleType, ShapeRendering_StyleType, StrokeDasharray_StyleType, StrokeLinecap_StyleType, StrokeLinejoin_StyleType, TextAnchor_StyleType, TextRendering_StyleType, UnicodeBidi_StyleType, VectorEffect_StyleType, Visibility_StyleType, WritingMode_StyleType } from "mimcss";
 /**
  * The ISvgElementAttrs interface defines standard properties (attributes and event listeners)
  * that can be used on all SVG elements.
  */
 export interface ISvgElementAttrs extends IElementAttrs {
+}
+/**
+ * Defines events common to all SVG elements
+ */
+export interface ISvgElementEvents extends IElementEvents {
 }
 export declare type PreserveAspectRatioPropType = "none" | "xMinYMin" | "xMidYMin" | "xMaxYMin" | "xMinYMid" | "xMidYMid" | "xMaxYMid" | "xMinYMax" | "xMidYMax" | "xMaxYMax" | "meet" | "slice";
 export declare type SvgInPropType = string | "SourceGraphic" | "SourceAlpha" | "BackgroundImage" | "BackgroundAlpha" | "FillPaint" | "StrokePaint";
@@ -12,70 +18,64 @@ export declare type UnitsPropType = "userSpaceOnUse" | "objectBoundingBox";
 export declare type LengthAdjustPropType = "spacing" | "spacingAndGlyphs";
 /** The ISvgConditionalProcessingProps interface defines SVG Conditional Processing Attributes. */
 export interface ISvgConditionalProcessingAttrs extends ISvgElementAttrs {
-    externalResourcesRequired?: boolean;
-    requiredExtensions?: string;
-    requiredFeatures?: string;
-    systemLanguage?: string;
+    requiredExtensions?: string | string[];
+    systemLanguage?: string | string[];
 }
 /** The ISvgPresentationProps interface defines SVG Presentation Attributes. */
 export interface ISvgPresentationAttrs extends ISvgElementAttrs {
-    "alignment-baseline"?: "auto" | "baseline" | "before-edge" | "text-before-edge" | "middle" | "central" | "after-edge" | "text-after-edge" | "ideographic" | "alphabetic" | "hanging" | "mathematical" | "inherit";
-    "baseline-shift"?: string | number | "auto" | "baseline" | "super" | "sub" | "<percentage>" | "<length>" | "inherit";
-    "clip"?: string;
-    "clip-path"?: string;
-    "clip-rule"?: "nonzero" | "evenodd" | "inherit";
-    "color"?: string;
-    "color-interpolation"?: "auto" | "sRGB" | "linearRGB" | "inherit";
-    "color-interpolation-filters"?: "auto" | "sRGB" | "linearRGB" | "inherit";
-    "color-profile"?: string | "auto" | "sRGB" | "<name>" | "inherit";
+    "alignment-baseline"?: AlignmentBaselineKeywords | "inherit";
+    "baseline-shift"?: BaselineShift_StyleType | "inherit";
+    "clip-path"?: ClipPath_StyleType | "inherit";
+    "clip-rule"?: ClipRule_StyleType | "inherit";
+    "color"?: CssColor | "inherit";
+    "color-interpolation"?: ColorInterpolation_StyleType | "inherit";
+    "color-interpolation-filters"?: ColorInterpolation_StyleType | "inherit";
     "color-rendering"?: "auto" | "optimizeSpeed" | "optimizeQuality" | "inherit";
-    "cursor"?: "auto" | "crosshair" | "default" | "pointer" | "move" | "e-resize" | "ne-resize" | "nw-resize" | "n-resize" | "se-resize" | "sw-resize" | "s-resize" | "w-resize| text" | "wait" | "help" | "inherit";
-    "direction"?: "ltr" | "rtl" | "inherit";
-    "display"?: "inline" | "block" | "list-item" | "run-in" | "compact" | "marker" | "table" | "inline-table" | "table-row-group" | "table-header-group" | "table-footer-group" | "table-row" | "table-column-group" | "table-column" | "table-cell" | "table-caption" | "none" | "inherit" | "flex" | "grid";
-    "dominant-baseline"?: "auto" | "use-script" | "no-change" | "reset-size" | "ideographic" | "alphabetic" | "hanging" | "mathematical" | "central" | "middle" | "text-after-edge" | "text-before-edge" | "inherit";
-    "enable-background"?: string;
-    "fill"?: string;
-    "fill-opacity"?: string | number;
-    "fill-rule"?: "nonzero" | "evenodd";
+    "cursor"?: Cursor_StyleType | "inherit";
+    "direction"?: Direction | "inherit";
+    "display"?: Display_StyleType;
+    "dominant-baseline"?: DominantBaseline_StyleType | "inherit";
+    "fill"?: CssColor;
+    "fill-opacity"?: CssPercent;
+    "fill-rule"?: FillRule | "inherit";
     "filter"?: string | "none" | "inherit";
     "font-family"?: string;
-    "font-size"?: number | "none" | "inherit";
-    "font-sizeAdjust"?: number | "none" | "inherit";
-    "font-stretch"?: "normal" | "wider" | "narrower" | "ultra-condensed" | "extra-condensed" | "condensed" | "semi-condensed" | "semi-expanded" | "expanded" | "extra-expanded" | "ultra-expanded" | "inherit";
-    "font-style"?: "normal" | "italic" | "oblique" | "inherit";
-    "font-variant"?: "normal" | "small-caps" | "inherit";
-    "font-weight"?: "normal" | "bold" | "bolder" | "lighter" | "100" | "200" | "300" | "400" | "500" | "600" | "700" | "800" | "900" | "inherit";
+    "font-size"?: FontSize | "inherit";
+    "font-size-adjust"?: CssNumber | "none" | "inherit";
+    "font-stretch"?: FontStretch | "inherit";
+    "font-style"?: "normal" | "italic" | "oblique";
+    "font-variant"?: string;
+    "font-weight"?: FontWeight_StyleType | "inherit";
     "glyph-orientation-horizontal"?: string;
     "glyph-orientation-vertical"?: string;
-    "image-rendering"?: "auto" | "optimizeSpeed" | "optimizeQuality" | "inherit";
-    "kerning"?: string | number | "auto" | "inherit";
-    "letter-spacing"?: string | number | "normal" | "inherit";
-    "lighting-color"?: string;
-    "marker-end"?: string;
-    "marker-mid"?: string;
-    "marker-start"?: string;
+    "image-rendering"?: ImageRendering_StyleType | "inherit";
+    "letter-spacing"?: LetterSpacing_StyleType | "inherit";
+    "lighting-color"?: CssColor;
+    "marker-end"?: Marker_StyleType | "inherit";
+    "marker-mid"?: Marker_StyleType | "inherit";
+    "marker-start"?: Marker_StyleType | "inherit";
     "mask"?: string;
-    "opacity"?: string | number;
+    "opacity"?: number;
     "overflow"?: "visible" | "hidden" | "scroll" | "auto" | "inherit";
-    "pointer-events"?: "bounding-box" | "visiblePainted" | "visibleFill" | "visibleStroke" | "visible" | "painted" | "fill" | "stroke" | "all" | "none";
-    "shape-rendering"?: "auto" | "optimizeSpeed" | "crispEdges" | "geometricPrecision" | "inherit";
-    "stroke"?: string;
-    "stroke-dasharray"?: string;
-    "stroke-dashoffset"?: string | number;
-    "stroke-linecap"?: "butt" | "round" | "square";
-    "stroke-linejoin"?: "arcs" | "bevel |miter" | "miter-clip" | "round";
-    "stroke-miterlimit"?: number;
-    "stroke-opacity"?: string | number;
-    "stroke-width"?: string | number;
-    "text-anchor"?: "start" | "middle" | "end" | "inherit";
-    "transform"?: string;
+    "pointer-events"?: PointerEvents_StyleType;
+    "shape-rendering"?: ShapeRendering_StyleType | "inherit";
+    "stroke"?: CssColor;
+    "stroke-dasharray"?: StrokeDasharray_StyleType;
+    "stroke-dashoffset"?: CssLength;
+    "stroke-linecap"?: StrokeLinecap_StyleType;
+    "stroke-linejoin"?: StrokeLinejoin_StyleType;
+    "stroke-miterlimit"?: CssNumber;
+    "stroke-opacity"?: CssPercent;
+    "stroke-width"?: CssLength;
+    "text-anchor"?: TextAnchor_StyleType | "inherit";
     "text-decoration"?: "none" | "underline" | "overline" | "line-through" | "blink" | "inherit";
-    "text-rendering"?: "auto" | "optimizeSpeed" | "optimizeLegibility" | "geometricPrecision" | "inherit";
-    "unicode-bidi"?: string;
-    "vector-effect"?: string;
-    "visibility"?: "visible" | "hidden" | "collapse" | "inherit";
-    "word-spacing"?: string | number;
-    "writing-mode"?: "lr-tb" | "rl-tb" | "tb-rl" | "lr" | "rl" | "tb" | "inherit";
+    "text-rendering"?: TextRendering_StyleType | "inherit";
+    "transform"?: string;
+    "unicode-bidi"?: UnicodeBidi_StyleType;
+    "vector-effect"?: VectorEffect_StyleType;
+    "visibility"?: Visibility_StyleType | "inherit";
+    "word-spacing"?: CssLength | "inherit";
+    "writing-mode"?: WritingMode_StyleType | "inherit";
 }
 /** The ISvgFilterPrimitiveProps interface defines SVG Filters Attributes. */
 export interface ISvgFilterPrimitiveAttrs extends ISvgElementAttrs {
@@ -228,10 +228,12 @@ export interface ISvgFeDropShadowElementProps extends ISvgPresentationAttrs, ISv
     stdDeviation?: string;
     dx?: string | number;
     dy?: string | number;
+    "flood-color"?: CssColor;
+    "flood-opacity"?: CssPercent;
 }
 export interface ISvgFeFloodElementProps extends ISvgPresentationAttrs, ISvgFilterPrimitiveAttrs {
-    "flood-color"?: string;
-    "flood-opacity"?: string | number;
+    "flood-color"?: CssColor;
+    "flood-opacity"?: CssPercent;
 }
 export interface ISvgFeGaussianBlurElementProps extends ISvgPresentationAttrs, ISvgFilterPrimitiveAttrs {
     in?: SvgInPropType;
@@ -422,8 +424,8 @@ export interface ISvgSetElementProps extends ISvgConditionalProcessingAttrs, ISv
 }
 export interface ISvgStopElementProps extends ISvgPresentationAttrs {
     offset?: string;
-    "stop-color"?: string;
-    "stop-opacity"?: string | number;
+    "stop-color"?: CssColor;
+    "stop-opacity"?: CssPercent;
 }
 export interface ISvgStyleElementProps extends ISvgElementAttrs {
     media?: MediaStatement;

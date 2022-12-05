@@ -183,21 +183,12 @@ export function createTextVN( text: string): ITextVN
 
 /**
  * Registers custom attribute handler class for the given property name.
- * @param propName name of the custom attribute
- * @param factory custom attribute class
+ * @param attrName Name of the custom attribute
+ * @param handlerClass Class handling the custom attribute functionality
  */
 export function registerCustomAttribute<T>( attrName: string, handlerClass: ICustomAttributeHandlerClass<T>): void
 {
 	registerElmProp( attrName, { type: PropType.CustomAttr, handlerClass });
-}
-
-/**
- * Registers custom event for the given property name.
- * @param propName name of the custom event
- */
-export function registerCustomEvent( eventName: string): void
-{
-	registerElmProp( eventName, { type: PropType.Event });
 }
 
 

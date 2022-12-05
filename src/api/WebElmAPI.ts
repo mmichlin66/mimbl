@@ -9,6 +9,7 @@ import {
 import { mimcss } from "../core/StyleScheduler";
 import { trigger } from "./TriggerAPI";
 import { mount, unmount } from "./CompAPI";
+import { setAttrValue } from "../core/ElmVN";
 
 
 
@@ -209,12 +210,17 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
         // Necessary IWebElm members
         processStyles(flagOrFunc: boolean | (() => void), func?: () => void)
         {
+            // if the first parameter is Boolean, then it is the `useAdoption` flag. In this case
+            // the function to run is in the second parameter.
             let useAdoption = true;
             if (typeof flagOrFunc === "boolean")
                 useAdoption = flagOrFunc;
             else
                 func = flagOrFunc;
 
+            // no matter what useAdoption says, if we don't have Mimcss library or if the element
+            // doesn't have a shadow DOM root, we call the function with the current context (which,
+            // normally, will create/remove style elements in the document's head).
             if (!mimcss || !this.#shadowRoot)
                 func!();
             else
@@ -233,22 +239,17 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
 
         setAttr<K extends string & keyof TAttrs>( attrName: K, value: TAttrs[K] | null | undefined): void
         {
-            let stringValue: string | null = null;
+            let actualValue: typeof value | string = null;
 
             // if conversion function is defined in the attribute options, use it
             let toHtml = this.#definition.attrs[attrName]?.options?.toHtml;
             if (toHtml)
-                stringValue = toHtml.call(this, value, attrName);
-            else
-            {
-                if (value)
-                    stringValue = (value as any).toString();
-            }
+                actualValue = toHtml.call(this, value, attrName);
 
-            if (!stringValue)
+            if (actualValue == null)
                 this.removeAttribute(attrName);
             else
-                this.setAttribute( attrName, stringValue);
+                setAttrValue( this, attrName, actualValue);
         }
 
         getAttr<K extends string & keyof TAttrs>( attrName: K): TAttrs[K] | string | null
