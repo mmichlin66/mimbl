@@ -475,7 +475,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
         // the value can actually be a trigger and we need to listen to its changes then
         let actVal = val;
-        if (actVal != null && actVal !== false)
+        if (actVal != null)
         {
             if (isTrigger(val))
             {
@@ -557,9 +557,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
             if (actNewVal !== actOldVal)
             {
-                if (actNewVal == null || actNewVal === false)
+                if (actNewVal == null)
                     removeElmProp( this.ownDN!, name, oldRTD.info);
-                else if (!s_deepCompare( actOldVal, actNewVal, 1))
+                else
                     updateElmProp( this.ownDN!, name, oldRTD.info, actOldVal, actNewVal);
             }
 
@@ -1148,7 +1148,7 @@ interface AttrPropInfo extends PropInfoBase
      * Function that sets the value of the attribute. If this function is not defined, then the DOM
      * elm.setAttribute is called with propName as attribute name and propVal converted to string.
      */
-	set?: (elm: Element, name: string, propVal: any) => void;
+	set?: (elm: Element, name: string, val: any) => void;
 
 	/**
      * Function that updates the value of the attribute based on the object that was returned from
@@ -1156,7 +1156,7 @@ interface AttrPropInfo extends PropInfoBase
      * set function is not defined either, the DOM elm.setAttribute is called with propName as
      * attribute name and updateVal converted to string.
      */
-	update?: (elm: Element, name: string, oldVal: any, newVal: any) => void;
+	update?: (elm: Element, name: string, oldVal: any, newVal: any) => boolean | void;
 
 	/**
      * Function that removes the attribute. If this function is not defined, then the DOM
@@ -1168,7 +1168,7 @@ interface AttrPropInfo extends PropInfoBase
      * Function that converts attribute value to string. Usually only needed for complex attribute
      * types.
      */
-	v2s?: (v: any, name: string, elm: Element) => string;
+	v2s?: (val: any, name: string, elm: Element) => string;
 
 	/**
      * The actual name of the attribute/property. This is sometimes needed if the attribute name
@@ -1213,22 +1213,24 @@ export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
 
 
 /**
- * Helper function that converts the given value to string.
+ * Helper function that converts the given value to string or null. Null is an indication that
+ * the attribute should not be set or should be deleted.
  *   - strings are returned as is.
  *   - true is converted to an empty string.
- *   - false is converted to "false".
- *   - null and undefined are converted to an empty string.
+ *   - false is converted to null.
+ *   - null and undefined are converted to null.
  *   - arrays are converted by calling this function recursively on the elements and separating
  *     them with spaces.
  *   - everything else is converted by calling the toString method.
  *
- * Note that although this functiondoes handles null, undefined and false, it is normally should
+ * Note that although this functiondoes handles null and undefined, it is normally should
  * not be called with these values as the proper action is to remove attributes with such values.
  */
 
-const valToString = (val: any): string =>
+const valToString = (val: any): string | null =>
     // attribute will be created without alue
-    val == null || val === true ? "" :
+    val == null || val === false ? null :
+    val === true ? "" :
 
     // set string value as is
 	typeof val === "string" ? val :
@@ -1281,7 +1283,17 @@ function setElmProp( elm: Element, name: string, info: AttrPropInfo | null, val:
 {
     // get property info object
     if (!info)
-        elm.setAttribute( name, valToString( val));
+    {
+        val = valToString( val);
+        if (val != null)
+        {
+            elm.setAttribute( name, val);
+
+            /// #if USE_STATS
+                DetailedStats.log( StatsCategory.Attr, StatsAction.Added);
+            /// #endif
+        }
+    }
     else
     {
         // get actual attribute/property name to use
@@ -1291,12 +1303,50 @@ function setElmProp( elm: Element, name: string, info: AttrPropInfo | null, val:
         if (info.set)
             info.set( elm, name, val);
         else if (info.v2s)
-            elm.setAttribute( name, info.v2s ? info.v2s(val, name, elm) : valToString( val));
-    }
+        {
+            val = info.v2s ? info.v2s(val, name, elm) : valToString( val);
+            if (val != null)
+            {
+                elm.setAttribute( name, val);
 
-    /// #if USE_STATS
-        DetailedStats.log( StatsCategory.Attr, StatsAction.Added);
-    /// #endif
+                /// #if USE_STATS
+                    DetailedStats.log( StatsCategory.Attr, StatsAction.Added);
+                /// #endif
+            }
+        }
+    }
+}
+
+
+
+/**
+ * Determines whether the old and the new values of the property are different and sets the updated
+ * value to the element's attribute. Returns true if update has been performed and false if no
+ * change in property value has been detected.
+ */
+function convertCompareAndUpdateOrRemoveAttr( elm: Element, name: string, oldVal: any, newVal: any): void
+{
+    oldVal = valToString(oldVal);
+    newVal = valToString(newVal);
+    if (oldVal !== newVal)
+    {
+        if (newVal != null)
+        {
+            elm.setAttribute( name, newVal);
+
+            /// #if USE_STATS
+                DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
+            /// #endif
+        }
+        else
+        {
+            elm.removeAttribute( name);
+
+            /// #if USE_STATS
+                DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
+            /// #endif
+        }
+    }
 }
 
 
@@ -1312,25 +1362,35 @@ function updateElmProp( elm: Element, name: string, info: AttrPropInfo | null,
     // get property info object; if this is not a special case (property is not in our list)
     // just set the new value to the attribute.
     if (!info)
-        elm.setAttribute( name, valToString( newVal));
+        convertCompareAndUpdateOrRemoveAttr(elm, name, oldVal, newVal);
     else
     {
         // get actual attribute/property name to use
         if (info.name)
             name = info.name;
 
-        // if update method is defined use it; otherwise, set the new value using setAttribute
+        // if update method is defined use it; otherwise, if set methid is defined use it;
+        // otherwise, set the new value using setAttribute
         if (info.update)
-            info.update( elm, name, oldVal, newVal);
+        {
+            /// #if USE_STATS
+                if (info.update( elm, name, oldVal, newVal))
+                    DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
+            /// #else
+                info.update( elm, name, oldVal, newVal);
+            /// #endif
+        }
         else if (info.set)
+        {
             info.set( elm, name, newVal);
-        else
-            elm.setAttribute( name, valToString( newVal));
-    }
 
-    /// #if USE_STATS
-        DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
-    /// #endif
+            /// #if USE_STATS
+                DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
+            /// #endif
+        }
+        else
+            convertCompareAndUpdateOrRemoveAttr(elm, name, oldVal, newVal);
+    }
 }
 
 
@@ -1370,9 +1430,29 @@ function setAttrAsProp( elm: Element, name: string, val: any): void
     elm[name] = val;
 }
 
+function updateAttrAsProp( elm: Element, name: string, oldVal: any, newVal: any): boolean | void
+{
+    if (oldVal !== newVal)
+    {
+        elm[name] = newVal;
+        return true;
+    }
+}
+
 function setAttrAsStringProp( elm: Element, name: string, val: any): void
 {
     elm[name] = valToString(val);
+}
+
+function updateAttrAsStringProp( elm: Element, name: string, oldVal: any, newVal: any): boolean | void
+{
+    oldVal = valToString(oldVal);
+    newVal = valToString(newVal);
+    if (oldVal !== newVal)
+    {
+        elm[name] = newVal;
+        return true;
+    }
 }
 
 function removeAttrAsProp( elm: Element, name: string): void
@@ -1404,18 +1484,53 @@ function setDefaultCheckedProp( elm: HTMLInputElement, name: string, val: boolea
 
 
 
-/** we set the defaultChecked and also the checked properties */
+/** Joins array elements with comma */
 const array2sWithComma = (val: any[]): string =>
     val == null ? "" : val.map( item => valToString(item)).filter( item => !!item).join(",");
 
 
 
 /**
- * If Mimcss library is not included, then value can only be a string. If it is not,
- * we return empty string.
+ * SVG presentation attributes can be used as CSS style properties and, therefore, there
+ * conversions to strings are already handled by Mimcss library. If Mimcss library is not included,
+ * then value can only be a string. If it is not, we set the attribute to empty string. Note that
+ * SVG attribute names can be provided in camel-case, so they are converted to dash-case.
  */
-const mimcssStylePropToString = (val: any, name: string): string =>
-    mimcss ? mimcss.stylePropValueToString(val, name) : typeof val === "string" ? val : "";
+function setSvgAttrAsStyleProp(elm: HTMLInputElement, name: string, val: any): void
+{
+    // convert from camel-case to dash-case
+    name = name.replace( /([a-zA-Z])(?=[A-Z])/g, '$1-').toLowerCase();
+
+    // If Mimcss library is not included, then value can only be a string. If it is not,
+    // we return empty string.
+    elm.setAttribute(name, mimcss ? mimcss.stylePropValueToString(name, val) : typeof val === "string" ? val : "");
+}
+
+/**
+ * SVG presentation attributes can be used as CSS style properties and, therefore, there
+ * conversions to strings are already handled by Mimcss library. If Mimcss library is not included,
+ * then value can only be a string. If it is not, we set the attribute to empty string. Note that
+ * SVG attribute names can be provided in camel-case, so they are converted to dash-case.
+ */
+function updateSvgAttrAsStyleProp(elm: HTMLInputElement, name: string, oldVal: any, newVal: any): boolean | void
+{
+    // if Mimcss library is not included, then SVG attributes can only be strings. If they are
+    // not, this is an application bug and we canont handle it.
+    if (!mimcss && (typeof oldVal !== "string" || typeof newVal !== "string"))
+        return;
+
+    // convert from camel-case to dash-case
+    name = name.replace( /([a-zA-Z])(?=[A-Z])/g, '$1-').toLowerCase();
+
+    // convert both old and new to strings and compare
+    let oldValAsString = typeof oldVal === "string" ? oldVal :  mimcss.stylePropValueToString(name, oldVal);
+    let newValAsString = typeof newVal === "string" ? newVal :  mimcss.stylesetToString(name, newVal);
+    if (oldValAsString !== newValAsString)
+    {
+        elm.setAttribute( name, newValAsString);
+        return true;
+    }
+}
 
 
 
@@ -1434,6 +1549,24 @@ function setStyleProp( elm: Element, name: string, val: string | Styleset): void
         elm.setAttribute( name, val);
 }
 
+function updateStyleProp( elm: Element, name: string, oldVal: string | Styleset,
+    newVal: string | Styleset): boolean | void
+{
+    // if Mimcss library is not included, then style attributes can only be strings. If they are
+    // not, this is an application bug and we canont handle it.
+    if (!mimcss && (typeof oldVal !== "string" || typeof newVal !== "string"))
+        return;
+
+    // convert both old and new to strings and compare
+    let oldValAsString = typeof oldVal === "string" ? oldVal :  mimcss.stylesetToString( oldVal);
+    let newValAsString = typeof newVal === "string" ? newVal :  mimcss.stylesetToString( newVal);
+    if (oldValAsString !== newValAsString)
+    {
+        elm.setAttribute( name, newValAsString);
+        return true;
+    }
+}
+
 
 
 /**
@@ -1448,6 +1581,24 @@ const setMediaProp = (elm: Element, name: string, val: MediaStatement): void =>
        elm[name] = mimcss.mediaToString( val);
     else if (typeof val === "string")
        elm[name] = val;
+}
+
+function updateMediaProp( elm: Element, name: string, oldVal: MediaStatement,
+    newVal: MediaStatement): boolean | void
+{
+    // if Mimcss library is not included, then media attributes can only be strings. If they are
+    // not, this is an application bug and we canont handle it.
+    if (!mimcss && (typeof oldVal !== "string" || typeof newVal !== "string"))
+        return;
+
+    // convert both old and new to strings and compare
+    let oldValAsString = mimcss.mediaToString( oldVal);
+	let newValAsString = mimcss.mediaToString( newVal);
+	if (newValAsString !== oldValAsString)
+    {
+        elm[name] = newValAsString;
+        return true;
+    }
 }
 
 
@@ -1467,8 +1618,8 @@ const AttrAsPropInfo = { type: PropType.Attr, set: setAttrAsProp, remove: remove
 // Produces comma-separate list from array of values
 const ArrayWithCommaPropInfo = { type: PropType.Attr, v2s: array2sWithComma };
 
-// Handles conversion of Mimcss style properties to strings
-const MimcssPropInfo = { type: PropType.Attr, v2s: mimcssStylePropToString };
+// Handles conversion of SVG presentation attributes as Mimcss style properties to strings
+const SvgAttrAsStylePropInfo = { type: PropType.Attr, set: setSvgAttrAsStyleProp, update: updateSvgAttrAsStyleProp };
 
 /**
  * Object that maps property names to PropInfo-derived objects. Information about custom
@@ -1484,44 +1635,46 @@ const propInfos: {[P:string]: PropInfo} =
 
     // attributes - only those attributes are listed that have non-trivial treatment or whose value
     // type is object or function.
-    class: { type: PropType.Attr, set: setAttrAsStringProp, remove: removeAttrAsProp, name: "className" },
-    className: { type: PropType.Attr, set: setAttrAsStringProp, remove: removeAttrAsProp },
+    class: { type: PropType.Attr, set: setAttrAsStringProp, update: updateAttrAsStringProp, remove: removeAttrAsProp, name: "className" },
+    className: { type: PropType.Attr, set: setAttrAsStringProp, update: updateAttrAsStringProp, remove: removeAttrAsProp },
     for: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp, name: "htmlFor" },
     htmlFor: AttrAsPropInfo,
     tabindex: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp, name: "tabIndex" },
     tabIndex: AttrAsPropInfo,
     value: AttrAsPropInfo,
     checked: AttrAsPropInfo,
-    defaultValue: { type: PropType.Attr, set: setDefaultValueProp, update: setAttrAsProp, remove: (elm: HTMLInputElement) => elm.defaultValue = "" },
-    defaultChecked: { type: PropType.Attr, set: setDefaultCheckedProp, update: setAttrAsProp, remove: removeAttrAsProp },
-    style: { type: PropType.Attr, set: setStyleProp },
-    media: { type: PropType.Attr, set: setMediaProp },
+    defaultValue: { type: PropType.Attr, set: setDefaultValueProp, update: updateAttrAsProp, remove: (elm: HTMLInputElement) => elm.defaultValue = "" },
+    defaultChecked: { type: PropType.Attr, set: setDefaultCheckedProp, update: updateAttrAsProp, remove: removeAttrAsProp },
+    style: { type: PropType.Attr, set: setStyleProp, update: updateStyleProp },
+    media: { type: PropType.Attr, set: setMediaProp, update: updateMediaProp },
     coords: ArrayWithCommaPropInfo,
     sizes: ArrayWithCommaPropInfo,
     srcset: ArrayWithCommaPropInfo,
 
     // SVG presentational attributes that require special conversion to string
-	"baseline-shift": MimcssPropInfo,
-	"color": MimcssPropInfo,
-	"cursor": MimcssPropInfo,
-	"fill": MimcssPropInfo,
-	"fill-opacity": MimcssPropInfo,
-	// "filter": MimcssPropInfo,
-	"flood-color": MimcssPropInfo,
-	"flood-opacity": MimcssPropInfo,
-	"font-size": MimcssPropInfo,
-	"font-stretch": MimcssPropInfo,
-	"letter-spacing": MimcssPropInfo,
-	"lighting-color": MimcssPropInfo,
-	"marker-end": MimcssPropInfo,
-	"marker-mid": MimcssPropInfo,
-	"marker-start": MimcssPropInfo,
-	"mask": MimcssPropInfo,
-	"stop-color": MimcssPropInfo,
-	"stop-opacity": MimcssPropInfo,
-	"stroke": MimcssPropInfo,
-	"stroke-opacity": MimcssPropInfo,
-	"transform": MimcssPropInfo,
+	"baseline-shift": SvgAttrAsStylePropInfo,
+	"color": SvgAttrAsStylePropInfo,
+	"cursor": SvgAttrAsStylePropInfo,
+	"fillColor": { type: PropType.Attr, set: setSvgAttrAsStyleProp, name: "fill" },
+	"fill-opacity": SvgAttrAsStylePropInfo,
+	"fillOpacity": SvgAttrAsStylePropInfo,
+	"filter": SvgAttrAsStylePropInfo,
+	"flood-color": SvgAttrAsStylePropInfo,
+	"flood-opacity": SvgAttrAsStylePropInfo,
+	"font-size": SvgAttrAsStylePropInfo,
+	"font-stretch": SvgAttrAsStylePropInfo,
+	"letter-spacing": SvgAttrAsStylePropInfo,
+	"lighting-color": SvgAttrAsStylePropInfo,
+	"marker-end": SvgAttrAsStylePropInfo,
+	"marker-mid": SvgAttrAsStylePropInfo,
+	"marker-start": SvgAttrAsStylePropInfo,
+	"mask": SvgAttrAsStylePropInfo,
+	"stop-color": SvgAttrAsStylePropInfo,
+	"stop-opacity": SvgAttrAsStylePropInfo,
+	"stroke": SvgAttrAsStylePropInfo,
+	"stroke-opacity": SvgAttrAsStylePropInfo,
+	"transform": SvgAttrAsStylePropInfo,
+	"transform-origin": SvgAttrAsStylePropInfo,
 
     // // global events
     // click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },

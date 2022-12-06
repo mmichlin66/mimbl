@@ -2,7 +2,7 @@ import { CssImage, CssSelector, CssString, DependentRuleCombinator, Direction, E
 import { CssColor } from "./ColorTypes";
 import { BorderRadius, CssAngle, CssAspectRatio, CssFrequency, CssLength, CssLengthOrAuto, CssMultiPosition, CssMultiPositionX, CssMultiPositionY, CssNumber, CssPercent, CssPoint, CssPosition, CssRadius, CssResolution, CssSize, CssTime } from "./NumericTypes";
 import * as st from "./StyleTypes";
-import { FillRule, TransformFuncs } from "./ShapeTypes";
+import { FillRule, IPathBuilder, TransformFuncs } from "./ShapeTypes";
 import { FontKerning, FontOpticalSizing, FontSize, FontStretch, FontStyle, FontSynthesis, FontVariantCaps, FontVariantPosition } from "./FontTypes";
 import { ClassMoniker, IStyleDefinition, IStyleDefinitionClass, IStyleRule, IVarRule } from "./RuleTypes";
 /**
@@ -1532,6 +1532,10 @@ export interface IStyleset {
      * - <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/cursor" target="mdn">MDN Page</a>
      */
     cursor?: st.Cursor_StyleType;
+    /**
+     * - <a href="https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/d" target="mdn">MDN Page</a>
+     */
+    d?: "none" | IPathBuilder;
     /**
      * - <a href="https://developer.mozilla.org/en-US/docs/Web/CSS/direction" target="mdn">MDN Page</a>
      */

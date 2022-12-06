@@ -2,9 +2,17 @@
 import {ICustomWebElements, ExtendedElement} from "./CompTypes"
 import {
     ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType, FormenctypePropType,
-    FormmethodPropType, IElementAttrs, IElementEvents, SandboxPropType, FetchpriorityPropType,
-    IDPropType
+    FormmethodPropType, IElementAttrs, IElementEvents, FetchpriorityPropType, IDPropType
 } from "./ElementTypes"
+
+
+
+/** Type for `sandbox` attribute used for `<iframe>` elements */
+export type SandboxPropType = "allow-downloads-without-user-activation" | "allow-downloads" |
+    "allow-forms" | "allow-modals" | "allow-orientation-lock" | "allow-pointer-lock" |
+    "allow-popups" | "allow-popups-to-escape-sandbox" | "allow-presentation" | "allow-same-origin" |
+    "allow-scripts" | "allow-storage-access-by-user-activation" | "allow-top-navigation" |
+    "allow-top-navigation-by-user-activation";
 
 
 
