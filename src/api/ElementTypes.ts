@@ -12,7 +12,7 @@ export type IDPropType = string | number | IIDRule;
 // Types for some common HTML and SVG properties
 
 /** Type for `crossorigin` attribute used for some HTML and SVG elements */
-export type CrossoriginPropType = "anonymous" | "use-credentials";
+export type CrossoriginPropType = "anonymous" | "use-credentials" | boolean;
 
 /** Type for `formenctype` attribute used for some HTML and SVG elements */
 export type FormenctypePropType = "application/x-www-form-urlencoded" | "multipart/form-data" | "text/plain";

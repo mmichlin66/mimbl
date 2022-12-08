@@ -3,27 +3,82 @@ import {
     ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType, IElementAttrs, IElementEvents
 } from "./ElementTypes";
 import {
-    AlignmentBaselineKeywords, BaselineShift_StyleType, ClipPath_StyleType, ClipRule_StyleType,
-    ColorInterpolation_StyleType, CssColor, CssLength, CssNumber, CssPercent, Cursor_StyleType,
-    Direction, Display_StyleType, DominantBaseline_StyleType, FillRule, Filter_StyleType, FontSize,
-    FontStretch, FontWeight_StyleType, ImageRendering_StyleType, IPathBuilder,
-    LetterSpacing_StyleType, Marker_StyleType, MediaStatement, PointerEvents_StyleType,
-    ShapeRendering_StyleType, StrokeDasharray_StyleType, StrokeLinecap_StyleType,
-    StrokeLinejoin_StyleType, TextAnchor_StyleType, TextRendering_StyleType, TransformOrigin_StyleType,
-    UnicodeBidi_StyleType, VectorEffect_StyleType, Visibility_StyleType, WritingMode_StyleType
+    AlignmentBaselineKeyword, AngleUnits, BlendModeKeyword, ClipPath_StyleType, ClipRule_StyleType,
+    ColorInterpolation_StyleType, CssColor, Cursor_StyleType, Direction, Display_StyleType,
+    DominantBaseline_StyleType, FillRule, Filter_StyleType, FontSizeKeyword, FontStretchKeyword,
+    HorizontalPositionKeyword, ImageRendering_StyleType, IPathBuilder, LengthUnits,
+    Marker_StyleType, MediaStatement, OneOrMany, PercentUnits, PointerEvents_StyleType,
+    ShapeRendering_StyleType, StrokeLinecap_StyleType, StrokeLinejoin_StyleType, TextAnchor_StyleType,
+    TextRendering_StyleType, Transform_StyleType, UnicodeBidi_StyleType, VectorEffect_StyleType, VerticalPositionKeyword,
+    Visibility_StyleType, WritingMode_StyleType
 } from "mimcss";
 
 
 
-export type PreserveAspectRatioPropType = "none" | "xMinYMin" | "xMidYMin" | "xMaxYMin" |
-    "xMinYMid" | "xMidYMid" | "xMaxYMid" | "xMinYMax" | "xMidYMax" | "xMaxYMax" | "meet" | "slice";
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Common SVG attribute types
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+export type PreserveAspectAlignKeyword = "none" | "xMinYMin" | "xMidYMin" | "xMaxYMin" |
+    "xMinYMid" | "xMidYMid" | "xMaxYMid" | "xMinYMax" | "xMidYMax" | "xMaxYMax";
+
+export type PreserveAspectRatioMeetOrSliceKeyword = "meet" | "slice";
+
+export type PreserveAspectRatioPropType = "none" | PreserveAspectAlignKeyword |
+    [PreserveAspectAlignKeyword, PreserveAspectRatioMeetOrSliceKeyword?];
 
 export type	SvgInPropType = string | "SourceGraphic" | "SourceAlpha" | "BackgroundImage" |
     "BackgroundAlpha" | "FillPaint" | "StrokePaint";
 
-export type UnitsPropType = "userSpaceOnUse" | "objectBoundingBox";
+export type SvgUnitsPropType = "userSpaceOnUse" | "objectBoundingBox";
 
 export type LengthAdjustPropType = "spacing" | "spacingAndGlyphs";
+
+/**
+ * Defines units used in the SVG `<clock-value>' type
+ */
+export type SvgClockUnits = "h" | "min" | "s" | "ms";
+
+export type SvgClock = number | `${number}${SvgClockUnits}` | `${number}:${number}` | `${number}:${number}:${number}`;
+
+export type SvgViewBox = number | [number, number?, number?, number?];
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// SVG presentation attributes are similar to CSS style properties; however, the types that SVG
+// presentation attributes can accept are subsets of CSS style properties. For example, while
+// CSS <length> can accept such functions as calc() and min(), SVG presentation attributes
+// cannot. Therefore, the following types define types that are used by the SVG presentation
+// attributes
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Type for presentation attributes of the `<percentage>` SVG type. Values of this type can be specifed as:
+ * - strings that have a number followed by the percent sign, like `"83%"`
+ * - a number:
+ *   - if the number is an integer, it is taken as is and a percent sign is appended to it
+ *   - if the number is a floating point, it is multiplied by 100 and a percent sign is appended to it
+ */
+export type SvgPercent = number | `${number}${PercentUnits}`;
+
+/**
+ * Type for presentation attributes of the `<length>` SVG type. Values of this type can be specifed as:
+ * - strings that have a number followed by one of the length units, like `"100vh"` or `"1em"`
+ * - a number
+ */
+export type SvgLength = SvgPercent | `${number}${LengthUnits}`;
+
+/**
+ * Type for presentation attributes of the `<length>` SVG type. Values of this type can be specifed as:
+ * - strings that have a number followed by one of the length units, like `"100deg"` or `"1rad"`
+ * - a number
+ */
+ export type SvgAngle = number | `${number}${AngleUnits}`;
 
 
 
@@ -39,66 +94,64 @@ export interface ISvgConditionalProcessingAttrs
 /** The ISvgPresentationProps interface defines SVG Presentation Attributes. */
 export interface ISvgPresentationAttrs
 {
-	"alignment-baseline"?: AlignmentBaselineKeywords | "inherit";
-	"baseline-shift"?: BaselineShift_StyleType | "inherit";
-	"clip-path"?: ClipPath_StyleType | "inherit";
-	"clip-rule"?: ClipRule_StyleType | "inherit";
-	"color"?: CssColor | "inherit";
-	"color-interpolation"?: ColorInterpolation_StyleType | "inherit";
-	"color-interpolation-filters"?: ColorInterpolation_StyleType | "inherit";
-	"cursor"?: Cursor_StyleType | "inherit";
-    "d"?: IPathBuilder;
-	"direction"?: Direction | "inherit";
-	"display"?: Display_StyleType;
-	"dominant-baseline"?: DominantBaseline_StyleType | "inherit";
-	"fill"?: "freeze" | "remove";
-	"fillColor"?: CssColor;
-	"fill-opacity"?: CssPercent;
-	"fillOpacity"?: CssPercent;
-	"fill-rule"?: FillRule | "inherit";
-	"filter"?: Filter_StyleType;
-	"flood-color"?: CssColor;
-	"flood-opacity"?: CssPercent;
-	"font-family"?: string;
-	"font-size"?: FontSize | "inherit";
-	"font-size-adjust"?: CssNumber | "none" | "inherit";
-	"font-stretch"?: FontStretch | "inherit";
-	"font-style"?: "normal" | "italic" | "oblique";
-	"font-variant"?: string;
-	"font-weight"?: FontWeight_StyleType | "inherit";
-	"glyph-orientation-horizontal"?: string;
-	"glyph-orientation-vertical"?: string;
-	"image-rendering"?: ImageRendering_StyleType | "inherit";
-	"letter-spacing"?: LetterSpacing_StyleType | "inherit";
-	"lighting-color"?: CssColor;
-	"marker-end"?: Marker_StyleType | "inherit";
-	"marker-mid"?: Marker_StyleType | "inherit";
-	"marker-start"?: Marker_StyleType | "inherit";
-	"mask"?: string;
-	"opacity"?: number;
-	"overflow"?: "visible" | "hidden" | "scroll" | "auto" | "inherit";
-	"pointer-events"?: PointerEvents_StyleType;
-	"shape-rendering"?: ShapeRendering_StyleType | "inherit";
-	"stop-color"?: CssColor;
-	"stop-opacity"?: number;
-	"stroke"?: CssColor;
-	"stroke-dasharray"?: StrokeDasharray_StyleType;
-	"stroke-dashoffset"?: CssLength;
-	"stroke-linecap"?: StrokeLinecap_StyleType;
-	"stroke-linejoin"?: StrokeLinejoin_StyleType;
-	"stroke-miterlimit"?: CssNumber;
-	"stroke-opacity"?: CssPercent;
-	"stroke-width"?: CssLength;
-	"text-anchor"?: TextAnchor_StyleType | "inherit";
-	"text-decoration"?: "none" | "underline" | "overline" | "line-through" | "blink" | "inherit";
-	"text-rendering"?: TextRendering_StyleType | "inherit";
-	"transform"?: string;
-	"transform-origin"?: TransformOrigin_StyleType;
-	"unicode-bidi"?: UnicodeBidi_StyleType;
-	"vector-effect"?: VectorEffect_StyleType;
-	"visibility"?: Visibility_StyleType | "inherit";
-	"word-spacing"?: CssLength | "inherit";
-	"writing-mode"?: WritingMode_StyleType | "inherit";
+	alignmentBaseline?: AlignmentBaselineKeyword | "inherit";
+	baselineShift?: "sub" | "super" | SvgLength | "inherit";
+	clipPath?: ClipPath_StyleType | "inherit";
+	clipRule?: ClipRule_StyleType | "inherit";
+	color?: CssColor | "inherit";
+	colorInterpolation?: ColorInterpolation_StyleType | "inherit";
+	colorInterpolationFilters?: ColorInterpolation_StyleType | "inherit";
+	cursor?: Cursor_StyleType | "inherit";
+    d?: string | IPathBuilder;
+	direction?: Direction | "inherit";
+	display?: Display_StyleType;
+	dominantBaseline?: DominantBaseline_StyleType | "inherit";
+	fill?: "freeze" | "remove";
+	fillColor?: CssColor;
+	fillOpacity?: SvgPercent;
+	fillRule?: FillRule | "inherit";
+	filter?: Filter_StyleType;
+	floodColor?: CssColor;
+	floodOpacity?: SvgPercent;
+	fontFamily?: string;
+	fontSize?: FontSizeKeyword | SvgLength | "inherit";
+	fontSizeAdjust?: number | "none" | "inherit";
+	fontStretch?: FontStretchKeyword | SvgPercent | "inherit";
+	fontStyle?: "normal" | "italic" | "oblique";
+	fontVariant?: string;
+	fontWeight?: number | "normal" | "bold" | "bolder" | "lighter" | "inherit";
+	imageRendering?: ImageRendering_StyleType | "inherit";
+	letterSpacing?: "normal" | SvgLength | "inherit";
+	lightingColor?: CssColor;
+	markerEnd?: Marker_StyleType | "inherit";
+	markerMid?: Marker_StyleType | "inherit";
+	markerStart?: Marker_StyleType | "inherit";
+	mask?: string;
+	opacity?: number;
+	overflow?: "visible" | "hidden" | "scroll" | "auto" | "inherit";
+	pointerEvents?: PointerEvents_StyleType;
+	shapeRendering?: ShapeRendering_StyleType | "inherit";
+	stopColor?: CssColor;
+	stopOpacity?: number;
+	stroke?: CssColor;
+	strokeDasharray?: "none" | OneOrMany<SvgLength>;
+	strokeDashoffset?: SvgLength;
+	strokeLinecap?: StrokeLinecap_StyleType;
+	strokeLinejoin?: StrokeLinejoin_StyleType;
+	strokeMiterlimit?: number;
+	strokeOpacity?: SvgPercent;
+	strokeWidth?: SvgLength;
+	textAnchor?: TextAnchor_StyleType | "inherit";
+	textDecoration?: "none" | "underline" | "overline" | "line-through" | "blink" | "inherit";
+	textRendering?: TextRendering_StyleType | "inherit";
+	transform?: Transform_StyleType;
+	transformOrigin?: HorizontalPositionKeyword | VerticalPositionKeyword | SvgLength |
+        [HorizontalPositionKeyword | SvgLength, VerticalPositionKeyword | SvgLength, SvgLength?];
+	unicodeBidi?: UnicodeBidi_StyleType;
+	vectorEffect?: VectorEffect_StyleType;
+	visibility?: Visibility_StyleType | "inherit";
+	wordSpacing?: SvgLength | "inherit";
+	writingMode?: WritingMode_StyleType | "inherit";
 }
 
 
@@ -118,7 +171,7 @@ export interface ISvgFilterPrimitiveAttrs
 /** The ISvgTransferFunctionProps interface defines SVG Tarnsfer Function Attributes. */
 export interface ISvgTransferFunctionAttrs
 {
-	type?: "identity" | "table" | "discrete" | "linear" | "gamma";
+	type: "identity" | "table" | "discrete" | "linear" | "gamma";
 	tableValues?: string;
 	slope?: string;
 	intercept?: string;
@@ -129,33 +182,60 @@ export interface ISvgTransferFunctionAttrs
 
 
 
-/** The ISvgAnimationProps interface defines SVG Animation Attributes. */
-export interface ISvgAnimationAttrs
+/** Defines SVG animation target attributes. */
+export interface ISvgAnimationTargetAttrs
 {
-	attributeType?: string;
-	attributeName?: string;
-	begin?: string;
-	dur?: string;
-	end?: string;
-	min?: string;
-	max?: string;
+    href?: string;
+}
+
+
+
+/** Defines SVG property that is a subject of animation. */
+export interface ISvgAnimationTargetAttributeAttrs
+{
+	attributeName: string;
+}
+
+
+
+/** Defines SVG animation timing attributes. */
+export interface ISvgAnimationTimingAttrs
+{
+	begin?: string | string[];
+	dur?: SvgClock;
+	end?: string[];
+	min?: SvgClock;
+	max?: SvgClock;
 	restart?: "always" | "whenNotActive" | "never";
-	repeatCount?: string | number;
-	repeatDur?: string;
+	repeatCount?: number | "indefinite";
+	repeatDur?: SvgClock;
 	fill?: "freeze" | "remove";
+}
+
+
+
+/** Defines SVG animation value attributes. */
+export interface ISvgAnimationValueAttrs
+{
 	calcMode?: "discrete" | "linear" | "paced" | "spline";
-	values?: string;
-	keyTimes?: string;
-	keySplines?: string;
+	values?: string[];
+	keyTimes?: number[];
+	keySplines?: [number,number,number,number][];
 	from?: string | number;
 	to?: string | number;
-	by?: string;
+	by?: string | number;
 	autoReverse?: string;
 	accelerate?: string;
 	decelerate?: string;
+}
+
+
+
+/** Defines SVG animation addition attributes. */
+export interface ISvgAnimationAdditionAttrs
+{
 	additive?: "replace" | "sum";
 	accumulate?: "none" | "sum";
-    href?: string;
 }
 
 
@@ -165,7 +245,7 @@ export interface ISvgAnimationAttrs
  * that can be used on all SVG elements.
  */
 export interface ISvgElementAttrs extends IElementAttrs,
-    Pick<ISvgPresentationAttrs, "color" | "display" | "transform" | "transform-origin">
+    Pick<ISvgPresentationAttrs, "color" | "display" | "transform" | "transformOrigin">
 {
 }
 
@@ -183,8 +263,8 @@ export interface ISvgElementEvents extends IElementEvents
 /**
  * Represents SVG elements of the Animation category
  */
-export interface ISvgAnimationCategoryAttrs extends ISvgElementAttrs, ISvgAnimationAttrs, ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "clip-rule" | "fill">
+export interface ISvgAnimationCategoryAttrs extends ISvgElementAttrs, ISvgConditionalProcessingAttrs,
+    Pick<ISvgPresentationAttrs, "clipRule" | "fill">
 {
 }
 
@@ -194,7 +274,7 @@ export interface ISvgAnimationCategoryAttrs extends ISvgElementAttrs, ISvgAnimat
  * Represents SVG elements of the Container category
  */
 export interface ISvgContainerCategoryAttrs extends ISvgElementAttrs,
-    Pick<ISvgPresentationAttrs, "color-interpolation" | "cursor" | "filter" | "mask" | "pointer-events">
+    Pick<ISvgPresentationAttrs, "colorInterpolation" | "cursor" | "filter" | "mask" | "pointerEvents">
 {
 }
 
@@ -204,7 +284,7 @@ export interface ISvgContainerCategoryAttrs extends ISvgElementAttrs,
  * Represents SVG elements of the Descriptive category
  */
 export interface ISvgDescriptiveCategoryAttrs extends ISvgElementAttrs,
-    Pick<ISvgPresentationAttrs, "clip-rule">
+    Pick<ISvgPresentationAttrs, "clipRule">
 {
 }
 
@@ -214,7 +294,7 @@ export interface ISvgDescriptiveCategoryAttrs extends ISvgElementAttrs,
  * Represents SVG elements of the Filter Primitive category
  */
 export interface ISvgFilterPrimitiveCategoryAttrs extends ISvgElementAttrs, ISvgFilterPrimitiveAttrs,
-    Pick<ISvgPresentationAttrs, "color-interpolation-filters">
+    Pick<ISvgPresentationAttrs, "colorInterpolationFilters">
 {
 }
 
@@ -233,7 +313,7 @@ export interface ISvgTransferFunctionCategoryAttrs extends ISvgElementAttrs, ISv
  * Represents SVG elements of the Graphics category
  */
 export interface ISvgGraphicsCategoryAttrs extends ISvgElementAttrs, ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "clip-path" | "cursor" | "filter" | "mask" | "opacity" | "pointer-events">
+    Pick<ISvgPresentationAttrs, "clipPath" | "cursor" | "filter" | "mask" | "opacity" | "pointerEvents">
 {
 }
 
@@ -252,7 +332,7 @@ export interface ISvgLightSourceCategoryAttrs extends ISvgElementAttrs
  * Represents SVG elements of the Gradient category
  */
 export interface ISvgGradientCategoryAttrs extends ISvgElementAttrs, ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "color-interpolation">
+    Pick<ISvgPresentationAttrs, "colorInterpolation">
 {
 }
 
@@ -271,7 +351,7 @@ export interface ISvgPaintServerCategoryAttrs extends ISvgElementAttrs
  * Represents SVG elements of the Renderable category
  */
 export interface ISvgRenderableCategoryAttrs extends ISvgElementAttrs,
-    Pick<ISvgPresentationAttrs, "color-interpolation" | "opacity" | "pointer-events">
+    Pick<ISvgPresentationAttrs, "colorInterpolation" | "opacity" | "pointerEvents">
 {
 }
 
@@ -281,10 +361,10 @@ export interface ISvgRenderableCategoryAttrs extends ISvgElementAttrs,
  * Represents SVG elements of the Shape category
  */
 export interface ISvgShapeCategoryAttrs extends ISvgElementAttrs, ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "clip-rule" | "fillColor" | "fill-opacity" | "fillOpacity" | "marker-end" |
-        "marker-mid" | "marker-start" | "mask" | "opacity" | "pointer-events" | "shape-rendering" |
-        "stroke" | "stroke-dasharray" | "stroke-dashoffset" | "stroke-linecap" | "stroke-linejoin" |
-        "stroke-miterlimit" | "stroke-opacity" | "stroke-width" | "vector-effect" | "visibility">
+    Pick<ISvgPresentationAttrs, "clipRule" | "fillColor" | "fillOpacity" | "markerEnd" |
+        "markerMid" | "markerStart" | "mask" | "opacity" | "pointerEvents" | "shapeRendering" |
+        "stroke" | "strokeDasharray" | "strokeDashoffset" | "strokeLinecap" | "strokeLinejoin" |
+        "strokeMiterlimit" | "strokeOpacity" | "strokeWidth" | "vectorEffect" | "visibility">
 {
 }
 
@@ -294,7 +374,7 @@ export interface ISvgShapeCategoryAttrs extends ISvgElementAttrs, ISvgConditiona
  * Represents SVG elements of the Structural category
  */
 export interface ISvgStructuralCategoryAttrs extends ISvgElementAttrs,
-    Pick<ISvgPresentationAttrs, "color-interpolation" | "pointer-events">
+    Pick<ISvgPresentationAttrs, "colorInterpolation" | "pointerEvents">
 {
 }
 
@@ -304,13 +384,13 @@ export interface ISvgStructuralCategoryAttrs extends ISvgElementAttrs,
  * Represents SVG elements of the TextContent category
  */
 export interface ISvgTextContentCategoryAttrs extends ISvgElementAttrs,
-    Pick<ISvgPresentationAttrs, "color-interpolation" | "direction" | "dominant-baseline" |
-        "fillColor" | "fill-opacity" | "fill-rule" | "font-family" | "font-size" |
-        "font-size-adjust" | "font-stretch" | "font-style" | "font-variant" | "font-weight" |
-        "letter-spacing" | "pointer-events" | "stroke" | "stroke-dasharray" | "stroke-dashoffset" |
-        "stroke-linecap" | "stroke-linejoin" | "stroke-miterlimit" | "stroke-opacity" |
-        "stroke-width" | "text-anchor" | "text-decoration" | "unicode-bidi" | "vector-effect" |
-        "visibility" | "word-spacing" | "writing-mode">
+    Pick<ISvgPresentationAttrs, "colorInterpolation" | "direction" | "dominantBaseline" |
+        "fillColor" | "fillOpacity" | "fillRule" | "fontFamily" | "fontSize" |
+        "fontSizeAdjust" | "fontStretch" | "fontStyle" | "fontVariant" | "fontWeight" |
+        "letterSpacing" | "pointerEvents" | "stroke" | "strokeDasharray" | "strokeDashoffset" |
+        "strokeLinecap" | "strokeLinejoin" | "strokeMiterlimit" | "strokeOpacity" |
+        "strokeWidth" | "textAnchor" | "textDecoration" | "unicodeBidi" | "vectorEffect" |
+        "visibility" | "wordSpacing" | "writingMode">
 {
 }
 
@@ -321,12 +401,12 @@ export interface ISvgAElementProps extends
     ISvgContainerCategoryAttrs,
     ISvgRenderableCategoryAttrs,
     ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "clip-path" | "visibility">
+    Pick<ISvgPresentationAttrs, "clipPath" | "visibility">
 {
-	download?: boolean;
+	download?: string;
 	href?: string;
 	hreflang?: string;
-	ping?: string;
+	ping?: string | string[];
 	referrerpolicy?: ReferrerPolicyPropType;
 	rel?: string;
 	target?: FormtargetPropType;
@@ -338,7 +418,12 @@ export interface ISvgAElementProps extends
 // <animate>
 export interface ISvgAnimateElementProps extends
     ISvgAnimationCategoryAttrs,
-    Pick<ISvgPresentationAttrs, "color-interpolation">
+    ISvgAnimationTargetAttrs,
+    ISvgAnimationTargetAttributeAttrs,
+    ISvgAnimationTimingAttrs,
+    ISvgAnimationValueAttrs,
+    ISvgAnimationAdditionAttrs,
+    Pick<ISvgPresentationAttrs, "colorInterpolation">
 {
 }
 
@@ -346,20 +431,29 @@ export interface ISvgAnimateElementProps extends
 
 // <animateMotion>
 export interface ISvgAnimateMotionElementProps extends
-    ISvgAnimationCategoryAttrs
+    ISvgAnimationCategoryAttrs,
+    ISvgAnimationTargetAttrs,
+    ISvgAnimationTimingAttrs,
+    ISvgAnimationValueAttrs,
+    ISvgAnimationAdditionAttrs
 {
-	path?: string;
-	keyPoints?: string;
-	rotate?: string;
-	origin?: string;
+	path?: string | IPathBuilder;
+	keyPoints?: number[];
+	rotate?: number| "auto" | "auto-reverse";
 }
 
 
 
-// <animateMotion>
+// <animateTransform>
 export interface ISvgAnimateTransformElementProps extends
-    ISvgAnimationCategoryAttrs
+    ISvgAnimationCategoryAttrs,
+    ISvgAnimationTargetAttrs,
+    ISvgAnimationTargetAttributeAttrs,
+    ISvgAnimationTimingAttrs,
+    ISvgAnimationValueAttrs,
+    ISvgAnimationAdditionAttrs
 {
+	type: "translate" | "scale" | "rotate" | "skewX" | "skewY";
 }
 
 
@@ -370,9 +464,9 @@ export interface ISvgCircleElementProps extends
     ISvgGraphicsCategoryAttrs,
     ISvgRenderableCategoryAttrs
 {
-	cx: string | number;
-	cy: string | number;
-	r: string | number;
+	cx?: SvgLength;
+	cy?: SvgLength;
+	r?: SvgLength;
 	pathLength?: number;
 }
 
@@ -382,9 +476,9 @@ export interface ISvgCircleElementProps extends
 export interface ISvgClipPathElementProps extends
     ISvgAElementProps,
     ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "clip-path" | "color-interpolation">
+    Pick<ISvgPresentationAttrs, "clipPath" | "colorInterpolation">
 {
-	clipPathUnits?: UnitsPropType;
+	clipPathUnits?: SvgUnitsPropType;
 }
 
 
@@ -393,7 +487,7 @@ export interface ISvgClipPathElementProps extends
 export interface ISvgDefsElementProps extends
     ISvgContainerCategoryAttrs,
     ISvgStructuralCategoryAttrs,
-    Pick<ISvgPresentationAttrs, "clip-path">
+    Pick<ISvgPresentationAttrs, "clipPath">
 {
 	begin?: string;
 	href?: string;
@@ -411,7 +505,8 @@ export interface ISvgDeskElementProps extends
 
 // <discard>
 export interface ISvgDiscardElementProps extends
-    ISvgAnimationCategoryAttrs
+    ISvgAnimationCategoryAttrs,
+    ISvgAnimationTimingAttrs
 {
 }
 
@@ -423,10 +518,10 @@ export interface ISvgEllipseElementProps extends
     ISvgGraphicsCategoryAttrs,
     ISvgRenderableCategoryAttrs
 {
-	cx: string | number;
-	cy: string | number;
-	rx: string | number;
-	ry: string | number;
+	cx?: SvgLength;
+	cy?: SvgLength;
+	rx?: SvgLength | "auto";
+	ry?: SvgLength | "auto";
 	pathLength?: number;
 }
 
@@ -438,7 +533,7 @@ export interface ISvgFeBlendElementProps extends
 {
 	in?: SvgInPropType;
 	in2?: SvgInPropType;
-	mode?: "normal" | "multiply" | "screen" | "darken" | "lighten";
+	mode?: BlendModeKeyword;
 }
 
 
@@ -448,8 +543,14 @@ export interface ISvgFeColorMatrixElementProps extends
     ISvgFilterPrimitiveCategoryAttrs
 {
 	in?: SvgInPropType;
-	type?: "matrix" | "saturate" | "hueRotate" | "luminanceToAlpha";
-	values?: string | number;
+	type: "matrix" | "saturate" | "hueRotate" | "luminanceToAlpha";
+	values?: number |
+        [
+            number,number,number,number,number,
+            number,number,number,number,number,
+            number,number,number,number,number,
+            number,number,number,number,number,
+        ];
 }
 
 
@@ -469,8 +570,7 @@ export interface ISvgFeCompositeElementProps extends
 {
 	in?: SvgInPropType;
 	in2?: SvgInPropType;
-	mode?: "normal" | "multiply" | "screen" | "darken" | "lighten";
-	opertor?: "over" | "in" | "out" | "atop" | "xor" | "arithmetic";
+	opertor?: "over" | "in" | "out" | "atop" | "xor" | "lighter" | "arithmetic";
 	k1?: number;
 	k2?: number;
 	k3?: number;
@@ -486,11 +586,10 @@ export interface ISvgFeConvolveMatrixElementProps extends
 	bias?: number;
 	divisor?: number;
 	edgeMode?: "duplicate" | "wrap" | "none";
-	in?: string | "SourceGraphic" | "SourceAlpha" | "BackgroundImage" | "BackgroundAlpha" | "FillPaint" | "StrokePaint";
-	kernelMatrix?: string;
-	kernelUnitLength?: string;
-	order?: string;
-	preserveAlpha?: boolean;
+	in?: SvgInPropType;
+	kernelMatrix?: number[];
+	order?: number | [number, number?];
+	preserveAlpha?: "true" | "false";
 	targetX?: number;
 	targetY?: number;
 }
@@ -500,12 +599,11 @@ export interface ISvgFeConvolveMatrixElementProps extends
 // <feDiffuseLighting>
 export interface ISvgFeDiffuseLightingElementProps extends
     ISvgFilterPrimitiveCategoryAttrs,
-    Pick<ISvgPresentationAttrs, "lighting-color">
+    Pick<ISvgPresentationAttrs, "lightingColor">
 {
-	in?: string | "SourceGraphic" | "SourceAlpha" | "BackgroundImage" | "BackgroundAlpha" | "FillPaint" | "StrokePaint";
+	in?: SvgInPropType;
 	surfaceScale?: number;
 	diffuseConstant?: number;
-	kernelUnitLength?: string;
 }
 
 
@@ -536,12 +634,12 @@ export interface ISvgFeDistantLightElementProps extends
 // <feDropShadow>
 export interface ISvgFeDropShadowElementProps extends
     ISvgFilterPrimitiveCategoryAttrs,
-    Pick<ISvgPresentationAttrs, "flood-color" | "flood-opacity">
+    Pick<ISvgPresentationAttrs, "floodColor" | "floodOpacity">
 {
 	in?: SvgInPropType;
-	stdDeviation?: string;
-	dx?: string | number;
-	dy?: string | number;
+	stdDeviation?: number;
+	dx?: number;
+	dy?: number;
 }
 
 
@@ -549,7 +647,7 @@ export interface ISvgFeDropShadowElementProps extends
 // <feFlood>
 export interface ISvgFeFloodElementProps extends
     ISvgFilterPrimitiveCategoryAttrs,
-    Pick<ISvgPresentationAttrs, "flood-color" | "flood-opacity">
+    Pick<ISvgPresentationAttrs, "floodColor" | "floodOpacity">
 {
 }
 
@@ -592,7 +690,7 @@ export interface ISvgFeGaussianBlurElementProps extends
     ISvgFilterPrimitiveCategoryAttrs
 {
 	in?: SvgInPropType;
-	stdDeviation?: string;
+	stdDeviation?: number | [number, number?];
 	edgeMode?: "duplicate" | "wrap" | "none";
 }
 
@@ -602,9 +700,8 @@ export interface ISvgFeGaussianBlurElementProps extends
 export interface ISvgFeImageElementProps extends
     ISvgFilterPrimitiveCategoryAttrs
 {
+    href: string;
 	preserveAspectRatio?: PreserveAspectRatioPropType;
-	stdDeviation?: string;
-	edgeMode?: "duplicate" | "wrap" | "none";
 }
 
 
@@ -631,8 +728,8 @@ export interface ISvgFeMorphologyElementProps extends
     ISvgFilterPrimitiveCategoryAttrs
 {
 	in?: SvgInPropType;
-	operator?: "over" | "in" | "out" | "atop" | "xor" | "arithmetic?: string";
-	radius?: string;
+	operator?: "erode" | "dilate";
+	radius?: number | [number, number?];
 }
 
 
@@ -642,8 +739,8 @@ export interface ISvgFeOffsetElementProps extends
     ISvgFilterPrimitiveCategoryAttrs
 {
 	in?: SvgInPropType;
-	dx?: string | number;
-	dy?: string | number;
+	dx?: number;
+	dy?: number;
 }
 
 
@@ -662,13 +759,12 @@ export interface ISvgFePointLightElementProps extends
 // <feSpecularLighting>
 export interface ISvgFeSpecularLightingElementProps extends
     ISvgFilterPrimitiveCategoryAttrs,
-    Pick<ISvgPresentationAttrs, "lighting-color">
+    Pick<ISvgPresentationAttrs, "lightingColor">
 {
 	in?: SvgInPropType;
 	surfaceScale?: number;
 	specularConstant?: number;
 	specularExponent?: number;
-	kernelUnitLength?: string;
 }
 
 
@@ -702,11 +798,11 @@ export interface ISvgFeTileElementProps extends
 export interface ISvgFeTurbulenceElementProps extends
     ISvgFilterPrimitiveCategoryAttrs
 {
-	baseFrequency?: string;
+	baseFrequency?: number | [number, number?];
 	numOctaves?: number;
 	seed?: number;
 	stitchTiles?: "noStitch" | "stitch";
-	type?: "fractalNoise" | "turbulence";
+	type: "fractalNoise" | "turbulence";
 }
 
 
@@ -715,12 +811,13 @@ export interface ISvgFeTurbulenceElementProps extends
 export interface ISvgFilterElementProps extends
     ISvgElementAttrs
 {
-	x?: string | number;
-	y?: string | number;
-	width?: string | number;
-	height?: string | number;
-	filterUnits?: UnitsPropType;
-	primitiveUnits?: UnitsPropType;
+	x?: SvgLength;
+	y?: SvgLength;
+	width?: SvgLength;
+	height?: SvgLength;
+	filterUnits?: SvgUnitsPropType;
+	primitiveUnits?: SvgUnitsPropType;
+    href?: string;
 }
 
 
@@ -729,12 +826,12 @@ export interface ISvgFilterElementProps extends
 export interface ISvgForeignObjectElementProps extends
     ISvgRenderableCategoryAttrs,
     ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "overflow" | "vector-effect" | "visibility">
+    Pick<ISvgPresentationAttrs, "overflow" | "vectorEffect" | "visibility">
 {
-	x?: string | number;
-	y?: string | number;
-	width?: string | number;
-	height?: string | number;
+	x?: SvgLength;
+	y?: SvgLength;
+	width?: SvgLength;
+	height?: SvgLength;
 }
 
 
@@ -745,7 +842,7 @@ export interface ISvgGElementProps extends
     ISvgRenderableCategoryAttrs,
     ISvgStructuralCategoryAttrs,
     ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "clip-path">
+    Pick<ISvgPresentationAttrs, "clipPath">
 {
 }
 
@@ -779,14 +876,15 @@ export interface ISvgHatchpathElementProps extends
 export interface ISvgImageElementProps extends
     ISvgGraphicsCategoryAttrs,
     ISvgRenderableCategoryAttrs,
-    Pick<ISvgPresentationAttrs, "image-rendering" | "overflow" | "vector-effect" | "visibility">
+    Pick<ISvgPresentationAttrs, "imageRendering" | "overflow" | "vectorEffect" | "visibility">
 {
-	x?: string | number;
-	y?: string | number;
-	width?: string | number;
-	height?: string | number;
+	x?: SvgLength;
+	y?: SvgLength;
+	width?: SvgLength;
+	height?: SvgLength;
 	preserveAspectRatio?: PreserveAspectRatioPropType;
 	href?: string;
+    crossorigin?: CrossoriginPropType;
 }
 
 
@@ -797,10 +895,10 @@ export interface ISvgLineElementProps extends
     ISvgGraphicsCategoryAttrs,
     ISvgRenderableCategoryAttrs
 {
-	x1?: string | number;
-	x2?: string | number;
-	y1?: string | number;
-	y2?: string | number;
+	x1?: CrossoriginPropType;
+	x2?: CrossoriginPropType;
+	y1?: CrossoriginPropType;
+	y2?: CrossoriginPropType;
 	pathLength?: number;
 }
 
@@ -810,16 +908,15 @@ export interface ISvgLineElementProps extends
 export interface ISvgLinearGradientElementProps extends
     ISvgGradientCategoryAttrs,
     ISvgPaintServerCategoryAttrs,
-    Pick<ISvgPresentationAttrs, "clip-path">
+    Pick<ISvgPresentationAttrs, "clipPath">
 {
-	x1?: string | number;
-	x2?: string | number;
-	y1?: string | number;
-	y2?: string | number;
-	gradientUnits?: UnitsPropType;
-	gradientTransform?: string;
+	x1?: SvgLength;
+	x2?: SvgLength;
+	y1?: SvgLength;
+	y2?: SvgLength;
+	gradientUnits?: SvgUnitsPropType;
+	gradientTransform?: Transform_StyleType;
 	spreadMethod?: "pad" | "reflect" | "repeat";
-	href?: string;
 }
 
 
@@ -828,17 +925,17 @@ export interface ISvgLinearGradientElementProps extends
 export interface ISvgMarkerElementProps extends
     ISvgContainerCategoryAttrs,
     ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "clip-path" | "opacity" | "overflow">
+    Pick<ISvgPresentationAttrs, "clipPath" | "opacity" | "overflow">
 {
-	markerHeight?: string | number;
-	markerUnits?: UnitsPropType;
-	markerWidth?: string | number;
-	gradientTransform?: string;
-	orient?: number | string | "auto" | "auto-start-reverse";
+	markerHeight?: SvgLength;
+	markerUnits?: SvgUnitsPropType;
+	markerWidth?: SvgLength;
+	gradientTransform?: Transform_StyleType;
+	orient?: SvgAngle | "auto" | "auto-start-reverse";
 	preserveAspectRatio?: PreserveAspectRatioPropType;
-	refX?: string | number;
-	refY?: string | number;
-	viewBox?: string;
+	refX?: "left" | "center" | "right" | SvgLength;
+	refY?: "top" | "center" | "bottom" | SvgLength;
+	viewBox?: SvgViewBox;
 }
 
 
@@ -847,20 +944,20 @@ export interface ISvgMarkerElementProps extends
 export interface ISvgMaskElementProps extends
     ISvgContainerCategoryAttrs,
     ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "clip-path">
+    Pick<ISvgPresentationAttrs, "clipPath">
 {
-	x?: string | number;
-	y?: string | number;
-	height?: string | number;
-	width?: string | number;
-	maskUnits?: UnitsPropType;
-	maskContentUnits?: UnitsPropType;
+	x?: SvgLength;
+	y?: SvgLength;
+	height?: SvgLength;
+	width?: SvgLength;
+	maskUnits?: SvgUnitsPropType;
+	maskContentUnits?: SvgUnitsPropType;
 }
 
 
 
 // <metadata>
-export interface ISvgDeskElementProps extends
+export interface ISvgMetadataElementProps extends
     ISvgDescriptiveCategoryAttrs
 {
 }
@@ -881,7 +978,7 @@ export interface ISvgPathElementProps extends
     ISvgShapeCategoryAttrs,
     ISvgGraphicsCategoryAttrs,
     ISvgRenderableCategoryAttrs,
-    Pick<ISvgPresentationAttrs, "d" | "fill-rule">
+    Pick<ISvgPresentationAttrs, "d" | "fillRule">
 {
 	pathLength?: number;
 }
@@ -893,16 +990,18 @@ export interface ISvgPatternElementProps extends
     ISvgContainerCategoryAttrs,
     ISvgPaintServerCategoryAttrs,
     ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "clip-path" | "overflow">
+    Pick<ISvgPresentationAttrs, "clipPath" | "overflow">
 {
-	x?: string | number;
-	y?: string | number;
-	width?: string | number;
-	height?: string | number;
-	patternUnits?: UnitsPropType;
-	patternContentUnits?: UnitsPropType;
+	x?: SvgLength;
+	y?: SvgLength;
+	width?: SvgLength;
+	height?: SvgLength;
+	patternUnits?: SvgUnitsPropType;
+	patternContentUnits?: SvgUnitsPropType;
+    patternTransform?: Transform_StyleType;
+	preserveAspectRatio?: PreserveAspectRatioPropType;
 	href?: string;
-	viewBox?: string;
+	viewBox?: SvgViewBox;
 }
 
 
@@ -912,9 +1011,9 @@ export interface ISvgPolygonElementProps extends
     ISvgShapeCategoryAttrs,
     ISvgGraphicsCategoryAttrs,
     ISvgRenderableCategoryAttrs,
-    Pick<ISvgPresentationAttrs, "fill-rule">
+    Pick<ISvgPresentationAttrs, "fillRule">
 {
-	points: string;
+	points: number[];
 	pathLength?: number;
 }
 
@@ -925,9 +1024,9 @@ export interface ISvgPolylineElementProps extends
     ISvgShapeCategoryAttrs,
     ISvgGraphicsCategoryAttrs,
     ISvgRenderableCategoryAttrs,
-    Pick<ISvgPresentationAttrs, "fill-rule">
+    Pick<ISvgPresentationAttrs, "fillRule">
 {
-	points?: string;
+	points?: number[];
 	pathLength?: number;
 }
 
@@ -938,16 +1037,15 @@ export interface ISvgRadialGradientElementProps extends
     ISvgGradientCategoryAttrs,
     ISvgPaintServerCategoryAttrs
 {
-	cx?: string | number;
-	cy?: string | number;
-	r?: string | number;
-	fx?: string | number;
-	fy?: string | number;
-	fr?: string | number;
-	gradientUnits?: UnitsPropType;
-	gradientTransform?: string;
+	cx?: SvgLength;
+	cy?: SvgLength;
+	r?: SvgLength;
+	fx?: SvgLength;
+	fy?: SvgLength;
+	fr?: SvgLength;
+	gradientUnits?: SvgUnitsPropType;
+	gradientTransform?: Transform_StyleType;
 	spreadMethod?: "pad" | "reflect" | "repeat";
-	href?: string;
 }
 
 
@@ -958,12 +1056,12 @@ export interface ISvgRectElementProps extends
     ISvgGraphicsCategoryAttrs,
     ISvgRenderableCategoryAttrs
 {
-	x?: string | number;
-	y?: string | number;
-	width?: string | number;
-	height?: string | number;
-	rx?: string | number;
-	ry?: string | number;
+	x?: SvgLength;
+	y?: SvgLength;
+	width?: SvgLength | "auto";
+	height?: SvgLength | "auto";
+	rx?: SvgLength | "auto";
+	ry?: SvgLength | "auto";
 	pathLength?: number;
 }
 
@@ -972,24 +1070,21 @@ export interface ISvgRectElementProps extends
 // <script> (<svgScript>)
 export interface ISvgScriptElementProps extends ISvgElementAttrs
 {
-	async?: boolean;
-	crossorigin?: CrossoriginPropType;
-	defer?: boolean;
-	integrity?: string;
-	nomodule?: boolean;
-	nonce?: string;
-	src?: string;
-	text?: string;
 	type?: string;
+    href?: string;
+	crossorigin?: CrossoriginPropType;
 }
 
 
 
 // <set>
 export interface ISvgSetElementProps extends
-    ISvgAnimationCategoryAttrs
+    ISvgAnimationCategoryAttrs,
+    ISvgAnimationTargetAttrs,
+    ISvgAnimationTargetAttributeAttrs,
+    ISvgAnimationTimingAttrs
 {
-	to: string;
+	to: string | number;
 }
 
 
@@ -997,9 +1092,9 @@ export interface ISvgSetElementProps extends
 // <stop>
 export interface ISvgStopElementProps extends
     ISvgElementAttrs,
-    Pick<ISvgPresentationAttrs, "stop-color" | "stop-opacity">
+    Pick<ISvgPresentationAttrs, "stopColor" | "stopOpacity">
 {
-	offset?: CssPercent;
+	offset?: SvgPercent;
 }
 
 
@@ -1021,14 +1116,14 @@ export interface ISvgSvgElementProps extends
     ISvgRenderableCategoryAttrs,
     ISvgStructuralCategoryAttrs,
     ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "clip-path" | "overflow">
+    Pick<ISvgPresentationAttrs, "clipPath" | "overflow">
 {
-	height?: string | number;
+	height?: SvgLength;
 	preserveAspectRatio?: PreserveAspectRatioPropType;
-	viewBox?: string;
-	width?: string | number;
-	x?: string | number;
-	y?: string | number;
+	viewBox?: SvgViewBox;
+	width?: SvgLength;
+	x?: SvgLength;
+	y?: SvgLength;
 }
 
 
@@ -1038,7 +1133,7 @@ export interface ISvgSwitchElementProps extends
     ISvgContainerCategoryAttrs,
     ISvgRenderableCategoryAttrs,
     ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "clip-path">
+    Pick<ISvgPresentationAttrs, "clipPath">
 {
 }
 
@@ -1049,16 +1144,16 @@ export interface ISvgSymbolElementProps extends
     ISvgContainerCategoryAttrs,
     ISvgRenderableCategoryAttrs,
     ISvgStructuralCategoryAttrs,
-    Pick<ISvgPresentationAttrs, "clip-path" | "overflow">
+    Pick<ISvgPresentationAttrs, "clipPath" | "overflow">
 {
-	x?: string | number;
-	y?: string | number;
-	width?: string | number;
-	height?: string | number;
+	x?: SvgLength;
+	y?: SvgLength;
+	width?: SvgLength;
+	height?: SvgLength;
 	preserveAspectRatio?: PreserveAspectRatioPropType;
-	refX?: string | number;
-	refY?: string | number;
-	viewBox?: string;
+	refX?: SvgLength | "left" | "center" | "right";
+	refY?: SvgLength | "top" | "center" | "bottom";
+	viewBox?: SvgViewBox;
 }
 
 
@@ -1068,15 +1163,15 @@ export interface ISvgTextElementProps extends
     ISvgGraphicsCategoryAttrs,
     ISvgRenderableCategoryAttrs,
     ISvgTextContentCategoryAttrs,
-    Pick<ISvgPresentationAttrs, "clip-rule" | "overflow" | "text-rendering">
+    Pick<ISvgPresentationAttrs, "clipRule" | "overflow" | "textRendering">
 {
-	x?: string | number;
-	y?: string | number;
-	dx?: string | number;
-	dy?: string | number;
-	rotate?: string;
+	x?: SvgLength;
+	y?: SvgLength;
+	dx?: SvgLength;
+	dy?: SvgLength;
+	rotate?: number | number[];
 	lengthAdjust?: LengthAdjustPropType;
-	textLength?: string | number;
+	textLength?: SvgLength;
 }
 
 
@@ -1086,16 +1181,16 @@ export interface ISvgTextPathElementProps extends
     ISvgRenderableCategoryAttrs,
     ISvgTextContentCategoryAttrs,
     ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "alignment-baseline" | "baseline-shift">
+    Pick<ISvgPresentationAttrs, "alignmentBaseline" | "baselineShift">
 {
 	href?: string;
 	lengthAdjust?: LengthAdjustPropType;
 	method?: "align" | "stretch";
-	path?: string;
+	path?: string | IPathBuilder;
 	side?: "left" | "right";
 	spacing?: "auto" | "exact";
-	startOffset?: string | number;
-	textLength?: string | number;
+	startOffset?: SvgLength;
+	textLength?: SvgLength;
 }
 
 
@@ -1108,20 +1203,20 @@ export interface ISvgTitleElementProps extends
 
 
 
-// <textSpan>
+// <tSpan>
 export interface ISvgTspanElementProps extends
     ISvgRenderableCategoryAttrs,
     ISvgTextContentCategoryAttrs,
     ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "alignment-baseline" | "baseline-shift">
+    Pick<ISvgPresentationAttrs, "alignmentBaseline" | "baselineShift">
 {
-	x?: string | number;
-	y?: string | number;
-	dx?: string | number;
-	dy?: string | number;
-	rotate?: string;
+	x?: SvgLength;
+	y?: SvgLength;
+	dx?: SvgLength;
+	dy?: SvgLength;
+	rotate?: number | number[];
 	lengthAdjust?: LengthAdjustPropType;
-	textLength?: string | number;
+	textLength?: SvgLength;
 }
 
 
@@ -1130,13 +1225,13 @@ export interface ISvgTspanElementProps extends
 export interface ISvgUseElementProps extends
     ISvgRenderableCategoryAttrs,
     ISvgStructuralCategoryAttrs,
-    Pick<ISvgPresentationAttrs, "clip-path" | "clip-rule" | "filter" | "vector-effect">
+    Pick<ISvgPresentationAttrs, "clipPath" | "clipRule" | "filter" | "vectorEffect">
 {
 	href: string;
-	x?: string | number;
-	y?: string | number;
-	width?: string | number;
-	height?: string | number;
+	x?: SvgLength;
+	y?: SvgLength;
+	width?: SvgLength;
+	height?: SvgLength;
 }
 
 
@@ -1146,7 +1241,7 @@ export interface ISvgViewElementProps extends
     ISvgElementAttrs
 {
 	preserveAspectRatio?: PreserveAspectRatioPropType;
-	viewBox?: string;
+	viewBox?: SvgViewBox;
 }
 
 

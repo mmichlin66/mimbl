@@ -1110,7 +1110,6 @@ const elmInfos: {[elmName:string]: ElmInfo} =
     td: ElementNamespace.HTML,
 
     svg: ElementNamespace.SVG,
-    colorProfile: { ns: ElementNamespace.SVG, name: "color-profile" },
     svgA: { ns: ElementNamespace.SVG, name: "a" },
     svgTitle: { ns: ElementNamespace.SVG, name: "title" },
     svgScript: { ns: ElementNamespace.SVG, name: "script" },
@@ -1177,8 +1176,12 @@ interface AttrPropInfo extends PropInfoBase
      * `setAttribute()` method we want to set the element's property directly and the property
      * name is different from the attribute name. For example, `class` -> `className` or
      * `for` -> `htmlFor`.
+     *
+     * This field can also specify a function that gets the attribute name and returns a different
+     * name. This can be usefull, for example, to convert property name from one form to another,
+     * e.g. from camel-case to dash-case
      */
-	name?: string;
+	name?: string | ((s:string) => string);
 }
 
 
@@ -1209,37 +1212,6 @@ export interface CustomAttrPropInfo extends PropInfoBase
 
 /** Type combining information about regular attributes or events or custom attributes. */
 export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
-
-
-
-/**
- * Helper function that converts the given value to string or null. Null is an indication that
- * the attribute should not be set or should be deleted.
- *   - strings are returned as is.
- *   - true is converted to an empty string.
- *   - false is converted to null.
- *   - null and undefined are converted to null.
- *   - arrays are converted by calling this function recursively on the elements and separating
- *     them with spaces.
- *   - everything else is converted by calling the toString method.
- *
- * Note that although this functiondoes handles null and undefined, it is normally should
- * not be called with these values as the proper action is to remove attributes with such values.
- */
-
-const valToString = (val: any): string | null =>
-    // attribute will be created without alue
-    val == null || val === false ? null :
-    val === true ? "" :
-
-    // set string value as is
-	typeof val === "string" ? val :
-
-    // by defalt array elements are joined with space
-    Array.isArray( val) ? val.map( item => valToString(item)).filter( item => !!item).join(" ") :
-
-    // call toString() for all other values (including numbers and objects)
-    val.toString();
 
 
 
@@ -1298,13 +1270,15 @@ function setElmProp( elm: Element, name: string, info: AttrPropInfo | null, val:
     {
         // get actual attribute/property name to use
         if (info.name)
-            name = info.name;
+            name = typeof info.name === "string" ? info.name : info.name(name);
 
         if (info.set)
             info.set( elm, name, val);
-        else if (info.v2s)
+        else
         {
-            val = info.v2s ? info.v2s(val, name, elm) : valToString( val);
+            if (info.v2s)
+                val = info.v2s ? info.v2s(val, name, elm) : valToString( val);
+
             if (val != null)
             {
                 elm.setAttribute( name, val);
@@ -1367,7 +1341,7 @@ function updateElmProp( elm: Element, name: string, info: AttrPropInfo | null,
     {
         // get actual attribute/property name to use
         if (info.name)
-            name = info.name;
+            name = typeof info.name === "string" ? info.name : info.name(name);
 
         // if update method is defined use it; otherwise, if set methid is defined use it;
         // otherwise, set the new value using setAttribute
@@ -1405,7 +1379,7 @@ function removeElmProp( elm: Element, name: string, info: AttrPropInfo | null): 
     {
         // get actual attribute/property name to use
         if (info.name)
-            name = info.name;
+            name = typeof info.name === "string" ? info.name : info.name(name);
 
         if (info.remove)
             info.remove( elm, name);
@@ -1425,6 +1399,50 @@ function removeElmProp( elm: Element, name: string, info: AttrPropInfo | null): 
 // Handling of attributes that are set using properties.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/** Converts string from camel-case to dash-case */
+const camelToDash = (s: string): string => s.replace( /([a-zA-Z])(?=[A-Z])/g, '$1-').toLowerCase();
+
+
+
+/** Joins array elements with comma */
+const array2s = (val: any[], sep: string): string =>
+    val == null ? "" : val.map( item => valToString(item)).filter( item => !!item).join(sep);
+
+/** Joins array elements with comma */
+const array2sWithSpace = (val: any[]): string => array2s(val, " ");
+
+/** Joins array elements with comma */
+const array2sWithComma = (val: any[]): string => array2s(val, ",");
+
+/** Joins array elements with comma */
+const array2sWithSemicolon = (val: any[]): string => array2s(val, ";");
+
+
+
+/**
+ * Helper function that converts the given value to string or null. Null is an indication that
+ * the attribute should not be set or should be deleted.
+ *   - strings are returned as is.
+ *   - true is converted to an empty string.
+ *   - false is converted to null.
+ *   - null and undefined are converted to null.
+ *   - arrays are converted by calling this function recursively on the elements and separating
+ *     them with spaces.
+ *   - everything else is converted by calling the toString method.
+ *
+ * Note that although this functiondoes handles null and undefined, it is normally should
+ * not be called with these values as the proper action is to remove attributes with such values.
+ */
+const valToString = (val: any): string | null =>
+    val == null || val === false ? null :
+    val === true ? "" :
+	typeof val === "string" ? val :
+    Array.isArray(val) ? array2sWithSpace(val) :
+    val.toString();
+
+
+
 function setAttrAsProp( elm: Element, name: string, val: any): void
 {
     elm[name] = val;
@@ -1484,12 +1502,6 @@ function setDefaultCheckedProp( elm: HTMLInputElement, name: string, val: boolea
 
 
 
-/** Joins array elements with comma */
-const array2sWithComma = (val: any[]): string =>
-    val == null ? "" : val.map( item => valToString(item)).filter( item => !!item).join(",");
-
-
-
 /**
  * SVG presentation attributes can be used as CSS style properties and, therefore, there
  * conversions to strings are already handled by Mimcss library. If Mimcss library is not included,
@@ -1498,12 +1510,11 @@ const array2sWithComma = (val: any[]): string =>
  */
 function setSvgAttrAsStyleProp(elm: HTMLInputElement, name: string, val: any): void
 {
-    // convert from camel-case to dash-case
-    name = name.replace( /([a-zA-Z])(?=[A-Z])/g, '$1-').toLowerCase();
-
-    // If Mimcss library is not included, then value can only be a string. If it is not,
-    // we return empty string.
-    elm.setAttribute(name, mimcss ? mimcss.stylePropValueToString(name, val) : typeof val === "string" ? val : "");
+    // convert the name from camel-case to dash-case. If Mimcss library is not included, then
+    // value can only be a string. If it is not, we return empty string.
+    elm.setAttribute(camelToDash(name), mimcss
+        ? mimcss.stylePropValueToString(name, val)
+        : typeof val === "string" ? val : "");
 }
 
 /**
@@ -1519,15 +1530,12 @@ function updateSvgAttrAsStyleProp(elm: HTMLInputElement, name: string, oldVal: a
     if (!mimcss && (typeof oldVal !== "string" || typeof newVal !== "string"))
         return;
 
-    // convert from camel-case to dash-case
-    name = name.replace( /([a-zA-Z])(?=[A-Z])/g, '$1-').toLowerCase();
-
     // convert both old and new to strings and compare
     let oldValAsString = typeof oldVal === "string" ? oldVal :  mimcss.stylePropValueToString(name, oldVal);
-    let newValAsString = typeof newVal === "string" ? newVal :  mimcss.stylesetToString(name, newVal);
+    let newValAsString = typeof newVal === "string" ? newVal :  mimcss.stylePropValueToString(name, newVal);
     if (oldValAsString !== newValAsString)
     {
-        elm.setAttribute( name, newValAsString);
+        elm.setAttribute( camelToDash(name), newValAsString);
         return true;
     }
 }
@@ -1615,11 +1623,17 @@ const StdFrameworkPropInfo = { type: PropType.Framework };
 // sets and removes an attribute using element's property
 const AttrAsPropInfo = { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp };
 
-// Produces comma-separate list from array of values
+// Produces comma-separated list from array of values
 const ArrayWithCommaPropInfo = { type: PropType.Attr, v2s: array2sWithComma };
+
+// Produces semicolon-separated list from array of values
+const ArrayWithSemicolonPropInfo = { type: PropType.Attr, v2s: array2sWithSemicolon };
 
 // Handles conversion of SVG presentation attributes as Mimcss style properties to strings
 const SvgAttrAsStylePropInfo = { type: PropType.Attr, set: setSvgAttrAsStyleProp, update: updateSvgAttrAsStyleProp };
+
+// Handles conversion of SVG presentation attributes as Mimcss style properties to strings
+const SvgAttrNameConversionPropInfo = { type: PropType.Attr, name: camelToDash };
 
 /**
  * Object that maps property names to PropInfo-derived objects. Information about custom
@@ -1651,30 +1665,69 @@ const propInfos: {[P:string]: PropInfo} =
     sizes: ArrayWithCommaPropInfo,
     srcset: ArrayWithCommaPropInfo,
 
-    // SVG presentational attributes that require special conversion to string
-	"baseline-shift": SvgAttrAsStylePropInfo,
-	"color": SvgAttrAsStylePropInfo,
-	"cursor": SvgAttrAsStylePropInfo,
-	"fillColor": { type: PropType.Attr, set: setSvgAttrAsStyleProp, name: "fill" },
-	"fill-opacity": SvgAttrAsStylePropInfo,
-	"fillOpacity": SvgAttrAsStylePropInfo,
-	"filter": SvgAttrAsStylePropInfo,
-	"flood-color": SvgAttrAsStylePropInfo,
-	"flood-opacity": SvgAttrAsStylePropInfo,
-	"font-size": SvgAttrAsStylePropInfo,
-	"font-stretch": SvgAttrAsStylePropInfo,
-	"letter-spacing": SvgAttrAsStylePropInfo,
-	"lighting-color": SvgAttrAsStylePropInfo,
-	"marker-end": SvgAttrAsStylePropInfo,
-	"marker-mid": SvgAttrAsStylePropInfo,
-	"marker-start": SvgAttrAsStylePropInfo,
-	"mask": SvgAttrAsStylePropInfo,
-	"stop-color": SvgAttrAsStylePropInfo,
-	"stop-opacity": SvgAttrAsStylePropInfo,
-	"stroke": SvgAttrAsStylePropInfo,
-	"stroke-opacity": SvgAttrAsStylePropInfo,
-	"transform": SvgAttrAsStylePropInfo,
-	"transform-origin": SvgAttrAsStylePropInfo,
+    // SVG presentational attributes that require special conversion to string. This also takes
+    // care of converting the attribute name from camel-case to dash-case if necessary.
+	baselineShift: SvgAttrAsStylePropInfo,
+	color: SvgAttrAsStylePropInfo,
+	cursor: SvgAttrAsStylePropInfo,
+	fillColor: { type: PropType.Attr, set: setSvgAttrAsStyleProp, name: "fill" },
+	fillOpacity: SvgAttrAsStylePropInfo,
+	filter: SvgAttrAsStylePropInfo,
+	floodColor: SvgAttrAsStylePropInfo,
+	floodOpacity: SvgAttrAsStylePropInfo,
+	fontSize: SvgAttrAsStylePropInfo,
+	fontStretch: SvgAttrAsStylePropInfo,
+	letterSpacing: SvgAttrAsStylePropInfo,
+	lightingColor: SvgAttrAsStylePropInfo,
+	markerEnd: SvgAttrAsStylePropInfo,
+	markerMid: SvgAttrAsStylePropInfo,
+	markerStart: SvgAttrAsStylePropInfo,
+	mask: SvgAttrAsStylePropInfo,
+	stopColor: SvgAttrAsStylePropInfo,
+	stopOpacity: SvgAttrAsStylePropInfo,
+	stroke: SvgAttrAsStylePropInfo,
+	strokeOpacity: SvgAttrAsStylePropInfo,
+	transform: SvgAttrAsStylePropInfo,
+	transformOrigin: SvgAttrAsStylePropInfo,
+
+    // SVG attributes that don't require conversion of the value but do require conversion of the
+    // attribute name from camel-case to dash-case. All SVG presentation atributes with a dash
+    // in the name are here.
+	alignmentBaseline: SvgAttrNameConversionPropInfo,
+	clipPath: SvgAttrNameConversionPropInfo,
+	clipRule: SvgAttrNameConversionPropInfo,
+	colorInterpolation: SvgAttrNameConversionPropInfo,
+	colorInterpolationFilters: SvgAttrNameConversionPropInfo,
+	dominantBaseline: SvgAttrNameConversionPropInfo,
+	fillRule: SvgAttrNameConversionPropInfo,
+	fontFamily: SvgAttrNameConversionPropInfo,
+	fontSizeAdjust: SvgAttrNameConversionPropInfo,
+	fontStyle: SvgAttrNameConversionPropInfo,
+	fontVariant: SvgAttrNameConversionPropInfo,
+	fontWeight: SvgAttrNameConversionPropInfo,
+	imageRendering: SvgAttrNameConversionPropInfo,
+	pointerEvents: SvgAttrNameConversionPropInfo,
+	shapeRendering: SvgAttrNameConversionPropInfo,
+	strokeDasharray: SvgAttrNameConversionPropInfo,
+	strokeDashoffset: SvgAttrNameConversionPropInfo,
+	strokeLinecap: SvgAttrNameConversionPropInfo,
+	strokeLinejoin: SvgAttrNameConversionPropInfo,
+	strokeMiterlimit: SvgAttrNameConversionPropInfo,
+	strokeWidth: SvgAttrNameConversionPropInfo,
+	textAnchor: SvgAttrNameConversionPropInfo,
+	textDecoration: SvgAttrNameConversionPropInfo,
+	textRendering: SvgAttrNameConversionPropInfo,
+	unicodeBidi: SvgAttrNameConversionPropInfo,
+	vectorEffect: SvgAttrNameConversionPropInfo,
+	wordSpacing: SvgAttrNameConversionPropInfo,
+	writingMode: SvgAttrNameConversionPropInfo,
+
+    // SVG element atributes
+    values: ArrayWithSemicolonPropInfo,
+    begin: ArrayWithSemicolonPropInfo,
+    end: ArrayWithSemicolonPropInfo,
+    keyTimes: ArrayWithSemicolonPropInfo,
+    keySplines: ArrayWithSemicolonPropInfo,
 
     // // global events
     // click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },
