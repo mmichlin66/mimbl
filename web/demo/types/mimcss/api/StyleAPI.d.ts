@@ -19,7 +19,7 @@ export declare const registerStyleProperty: (name: string, toStringFunc: (v: any
  * @param value Value to convert.
  * @returns String value of the style property.
  */
-export declare const getStylePropValue: <K extends keyof IStyleset>(name: K, value: ExtendedIStyleset[K]) => string;
+export declare function getStylePropValue<K extends keyof IStyleset>(name: K, value: ExtendedIStyleset[K]): string;
 /**
  * Converts the given value corresponding to the given style property to a CSS string. The caller
  * is responsible for ensuring the value type is correct for the given style property. If the
@@ -29,7 +29,7 @@ export declare const getStylePropValue: <K extends keyof IStyleset>(name: K, val
  * @param value Value to convert.
  * @returns String value of the style property.
  */
-export declare const stylePropValueToString: (name: string, value: any) => string;
+export declare function getStylePropValue(name: string, value: any): string;
 /**
  * Sets values of the style properties from the given Styleset object to the `style` attribute
  * of the given HTML element.

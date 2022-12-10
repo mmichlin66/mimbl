@@ -195,13 +195,13 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
             return this.vn?.wrap( func, thisArg ?? this, arg, schedulingType);
         }
 
-        publishService<K extends keyof IServiceDefinitions>( id: K, value: IServiceDefinitions[K],
+        publishService<K extends keyof IServiceDefinitions>(id: K, value: IServiceDefinitions[K],
             depth?: number): IPublication<K>
         {
             return this.vn?.publishService(id, value, depth);
         }
 
-        subscribeService<K extends keyof IServiceDefinitions>( id: K, defaultValue?: IServiceDefinitions[K],
+        subscribeService<K extends keyof IServiceDefinitions>(id: K, defaultValue?: IServiceDefinitions[K],
             useSelf?: boolean): ISubscription<K>
         {
             return this.vn?.subscribeService(id, defaultValue, useSelf);
@@ -237,7 +237,7 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
             }
         }
 
-        setAttr<K extends string & keyof TAttrs>( attrName: K, value: TAttrs[K] | null | undefined): void
+        setAttr<K extends string & keyof TAttrs>(attrName: K, value: TAttrs[K] | null | undefined): void
         {
             let actualValue: typeof value | string = null;
 
@@ -252,24 +252,17 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
                 setAttrValue( this, attrName, actualValue);
         }
 
-        getAttr<K extends string & keyof TAttrs>( attrName: K): TAttrs[K] | string | null
+        getAttr<K extends string & keyof TAttrs>(attrName: K): string | null
         {
-            let actNewValue: TAttrs[K] | string | null = this.getAttribute(attrName);
-
-            // if conversion function is defined in the attribute options, use it
-            let fromHtml = this.#definition.attrs[attrName]?.options?.fromHtml;
-            if (fromHtml)
-                actNewValue = fromHtml.call(this, actNewValue, attrName);
-
-            return actNewValue;
+            return this.getAttribute(attrName);
         }
 
-        hasAttr<K extends string & keyof TAttrs>( attrName: K): boolean
+        hasAttr<K extends string & keyof TAttrs>(attrName: K): boolean
         {
             return this.hasAttribute(attrName);
         }
 
-        fireEvent<K extends string & keyof TEvents>( key: K, detail: TEvents[K]): boolean
+        fireEvent<K extends string & keyof TEvents>(key: K, detail: TEvents[K]): boolean
         {
             let event = detail instanceof Event ? detail : new CustomEvent(key, {detail});
             return this.dispatchEvent(event);

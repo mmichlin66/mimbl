@@ -134,36 +134,43 @@ export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}> extend
 
     /**
      * Sets the value of the given attribute converting it to string if necessary.
+     * @typeparam K Defines a range of possible values for the `attrName` parameter. K is a key
+     * from the `TAttr` type.
      * @param attrName Attribute name, which is a key from the `TAttrs` type
      * @param value Value to set to the attribute. It is converted to string if necessary.
      */
-    setAttr<K extends string & keyof TAttrs>( attrName: K, value: TAttrs[K]): void;
+    setAttr<K extends string & keyof TAttrs>(attrName: K, value: TAttrs[K]): void;
 
     /**
-     * Gets the current value of the given attribute converting it from string to the
-     * attributes type if possible.
+     * Gets the current string value of the given attribute.
+     * @typeparam K Defines a range of possible values for the `attrName` parameter. K is a key
+     * from the `TAttr` type.
      * @param attrName Attribute name, which is a key from the `TAttrs` type
      * @returns The current value of the attribute.
      */
-    getAttr<K extends string & keyof TAttrs>( attrName: K): TAttrs[K] | string | null;
+    getAttr<K extends string & keyof TAttrs>(attrName: K): string | null;
 
     /**
      * Determines whether the element has the attribute with the given name.
+     * @typeparam K Defines a range of possible values for the `attrName` parameter. K is a key
+     * from the `TAttr` type.
      * @param attrName Attribute name, which is a key from the `TAttrs` type
      * @returns True if the attribute with the given name exists on the element.
      */
-    hasAttr<K extends string & keyof TAttrs>( attrName: K): boolean;
+    hasAttr<K extends string & keyof TAttrs>(attrName: K): boolean;
 
     /**
      * Fires an event of the given type. The `detail` parameter is interpreted differently for
      * built-in and custom events. For built-in events (that is, events whose type derives from
      * Event), this is the event object itself. For custom events, it becomes the value of the
      * `detail` property of the CustomEvent object.
+     * @typeparam K Defines a range of possible values for the `eventType` parameter. K is a key
+     * from the `TEvent` type.
      * @param eventType Event type name, which is a key from the `TEvents` type
      * @param detail Event data, whose type is defined by the type mapped to the key
      * in the `TEvents` type.
      */
-    fireEvent<K extends string & keyof TEvents>( eventType: K, detail: TEvents[K]): boolean;
+    fireEvent<K extends string & keyof TEvents>(eventType: K, detail: TEvents[K]): boolean;
 }
 
 

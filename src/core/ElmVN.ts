@@ -1,4 +1,4 @@
-﻿import {Styleset, SchedulerType, MediaStatement} from "mimcss"
+﻿import {Styleset, MediaStatement} from "mimcss"
 import {
     IElmVN, EventFuncType, ICustomAttributeHandler, EventPropType, RefType, ExtendedElement,
     ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy,
@@ -15,6 +15,7 @@ import { isTrigger } from "../api/TriggerAPI"
 import { mountSubNodes, unmountSubNodes, reconcileSubNodes, CallbackWrapper } from "./Reconciler";
 import { mimcss } from "./StyleScheduler";
 import { VN, setRef } from "./VN";
+import { Ariaset, DatasetPropType } from "../api/ElementTypes";
 
 
 
@@ -558,7 +559,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             if (actNewVal !== actOldVal)
             {
                 if (actNewVal == null)
-                    removeElmProp( this.ownDN!, name, oldRTD.info);
+                    removeElmProp( this.ownDN!, name, oldRTD.info, oldRTD.val);
                 else
                     updateElmProp( this.ownDN!, name, oldRTD.info, actOldVal, actNewVal);
             }
@@ -582,7 +583,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
         if (isUpdate)
         {
-            removeElmProp( this.ownDN!, name, rtd.info)
+            removeElmProp( this.ownDN!, name, rtd.info, rtd.val)
             delete this.attrs[name];
         }
     }
@@ -1144,16 +1145,32 @@ interface PropInfoBase
 interface AttrPropInfo extends PropInfoBase
 {
 	/**
-     * Function that sets the value of the attribute. If this function is not defined, then the DOM
-     * elm.setAttribute is called with propName as attribute name and propVal converted to string.
+     * Function that converts attribute value to string. If this function is not defined, a
+     * standard algorithm is used, in which:
+     *   - string is returned as is.
+     *   - true is converted to an empty string.
+     *   - false is converted to null.
+     *   - null and undefined are converted to null.
+     *   - arrays are converted by calling this function recursively on the elements and separating
+     *     them with spaces.
+     *   - everything else is converted by calling the toString method.
+     */
+	v2s?: (name: string, val: any) => string | null;
+
+	/**
+     * Function that sets the value of the attribute. If this function is not defined, then the
+     * value is converted to string and is set either via the element's setAttribute() function
+     * or (if `isProp` property is true) by assigning the string value to the element's property.
      */
 	set?: (elm: Element, name: string, val: any) => void;
 
 	/**
      * Function that updates the value of the attribute based on the object that was returned from
-     * the diff function. If this function is not defined, then the set function is used. If the
-     * set function is not defined either, the DOM elm.setAttribute is called with propName as
-     * attribute name and updateVal converted to string.
+     * the diff function. If this function is not defined, then the old and the new values are
+     * converted to strings and copared. If the strings are identical, no DOM operation is
+     * performed; otherwise, the value is set to the element either via the set function, if
+     * defined, or via the element's setAttribute() method or (if `isProp` property is true) by
+     * assigning the string value to the element's property.
      */
 	update?: (elm: Element, name: string, oldVal: any, newVal: any) => boolean | void;
 
@@ -1161,13 +1178,7 @@ interface AttrPropInfo extends PropInfoBase
      * Function that removes the attribute. If this function is not defined, then the DOM
      * elm.removeAttribute is called with propName as attribute name.
      */
-	remove?: (elm: Element, name: string) => void;
-
-	/**
-     * Function that converts attribute value to string. Usually only needed for complex attribute
-     * types.
-     */
-	v2s?: (val: any, name: string, elm: Element) => string;
+	remove?: (elm: Element, name: string, oldVal: any) => void;
 
 	/**
      * The actual name of the attribute/property. This is sometimes needed if the attribute name
@@ -1179,9 +1190,15 @@ interface AttrPropInfo extends PropInfoBase
      *
      * This field can also specify a function that gets the attribute name and returns a different
      * name. This can be usefull, for example, to convert property name from one form to another,
-     * e.g. from camel-case to dash-case
+     * e.g. from camelCase to dash-case
      */
-	name?: string | ((s:string) => string);
+	name?: string | ((name: string) => string);
+
+    /**
+     * Flag indicating that the attribute's value can be set to the element via property assignment
+     * instead of the setAttribute() method.
+     */
+    isProp?: boolean;
 }
 
 
@@ -1236,13 +1253,13 @@ export function registerElmProp( propName: string, info: AttrPropInfo | EventPro
  * Sets the value of the given attribute on the given element. This method handles special cases
  * of properties with non-trivial values.
  */
-export function setAttrValue( elm: Element, name: string, val: any): void
+export function setAttrValue(elm: Element, name: string, val: any): void
 {
     let info = propInfos[name];
-    if(info && info.type !== PropType.Attr)
+    if (info && info.type !== PropType.Attr)
         return;
 
-    setElmProp(elm, name, info, val);
+    setElmProp(elm, name, info as AttrPropInfo, val);
 }
 
 
@@ -1251,15 +1268,15 @@ export function setAttrValue( elm: Element, name: string, val: any): void
  * Using the given property name and its value set the appropriate attribute(s) on the element.
  * This method handles special cases of properties with non-trivial values.
  */
-function setElmProp( elm: Element, name: string, info: AttrPropInfo | null, val: any): void
+function setElmProp(elm: Element, name: string, info: AttrPropInfo | null, val: any): void
 {
     // get property info object
     if (!info)
     {
-        val = valToString( val);
-        if (val != null)
+        let s = valToString( val);
+        if (s != null)
         {
-            elm.setAttribute( name, val);
+            elm.setAttribute( name, s);
 
             /// #if USE_STATS
                 DetailedStats.log( StatsCategory.Attr, StatsAction.Added);
@@ -1268,20 +1285,22 @@ function setElmProp( elm: Element, name: string, info: AttrPropInfo | null, val:
     }
     else
     {
-        // get actual attribute/property name to use
-        if (info.name)
-            name = typeof info.name === "string" ? info.name : info.name(name);
+        let {name: nameOrFunc, set} = info;
 
-        if (info.set)
-            info.set( elm, name, val);
+        // get actual attribute/property name to use
+        if (nameOrFunc)
+            name = typeof nameOrFunc === "string" ? nameOrFunc : nameOrFunc(name);
+
+        if (set)
+            set( elm, name, val);
         else
         {
-            if (info.v2s)
-                val = info.v2s ? info.v2s(val, name, elm) : valToString( val);
+            let {v2s} = info;
+            let s = v2s ? v2s(name, val) : valToString( val);
 
-            if (val != null)
+            if (s != null)
             {
-                elm.setAttribute( name, val);
+                setAttrValueToElement(elm, name, s, info);
 
                 /// #if USE_STATS
                     DetailedStats.log( StatsCategory.Attr, StatsAction.Added);
@@ -1298,15 +1317,90 @@ function setElmProp( elm: Element, name: string, info: AttrPropInfo | null, val:
  * value to the element's attribute. Returns true if update has been performed and false if no
  * change in property value has been detected.
  */
-function convertCompareAndUpdateOrRemoveAttr( elm: Element, name: string, oldVal: any, newVal: any): void
+function updateElmProp(elm: Element, name: string, info: AttrPropInfo | null,
+    oldVal: any, newVal: any): void
 {
-    oldVal = valToString(oldVal);
-    newVal = valToString(newVal);
-    if (oldVal !== newVal)
+    // get property info object; if this is not a special case (property is not in our list)
+    // just set the new value to the attribute.
+    if (!info)
+        convertCompareAndUpdateOrRemoveAttr(elm, name, oldVal, newVal);
+    else
     {
-        if (newVal != null)
+        let {name: nameOrFunc, update, set} = info;
+
+        // get actual attribute/property name to use
+        if (nameOrFunc)
+            name = typeof nameOrFunc === "string" ? nameOrFunc : nameOrFunc(name);
+
+        // if update method is defined use it; otherwise, if set methid is defined use it;
+        // otherwise, set the new value using setAttribute
+        if (update)
         {
-            elm.setAttribute( name, newVal);
+            /// #if USE_STATS
+                if (update( elm, name, oldVal, newVal))
+                    DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
+            /// #else
+                update( elm, name, oldVal, newVal);
+            /// #endif
+        }
+        else if (set)
+        {
+            set( elm, name, newVal);
+
+            /// #if USE_STATS
+                DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
+            /// #endif
+        }
+        else
+            convertCompareAndUpdateOrRemoveAttr(elm, name, oldVal, newVal, info);
+    }
+}
+
+
+
+/** Removes the attribute(s) corresponding to the given property. */
+function removeElmProp(elm: Element, name: string, info: AttrPropInfo | null, oldVal: any): void
+{
+    // get property info object
+    if (!info)
+        elm.removeAttribute( name);
+    else
+    {
+        let {name: nameOrFunc, remove} = info;
+
+        // get actual attribute/property name to use
+        if (nameOrFunc)
+            name = typeof nameOrFunc === "string" ? nameOrFunc : nameOrFunc(name);
+
+        if (remove)
+            remove( elm, name, oldVal);
+        else
+            removeAttrFromElement(elm, name, info);
+    }
+
+    /// #if USE_STATS
+        DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
+    /// #endif
+}
+
+
+
+/**
+ * Converts the old and new values to strings and compares them. If the strings are identical, does
+ * nothing. If the strings are different and the new value is not null or undefined, then updtes
+ * the element's attribute; otherwise, removes the attribute.
+ */
+function convertCompareAndUpdateOrRemoveAttr(elm: Element, name: string, oldVal: any, newVal: any,
+    info?: AttrPropInfo | null): void
+{
+    let v2s = info?.v2s;
+    let oldS = v2s ? v2s(name, oldVal) : valToString( oldVal);
+    let newS = v2s ? v2s(name, newVal) : valToString( newVal);
+    if (oldS !== newS)
+    {
+        if (newS != null)
+        {
+            setAttrValueToElement(elm, name, newS, info);
 
             /// #if USE_STATS
                 DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
@@ -1314,7 +1408,7 @@ function convertCompareAndUpdateOrRemoveAttr( elm: Element, name: string, oldVal
         }
         else
         {
-            elm.removeAttribute( name);
+            removeAttrFromElement(elm, name, info);
 
             /// #if USE_STATS
                 DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
@@ -1326,81 +1420,34 @@ function convertCompareAndUpdateOrRemoveAttr( elm: Element, name: string, oldVal
 
 
 /**
- * Determines whether the old and the new values of the property are different and sets the updated
- * value to the element's attribute. Returns true if update has been performed and false if no
- * change in property value has been detected.
+ * Helper function that depending on the info.isProp flag either uses the element's setAttribute()
+ * method or sets the value to the element's property.
  */
-function updateElmProp( elm: Element, name: string, info: AttrPropInfo | null,
-    oldVal: any, newVal: any): void
+function setAttrValueToElement(elm: Element, name: string, val: string, info?: AttrPropInfo | null): void
 {
-    // get property info object; if this is not a special case (property is not in our list)
-    // just set the new value to the attribute.
-    if (!info)
-        convertCompareAndUpdateOrRemoveAttr(elm, name, oldVal, newVal);
+    if (info?.isProp)
+        elm[name] = val;
     else
-    {
-        // get actual attribute/property name to use
-        if (info.name)
-            name = typeof info.name === "string" ? info.name : info.name(name);
-
-        // if update method is defined use it; otherwise, if set methid is defined use it;
-        // otherwise, set the new value using setAttribute
-        if (info.update)
-        {
-            /// #if USE_STATS
-                if (info.update( elm, name, oldVal, newVal))
-                    DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
-            /// #else
-                info.update( elm, name, oldVal, newVal);
-            /// #endif
-        }
-        else if (info.set)
-        {
-            info.set( elm, name, newVal);
-
-            /// #if USE_STATS
-                DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
-            /// #endif
-        }
-        else
-            convertCompareAndUpdateOrRemoveAttr(elm, name, oldVal, newVal);
-    }
+        elm.setAttribute( name, val);
 }
 
 
 
-/** Removes the attribute(s) corresponding to the given property. */
-function removeElmProp( elm: Element, name: string, info: AttrPropInfo | null): void
+/**
+ * Helper function that depending on the info.isProp flag either uses the element's removeAttribute()
+ * method or sets null to the element's property.
+ */
+function removeAttrFromElement(elm: Element, name: string, info?: AttrPropInfo | null): void
 {
-    // get property info object
-    if (!info)
-        elm.removeAttribute( name);
+    if (info?.isProp)
+        elm[name] = null;
     else
-    {
-        // get actual attribute/property name to use
-        if (info.name)
-            name = typeof info.name === "string" ? info.name : info.name(name);
-
-        if (info.remove)
-            info.remove( elm, name);
-        else
-            elm.removeAttribute( name);
-    }
-
-    /// #if USE_STATS
-        DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
-    /// #endif
+        elm.removeAttribute(name);
 }
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Handling of attributes that are set using properties.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-/** Converts string from camel-case to dash-case */
+/** Converts string from camelCase to dash-case */
 const camelToDash = (s: string): string => s.replace( /([a-zA-Z])(?=[A-Z])/g, '$1-').toLowerCase();
 
 
@@ -1410,13 +1457,10 @@ const array2s = (val: any[], sep: string): string =>
     val == null ? "" : val.map( item => valToString(item)).filter( item => !!item).join(sep);
 
 /** Joins array elements with comma */
-const array2sWithSpace = (val: any[]): string => array2s(val, " ");
+const array2sWithComma = (elm: Element, name: string, val: any[]): string => array2s(val, ",");
 
-/** Joins array elements with comma */
-const array2sWithComma = (val: any[]): string => array2s(val, ",");
-
-/** Joins array elements with comma */
-const array2sWithSemicolon = (val: any[]): string => array2s(val, ";");
+/** Joins array elements with semicolon */
+const array2sWithSemicolon = (elm: Element, name: string, val: any[]): string => array2s(val, ";");
 
 
 
@@ -1438,44 +1482,93 @@ const valToString = (val: any): string | null =>
     val == null || val === false ? null :
     val === true ? "" :
 	typeof val === "string" ? val :
-    Array.isArray(val) ? array2sWithSpace(val) :
+    Array.isArray(val) ? array2s(val, " ") :
     val.toString();
 
 
 
-function setAttrAsProp( elm: Element, name: string, val: any): void
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Handling of "object" properties - properties whose value is an object and every object's
+// property corresponds to a separate element attribute. For example, dataset and aria are
+// examles of such object properties.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/** Type describing the most generic form of object properties */
+type ObjectPropValueType = { [K: string]: any };
+
+/** Type for function that converts object property name to element attribute name */
+type ObjectPropToAttrNameFunc = (propName: string) => string;
+
+/** Type for function that converts object property value to string */
+type ObjectPropValToStringFunc = (val: any) => string;
+
+
+
+/** Sets `data-* attributes */
+function setObjectProp(elm: HTMLInputElement, name: string, val: ObjectPropValueType,
+    nameFunc: ObjectPropToAttrNameFunc, valFunc: ObjectPropValToStringFunc): void
 {
-    elm[name] = val;
+    for( let key in val)
+        elm.setAttribute(nameFunc(key), valFunc(val[key]));
 }
 
-function updateAttrAsProp( elm: Element, name: string, oldVal: any, newVal: any): boolean | void
+
+
+/** Updates `data-* attributes */
+function updateObjectProp(elm: HTMLInputElement, name: string,
+    oldVal: ObjectPropValueType, newVal: ObjectPropValueType,
+    nameFunc: ObjectPropToAttrNameFunc, valFunc: ObjectPropValToStringFunc): boolean
 {
-    if (oldVal !== newVal)
+    let hasChanges = false;
+
+    // loop over old data properties: remove those not found in the new data set and change
+    // those that have different values in the new data set compared to the old data set.
+    for( let dataPropName in oldVal)
     {
-        elm[name] = newVal;
-        return true;
+        if (!(dataPropName in newVal))
+        {
+            elm.removeAttribute(nameFunc(dataPropName));
+            hasChanges = true;
+        }
+        else
+        {
+            let dataPropValOld = oldVal[dataPropName];
+            let dataPropValNew = newVal[dataPropName];
+            if (dataPropValOld !== dataPropValNew)
+            {
+                let dataPropStringNew = valFunc(dataPropValNew);
+                if (dataPropToString(dataPropValOld) !== dataPropStringNew)
+                {
+                    elm.setAttribute(nameFunc(dataPropName), dataPropStringNew);
+                    hasChanges = true;
+                }
+            }
+        }
     }
-}
 
-function setAttrAsStringProp( elm: Element, name: string, val: any): void
-{
-    elm[name] = valToString(val);
-}
-
-function updateAttrAsStringProp( elm: Element, name: string, oldVal: any, newVal: any): boolean | void
-{
-    oldVal = valToString(oldVal);
-    newVal = valToString(newVal);
-    if (oldVal !== newVal)
+    // loop over old data properties: set those not found in the old data set.
+    for( let dataPropName in newVal)
     {
-        elm[name] = newVal;
-        return true;
+        if (!(dataPropName in oldVal))
+        {
+            elm.setAttribute(nameFunc(dataPropName), valFunc(newVal[dataPropName]));
+            hasChanges = true;
+        }
     }
+
+    return hasChanges;
 }
 
-function removeAttrAsProp( elm: Element, name: string): void
+
+
+/** Removes `data-* attributes */
+function removeObjectProp(elm: HTMLInputElement, name: string, oldVal: ObjectPropValueType,
+    nameFunc: ObjectPropToAttrNameFunc): void
 {
-    elm[name] = null;
+    for( let key in oldVal)
+        elm.removeAttribute(nameFunc(key));
 }
 
 
@@ -1487,7 +1580,7 @@ function removeAttrAsProp( elm: Element, name: string): void
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /** we set the deafultValue and also the value properties */
-function setDefaultValueProp( elm: HTMLInputElement, name: string, val: string): void
+function setDefaultValueProp(elm: HTMLInputElement, name: string, val: string): void
 {
     elm.value = elm.defaultValue = val;
 }
@@ -1495,7 +1588,7 @@ function setDefaultValueProp( elm: HTMLInputElement, name: string, val: string):
 
 
 /** we set the defaultChecked and also the checked properties */
-function setDefaultCheckedProp( elm: HTMLInputElement, name: string, val: boolean): void
+function setDefaultCheckedProp(elm: HTMLInputElement, name: string, val: boolean): void
 {
     elm.checked = elm.defaultChecked = val;
 }
@@ -1506,108 +1599,70 @@ function setDefaultCheckedProp( elm: HTMLInputElement, name: string, val: boolea
  * SVG presentation attributes can be used as CSS style properties and, therefore, there
  * conversions to strings are already handled by Mimcss library. If Mimcss library is not included,
  * then value can only be a string. If it is not, we set the attribute to empty string. Note that
- * SVG attribute names can be provided in camel-case, so they are converted to dash-case.
+ * SVG attribute names can be provided in camelCase, so they are converted to dash-case.
  */
-function setSvgAttrAsStyleProp(elm: HTMLInputElement, name: string, val: any): void
-{
-    // convert the name from camel-case to dash-case. If Mimcss library is not included, then
-    // value can only be a string. If it is not, we return empty string.
-    elm.setAttribute(camelToDash(name), mimcss
-        ? mimcss.stylePropValueToString(name, val)
-        : typeof val === "string" ? val : "");
-}
-
-/**
- * SVG presentation attributes can be used as CSS style properties and, therefore, there
- * conversions to strings are already handled by Mimcss library. If Mimcss library is not included,
- * then value can only be a string. If it is not, we set the attribute to empty string. Note that
- * SVG attribute names can be provided in camel-case, so they are converted to dash-case.
- */
-function updateSvgAttrAsStyleProp(elm: HTMLInputElement, name: string, oldVal: any, newVal: any): boolean | void
-{
-    // if Mimcss library is not included, then SVG attributes can only be strings. If they are
-    // not, this is an application bug and we canont handle it.
-    if (!mimcss && (typeof oldVal !== "string" || typeof newVal !== "string"))
-        return;
-
-    // convert both old and new to strings and compare
-    let oldValAsString = typeof oldVal === "string" ? oldVal :  mimcss.stylePropValueToString(name, oldVal);
-    let newValAsString = typeof newVal === "string" ? newVal :  mimcss.stylePropValueToString(name, newVal);
-    if (oldValAsString !== newValAsString)
-    {
-        elm.setAttribute( camelToDash(name), newValAsString);
-        return true;
-    }
-}
+const svgAttrToStylePropString = (name: string, val: any): string =>
+    mimcss ? mimcss.getStylePropValue(name, val) : typeof val === "string" ? val : "";
 
 
 
 /**
- * Handling of style property. Style property can be specified either as a string or as the
- * Styleset object from the Mimcss library. Both the old and new style property values are
- * converted to strings and then compared.
+ * Converts style property value using Mimcss library if available.
  */
-function setStyleProp( elm: Element, name: string, val: string | Styleset): void
-{
+const styleToString = (name: string, val: string | Styleset): string | null =>
     // if Mimcss library is not included, then style attributes can only be strings. If they are
     // not, this is an application bug and we cannot handle it.
-    if (mimcss)
-        mimcss.setElementStyle( elm as unknown as ElementCSSInlineStyle, val, SchedulerType.Sync);
-    else if (typeof val === "string")
-        elm.setAttribute( name, val);
-}
-
-function updateStyleProp( elm: Element, name: string, oldVal: string | Styleset,
-    newVal: string | Styleset): boolean | void
-{
-    // if Mimcss library is not included, then style attributes can only be strings. If they are
-    // not, this is an application bug and we canont handle it.
-    if (!mimcss && (typeof oldVal !== "string" || typeof newVal !== "string"))
-        return;
-
-    // convert both old and new to strings and compare
-    let oldValAsString = typeof oldVal === "string" ? oldVal :  mimcss.stylesetToString( oldVal);
-    let newValAsString = typeof newVal === "string" ? newVal :  mimcss.stylesetToString( newVal);
-    if (oldValAsString !== newValAsString)
-    {
-        elm.setAttribute( name, newValAsString);
-        return true;
-    }
-}
+    typeof val === "string" ? val : mimcss ? mimcss.stylesetToString(val) : null;
 
 
 
 /**
- * Handling of media property. Media property can be specified either as a string or as the
- * MediaStatement object from the Mimcss library.
+ * Converts media property value using Mimcss library if available.
  */
-const setMediaProp = (elm: Element, name: string, val: MediaStatement): void =>
-{
-    // if Mimcss library is not included, then the media attribute can only be a string. If it is
+const mediaToString = (name: string, val: MediaStatement): string | null =>
+    // if Mimcss library is not included, then style attributes can only be strings. If they are
     // not, this is an application bug and we cannot handle it.
-    if (mimcss)
-       elm[name] = mimcss.mediaToString( val);
-    else if (typeof val === "string")
-       elm[name] = val;
-}
+    typeof val === "string" ? val : mimcss ? mimcss.mediaToString(val) : null;
 
-function updateMediaProp( elm: Element, name: string, oldVal: MediaStatement,
-    newVal: MediaStatement): boolean | void
-{
-    // if Mimcss library is not included, then media attributes can only be strings. If they are
-    // not, this is an application bug and we canont handle it.
-    if (!mimcss && (typeof oldVal !== "string" || typeof newVal !== "string"))
-        return;
 
-    // convert both old and new to strings and compare
-    let oldValAsString = mimcss.mediaToString( oldVal);
-	let newValAsString = mimcss.mediaToString( newVal);
-	if (newValAsString !== oldValAsString)
-    {
-        elm[name] = newValAsString;
-        return true;
-    }
-}
+/** Converts property of the data set to a `data-*` name */
+const dataPropToAttrName = (propName: any): string => `data-${camelToDash(propName)}`
+
+/** Converts property of the data set to string */
+const dataPropToString = (val: any): string =>
+    Array.isArray(val) ? val.map( item => dataPropToString(item)).join(" ") : "" + val;
+
+/** Sets `data-* attributes */
+const setDataProp = (elm: HTMLInputElement, name: string, val: DatasetPropType): void =>
+    setObjectProp(elm, name, val, dataPropToAttrName, dataPropToString);
+
+/** Updates `data-* attributes */
+const updateDataProp = (elm: HTMLInputElement, name: string, oldVal: DatasetPropType, newVal: DatasetPropType): boolean =>
+    updateObjectProp(elm, name, oldVal, newVal, dataPropToAttrName, dataPropToString);
+
+/** Removes `data-* attributes */
+const removeDataProp = (elm: HTMLInputElement, name: string, oldVal: DatasetPropType): void =>
+    removeObjectProp(elm, name, oldVal, dataPropToAttrName);
+
+
+
+/** Converts property of the aria set to a `aria-*` name */
+const ariaPropToAttrName = (propName: any): string => `aria-${propName}`
+
+/** Converts property of the aria set to string */
+const ariaPropToString = (val: any): string => dataPropToString(val);
+
+/** Sets `aria-* attributes */
+const setAriaProp = (elm: HTMLInputElement, name: string, val: Ariaset): void =>
+    setObjectProp(elm, name, val, ariaPropToAttrName, ariaPropToString);
+
+/** Updates `aria-* attributes */
+const updateAriaProp = (elm: HTMLInputElement, name: string, oldVal: Ariaset, newVal: Ariaset): boolean =>
+    updateObjectProp(elm, name, oldVal, newVal, ariaPropToAttrName, ariaPropToString);
+
+/** Removes `aria-* attributes */
+const removeAriaProp = (elm: HTMLInputElement, name: string, oldVal: Ariaset): void =>
+    removeObjectProp(elm, name, oldVal, ariaPropToString);
 
 
 
@@ -1621,7 +1676,7 @@ function updateMediaProp( elm: Element, name: string, oldVal: MediaStatement,
 const StdFrameworkPropInfo = { type: PropType.Framework };
 
 // sets and removes an attribute using element's property
-const AttrAsPropInfo = { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp };
+const AttrAsPropInfo = { type: PropType.Attr, isProp: true };
 
 // Produces comma-separated list from array of values
 const ArrayWithCommaPropInfo = { type: PropType.Attr, v2s: array2sWithComma };
@@ -1630,10 +1685,14 @@ const ArrayWithCommaPropInfo = { type: PropType.Attr, v2s: array2sWithComma };
 const ArrayWithSemicolonPropInfo = { type: PropType.Attr, v2s: array2sWithSemicolon };
 
 // Handles conversion of SVG presentation attributes as Mimcss style properties to strings
-const SvgAttrAsStylePropInfo = { type: PropType.Attr, set: setSvgAttrAsStyleProp, update: updateSvgAttrAsStyleProp };
+const SvgAttrAsStylePropInfo = { type: PropType.Attr, v2s: svgAttrToStylePropString };
 
-// Handles conversion of SVG presentation attributes as Mimcss style properties to strings
+// Handles conversion of SVG presentation attributes' names from camelCase to dash case
 const SvgAttrNameConversionPropInfo = { type: PropType.Attr, name: camelToDash };
+
+// Handles conversion of SVG presentation attributes as Mimcss style properties to strings and
+// conversion of camelCase propery names to dash case.
+const SvgAttrAsStyleWithNameConversionPropInfo = { type: PropType.Attr, v2s: svgAttrToStylePropString, name: camelToDash };
 
 /**
  * Object that maps property names to PropInfo-derived objects. Information about custom
@@ -1649,49 +1708,49 @@ const propInfos: {[P:string]: PropInfo} =
 
     // attributes - only those attributes are listed that have non-trivial treatment or whose value
     // type is object or function.
-    class: { type: PropType.Attr, set: setAttrAsStringProp, update: updateAttrAsStringProp, remove: removeAttrAsProp, name: "className" },
-    className: { type: PropType.Attr, set: setAttrAsStringProp, update: updateAttrAsStringProp, remove: removeAttrAsProp },
-    for: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp, name: "htmlFor" },
-    htmlFor: AttrAsPropInfo,
-    tabindex: { type: PropType.Attr, set: setAttrAsProp, remove: removeAttrAsProp, name: "tabIndex" },
-    tabIndex: AttrAsPropInfo,
+    class: { type: PropType.Attr, name: "className", isProp: true },
+    for: { type: PropType.Attr, name: "htmlFor", isProp: true },
+    tabindex: { type: PropType.Attr, name: "tabIndex", isProp: true },
     value: AttrAsPropInfo,
     checked: AttrAsPropInfo,
-    defaultValue: { type: PropType.Attr, set: setDefaultValueProp, update: updateAttrAsProp, remove: (elm: HTMLInputElement) => elm.defaultValue = "" },
-    defaultChecked: { type: PropType.Attr, set: setDefaultCheckedProp, update: updateAttrAsProp, remove: removeAttrAsProp },
-    style: { type: PropType.Attr, set: setStyleProp, update: updateStyleProp },
-    media: { type: PropType.Attr, set: setMediaProp, update: updateMediaProp },
+    defaultValue: { type: PropType.Attr, set: setDefaultValueProp, remove: (elm: HTMLInputElement) => elm.defaultValue = "", isProp: true },
+    defaultChecked: { type: PropType.Attr, set: setDefaultCheckedProp, isProp: true },
+    style: { type: PropType.Attr, v2s: styleToString },
+    media: { type: PropType.Attr, v2s: mediaToString },
+    dataset: { type: PropType.Attr, set: setDataProp, update: updateDataProp, remove: removeDataProp },
+    aria: { type: PropType.Attr, set: setAriaProp, update: updateAriaProp, remove: removeAriaProp },
+
     coords: ArrayWithCommaPropInfo,
     sizes: ArrayWithCommaPropInfo,
     srcset: ArrayWithCommaPropInfo,
 
     // SVG presentational attributes that require special conversion to string. This also takes
-    // care of converting the attribute name from camel-case to dash-case if necessary.
+    // care of converting the attribute name from camelCase to dash-case if necessary.
 	baselineShift: SvgAttrAsStylePropInfo,
 	color: SvgAttrAsStylePropInfo,
 	cursor: SvgAttrAsStylePropInfo,
-	fillColor: { type: PropType.Attr, set: setSvgAttrAsStyleProp, name: "fill" },
-	fillOpacity: SvgAttrAsStylePropInfo,
+	fillColor: { type: PropType.Attr, v2s: svgAttrToStylePropString, name: "fill" },
+	fillOpacity: SvgAttrAsStyleWithNameConversionPropInfo,
 	filter: SvgAttrAsStylePropInfo,
-	floodColor: SvgAttrAsStylePropInfo,
-	floodOpacity: SvgAttrAsStylePropInfo,
-	fontSize: SvgAttrAsStylePropInfo,
-	fontStretch: SvgAttrAsStylePropInfo,
-	letterSpacing: SvgAttrAsStylePropInfo,
-	lightingColor: SvgAttrAsStylePropInfo,
-	markerEnd: SvgAttrAsStylePropInfo,
-	markerMid: SvgAttrAsStylePropInfo,
-	markerStart: SvgAttrAsStylePropInfo,
+	floodColor: SvgAttrAsStyleWithNameConversionPropInfo,
+	floodOpacity: SvgAttrAsStyleWithNameConversionPropInfo,
+	fontSize: SvgAttrAsStyleWithNameConversionPropInfo,
+	fontStretch: SvgAttrAsStyleWithNameConversionPropInfo,
+	letterSpacing: SvgAttrAsStyleWithNameConversionPropInfo,
+	lightingColor: SvgAttrAsStyleWithNameConversionPropInfo,
+	markerEnd: SvgAttrAsStyleWithNameConversionPropInfo,
+	markerMid: SvgAttrAsStyleWithNameConversionPropInfo,
+	markerStart: SvgAttrAsStyleWithNameConversionPropInfo,
 	mask: SvgAttrAsStylePropInfo,
-	stopColor: SvgAttrAsStylePropInfo,
-	stopOpacity: SvgAttrAsStylePropInfo,
+	stopColor: SvgAttrAsStyleWithNameConversionPropInfo,
+	stopOpacity: SvgAttrAsStyleWithNameConversionPropInfo,
 	stroke: SvgAttrAsStylePropInfo,
-	strokeOpacity: SvgAttrAsStylePropInfo,
+	strokeOpacity: SvgAttrAsStyleWithNameConversionPropInfo,
 	transform: SvgAttrAsStylePropInfo,
-	transformOrigin: SvgAttrAsStylePropInfo,
+	transformOrigin: SvgAttrAsStyleWithNameConversionPropInfo,
 
     // SVG attributes that don't require conversion of the value but do require conversion of the
-    // attribute name from camel-case to dash-case. All SVG presentation atributes with a dash
+    // attribute name from camelCase to dash-case. All SVG presentation atributes with a dash
     // in the name are here.
 	alignmentBaseline: SvgAttrNameConversionPropInfo,
 	clipPath: SvgAttrNameConversionPropInfo,
