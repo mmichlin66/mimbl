@@ -28,15 +28,6 @@ import { getCurrentClassComp, requestNodeUpdate } from "./Reconciler";
 
 export abstract class VN implements IVN
 {
-    constructor()
-    {
-        /// #if DEBUG
-        this.debugID = g_nextVNDebugID++;
-        /// #endif
-
-        this.creator = getCurrentClassComp();
-    }
-
 	// String representation of the virtual node. This is used mostly for tracing and error
 	// reporting. The name can change during the lifetime of the virtual node; for example,
 	// it can reflect an "id" property of an element (if any).
@@ -96,12 +87,16 @@ export abstract class VN implements IVN
 
 
 
-	/// #if USE_STATS
+    /// #if USE_STATS
     public get statsCategory(): StatsCategory { return StatsCategory.Comp; }
 	/// #endif
 
     /// #if DEBUG
-    private debugID: number;
+    public debugID: number;
+    constructor()
+    {
+        this.debugID = g_nextVNDebugID++;
+    }
 	/// #endif
 
 	///////////////////////////////////////////////////////////////////////////////////////////////
@@ -116,6 +111,7 @@ export abstract class VN implements IVN
      */
 	public mount( parent: VN | null, index: number, anchorDN: DN, beforeDN: DN = null): void
     {
+        this.creator = getCurrentClassComp();
         this.parent = parent;
         this.index = index;
         this.anchorDN = anchorDN;
@@ -128,6 +124,7 @@ export abstract class VN implements IVN
     {
         this.parent = null;
         this.anchorDN = null;
+        this.creator = undefined;
     }
 
     /**

@@ -184,6 +184,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         else
             this.ownDN = document.createElementNS( ElementNamespaceNames[info.ns], info.name) as any as T;
 
+        /// #if DEBUG
+            this.ownDN.setAttribute("mim-debugID", "" + this.debugID);
+        /// #endif
+
         // translate properties into attributes, events and custom attributes
         if (this.props)
         {
