@@ -1,4 +1,4 @@
-import { CallbackWrappingOptions, ComponentShadowOptions, CompProps, IClassCompVN, IComponent, ICustomAttributeHandlerClass, IPublication, IRef, IServiceDefinitions, ISubscription, ITextVN, IVNode, PromiseProxyProps, RefFunc, RenderMethodType, ScheduledFuncType, TickSchedulingType, DN, IComponentEx } from "./CompTypes";
+import { CallbackWrappingOptions, ComponentShadowOptions, IClassCompVN, IComponent, ICustomAttributeHandlerClass, IPublication, IRef, IServiceDefinitions, ISubscription, ITextVN, IVNode, PromiseProxyProps, RefFunc, RenderMethodType, ScheduledFuncType, TickSchedulingType, DN, IComponentEx } from "./CompTypes";
 import { EventSlot } from "./EventSlotAPI";
 /**
  * Decorator function for components that allows them to use shadow DOM.
@@ -68,8 +68,17 @@ export declare function registerCustomAttribute<T>(attrName: string, handlerClas
 /**
  * Base class for components. Components that derive from this class must implement the render
  * method.
+ *
+ * @typeparam TProps type of the components properties object. By default, it contains an optional
+ * `children` property of type `any`. This allows components that don't explicitly specify any
+ * type, to accept children. Note that if a component provides its own type for the properties
+ * object and wants to accept children, this type must have the `children` property of the desired
+ * type. If not, the component will not be able to accept children (which, sometimes, might be a
+ * desired behavior)
  */
-export declare abstract class Component<TProps = {}, TChildren = any> implements IComponent<TProps, TChildren>, IComponentEx {
+export declare abstract class Component<TProps = {
+    children?: any;
+}> implements IComponent<TProps>, IComponentEx {
     /**
      * Remembered virtual node object through which the component can request services. This
      * is undefined in the component's costructor but will be defined before the call to the
@@ -80,8 +89,8 @@ export declare abstract class Component<TProps = {}, TChildren = any> implements
      * Component properties passed to the constructor. This is normally used only by managed
      * components and is usually undefined for independent components.
      */
-    props?: CompProps<TProps, TChildren>;
-    constructor(props?: CompProps<TProps, TChildren>);
+    props?: Readonly<TProps>;
+    constructor(props?: TProps);
     /**
      * Returns the component's content that will be ultimately placed into the DOM tree. This
      * method is abstract because it must be implemented by every component.
@@ -92,7 +101,7 @@ export declare abstract class Component<TProps = {}, TChildren = any> implements
      * it must call the parent's implementation.
      * @param newProps
      */
-    updateProps(newProps: CompProps<TProps, TChildren>): void;
+    updateProps(newProps: TProps): void;
     /**
      * Determines whether the component is currently mounted. If a component has asynchronous
      * functionality (e.g. fetching data from a server), component's code may be executed after
@@ -236,8 +245,8 @@ export declare function mount(content: any, anchorDN?: DN): void;
  */
 export declare function unmount(anchorDN?: DN): void;
 /**
- * Decorator function for tagging a component's render function so that it will not be wrapped in
- * a watcher.
+ * Decorator function for tagging a component's render function (or other rendering functions)
+ * so that it will not be wrapped in a watcher.
  */
 export declare function noWatcher(target: any, name: string, propDescr: PropertyDescriptor): void;
 /** Mimbl style scheduler as the default scheduler for style-related DOM-writing operations. */

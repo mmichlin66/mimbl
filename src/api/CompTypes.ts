@@ -10,31 +10,14 @@ export type DN = Node | null;
 
 
 /**
- * Type used to define properties that can be passed to a manged component.
- *
- * @typeparam TProps Type defining properties that can be passed to the functional or class-based
- * component with these properties. Default type is an empty object (no properties).
- * @typeparam TChildren Type defining components, elements or other objects that can be used as
- * children for the component with these properties. Default is `any`.
- */
-export type CompProps<TProps = {}, TChildren = any> = Readonly<TProps> &
-	{
-		readonly children?: TChildren;
-	};
-
-
-
-/**
  * Interface that defines constructor signature for components.
  *
  * @typeparam TProps Type defining properties that can be passed to the class-based component
  *		of this type. Default type is an empty object (no properties).
- * @typeparam TChildren Type defining components, elements or other objects that can be used
- *		as children for the class-based component of this type. Default is `any`.
  */
-export interface IComponentClass<TProps = {}, TChildren = any>
+export interface IComponentClass<TProps extends {} = {}>
 {
-	new( props?: CompProps<TProps>): IComponent<TProps,TChildren>;
+	new( props?: TProps): IComponent<TProps>;
 }
 
 
@@ -66,17 +49,9 @@ export type ComponentShadowOptions = boolean | string | ShadowRootInit |
  *
  * @typeparam TProps Type defining properties that can be passed to this class-based component.
  *		Default type is an empty object (no properties).
- * @typeparam TChildren Type defining components, elements or other objects that can be used
- *		as children for this class-based component. Default is `any`.
  */
-export interface IComponent<TProps = {}, TChildren = any>
+export interface IComponent<TProps extends {} = {}>
 {
-	// /**
-	//  * Component properties passed to the constructor. For managed components, the properties
-	//  * are updated when the component's parent is updated.
-	//  */
-	// props?: CompProps<TProps,TChildren>;
-
 	/**
 	 * Components can define display name for tracing purposes; if they don't the default name
 	 * used is the component's class constructor name. Note that this method can be called before
@@ -116,7 +91,7 @@ export interface IComponent<TProps = {}, TChildren = any>
      * Notifies the component that it replaced the given component. This allows the new
      * component to copy whatever internal state it needs from the old component.
      */
-    didReplace?( oldComp: IComponent<TProps, TChildren>): void;
+    didReplace?( oldComp: IComponent<TProps>): void;
 
     /**
 	 * Notifies that the component's content is going to be removed from the DOM tree. After
@@ -129,15 +104,15 @@ export interface IComponent<TProps = {}, TChildren = any>
 	 *
 	 * Informs the component that new properties have been specified. At the time of the call
 	 * this.props refers to the "old" properties. If the component returns true, then its render
-	 * method will be called. At that time,the original props object that was passed into the
-	 * component's constructor will have these new properties. If the component doesn't implement
-	 * the shouldUpdate method it is as though true is returned. If the component returns
-	 * false, the render method is not called and the DOM tree of the component remains unchanged.
-	 * The properties of the component, however, still change.
+	 * method will be called. If the component doesn't implement the `shouldUpdate` method it is
+     * as though true is returned. If the component returns false, the render method is not
+     * called and the DOM tree of the component remains unchanged. The component, however, will
+     * still be informed about the new properties via the call to the [[updateProps]] method (if
+     * implemented).
 	 * @param newProps The new properties that the parent component provides to this component.
 	 * @returns True if the component should have its render method called and false otherwise.
 	 */
-	shouldUpdate?( newProps: CompProps<TProps,TChildren>): boolean;
+	shouldUpdate?( newProps: TProps): boolean;
 
 	/**
 	 * This method is only used by managed components.
@@ -149,7 +124,7 @@ export interface IComponent<TProps = {}, TChildren = any>
      * [[shouldUpdate]] method is implemented and whether it returned `true` or `false`.
 	 * @param newProps The new properties that the parent component provides to this component.
 	 */
-	updateProps?( newProps: CompProps<TProps,TChildren>): void;
+	updateProps?( newProps: TProps): void;
 
 	/**
 	 * Handles an exception that occurred during the rendering of one of the component's children.
@@ -293,7 +268,7 @@ export type UpdateStrategy =
 	 * this can have some adverse effects under cirtain circumstances if certain data is bound
 	 * to the particular instances of DOM nodes.
 	 *
-	 * The flag's default value is false, that is recycling is enabled.
+	 * The flag's default value is false, that is, recycling is enabled.
 	 */
     disableKeyedNodeRecycling?: boolean;
 
@@ -306,7 +281,7 @@ export type UpdateStrategy =
      * old sub-nodes sequentially. Under certain circumstances this may speed up the reconciliation
      * process
 	 *
-	 * The flag's default value is false, that is keys are used for matching the nodes.
+	 * The flag's default value is false, that is, keys are used for matching the nodes.
 	 */
     ignoreKeys?: boolean;
 };
@@ -495,9 +470,9 @@ export type ExtendedEvents<T> = {
 
 
 /**
- * Represents an HTML or SVG element attributes and events known to Mimbl infrastucture. Each
+ * Represents intrinsic element attributes, events and children known to Mimbl infrastucture. Each
  * built-in or custom element is defined as a JSX intrinsic element using the `ExtendedElement`
- * type by passing the correct attribute and event types.
+ * type by passing the correct attribute, event and children types.
  *
  * @typeparam TRef - Type that can be passed to the `ref` attribute to get a reference to the
  * element.
@@ -507,7 +482,7 @@ export type ExtendedEvents<T> = {
  * there are some elements - e.g. <video> - that define additional events. Custom Web elements
  * can also define their own events - in this case, they must be specified here.
  * @typeparam TChildren Type that determines what children are allowed under the element. It
- * defaults to `any` and usually doesn't eed to be specified.
+ * defaults to `any` and usually doesn't need to be specified.
  */
 export type ExtendedElement<TRef extends Element = Element,
     TAttrs extends IElementAttrs = IElementAttrs,
@@ -679,8 +654,11 @@ export interface IVNode
 	/** Level of nesting at which the node resides relative to the root node. */
 	readonly depth?: number;
 
-	/** Component that created this node in its render method (or undefined). */
+	/** Component that created this node. */
 	readonly creator?: IComponent | null;
+
+	/** Component that used this node in its render method. */
+	readonly renderer?: IComponent | null;
 
 	/**
      * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the
@@ -1064,13 +1042,17 @@ export type RenderMethodType = (arg?: any) => any;
 /**
  * Properties to be used with the PromiseProxy component.
  */
-export interface PromiseProxyProps extends ICommonProps
+export interface PromiseProxyProps
 {
-	/** Promise that will be watch by the waiting node. */
+	/** Promise that will be watched by the waiting node. */
 	promise: Promise<any>;
 
 	/** Function that is called if the promise is rejected. */
 	errorContentFunc?: (err: any) => any;
+
+    children?: any;
+
+    key?: any;
 }
 
 

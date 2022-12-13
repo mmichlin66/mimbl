@@ -1,4 +1,4 @@
-﻿import {CompProps, ICommonProps, IComponent, ICustomWebElements} from "../api/CompTypes";
+﻿import {ICommonProps, IComponent, ICustomWebElements} from "../api/CompTypes";
 import {IHtmlIntrinsicElements} from "../api/HtmlTypes";
 import {ISvgIntrinsicElements} from "../api/SvgTypes";
 import {IVN} from "../core/VNTypes";
@@ -85,7 +85,7 @@ export function jsx( tag: any, props: any, ...children: any[]): any
 
  * @param props
  */
-export function Fragment( props: CompProps<{}>): any {}
+export function Fragment(): any {}
 
 
 

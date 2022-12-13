@@ -14,6 +14,9 @@ import { VN } from "./VN";
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export class IndependentCompVN extends ClassCompVN
 {
+	/** Component instance, which is always defined for independent components. */
+	public comp: IComponent;
+
 	constructor( comp: IComponent)
 	{
 		super();
@@ -31,7 +34,7 @@ export class IndependentCompVN extends ClassCompVN
 	{
 		// components can define the displayName property; if they don't then the default name
 		// is the component's constructor name
-		return this.comp!.displayName ?? this.comp!.constructor.name;
+		return this.comp.displayName ?? this.comp.constructor.name;
 	}
 
 
@@ -49,7 +52,6 @@ export class IndependentCompVN extends ClassCompVN
         if (this.comp!.vn)
         {
             this.ignoreUnmount = true;
-            // this.creator = creator;
             this.parent = parent;
             this.index = index;
             this.anchorDN = anchorDN;
@@ -77,8 +79,7 @@ export class IndependentCompVN extends ClassCompVN
 
 	// Updated this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node. The returned value indicates whether children
-	// should be updated (that is, this node's render method should be called).
+	// point to a VN of the same type as this node.
 	public update( newVN: IndependentCompVN, disp: VNDisp): void
 	{
         // if it is the same component instance, we don't need to do anything
@@ -87,16 +88,16 @@ export class IndependentCompVN extends ClassCompVN
 
         // we are here if the component instances are different; we need to prepare the old
         // instance for unmounting and the new one for mounting.
-        let oldComp = this.comp!;
+        let oldComp = this.comp;
         this.prepareUnmount( oldComp);
         this.comp = this.key = newVN.comp;
-        this.prepareMount( newVN.comp!);
+        this.prepareMount( newVN.comp);
 
         super.update( this, disp);
 
         if (oldComp)
         {
-            let fn = this.comp!.didReplace;
+            let fn = this.comp.didReplace;
             fn && fn.call( this.comp, oldComp);
         }
 	}

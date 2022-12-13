@@ -15,7 +15,7 @@ export declare const registerStyleProperty: (name: string, toStringFunc: (v: any
 /**
  * Converts the given value corresponding to the given style property to a CSS string.
  * @param name Style property name that determines how the value should be converted
- * to a CSS compliant string. The name can be given in dash-case or camel-case form.
+ * to a CSS compliant string. The name can be given in dash-case or camelCase form.
  * @param value Value to convert.
  * @returns String value of the style property.
  */
@@ -25,7 +25,7 @@ export declare function getStylePropValue<K extends keyof IStyleset>(name: K, va
  * is responsible for ensuring the value type is correct for the given style property. If the
  * property name is not a valid CSS property, empty string is returned.
  * @param name Style property name that determines how the value should be converted
- * to a CSS compliant string. The name can be given in dash-case or camel-case form.
+ * to a CSS compliant string. The name can be given in dash-case or camelCase form.
  * @param value Value to convert.
  * @returns String value of the style property.
  */

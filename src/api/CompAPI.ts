@@ -1,5 +1,5 @@
 ﻿import {
-    CallbackWrappingOptions, ComponentShadowOptions, CompProps, IClassCompVN, IComponent, ICustomAttributeHandlerClass,
+    CallbackWrappingOptions, ComponentShadowOptions, IClassCompVN, IComponent, ICustomAttributeHandlerClass,
     IPublication, IRef, IServiceDefinitions, ISubscription, ITextVN, IVNode, PromiseProxyProps, PropType,
     RefFunc, RenderMethodType, ScheduledFuncType, TickSchedulingType, DN, IComponentEx
 } from "./CompTypes";
@@ -30,11 +30,15 @@ import { symRenderNoWatcher, VN } from "../core/VN";
  *
  * // A `<span>` element will be created with shadow DOM in open mode
  * @mim.withShadow("span")
- * class SecondWidgetStyles extends css.StyleDefinition {...}
+ * class MyComponent extends mim.Component {...}
+ *
+ * // A `<div>` element will be created with shadow DOM in closed mode
+ * @mim.withShadow( {mode: "closed"})
+ * class MyComponent extends mim.Component {...}
  *
  * // A `<span>` element will be created with shadow DOM in closed mode
- * @mim.withShadow( {tag: "span", init: {mode: "closed"} })
- * class SecondWidgetStyles extends css.StyleDefinition {...}
+ * @mim.withShadow( ["span", {mode: "closed"}])
+ * class MyComponent extends mim.Component {...}
  * ```
  */
 export const withShadow = (options: Function | ComponentShadowOptions): any =>
@@ -196,8 +200,15 @@ export function registerCustomAttribute<T>( attrName: string, handlerClass: ICus
 /**
  * Base class for components. Components that derive from this class must implement the render
  * method.
+ *
+ * @typeparam TProps type of the components properties object. By default, it contains an optional
+ * `children` property of type `any`. This allows components that don't explicitly specify any
+ * type, to accept children. Note that if a component provides its own type for the properties
+ * object and wants to accept children, this type must have the `children` property of the desired
+ * type. If not, the component will not be able to accept children (which, oftentimes, might be a
+ * desired behavior)
  */
-export abstract class Component<TProps = {}, TChildren = any> implements IComponent<TProps,TChildren>, IComponentEx
+export abstract class Component<TProps extends {} = {children?: any}> implements IComponent<TProps>, IComponentEx
 {
 	/**
 	 * Remembered virtual node object through which the component can request services. This
@@ -210,9 +221,9 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
 	 * Component properties passed to the constructor. This is normally used only by managed
 	 * components and is usually undefined for independent components.
 	 */
-	public props?: CompProps<TProps,TChildren>;
+	public props?: Readonly<TProps>;
 
-	constructor( props?: CompProps<TProps,TChildren>)
+	constructor( props?: TProps)
 	{
         this.props = props;
 	}
@@ -228,7 +239,7 @@ export abstract class Component<TProps = {}, TChildren = any> implements ICompon
      * it must call the parent's implementation.
      * @param newProps
      */
-	updateProps( newProps: CompProps<TProps,TChildren>): void
+	updateProps( newProps: TProps): void
     {
         this.props = newProps;
     }
@@ -449,16 +460,19 @@ export function unmount( anchorDN: DN = null): void
 
 
 /**
- * Decorator function for tagging a component's render function so that it will not be wrapped in
- * a watcher.
+ * Decorator function for tagging a component's render function (or other rendering functions)
+ * so that it will not be wrapped in a watcher.
  */
 export function noWatcher( target: any, name: string, propDescr: PropertyDescriptor)
 {
     // propDesc.value is undefined for accessors and defined for functions
-    if (!propDescr.value)
-        throw new Error("@noWatcher decorator can only be applied to methods.");
+    if (propDescr.value)
+        propDescr.value[symRenderNoWatcher] = true;
 
-    propDescr.value[symRenderNoWatcher] = true;
+    /// #if DEBUG
+    else
+        console.error("@noWatcher decorator can only be applied to methods.");
+    /// #endif
 }
 
 

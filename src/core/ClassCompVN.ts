@@ -49,7 +49,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	public compClass: IComponentClass;
 
 	/** Component instance. */
-	declare public comp?: IComponent;
+	public comp?: IComponent;
 
 	// Properties that were passed to the component.
 	public props: any;

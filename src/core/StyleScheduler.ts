@@ -2,6 +2,7 @@ import {IScheduler} from "mimcss"
 import { scheduleFuncCall } from "./Reconciler";
 
 
+export type MimcssModuleType = typeof import("mimcss");
 
 /**
  * The s_mimcss variable will contain the mimcss module or undefined depending on whether the
@@ -13,7 +14,7 @@ import { scheduleFuncCall } from "./Reconciler";
  * can do so. Note that in this case, styles, classes, element IDs and some other entities cannot
  * be defined using Mimcss constructs.
  */
-export let mimcss: any;
+export let mimcss: MimcssModuleType | undefined;
 
 /**
  * Initializes style scheduler used by Mimbl to schedule writing style changes to the DOM. This
@@ -34,7 +35,7 @@ export async function s_initStyleScheduler(): Promise<number>
         /// #endif
     }
 
-    if (mimcss && mimcss.registerScheduler)
+    if (mimcss?.registerScheduler)
     {
         let schedulerType = mimcss.registerScheduler( new StyleScheduler());
         mimcss.setDefaultScheduler( schedulerType);
@@ -42,7 +43,7 @@ export async function s_initStyleScheduler(): Promise<number>
     }
     else
     {
-        mimcss = null;
+        mimcss = undefined;
         return 0;
     }
 }

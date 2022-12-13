@@ -106,8 +106,7 @@ export class ManagedCompVN extends ClassCompVN
 
 	// Updated this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node. The returned value indicates whether children
-	// should be updated (that is, this node's render method should be called).
+	// point to a VN of the same type as this node.
 	public update( newVN: ManagedCompVN, disp: VNDisp): void
 	{
         let comp = this.comp!;

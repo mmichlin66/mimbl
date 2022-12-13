@@ -28,6 +28,17 @@ import { getCurrentClassComp, requestNodeUpdate } from "./Reconciler";
 
 export abstract class VN implements IVN
 {
+    constructor()
+    {
+        // the creator is captured when the node is created because this is where the "this"
+        // variable is the one that should be used by event handlers and other callbacks.
+        this.creator = getCurrentClassComp();
+
+        /// #if DEBUG
+            this.debugID = g_nextVNDebugID++;
+        /// #endif
+    }
+
 	// String representation of the virtual node. This is used mostly for tracing and error
 	// reporting. The name can change during the lifetime of the virtual node; for example,
 	// it can reflect an "id" property of an element (if any).
@@ -36,8 +47,11 @@ export abstract class VN implements IVN
 	// Parent node. This is null for the top-level (root) nodes.
 	public parent?: VN | null;
 
-    /** Class component that created this node in its render method. */
+    /** Class component that created this node. */
     public creator?: IComponent | null;
+
+	/** Component that used this node in its render method. */
+	public renderer?: IComponent | null;
 
 	/**
      * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the
@@ -92,12 +106,8 @@ export abstract class VN implements IVN
 	/// #endif
 
     /// #if DEBUG
-    public debugID: number;
-    constructor()
-    {
-        this.debugID = g_nextVNDebugID++;
-    }
-	/// #endif
+        public debugID: number;
+    /// #endif
 
 	///////////////////////////////////////////////////////////////////////////////////////////////
 	//
@@ -111,7 +121,7 @@ export abstract class VN implements IVN
      */
 	public mount( parent: VN | null, index: number, anchorDN: DN, beforeDN: DN = null): void
     {
-        this.creator = getCurrentClassComp();
+        this.renderer = getCurrentClassComp();
         this.parent = parent;
         this.index = index;
         this.anchorDN = anchorDN;
@@ -122,9 +132,13 @@ export abstract class VN implements IVN
      */
 	public unmount( removeFromDOM: boolean): void
     {
-        this.parent = null;
         this.anchorDN = null;
-        this.creator = undefined;
+
+        // set null toparent and renderer as we don't want to hold on to their references as our
+        // object might not be destroyed - it might be mounted again. We don't relese the creator
+        // reference as the creator doesn't change with mounts/unmounts.
+        this.parent = null;
+        this.renderer = undefined;
     }
 
     /**
