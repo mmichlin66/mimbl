@@ -23,22 +23,6 @@ export interface IComponentClass<TProps extends {} = {}>
 
 
 /**
- * Type for the `shadow` property in the [[IComponent]] interface. This can be one of the following:
- * - boolean - if the value is true, a `<div>` element will be created and shadow root attached to
- *   it with mode "open".
- * - string - an element with this name will be created and shadow root attached to
- *   it with mode "open".
- * - ShadowRootInit - a `<div>` element will be created and shadow root attached to
- *   it with the given initialization prameters.
- * - two-item tuple - the first item is the name of the element to create and attach a shadow
- *   root to; the second item specifies the shadow root initialization prameters.
- */
-export type ComponentShadowOptions = boolean | string | ShadowRootInit |
-    [tag: string, init: ShadowRootInit]
-
-
-
-/**
  * Interface that must be implemented by all components. Although it has many methods that
  * components can implement, in practice, there is only one mandatory method - [[render]].
  * Components should be ready to have the `vn` property set, although they don't have to declare
@@ -50,7 +34,7 @@ export type ComponentShadowOptions = boolean | string | ShadowRootInit |
  * @typeparam TProps Type defining properties that can be passed to this class-based component.
  *		Default type is an empty object (no properties).
  */
-export interface IComponent<TProps extends {} = {}>
+export interface IComponent<TProps extends {} = {}> extends EventTarget
 {
 	/**
 	 * Components can define display name for tracing purposes; if they don't the default name
@@ -151,16 +135,42 @@ export interface IComponent<TProps extends {} = {}>
 
 
 /**
- * Represents component functionality that is implemented by the Mimbl built-in classes that
- * implement component functionality. It contains convenience methods that can be called from the
- * derived classes - regular comoponents and custom element implementations.
+ * Type for the `shadow` property in the [[IComponent]] interface. This can be one of the following:
+ * - boolean - if the value is true, a `<div>` element will be created and shadow root attached to
+ *   it with mode "open".
+ * - string - an element with this name will be created and shadow root attached to
+ *   it with mode "open".
+ * - ShadowRootInit - a `<div>` element will be created and shadow root attached to
+ *   it with the given initialization prameters.
+ * - two-item tuple - the first item is the name of the element to create and attach a shadow
+ *   root to; the second item specifies the shadow root initialization prameters.
  */
-export interface IComponentEx
+export type ComponentShadowOptions = boolean | string | ShadowRootInit |
+    [tag: string, init: ShadowRootInit]
+
+
+
+/**
+ * Represents component functionality that is implemented by the Mimbl base classes for
+ * regular components and custom Web element.
+ *
+ * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
+ * `detail` property of a CustomEvent.
+ */
+export interface IComponentEx<TEvents extends {} = {}>
 {
+	/**
+	 * Remembered virtual node object through which the component can request services. This
+	 * is undefined in the component's costructor but will be defined before the call to the
+	 * (optional) willMount method.
+	 */
+	vn?: IClassCompVN;
+
     /**
      * Determines whether the component is currently mounted. If a component has asynchronous
      * functionality (e.g. fetching data from a server), component's code may be executed after
-     * it was alrady unmounted. This property allows the component to handle this situation.
+     * it was already unmounted. This property allows the component to handle this situation.
      */
 	readonly isMounted: boolean;
 
@@ -245,6 +255,34 @@ export interface IComponentEx
 	 */
 	subscribeService<K extends keyof IServiceDefinitions>( id: K, defaultValue?: IServiceDefinitions[K],
         useSelf?: boolean): ISubscription<K>;
+
+
+    /**
+	 * Retrieves the value for a service with the given ID registered by a closest ancestor
+	 * component or the default value if none of the ancestor components registered a service with
+	 * this ID. This method doesn't establish a subscription and only reflects the current state.
+	 * @param id Unique service identifier
+	 * @param defaultValue Default value to return if no publish service is found.
+	 * @param useSelf Flag indicating whether the search for the service should start from the
+     * virtual node that calls this method. The default value is `false` meaning the search starts
+     * from the parent virtual node.
+     * @returns Current value of the service or default value if no published service is found.
+	 */
+	getService<K extends keyof IServiceDefinitions>( id: K, defaultValue?: IServiceDefinitions[K],
+        useSelf?: boolean): IServiceDefinitions[K];
+
+    /**
+     * Fires an event of the given type. The `detail` parameter is interpreted differently for
+     * built-in and custom events. For built-in events (that is, events whose type derives from
+     * Event), this is the event object itself. For custom events, it becomes the value of the
+     * `detail` property of the CustomEvent object.
+     * @typeparam K Defines a range of possible values for the `eventType` parameter. K is a key
+     * from the `TEvent` type.
+     * @param eventType Event type name, which is a key from the `TEvents` type
+     * @param detail Event data, whose type is defined by the type mapped to the key
+     * in the `TEvents` type.
+     */
+    fireEvent<K extends string & keyof TEvents>(eventType: K, detail: TEvents[K]): boolean;
 }
 
 

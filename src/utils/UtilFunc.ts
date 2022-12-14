@@ -148,3 +148,31 @@ export const s_isSvgSvg = (elm: Element): boolean =>
 
 
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Mixins.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Copies all members from the prototypes of the given source constructor functions to the
+ * prototype of the given source constructor function.
+ * @param target Constructor function to which to copy source members.
+ * @param sources Constructor functions from which to copy members to the target.
+ */
+export function applyMixins(target: any, ...sources: any[]): void
+{
+    let targetPrototype = target.prototype;
+    sources.forEach(source =>
+    {
+        let sourcePrototype = source.prototype;
+        Object.getOwnPropertyNames(sourcePrototype).forEach(name =>
+        {
+            Object.defineProperty(targetPrototype, name,
+                Object.getOwnPropertyDescriptor(sourcePrototype, name) || Object.create(null));
+        });
+    });
+}
+
+
+

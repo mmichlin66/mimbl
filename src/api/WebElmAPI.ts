@@ -1,22 +1,19 @@
 ﻿import {
-    IClassCompVN, IPublication, IServiceDefinitions, ISubscription, RenderMethodType,
-    ScheduledFuncType, TickSchedulingType
-} from "./CompTypes";
-import {
-    IWebElm, WebElmAttrChangeHandler, WebElmAttrOptions, WebElmConstructor, WebElmFromHtmlConverter,
-    WebElmOptions
+    WebElmAttrChangeHandler, WebElmAttrOptions, WebElmConstructor, WebElmFromHtmlConverter, WebElmOptions
 } from "./WebElmTypes";
 import { mimcss } from "../core/StyleScheduler";
 import { trigger } from "./TriggerAPI";
 import { mount, unmount } from "./CompAPI";
 import { setAttrValue } from "../core/ElmVN";
+import { ComponentMixin } from "../core/CompImpl";
+import { applyMixins } from "../utils/UtilFunc";
 
 
 
 /**
  * Structure defining options that determine an attribute behavior.
  */
-type WebElmAttrDefinition =
+export type WebElmAttrDefinition =
 {
     /** Name of the element attribute */
     attrName?: string;
@@ -65,7 +62,7 @@ const symWebElmDef = Symbol("webElmDef");
  * The class returned from this function inherits from the HTMLElement-derived class specified
  * as the parameter and implements the [[IComponent]] and [[IComponentEx]] interfaces.
  *
- * ## Usage: ##
+ * **Usage:**
  *
  * ```typescript
  * @mim.webElm("custom-button")
@@ -76,9 +73,10 @@ const symWebElmDef = Symbol("webElmDef");
  * ```
  *
  * @typeparam TElm Class deriving from HTMLElement, from which the resulting class will inherit.
- * @typeparam TAttrs Type or interface mapping attribute names to attribute types.
- * @typeparam TEvents Type or interface mapping event names to the types of the `detail`
- * property of the `CustomEvent` objects for the events.
+ * @typeparam TAttrs Type that maps attribute names to attribute types.
+ * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
+ * `detail` property of a CustomEvent.
  *
  * @param elmClass HTMLElement-derived class from which the returned class will derive.
  * @returns Class that inherits from the given HTMLElement-derived class that imlements all
@@ -88,7 +86,7 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
     elmClass: new() => TElm): WebElmConstructor<TElm,TAttrs,TEvents>
 {
     // dynamically build the actual element class and implement the necessary interfaces
-    class ActualClass extends (elmClass as (new() => HTMLElement)) implements IWebElm<TAttrs,TEvents>
+    class ActualClass extends (elmClass as (new() => HTMLElement))
     {
         static get observedAttributes(): string[]
         {
@@ -165,47 +163,8 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
             onchanged?.call(this, actNewValue, attrName, propName);
         }
 
-        // necessary IComponent members
-        vn: IClassCompVN;
-
-        /** Returns true if the component is mounted and false otherwise */
-        get isMounted(): boolean { return this.vn && this.isConnected; };
-
         /** The render() function should be overridden in the derived class */
         render(): any {}
-
-        // Necessary IComponentEx members
-        updateMe( func?: RenderMethodType, arg?: any): void
-        {
-            this.vn?.updateMe( func, arg);
-        }
-
-        callMeBeforeUpdate( func: ScheduledFuncType, thisArg?: any): void
-        {
-            this.vn?.callMe( func, true, thisArg ?? this);
-        }
-
-        callMeAfterUpdate( func: ScheduledFuncType, thisArg?: any): void
-        {
-            this.vn?.callMe( func, false, thisArg ?? this);
-        }
-
-        wrap<T extends Function>( func: T, arg?: any, thisArg?: any, schedulingType?: TickSchedulingType): T
-        {
-            return this.vn?.wrap( func, thisArg ?? this, arg, schedulingType);
-        }
-
-        publishService<K extends keyof IServiceDefinitions>(id: K, value: IServiceDefinitions[K],
-            depth?: number): IPublication<K>
-        {
-            return this.vn?.publishService(id, value, depth);
-        }
-
-        subscribeService<K extends keyof IServiceDefinitions>(id: K, defaultValue?: IServiceDefinitions[K],
-            useSelf?: boolean): ISubscription<K>
-        {
-            return this.vn?.subscribeService(id, defaultValue, useSelf);
-        }
 
         // Necessary IWebElm members
         processStyles(flagOrFunc: boolean | (() => void), func?: () => void)
@@ -261,14 +220,10 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
         {
             return this.hasAttribute(attrName);
         }
-
-        fireEvent<K extends string & keyof TEvents>(key: K, detail: TEvents[K]): boolean
-        {
-            let event = detail instanceof Event ? detail : new CustomEvent(key, {detail});
-            return this.dispatchEvent(event);
-        }
     }
 
+    // apply the ComponentMixin, which makes the actual class to implement all IComponentEx methods
+    applyMixins(ActualClass, ComponentMixin);
     return ActualClass as unknown as WebElmConstructor<TElm,TAttrs,TEvents>;
 }
 
@@ -279,9 +234,20 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
  * customize existing built-in elements) should inherit. The return class derives directly from
  * HTMLElement.
  *
- * @typeparam TAttrs Type or interface mapping attribute names to attribute types.
- * @typeparam TEvents Type or interface mapping event types (names) to the types of the `detail`
- * property of the `CustomEvent` objects for the events.
+ * **Usage:**
+ *
+ * ```typescript
+ * @mim.webElm("my-elelemnt")
+ * class MyCustomElement extends mim.WebElm()
+ * {
+ *    render(): any { return ... }
+ * }
+ * ```
+ *
+ * @typeparam TAttrs Type that maps attribute names to attribute types.
+ * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
+ * `detail` property of a CustomEvent.
  */
 export const WebElm = <TAttrs extends {} = {}, TEvents extends {} = {}>() =>
     WebElmEx<HTMLElement,TAttrs,TEvents>(HTMLElement);
