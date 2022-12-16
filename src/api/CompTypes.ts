@@ -10,14 +10,63 @@ export type DN = Node | null;
 
 
 /**
+ * Type that combines readonly component properties and component events. For each event, the
+ * *ComponentProps* type defines a property named $on_event, where "event" is the name of the
+ * property from the *TEvents* generic type. This allows attaching to component events in JSX
+ * just like we attach to HTML element events.
+ *
+ * **Example:**
+ * ```typescript
+ * // Component properties
+ * interface IMyCompProps
+ * {
+ *     title: string
+ * }
+ *
+ * // Component events
+ * interface IMyCompEvents
+ * {
+ *     titleChanged: string;
+ * }
+ *
+ * // the following component
+ * class MyComp extends Component<IMyCompProps,IMyCompEvents> {...}
+ *
+ * // would have its properties type equivalent to
+ * type CombinedProps =
+ * {
+ *     readonly title: string;
+ *     readonly $on_titleChanged: EventPropType<CustomEvent<string>>
+ * }
+ *
+ * // this allows using MyComp as follows
+ * <MyComp title="Hello" $on_titleChanged={e => console.log(`Title changed to ${e.detail}`)}
+ * ```
+ *
+ * @typeparam TProps Type defining properties that can be passed to the class-based component
+ *		of this type. Default type is an empty object (no properties).
+ * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
+ * `detail` property of a CustomEvent.
+ */
+export type ComponentProps<TProps extends {} = {}, TEvents extends {} = {}> = Readonly<TProps> &
+    { readonly [K in keyof TEvents & string as `$on_${K}`]?:
+        EventPropType<TEvents[K] extends Event ? TEvents[K] : CustomEvent<TEvents[K]>> }
+
+
+
+/**
  * Interface that defines constructor signature for components.
  *
  * @typeparam TProps Type defining properties that can be passed to the class-based component
  *		of this type. Default type is an empty object (no properties).
+ * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
+ * `detail` property of a CustomEvent.
  */
-export interface IComponentClass<TProps extends {} = {}>
+export interface IComponentClass<TProps extends {} = {}, TEvents extends {} = {}>
 {
-	new( props?: TProps): IComponent<TProps>;
+	new( props?: ComponentProps<TProps,TEvents>): IComponent<TProps,TEvents>;
 }
 
 
@@ -33,8 +82,11 @@ export interface IComponentClass<TProps extends {} = {}>
  *
  * @typeparam TProps Type defining properties that can be passed to this class-based component.
  *		Default type is an empty object (no properties).
+ * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
+ * `detail` property of a CustomEvent.
  */
-export interface IComponent<TProps extends {} = {}> extends EventTarget
+export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> extends EventTarget
 {
 	/**
 	 * Components can define display name for tracing purposes; if they don't the default name
@@ -44,11 +96,17 @@ export interface IComponent<TProps extends {} = {}> extends EventTarget
 	readonly displayName?: string;
 
 	/**
+	 * Component properties passed to the constructor. This is normally used only by managed
+	 * components and is usually undefined for independent components.
+	 */
+	props?: ComponentProps<TProps,TEvents>;
+
+	/**
 	 * Sets, gets or clears the virtual node object of the component. This property is set twice:
 	 *  1. Before the component is rendered for the first time: the component must remember the
 	 *    passed object.
-	 *  2. Before the component is destroyed: null is passed as a parameter and the component must
-	 *    release the remembered object.
+	 *  2. Before the component is destroyed: undefined is passed as a parameter and the component
+     *     must release the remembered object.
 	 */
 	vn?: IClassCompVN;
 

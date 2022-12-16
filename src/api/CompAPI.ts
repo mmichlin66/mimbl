@@ -1,6 +1,7 @@
 ﻿import {
     CallbackWrappingOptions, ComponentShadowOptions, IComponent, ICustomAttributeHandlerClass,
-    IRef, ITextVN, IVNode, PromiseProxyProps, PropType, RefFunc, RenderMethodType, DN, IComponentEx
+    IRef, ITextVN, IVNode, PromiseProxyProps, PropType, RefFunc, RenderMethodType, DN, IComponentEx,
+    ComponentProps
 } from "./CompTypes";
 import {EventSlot} from "./EventSlotAPI"
 import { shadowDecorator } from "../core/ClassCompVN";
@@ -210,13 +211,13 @@ export function registerCustomAttribute<T>( attrName: string, handlerClass: ICus
  * desired behavior)
  */
 export abstract class Component<TProps extends {} = {children?: any}, TEvents extends {} = {}>
-    extends EventTarget implements IComponent<TProps>, IComponentEx
+    extends EventTarget implements IComponent<TProps,TEvents>, IComponentEx<TEvents>
 {
 	/**
 	 * Component properties passed to the constructor. This is normally used only by managed
 	 * components and is usually undefined for independent components.
 	 */
-	public props?: Readonly<TProps>;
+	public props?: ComponentProps<TProps,TEvents>;
 
 	constructor( props?: TProps)
 	{
@@ -520,6 +521,7 @@ Function.prototype[symJsxToVNs] = function( props: any, children: VN[] | null): 
 /** Mimbl style scheduler as the default scheduler for style-related DOM-writing operations. */
 export let mimblStyleSchedulerType: number;
 s_initStyleScheduler().then( n => mimblStyleSchedulerType = n);
+// export let mimblStyleSchedulerType = await s_initStyleScheduler();
 
 
 

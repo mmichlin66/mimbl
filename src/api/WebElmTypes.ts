@@ -102,7 +102,8 @@ export type OnPropChangeHandlers<T> =
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
  */
-export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}> extends IComponent, IComponentEx
+export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}>
+    extends IComponent<{},TEvents>, IComponentEx<TEvents>
 {
     /**
      * Invokes the given function in the "style adoption context"; which allows all Mimcss style
