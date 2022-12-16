@@ -145,28 +145,20 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
 	 * This method is only used by managed components.
 	 *
 	 * Informs the component that new properties have been specified. At the time of the call
-	 * this.props refers to the "old" properties. If the component returns true, then its render
+	 * this.props refers to the "old" properties. They will be changed to the new props right
+     * after the call returns. If the component returns true, then its render
 	 * method will be called. If the component doesn't implement the `shouldUpdate` method it is
      * as though true is returned. If the component returns false, the render method is not
-     * called and the DOM tree of the component remains unchanged. The component, however, will
-     * still be informed about the new properties via the call to the [[updateProps]] method (if
-     * implemented).
+     * called and the DOM tree of the component remains unchanged. The component will have its
+     * [[props]] member set to the new properties regardless of this method's return value.
+     *
+     * If the component creates its internal structures based on properties, this call is the
+     * opportunity to change the internal structures to correspond to the new properties.
+     *
 	 * @param newProps The new properties that the parent component provides to this component.
 	 * @returns True if the component should have its render method called and false otherwise.
 	 */
 	shouldUpdate?( newProps: TProps): boolean;
-
-	/**
-	 * This method is only used by managed components.
-	 *
-	 * Instructs the component to change the proprties object to the new one. This method is
-     * invoked after [[shouldUpdate]] (if specified) and before [[render]]. This gives the
-     * component the opportunity to save the new properties and also to do whatever processing
-     * the component needs. If implemented, this method is invoked regardless of whether the
-     * [[shouldUpdate]] method is implemented and whether it returned `true` or `false`.
-	 * @param newProps The new properties that the parent component provides to this component.
-	 */
-	updateProps?( newProps: TProps): void;
 
 	/**
 	 * Handles an exception that occurred during the rendering of one of the component's children.

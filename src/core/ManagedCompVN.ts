@@ -140,8 +140,7 @@ export class ManagedCompVN extends ClassCompVN
 		let shouldRender = !comp.shouldUpdate || comp.shouldUpdate( newVN.props);
 
 		// let the component know about the new properties and remember them in our node
-        comp.updateProps?.(newVN.props);
-        this.props = newVN.props;
+        comp.props = this.props = newVN.props;
 
 		if (shouldRender)
             super.update( newVN, disp);

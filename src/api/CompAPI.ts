@@ -230,17 +230,6 @@ export abstract class Component<TProps extends {} = {children?: any}, TEvents ex
      * method is abstract because it must be implemented by every component.
      */
 	abstract render(): any;
-
-    /**
-     * Stores the new properties in the [[props]] field. If the component overrides this method
-     * it must call the parent's implementation.
-     * @param newProps
-     */
-	updateProps( newProps: TProps): void
-    {
-        this.props = newProps;
-    }
-
 }
 
 /**
