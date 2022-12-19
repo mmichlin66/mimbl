@@ -2,7 +2,15 @@
 import {IHtmlIntrinsicElements} from "../api/HtmlTypes";
 import {ISvgIntrinsicElements} from "../api/SvgTypes";
 import {IVN} from "../core/VNTypes";
-import { symJsxToVNs, symToVNs } from "../core/Reconciler";
+import { content2VNs, symJsxToVNs } from "../core/Reconciler";
+
+
+
+/**
+ * Type that of entities that can become renderable content
+ */
+export type RenderableContent = object | string | number | bigint | Function | RenderableContent[];
+
 
 
 /**
@@ -56,7 +64,7 @@ export function jsx( tag: any, props: any, ...children: any[]): any
     //	2) <A>{[t1, t2]}</A>. In this case, children will be [[t1,t2]] (as NOT expected by A).
     //		This looks like a TypeScript bug.
     let realChildren = children.length === 1 && Array.isArray(children[0]) ? children[0] : children;
-    return tag[symJsxToVNs]( props, realChildren[symToVNs]());
+    return tag[symJsxToVNs](props, content2VNs(realChildren));
 }
 
 
@@ -90,7 +98,8 @@ export function Fragment(): any {}
 
 
 // Add jsxToVNs method to the Fragment class object. This method is invoked by the JSX mechanism.
-Fragment[symJsxToVNs] = (props: any, children: IVN[] | null): IVN | IVN[] | null => children;
+Fragment[symJsxToVNs] = (props: Record<string,any> | undefined,
+    children: IVN[] | null): IVN | IVN[] | null | undefined => content2VNs(children);
 
 
 

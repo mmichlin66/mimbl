@@ -430,7 +430,7 @@ const setNodeChildren = (vn: IVN, req: SetRequest): void =>
         if (oldSubNodes)
             removeAllSubNodes(vn);
 
-        let newSubNodes = req.content && createVNChainFromContent( req.content);
+        let newSubNodes = req.content != null ? content2VNs( req.content) : null;
         if (newSubNodes)
         {
             let anchorDN = vn.ownDN ?? vn.anchorDN;
@@ -464,7 +464,7 @@ const spliceNodeChildren = (vn: IVN, req: SpliceRequest): void =>
     // calculate the number of sub-nodes to delete
     countToDelete = Math.min( countToDelete, oldLen - index);
 
-    let newSubNodes = req.contentToInsert != null && createVNChainFromContent( req.contentToInsert);
+    let newSubNodes = req.contentToInsert != null ? content2VNs( req.contentToInsert) : null;
     if (countToDelete === 0 && !newSubNodes)
         return;
 
@@ -751,8 +751,8 @@ const trimNodeChildren = (vn: IVN, req: TrimRequest): void =>
 const growNodeChildren = (vn: IVN, req: GrowRequest): void =>
 {
     // convert content to arrays of sub-nodes. Note that arrays cannot be empty but can be null.
-    let newStartSubNodes = req.startContent != null ? createVNChainFromContent( req.startContent) : null;
-    let newEndSubNodes = req.endContent != null ? createVNChainFromContent( req.endContent) : null;
+    let newStartSubNodes = req.startContent != null ? content2VNs( req.startContent) : null;
+    let newEndSubNodes = req.endContent != null ? content2VNs( req.endContent) : null;
     if (!newStartSubNodes && !newEndSubNodes)
         return;
 
@@ -855,7 +855,7 @@ const reverseNodeChildren = (vn: IVN, req: ReverseRequest): void =>
 // Recursively mounts sub-nodes.
 export const mountContent = (vn: IVN, content: any, anchorDN: DN, beforeDN: DN = null, startIndex?: number): void =>
 {
-    let subNodes = createVNChainFromContent(content);
+    let subNodes = content2VNs(content);
     if (subNodes)
         mountSubNodes( vn, subNodes, anchorDN, beforeDN, startIndex);
 
@@ -879,7 +879,7 @@ export const unmountSubNodes = (subNodes: IVN[], removeFromDOM: boolean): void =
 
 
 export const reconcile = (vn: IVN, disp: VNDisp, content: any): void =>
-    reconcileSubNodes( vn, disp, createVNChainFromContent(content));
+    reconcileSubNodes( vn, disp, content2VNs(content));
 
 
 
@@ -1856,7 +1856,10 @@ const getVNPath = (vn: IVN): string[] =>
 
 /**
  * Symbol used to set a "toVNs" function to certain classes. This function converts the instances
- * of these classes to a VN or an array of VNs.
+ * of these classes to a VN or an array of VNs. The signature of the function should be:
+ * ```typescript
+ * () => IVN | IVN[] | null | undefined
+ * ```
  */
 export let symToVNs = Symbol("toVNs");
 
@@ -1864,7 +1867,10 @@ export let symToVNs = Symbol("toVNs");
 
 /**
  * Symbol used to set a "jsxToVNs" function to certain classes. This function converts the instances
- * of these classes to a VN or an array of VNs.
+ * of these classes to a VN or an array of VNs. The signature of the function should be:
+ * ```typescript
+ * (props: Record<string,any> | undefined, children: IVN[] | null) => IVN | IVN[] | null | undefined
+ * ```
  */
 export let symJsxToVNs = Symbol("jsxToVNs");
 
@@ -1872,7 +1878,7 @@ export let symJsxToVNs = Symbol("jsxToVNs");
 
 // Creates an array of virtual nodes from the given content. Calls the createNodesFromContent and
 // if it returns a single node, wraps it in an array.
-const createVNChainFromContent = (content: any): IVN[] | null =>
+export const content2VNs = (content: any): IVN[] | null =>
 {
     let vns = content?.[symToVNs]();
     return !vns ? null : Array.isArray(vns) ? vns.length === 0 ? null : vns : [vns];

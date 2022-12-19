@@ -28,17 +28,6 @@ import { getCurrentClassComp, requestNodeUpdate } from "./Reconciler";
 
 export abstract class VN implements IVN
 {
-    constructor()
-    {
-        // the creator is captured when the node is created because this is where the "this"
-        // variable is the one that should be used by event handlers and other callbacks.
-        this.creator = getCurrentClassComp();
-
-        /// #if DEBUG
-            this.debugID = g_nextVNDebugID++;
-        /// #endif
-    }
-
 	// String representation of the virtual node. This is used mostly for tracing and error
 	// reporting. The name can change during the lifetime of the virtual node; for example,
 	// it can reflect an "id" property of an element (if any).
@@ -49,9 +38,6 @@ export abstract class VN implements IVN
 
     /** Class component that created this node. */
     public creator?: IComponent | null;
-
-	/** Component that used this node in its render method. */
-	public renderer?: IComponent | null;
 
 	/**
      * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the
@@ -69,7 +55,7 @@ export abstract class VN implements IVN
 	public key?: any;
 
 	// List of sub-nodes - both keyed and unkeyed - defined only if there are some sub-nodes.
-	public subNodes?: VN[];
+	public subNodes?: IVN[] | null;
 
 	/**
 	 * Update strategy object that determines different aspects of node behavior
@@ -101,6 +87,19 @@ export abstract class VN implements IVN
 
 
 
+    constructor()
+    {
+        // the creator is captured when the node is created because this is where the "this"
+        // variable is the one that should be used by event handlers and other callbacks.
+        this.creator = getCurrentClassComp();
+
+        /// #if DEBUG
+            this.debugID = g_nextVNDebugID++;
+        /// #endif
+    }
+
+
+
     /// #if USE_STATS
     public get statsCategory(): StatsCategory { return StatsCategory.Comp; }
 	/// #endif
@@ -109,11 +108,7 @@ export abstract class VN implements IVN
         public debugID: number;
     /// #endif
 
-	///////////////////////////////////////////////////////////////////////////////////////////////
-	//
-	// Life cycle methods
-	//
-	///////////////////////////////////////////////////////////////////////////////////////////////
+
 
 	/**
      * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
@@ -121,7 +116,6 @@ export abstract class VN implements IVN
      */
 	public mount( parent: VN | null, index: number, anchorDN: DN, beforeDN: DN = null): void
     {
-        this.renderer = getCurrentClassComp();
         this.parent = parent;
         this.index = index;
         this.anchorDN = anchorDN;
@@ -134,11 +128,10 @@ export abstract class VN implements IVN
     {
         this.anchorDN = null;
 
-        // set null toparent and renderer as we don't want to hold on to their references as our
+        // set null to parent as we don't want to hold on to the reference as our
         // object might not be destroyed - it might be mounted again. We don't relese the creator
         // reference as the creator doesn't change with mounts/unmounts.
         this.parent = null;
-        this.renderer = undefined;
     }
 
     /**
@@ -219,18 +212,8 @@ export abstract class VN implements IVN
             return null;
 
         let arr: DN[] = [];
-        this.subNodes.forEach( svn => svn.collectImmediateDNs( arr));
+        this.subNodes.forEach( svn => collectImmediateDNs(svn, arr));
         return arr.length === 0 ? null : arr;
-    }
-
-    // Collects all DOM nodes that are the immediate children of this virtual node (that is,
-    // are NOT children of sub-nodes that have their own DOM node) into the given array.
-    private collectImmediateDNs( arr: DN[]): void
-    {
-        if (this.ownDN)
-            arr.push( this.ownDN);
-        else if (this.subNodes)
-            this.subNodes.forEach( svn => svn.collectImmediateDNs( arr));
     }
 
 
@@ -343,6 +326,18 @@ export abstract class VN implements IVN
 
 	// Map of service IDs to objects constituting subscriptions made by this node.
 	private subs?: Map<string,Subscription>;
+}
+
+
+
+// Collects all DOM nodes that are the immediate children of this virtual node (that is,
+// are NOT children of sub-nodes that have their own DOM node) into the given array.
+function collectImmediateDNs(vn: IVN, arr: DN[]): void
+{
+    if (vn.ownDN)
+        arr.push( vn.ownDN);
+    else if (vn.subNodes)
+        vn.subNodes.forEach( svn => collectImmediateDNs(svn, arr));
 }
 
 

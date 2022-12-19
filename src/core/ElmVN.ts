@@ -4,7 +4,7 @@ import {
     ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy,
     ICustomAttributeHandlerClass, PropType, DN
 } from "../api/CompTypes"
-import { ChildrenUpdateOperation, VNDisp } from "./VNTypes";
+import { ChildrenUpdateOperation, IVN, VNDisp } from "./VNTypes";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -35,7 +35,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 
-	constructor( tagName: string, props: ExtendedElement<T>, subNodes: VN[])
+	constructor( tagName: string, props: ExtendedElement<T> | undefined, subNodes: IVN[] | null)
 	{
 		super();
 
@@ -271,7 +271,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	public isUpdatePossible( newVN: ElmVN<T>): boolean
 	{
 		// update is possible if this is the same type of element; that is, it has the same
-		// name.
+		// name. Also, if we currently have events, the creator must be the same.
 		return this.elmName === newVN.elmName;
 	}
 
@@ -279,19 +279,17 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 	// Updates this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node. The returned value indicates whether children
-	// should be updated (that is, this node's render method should be called).
+	// point to a VN of the same type as this node.
 	public update( newVN: ElmVN<T>, disp: VNDisp): void
 	{
-        // need to update attributes and events if the new props are different from the current ones.
+        // need to update attributes and events if the new props are different from the current
+        // ones. If we currently have events but the new creator is different from the old one,
+        // we need to update events.
         if (!s_deepCompare( this.props, newVN.props, 3))
         {
-            newVN.creator = this.creator;
+            // newVN.creator = this.creator;
             if (newVN.props)
                 newVN.parseProps( newVN.props);
-
-            // remember new props
-            this.props = newVN.props;
 
             // if reference specifications changed then set or unset them as necessary
             this.updateRef( newVN.ref);
@@ -307,6 +305,17 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             this.updateEvents( newVN.events);
             this.updateCustomAttrs( newVN.customAttrs);
         }
+        else if (this.events && this.creator !== newVN.creator)
+        {
+            if (newVN.props)
+                newVN.parseProps( newVN.props);
+
+            // update events only
+            this.updateEvents( newVN.events);
+        }
+
+        // remember new props
+        this.props = newVN.props;
 
         // update children if they exist either on our or on the new element
         if (this.subNodes || newVN.subNodes)
@@ -948,10 +957,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
      // Properties that were passed to the element.
-	private props: ExtendedElement<T>;
+	private props: ExtendedElement<T> | undefined;
 
     // Redefine the ownDN property from VN to be of the Element type
-	public declare ownDN: T | null;
+	public ownDN: T | null;
 
     // Reference to the element that is specified as a "ref" property.
 	private ref: RefType<T>;

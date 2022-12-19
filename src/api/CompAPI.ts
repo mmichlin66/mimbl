@@ -1,10 +1,11 @@
 ﻿import {
     CallbackWrappingOptions, ComponentShadowOptions, IComponent, ICustomAttributeHandlerClass,
     IRef, ITextVN, IVNode, PromiseProxyProps, PropType, RefFunc, RenderMethodType, DN, IComponentEx,
-    ComponentProps
+    ComponentProps,
+    ExtendedElement
 } from "./CompTypes";
 import {EventSlot} from "./EventSlotAPI"
-import { shadowDecorator } from "../core/ClassCompVN";
+import { ClassCompVN, shadowDecorator } from "../core/ClassCompVN";
 import { TextVN } from "../core/TextVN";
 import { ElmVN, registerElmProp } from "../core/ElmVN";
 import { IndependentCompVN } from "../core/IndependentCompVN";
@@ -12,12 +13,13 @@ import { FuncProxyVN } from "../core/FuncProxyVN";
 import { ManagedCompVN } from "../core/ManagedCompVN";
 import { PromiseProxyVN } from "../core/PromiseProxyVN";
 import { mountRoot, unmountRoot } from "../core/RootVN";
-import { CallbackWrapper, getCurrentClassComp, symJsxToVNs, symToVNs } from "../core/Reconciler";
+import { CallbackWrapper, content2VNs, getCurrentClassComp, symJsxToVNs, symToVNs } from "../core/Reconciler";
 import { s_initStyleScheduler } from "../core/StyleScheduler";
 import { isTrigger } from "./TriggerAPI";
 import { symRenderNoWatcher, VN } from "../core/VN";
 import { ComponentMixin } from "../core/CompImpl";
 import { applyMixins } from "../utils/UtilFunc";
+import { IVN } from "../core/VNTypes";
 
 
 /**
@@ -244,29 +246,6 @@ applyMixins(Component, ComponentMixin);
 
 
 
-// Add toVNs method to the Component class. This method is invoked to convert rendered content to
-// virtual node or nodes.
-Component.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
-{
-    // if the component (this can only be an Instance component) is already attached to VN,
-    // return this existing VN; otherwise create a new one.
-    let vn = this.vn ?? new IndependentCompVN( this);
-    if (nodes)
-        nodes.push( vn);
-
-    return vn;
-};
-
-
-
-// Add jsxToVNs method to the Component class object, which creates virtual node for managed
-// components. This method is invoked by the JSX mechanism.
-Component[symJsxToVNs] = function( props: any, children: VN[]): VN | VN[] | null
-{
-    return new ManagedCompVN( this, props, children);
-}
-
-
 /**
  * Creates a Function Proxy virtual node that wraps the given function with the given argument.
  * This allows using the same component method with different arguments, for example:
@@ -369,61 +348,89 @@ export function noWatcher( target: any, name: string, propDescr: PropertyDescrip
 
 // Add toVNs method to the Boolean class. This method is invoked to convert rendered content to
 // virtual node or nodes. For Booleans, it simply returns null, so neither true nor false create
-// any rendered content.
-Boolean.prototype[symToVNs] = () => null
+// any rendered content. For Symbols, it simply returns null.
+Symbol.prototype[symToVNs] = Boolean.prototype[symToVNs] = () => null
 
 
 
 // Add toVNs method to the String class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-String.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+String.prototype[symToVNs] = function(this: string): IVN | IVN[] | null | undefined
 {
-    if (this.length === 0)
-        return null;
-
-    let vn = new TextVN( this);
-    if (nodes)
-        nodes.push( vn);
-
-    return vn;
+    return this.length === 0 ? null : new TextVN( this);
 }
 
 
 
 // Add toVNs method to the Function class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-Function.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+Function.prototype[symToVNs] = function(this: Function): IVN | IVN[] | null | undefined
 {
-    let vn = new FuncProxyVN(this, getCurrentClassComp());
-    if (nodes)
-        nodes.push( vn);
-
-    return vn;
+    return new FuncProxyVN(this as RenderMethodType, getCurrentClassComp());
 };
 
 
 
 // Add toVNs method to the Array class. This method is invoked to convert rendered content to
-// virtual node or nodes.
-Array.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+// virtual node or nodes. This method is invoked for JSX element children almost every time a
+// JSX element is processed (exceptions are when a component has a special treatment of children,
+// which is rare); therefore, the following optimzations are done for most common cases:
+//   - when the array is empty (e.g. element or component without children)
+//   - when there is 1 item in the array (e.g. most of case for elements with text nodes)
+//   - when all array items are already VNs (e.g. when all children are JSX elements)
+//   - when all array items produce VNs one to one; that is, for no array item the toVNs
+//     method returns null/undefined or array
+Array.prototype[symToVNs] = function(this: Array<any>): IVN | IVN[] | null | undefined
 {
-    if (this.length === 0)
+    let count = this.length;
+    if (count === 0)
         return null;
+    else if (count === 1)
+        return this[0]?.[symToVNs]();
 
-    if (!nodes)
-        nodes = [];
-
-    this.forEach( (item: any) =>
+    // first try to modify the array in place converting every non-VN item to the corresponding
+    // VN. When the item is already a VN, do nothing. If converting the item returns a single VN,
+    // replace the item with the VN. If converting the item returns null/undefined or an array of
+    // VNs, then we switch to a new array.
+    let i = 0;
+    let vn: IVN | IVN[] | null | undefined;
+    for( let item of this)
     {
-        if (item != null)
-        {
-            if (item instanceof VN)
-                nodes!.push( item)
-            else
-                item[symToVNs]( nodes);
-        }
-    });
+        vn = item?.[symToVNs]();
+        if (!vn || Array.isArray(vn))
+            break;
+        else if (vn !== item)
+            this[i] = vn;
 
+        i++;
+    }
+
+    // we can be here either if we processed the entire array without any changes (that is, all
+    // items were already VNs), or if we discovered a null/undefined or an array item. In the
+    // former case, we just return the original array ("this"); in the latter case, we copy the
+    // already processed part of the array (if any) to a new array and then put the new VNs into
+    // this new array.
+    if (i === count)
+        return this;
+
+    // copy the already processed part of the original array or create a new array
+    let nodes: IVN[] = i === 0 ? [] : this.slice(0, i);
+
+    // copy the VN(s) for which we broke out of the prevous loop to the new array
+    if (Array.isArray(vn))
+        nodes.push(...vn);
+    else if (vn)
+        nodes.push(vn as IVN);
+
+    // loop over the rest of the original array, convert items to VN and copy them to the new array
+    for( i += 1; i < count; i++)
+    {
+        vn = this[i]?.[symToVNs]();
+        if (Array.isArray(vn))
+            nodes.push(...vn);
+        else if (vn)
+            nodes.push(vn as IVN);
+    }
     return nodes.length > 0 ? nodes : null;
 };
 
@@ -431,64 +438,71 @@ Array.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
 
 // Add toVNs method to the Object class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-Object.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+Object.prototype[symToVNs] = function(): IVN | IVN[] | null | undefined
 {
-    let vn: VN;
     if (typeof this.render === "function")
-        vn = this.vn ?? new IndependentCompVN( this);
+        return this.vn ?? new IndependentCompVN( this);
     else if (isTrigger(this))
-        vn = new TextVN( this);
+        return new TextVN( this);
     else
     {
         let s = this.toString();
-        if (!s)
-            return null;
-
-        vn = new TextVN( s);
+        return !s ? null : new TextVN( s);
     }
-
-    if (nodes)
-        nodes.push( vn);
-
-    return vn;
 };
 
 
 
 // Add toVNs method to the VN class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-VN.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+VN.prototype[symToVNs] = function(this: VN): IVN | IVN[] | null | undefined
 {
-    if (nodes)
-        nodes.push( this);
-
     return this;
 };
 
 
 
-// Add jsxToVNs method to the PromiseProxy class object. This method is invoked by the JSX mechanism.
-PromiseProxy[symJsxToVNs] = (props: PromiseProxyProps | undefined, children: VN[]): VN | VN[] | null =>
-    props?.promise ? new PromiseProxyVN( props, children) : null;
+// Add toVNs method to the Component class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+Component.prototype[symToVNs] = function(this: IComponent): IVN | IVN[] | null | undefined
+{
+    // if the component (this can only be an Instance component) is already attached to VN,
+    // return this existing VN; otherwise create a new one.
+    return this.vn as ClassCompVN ?? new IndependentCompVN( this);
+};
 
 
 
 // Add toVNs method to the Promise class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-Promise.prototype[symToVNs] = function( nodes?: VN[]): VN | VN[] | null
+Promise.prototype[symToVNs] = function(this: Promise<any>): IVN | IVN[] | null | undefined
 {
-    let vn = new PromiseProxyVN( { promise: this});
-    if (nodes)
-        nodes.push( vn);
-
-    return vn;
+    return new PromiseProxyVN( { promise: this});
 };
+
+
+
+// Add jsxToVNs method to the Component class object, which creates virtual node for managed
+// components. This method is invoked by the JSX mechanism.
+Component[symJsxToVNs] = function(props: Record<string,any> | undefined,
+    children: IVN[] | null): IVN | IVN[] | null | undefined
+{
+    return new ManagedCompVN( this, props, children);
+}
+
+
+
+// Add jsxToVNs method to the PromiseProxy class object. This method is invoked by the JSX mechanism.
+PromiseProxy[symJsxToVNs] = (props: PromiseProxyProps | undefined,
+    children: IVN[] | null): IVN | IVN[] | null | undefined =>
+        props?.promise ? new PromiseProxyVN( props, children) : null;
 
 
 
 // Add jsxToVNs method to the String class, which creates ElmVN with the given parameters. This
 // method is invoked by the JSX mechanism.
-String.prototype[symJsxToVNs] = function( props: any, children: VN[]): VN | VN[] | null
+String.prototype[symJsxToVNs] = function(props: ExtendedElement<Element> | undefined,
+    children: IVN[] | null): IVN | IVN[] | null | undefined
 {
     return new ElmVN( this, props, children);
 };
@@ -497,12 +511,13 @@ String.prototype[symJsxToVNs] = function( props: any, children: VN[]): VN | VN[]
 
 // Add jsxToVNs method to the Function class, which works for functional components. This method
 // is invoked by the JSX mechanism.
-Function.prototype[symJsxToVNs] = function( props: any, children: VN[] | null): VN | VN[] | null
+Function.prototype[symJsxToVNs] = function(props: Record<string,any> | undefined,
+    children: IVN[] | null): IVN | IVN[] | null | undefined
 {
     // invoke the function right away. The return value is treated as rendered content. This way,
     // the function runs under the current Mimbl context (e.g. creator object used as "this" for
     // event handlers).
-    return this(props, children)?.[symToVNs]();
+    return content2VNs(this(props, children));
 };
 
 

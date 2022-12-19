@@ -31,7 +31,7 @@ export async function s_initStyleScheduler(): Promise<number>
     catch(err)
     {
         /// #if DEBUG
-            console.debug( "Mimbl doesn't have Mimcss support because Mimcss library is not loaded.")
+            console.warn( "Mimbl doesn't have Mimcss support because Mimcss library is not loaded.")
         /// #endif
     }
 

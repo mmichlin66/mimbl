@@ -1,5 +1,5 @@
 ﻿import {DN, PromiseProxyProps} from "../api/CompTypes"
-import { VNDisp } from "./VNTypes";
+import { IVN, VNDisp } from "./VNTypes";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -15,7 +15,7 @@ import { VN } from "./VN";
  */
 export class PromiseProxyVN extends VN
 {
-	constructor( props: PromiseProxyProps, children?: any)
+	constructor( props: PromiseProxyProps, children?: IVN[] | null)
 	{
 		super();
 

@@ -1,5 +1,5 @@
 ﻿import {DN, IComponentClass, RefPropType} from "../api/CompTypes"
-import { VNDisp } from "./VNTypes";
+import { IVN, VNDisp } from "./VNTypes";
 import { ClassCompVN } from "./ClassCompVN";
 import { VN, setRef } from "./VN";
 
@@ -12,7 +12,15 @@ import { VN, setRef } from "./VN";
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 export class ManagedCompVN extends ClassCompVN
 {
-	constructor( compClass: IComponentClass, props: any, children: any[])
+	// Properties that were passed to the component. For managed components this is always defined.
+    // Even if no properties were passed to the component, props would include an array of
+    // children (which might be null or empty).
+	public props: Record<string,any>;
+
+
+
+
+	constructor( compClass: IComponentClass, props: Record<string,any> | undefined, children: IVN[] | null)
 	{
 		super();
 
@@ -26,7 +34,7 @@ export class ManagedCompVN extends ClassCompVN
             props.children = children;
             this.props = props;
 
-            // get the key (if exists) because we will need id during update even before the
+            // get the key (if exists) because we will need it during update even before the
             // component is mounted
             this.key = props.key;
 

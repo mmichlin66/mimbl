@@ -37,12 +37,10 @@ export const shadowDecorator = (options: ComponentShadowOptions, cls: Function):
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// The class CompBaseVN is a base class for InstanceVN and ClassVN. It provides common functionality
-// in terms of update requests and lifecycle management.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
+/**
+ * Base class for IndependentCompVN and ManagedCompVN classes. It provides common functionality
+ * in terms of update requests and lifecycle management.
+ */
 export abstract class ClassCompVN extends VN implements IClassCompVN
 {
 	/** Type of the class-based component. */
@@ -51,8 +49,11 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	/** Component instance. */
 	public comp?: IComponent;
 
-	// Properties that were passed to the component.
-	public props: any;
+	/**
+     * Properties that were passed to the component. This might be undefined for independent
+     * components.
+     */
+	public props: Record<string,any> | undefined;
 
     /**
      * Optional element serving as a host for shadow root if the component specifies the `shadow`
@@ -238,7 +239,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	// parameter is guaranteed to point to a VN of the same type as this node.
 	public isUpdatePossible( newVN: ClassCompVN): boolean
 	{
-		// update is possible if the component class name is the same
+		// update is possible if the component class is the same
 		return this.compClass === newVN.compClass;
 	}
 
@@ -352,7 +353,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
     // Actual function to be invoked during the rendering - it can be either the original func or
     // the watcher.
-	private actRender: (...args: any) => any;
+	private actRender: () => any;
 }
 
 

@@ -745,9 +745,6 @@ export interface IVNode
 	/** Component that created this node. */
 	readonly creator?: IComponent | null;
 
-	/** Component that used this node in its render method. */
-	readonly renderer?: IComponent | null;
-
 	/**
      * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the
      * root nodes that don't have parents.
