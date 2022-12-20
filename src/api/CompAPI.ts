@@ -388,28 +388,22 @@ Array.prototype[symToVNs] = function(this: Array<any>): IVN | IVN[] | null | und
     else if (count === 1)
         return this[0]?.[symToVNs]();
 
-    // first try to modify the array in place converting every non-VN item to the corresponding
-    // VN. When the item is already a VN, do nothing. If converting the item returns a single VN,
-    // replace the item with the VN. If converting the item returns null/undefined or an array of
-    // VNs, then we switch to a new array.
+    // if an item in the array is already a single VN, do nothing; otherwise, switch to a new array.
     let i = 0;
     let vn: IVN | IVN[] | null | undefined;
     for( let item of this)
     {
         vn = item?.[symToVNs]();
-        if (!vn || Array.isArray(vn))
+        if (!vn || vn !== item || Array.isArray(vn))
             break;
-        else if (vn !== item)
-            this[i] = vn;
 
         i++;
     }
 
     // we can be here either if we processed the entire array without any changes (that is, all
-    // items were already VNs), or if we discovered a null/undefined or an array item. In the
-    // former case, we just return the original array ("this"); in the latter case, we copy the
-    // already processed part of the array (if any) to a new array and then put the new VNs into
-    // this new array.
+    // items were already VNs), or if we discovered a non-VN item. In the former case, we just
+    // return the original array ("this"); in the latter case, we copy the already processed part
+    // of the array (if any) to a new array and then put the new VNs into this new array.
     if (i === count)
         return this;
 

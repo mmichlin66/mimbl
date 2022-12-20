@@ -1,21 +1,23 @@
 ﻿import {Styleset, MediaStatement} from "mimcss"
 import {
     IElmVN, EventFuncType, ICustomAttributeHandler, EventPropType, RefType, ExtendedElement,
-    ElmRefType, CallbackWrappingParams, TickSchedulingType, UpdateStrategy,
-    ICustomAttributeHandlerClass, PropType, DN
+    ElmRefType, TickSchedulingType, UpdateStrategy, ICustomAttributeHandlerClass, PropType, DN
 } from "../api/CompTypes"
 import { ChildrenUpdateOperation, IVN, VNDisp } from "./VNTypes";
+import { Ariaset, DatasetPropType } from "../api/ElementTypes";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
 
+import {
+    mountSubNodes, unmountSubNodes, reconcileSubNodes, CallbackWrapper, CallbackWrapperParams
+} from "./Reconciler";
 import { s_deepCompare } from "../utils/UtilFunc";
 import { isTrigger } from "../api/TriggerAPI"
-import { mountSubNodes, unmountSubNodes, reconcileSubNodes, CallbackWrapper } from "./Reconciler";
 import { mimcss } from "./StyleScheduler";
 import { VN, setRef } from "./VN";
-import { Ariaset, DatasetPropType } from "../api/ElementTypes";
+import { CheckedPropType } from "../api/HtmlTypes";
 
 
 
@@ -197,10 +199,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 this.mountAttrs( this.attrs);
 
             if (this.events)
-                this.addEvents();
+                this.mountEvents();
 
             if (this.customAttrs)
-                this.addCustomAttrs();
+                this.mountCustomAttrs();
 
             if (this.ref)
                 setRef( this.ref, this.ownDN);
@@ -235,26 +237,23 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             /// #endif
         }
 
-        if (this.props)
-        {
-            // unset the reference value if specified. We check whether the reference still points
-            // to our element before setting it to undefined. If the same ElmRef object is used for
-            // more than one element (and/or components) it can happen that the reference is changed
-            // before our element is unmounted.
-            if (this.ref)
-                setRef( this.ref, undefined, this.ownDN);
+        // unset the reference value if specified. We check whether the reference still points
+        // to our element before setting it to undefined. If the same ElmRef object is used for
+        // more than one element (and/or components) it can happen that the reference is changed
+        // before our element is unmounted.
+        if (this.ref)
+            setRef( this.ref, undefined, this.ownDN);
 
-            if (this.vnref)
-                setRef( this.vnref, undefined, this);
+        if (this.vnref)
+            setRef( this.vnref, undefined, this);
 
-            // if any attributes have triggers, detach from them
-            if (this.attrs)
-                this.unmountAttrs( this.attrs);
+        // if any attributes have triggers, detach from them
+        if (this.attrs)
+            this.unmountAttrs( this.attrs);
 
-            // terminate custom property handlers
-            if (this.customAttrs)
-                this.removeCustomAttrs();
-        }
+        // terminate custom property handlers
+        if (this.customAttrs)
+            this.unmountCustomAttrs();
 
         if (this.subNodes)
             unmountSubNodes( this.subNodes, false);
@@ -282,10 +281,19 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// point to a VN of the same type as this node.
 	public update( newVN: ElmVN<T>, disp: VNDisp): void
 	{
+        // if the new VN was created by a different creator, we will need to update all
+        // attributes and events (even if they are the same). We also need to "clean" some
+        // special properties for some special elements.
+        let isNewCreator = this.creator !== newVN.creator;
+        if (isNewCreator)
+        {
+            this.creator = newVN.creator;
+            cleanElmProps(this.elmName, this.ownDN!)
+        }
+
         // need to update attributes and events if the new props are different from the current
-        // ones. If we currently have events but the new creator is different from the old one,
-        // we need to update events.
-        if (!s_deepCompare( this.props, newVN.props, 3))
+        // ones.
+        if (isNewCreator || !s_deepCompare( this.props, newVN.props, 3))
         {
             // newVN.creator = this.creator;
             if (newVN.props)
@@ -301,17 +309,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             this.updateStrategy = newVN.updateStrategy;
 
             // update attributes and events
-            this.updateAttrs( newVN.attrs);
+            this.updateAttrs( newVN.attrs, isNewCreator);
             this.updateEvents( newVN.events);
             this.updateCustomAttrs( newVN.customAttrs);
-        }
-        else if (this.events && this.creator !== newVN.creator)
-        {
-            if (newVN.props)
-                newVN.parseProps( newVN.props);
-
-            // update events only
-            this.updateEvents( newVN.events);
         }
 
         // remember new props
@@ -513,7 +513,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 	// Updates DOM attributes of this Element.
-	private updateAttrs( newAttrs: { [name: string]: AttrRunTimeData }): void
+	private updateAttrs( newAttrs: { [name: string]: AttrRunTimeData }, isNewCreator: boolean): void
 	{
 		let oldAttrs = this.attrs;
 
@@ -522,7 +522,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		if (oldAttrs)
 		{
 			for( let name in oldAttrs)
-                this.updateAttr( name, oldAttrs[name], newAttrs?.[name]);
+                this.updateAttr( name, oldAttrs[name], newAttrs?.[name], isNewCreator);
 		}
 
 		// loop over new attributes; add those that are not found among the old ones
@@ -541,44 +541,47 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      * value is null, remove the old property and remove the attribute from the element. If the
      * new value is different from the old one, set it to the attribute in the element.
      */
-    private updateAttr( name: string, oldRTD: AttrRunTimeData, newRTD?: AttrRunTimeData): void
+    private updateAttr( name: string, oldRTD: AttrRunTimeData, newRTD?: AttrRunTimeData, isNewCreator?: boolean): void
     {
         let oldVal = oldRTD.val;
         let newVal = newRTD?.val;
-        if (newVal !== oldVal)
+        if (!isNewCreator && newVal === oldVal)
+            return;
+
+        // remember the new value
+        oldRTD.val = newVal;
+
+        let onChange = oldRTD.onChange;
+        if (onChange)
         {
-            let actOldVal = oldVal;
-            let onChange = oldRTD.onChange;
-            if (onChange)
-            {
-                // if onChange is defined then oldVal is a trigger. We detach from it but
-                // don't clear the onChange callback - because it can be used if the new value
-                // is also a trigger.
-                actOldVal = oldVal.get();
-                oldVal.detach( onChange);
-            }
-
-            let actNewVal = newVal;
-            if (isTrigger(newVal))
-            {
-                actNewVal = newVal.get();
-                if (!onChange)
-                    oldRTD.onChange = onAttrTriggerChanged.bind( this, name);
-                newVal.attach( oldRTD.onChange!);
-            }
-            else
-                oldRTD.onChange = undefined;
-
-            if (actNewVal !== actOldVal)
-            {
-                if (actNewVal == null)
-                    removeElmProp( this.ownDN!, name, oldRTD.info, oldRTD.val);
-                else
-                    updateElmProp( this.ownDN!, name, oldRTD.info, actOldVal, actNewVal);
-            }
-
-            oldRTD.val = newVal;
+            // if onChange is defined then oldVal is a trigger. We detach from it but
+            // don't clear the onChange callback - because it can be used if the new value
+            // is also a trigger.
+            oldVal.detach( onChange);
+            oldVal = oldVal.get();
         }
+
+        // check whether the new value is a trigger and get the actual value from it.
+        if (isTrigger(newVal))
+        {
+            if (!onChange)
+                oldRTD.onChange = onAttrTriggerChanged.bind( this, name);
+            newVal.attach( oldRTD.onChange!);
+            newVal = newVal.get();
+        }
+        else
+            oldRTD.onChange = undefined;
+
+        // if creator has changed, use "set" instead of "update" as some properties should be
+        // reset as new (e.g. defaultChecked)
+        // if the new value is null and the old one was not, then remove the attribute regardless
+        // of whether
+        if (newVal == null && oldVal != null)
+            removeElmProp( this.ownDN!, name, oldRTD.info, oldRTD.val);
+        else if (isNewCreator && newVal != null)
+            setElmProp(this.ownDN!, name, oldRTD.info, newVal);
+        else if (newVal !== oldVal)
+            updateElmProp( this.ownDN!, name, oldRTD.info, oldVal, newVal);
     }
 
 
@@ -627,17 +630,17 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 	// Adds information about events to the Element.
-	private addEvents(): void
+	private mountEvents(): void
 	{
 		for( let name in this.events)
-			this.addEvent( name, this.events[name]);
+			this.mountEvent( name, this.events[name]);
 	}
 
 
 
 	// Using the given property name and its value set the appropriate attribute(s) on the
 	// element. This method handles special cases of properties with non-trivial values.
-	private addEvent( name: string, rtd: EventRunTimeData): void
+	private mountEvent( name: string, rtd: EventRunTimeData): void
 	{
 		rtd.wrapper = CallbackWrapper.bind( rtd);
 		this.ownDN!.addEventListener( name, rtd.wrapper!, rtd.useCapture);
@@ -650,7 +653,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 	// Removes the given event listener from the Element.
-	private removeEvent( name: string, rtd: EventRunTimeData): void
+	private unmountEvent( name: string, rtd: EventRunTimeData): void
 	{
 		this.ownDN!.removeEventListener( name, rtd.wrapper!, rtd.useCapture);
 
@@ -675,7 +678,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 				let oldRTD = oldEvents[name];
 				let newRTD = newEvents?.[name];
 				if (!newRTD)
-					this.removeEvent( name, oldRTD);
+					this.unmountEvent( name, oldRTD);
 				else
 					this.updateEvent( name, oldRTD, newRTD);
 			}
@@ -689,7 +692,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 				if (oldEvents && (name in oldEvents))
 					continue;
 
-				this.addEvent( name, newEvents[name]);
+				this.mountEvent( name, newEvents[name]);
 			}
 		}
 
@@ -742,7 +745,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         {
             if (oldRTD)
             {
-                this.removeEvent( name, oldRTD);
+                this.unmountEvent( name, oldRTD);
                 delete this.events[name];
             }
         }
@@ -755,7 +758,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             }
             else
             {
-                this.addEvent( name, newRTD);
+                this.mountEvent( name, newRTD);
                 if (!this.events)
                     this.events = {};
 
@@ -798,13 +801,13 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 	// Creates custom attributes.
-	private addCustomAttrs(): void
+	private mountCustomAttrs(): void
 	{
 		// create and initialize custom property handlers
 		for( let name in this.customAttrs)
 		{
             let customAttr = this.customAttrs[name];
-            if (!this.addCustomAttr( name, customAttr))
+            if (!this.mountCustomAttr( name, customAttr))
 				delete this.customAttrs[name];
 		}
 	}
@@ -812,7 +815,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 	// Creates custom attribute.
-	private addCustomAttr( name: string, customAttr: CustomAttrRunTimeData): boolean
+	private mountCustomAttr( name: string, customAttr: CustomAttrRunTimeData): boolean
 	{
         // create custom property handler. If we cannot create the handler, remove the property
         // from our object.
@@ -834,16 +837,16 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 	// Destroys custom attributes of this element.
-	private removeCustomAttrs(): void
+	private unmountCustomAttrs(): void
 	{
         for( let name in this.customAttrs)
-            this.removeCustomAttr( name, this.customAttrs[name], true)
+            this.unmountCustomAttr( name, this.customAttrs[name], true)
 	}
 
 
 
 	// Destroys custom attributes of this element.
-	private removeCustomAttr( name: string, customAttr: CustomAttrRunTimeData, isRemoval: boolean): void
+	private unmountCustomAttr( name: string, customAttr: CustomAttrRunTimeData, isRemoval: boolean): void
 	{
         try
         {
@@ -873,7 +876,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 				const oldCustomAttr = oldCustomAttrs[name];
 				const newCustomAttr = newCustomAttrs?.[name];
                 if (!newCustomAttr)
-                    this.removeCustomAttr( name, oldCustomAttr, false);
+                    this.unmountCustomAttr( name, oldCustomAttr, false);
 				else
 				{
                     // update the custom property and remember the new value
@@ -892,7 +895,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 					continue;
 
                 let newCustomAttr = newCustomAttrs[name];
-                if (!this.addCustomAttr( name, newCustomAttr))
+                if (!this.mountCustomAttr( name, newCustomAttr))
 					delete newCustomAttrs[name];
 			}
 		}
@@ -932,7 +935,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         {
             if (oldCustomAttr)
             {
-                this.removeCustomAttr( name, oldCustomAttr, false)
+                this.unmountCustomAttr( name, oldCustomAttr, false)
                 delete this.customAttrs[name];
             }
         }
@@ -945,7 +948,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             }
             else
             {
-                this.addCustomAttr( name, newCustomAttr);
+                this.mountCustomAttr( name, newCustomAttr);
                 if (!this.customAttrs)
                     this.customAttrs = {};
 
@@ -1047,7 +1050,7 @@ interface AttrRunTimeData
 
 
 /** Type defining the information we keep about each event listener */
-interface EventRunTimeData extends CallbackWrappingParams<EventFuncType>
+interface EventRunTimeData extends CallbackWrapperParams<EventFuncType>
 {
 	// Flag indicating whether this event should be used as Capturing (true) or Bubbling (false)
 	useCapture?: boolean;
@@ -1519,7 +1522,7 @@ type ObjectPropValToStringFunc = (val: any) => string;
 
 
 
-/** Sets `data-* attributes */
+/** Sets object attributes like `data-*` or `aria-*` */
 function setObjectProp(elm: HTMLInputElement, name: string, val: ObjectPropValueType,
     nameFunc: ObjectPropToAttrNameFunc, valFunc: ObjectPropValToStringFunc): void
 {
@@ -1529,7 +1532,7 @@ function setObjectProp(elm: HTMLInputElement, name: string, val: ObjectPropValue
 
 
 
-/** Updates `data-* attributes */
+/** Updates object attributes like `data-*` or `aria-*` */
 function updateObjectProp(elm: HTMLInputElement, name: string,
     oldVal: ObjectPropValueType, newVal: ObjectPropValueType,
     nameFunc: ObjectPropToAttrNameFunc, valFunc: ObjectPropValToStringFunc): boolean
@@ -1576,7 +1579,7 @@ function updateObjectProp(elm: HTMLInputElement, name: string,
 
 
 
-/** Removes `data-* attributes */
+/** Removes object attributes like `data-*` or `aria-*` */
 function removeObjectProp(elm: HTMLInputElement, name: string, oldVal: ObjectPropValueType,
     nameFunc: ObjectPropToAttrNameFunc): void
 {
@@ -1592,18 +1595,56 @@ function removeObjectProp(elm: HTMLInputElement, name: string, oldVal: ObjectPro
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-/** we set the deafultValue and also the value properties */
-function setDefaultValueProp(elm: HTMLInputElement, name: string, val: string): void
+/**
+ * Function that does nothing - sometimes needed to avoid doing anything when setting, updating
+ * or removing attributes.
+ */
+const doNothing = () => {}
+
+
+
+function setCheckedProp(elm: HTMLInputElement, name: string, val: CheckedPropType): void
 {
-    elm.value = elm.defaultValue = val;
+    if (typeof val == "boolean")
+    {
+        elm.checked = val;
+        elm.indeterminate = false;
+    }
+    else
+    {
+        elm.checked = false;
+        elm.indeterminate = true;
+    }
 }
 
 
 
-/** we set the defaultChecked and also the checked properties */
-function setDefaultCheckedProp(elm: HTMLInputElement, name: string, val: boolean): void
+function removeCheckedProp(elm: HTMLInputElement, name: string): void
 {
-    elm.checked = elm.defaultChecked = val;
+    elm.checked = false;
+}
+
+
+
+function setDefaultCheckedProp(elm: HTMLInputElement, name: string, val: CheckedPropType): void
+{
+    if (typeof val == "boolean")
+    {
+        elm.checked = elm.defaultChecked = val;
+        elm.indeterminate = false;
+    }
+    else
+    {
+        elm.checked = elm.defaultChecked = false;
+        elm.indeterminate = true;
+    }
+}
+
+
+
+function setDefaultValueProp(elm: HTMLInputElement, name: string, val: string): void
+{
+    elm.value = elm.defaultValue = val;
 }
 
 
@@ -1688,8 +1729,8 @@ const removeAriaProp = (elm: HTMLInputElement, name: string, oldVal: Ariaset): v
 
 const StdFrameworkPropInfo = { type: PropType.Framework };
 
-// sets and removes an attribute using element's property
-const AttrAsPropInfo = { type: PropType.Attr, isProp: true };
+// // sets and removes an attribute using element's property
+// const AttrAsPropInfo = { type: PropType.Attr, isProp: true };
 
 // Produces comma-separated list from array of values
 const ArrayWithCommaPropInfo = { type: PropType.Attr, v2s: array2sWithComma };
@@ -1724,10 +1765,10 @@ const propInfos: {[P:string]: PropInfo} =
     class: { type: PropType.Attr, name: "className", isProp: true },
     for: { type: PropType.Attr, name: "htmlFor", isProp: true },
     tabindex: { type: PropType.Attr, name: "tabIndex", isProp: true },
-    value: AttrAsPropInfo,
-    checked: AttrAsPropInfo,
-    defaultValue: { type: PropType.Attr, set: setDefaultValueProp, remove: (elm: HTMLInputElement) => elm.defaultValue = "", isProp: true },
-    defaultChecked: { type: PropType.Attr, set: setDefaultCheckedProp, isProp: true },
+    checked: { type: PropType.Attr, set: setCheckedProp, remove: removeCheckedProp },
+    defaultChecked: { type: PropType.Attr, set: setDefaultCheckedProp, update: doNothing, remove: doNothing },
+    value: { type: PropType.Attr, isProp: true },
+    defaultValue: { type: PropType.Attr, set: setDefaultValueProp, update: doNothing, remove: doNothing },
     style: { type: PropType.Attr, v2s: styleToString },
     media: { type: PropType.Attr, v2s: mediaToString },
     dataset: { type: PropType.Attr, set: setDataProp, update: updateDataProp, remove: removeDataProp },
@@ -1805,5 +1846,50 @@ const propInfos: {[P:string]: PropInfo} =
     // click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },
 };
 
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// An element VN can be updated by a new VN, which was created by the different component. We do
+// allow updating the element because it saves us the time necessary to remove one element and add
+// a new one. However, in such cases we need to "clean" some special properties of some special
+// elements. For example, the "checked" property of the HTMLInputElement reflects the actual
+// "checked" state of a checkbox or a radio input elements; however, there is no attribute that
+// reflects this state. If a new element doesn't define the "checked" property in its JSX, our
+// code wouldn't try to set the element's "checked" property and, therefore, it will remain in the
+// left over from the previous user action. If this previous state was "on", this will be a wrong
+// state for the new rendering.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Cleans certain properties of the given element by looking at the elmPropsToClean structure
+ */
+function cleanElmProps(elmName: string, elm: Element): void
+{
+    let props = elmPropsToClean[elmName];
+    if (props)
+    {
+        for( let [propName, propVal] of Object.entries(props))
+            elm[propName] = propVal;
+    }
+}
+
+/**
+ * Type mapping a "clean" value for certain properties of certain elements. The "clean" value is
+ * the value that should be set when an element is updated by a different "creator" component.
+ */
+type ElmPropsToClean =
+{
+    [tag: string]: { [prop: string]: any }
+}
+
+const elmPropsToClean: ElmPropsToClean = {
+    input: {
+        checked: false,
+        defaultChecked: false,
+        intermediate: false,
+    }
+}
 
 

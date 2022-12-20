@@ -1,5 +1,5 @@
 ﻿import {
-    DN, ScheduledFuncType, CallbackWrappingParams, TickSchedulingType, IComponent,
+    DN, ScheduledFuncType,TickSchedulingType, IComponent, CallbackWrappingOptions,
 } from "../api/CompTypes"
 import {
     ChildrenUpdateRequest, ChildrenUpdateOperation, SetRequest, SpliceRequest, MoveRequest,
@@ -86,11 +86,20 @@ const enum SchedulerState
 
 
 
+/** Type defining the information that can be supplied for a callback to be wrapped */
+export type CallbackWrapperParams<T extends Function = Function> = CallbackWrappingOptions &
+{
+	/** Callback function */
+	func: T;
+};
+
+
+
 /**
  * The CallbackWrapper function is used to wrap callbacks in order to have it executed in a Mimbl
  * context.
  */
-export function CallbackWrapper( this: CallbackWrappingParams): any
+export function CallbackWrapper( this: CallbackWrapperParams): any
 {
     // if some scheduling type is set (that is, we are going to schedule a Mimbl tick after
     // the callback), we should ignore requests to schedule a tick made during the callback

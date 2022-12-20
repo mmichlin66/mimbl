@@ -533,6 +533,14 @@ export interface IHtmlImgElementAttrs extends IHtmlElementAttrs
 
 
 
+/**
+ * Type for the `checked` and `defaultChecked` properties for input elements of type
+ * checkbox and radio.
+ */
+export type CheckedPropType = boolean | "indeterminate";
+
+
+
 // <input>
 export interface IHtmlInputElementAttrs extends IHtmlFormFieldElementAttrs
 {
@@ -554,14 +562,14 @@ export interface IHtmlInputElementAttrs extends IHtmlFormFieldElementAttrs
         "email" | "file" | "hidden" | "image" | "month" | "number" | "password" | "radio" |
         "range" | "reset" | "search" | "submit" | "tel" | "text" | "time" | "url" | "week";
 	value?: string | number | Date;
+    defaultValue?: string;
 
     // text and search
     dirname?: string;
-    defaultValue?: string;
 
 	// checkbox and radio
-	checked?: boolean;
-    defaultChecked?: boolean;
+	checked?: CheckedPropType;
+    defaultChecked?: CheckedPropType;
 
 	// file
 	accept?: string;

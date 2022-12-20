@@ -394,15 +394,6 @@ export type CallbackWrappingOptions =
 
 
 
-/** Type defining the information that can be supplied for a callback to be wrapped */
-export type CallbackWrappingParams<T extends Function = Function> = CallbackWrappingOptions &
-{
-	/** Callback function */
-	func: T;
-};
-
-
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Definitions of callback types used when passing callback functions to components.
@@ -452,9 +443,12 @@ export type EventTupleType<T extends Event = Event> =
  * Type defining an object that can be supplied for an event listener.
  * @typeparam T DOM event type, e.g. MouseEvent
  */
-export interface EventObjectType<T extends Event> extends CallbackWrappingParams<EventFuncType<T>>
+export interface EventObjectType<T extends Event> extends CallbackWrappingOptions
 {
-	/**
+	/** Callback function */
+	func: EventFuncType<T>;
+
+    /**
      * Flag indicating whether this event should be used as Capturing or Bubbling. The default
      * value is `false`, that is, Bubbling.
      */
