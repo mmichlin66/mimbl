@@ -1,7 +1,8 @@
-﻿import {DN, IComponentClass, RefPropType} from "../api/CompTypes"
+﻿import {DN, EventPropType, IComponentClass, RefPropType} from "../api/CompTypes"
 import { IVN, VNDisp } from "./VNTypes";
 import { ClassCompVN } from "./ClassCompVN";
 import { VN, setRef } from "./VN";
+import { EventsMixin } from "./Events";
 
 
 
@@ -15,34 +16,22 @@ export class ManagedCompVN extends ClassCompVN
 	// Properties that were passed to the component. For managed components this is always defined.
     // Even if no properties were passed to the component, props would include an array of
     // children (which might be null or empty).
-	public props: Record<string,any>;
+	public props: Record<string,any> | undefined;
 
 
 
-
-	constructor( compClass: IComponentClass, props: Record<string,any> | undefined, children: IVN[] | null)
+    constructor( compClass: IComponentClass, props: Record<string,any> | undefined, children: IVN[] | null)
 	{
 		super();
 
 		this.compClass = compClass;
+        this.props = props;
+        this.children = children;
 
-		// remember the props and remember the children as part of the props
-		if (!props)
-            this.props = {children};
-        else
-		{
-            props.children = children;
-            this.props = props;
-
-            // get the key (if exists) because we will need it during update even before the
-            // component is mounted
-            this.key = props.key;
-
-            // remember the reference if specified
-            this.ref = props.ref;
-		}
+        // get the key (if exists) because we will need it during update even before the
+        // component is mounted
+        this.key = props?.key;
 	};
-
 
 
 	// String representation of the virtual node. This is used mostly for tracing and error
@@ -72,23 +61,17 @@ export class ManagedCompVN extends ClassCompVN
     // corresponding to this virtual node.
 	public mount( parent: VN, index: number, anchorDN: DN, beforeDN: DN): void
     {
+        // translate properties into attributes, events and custom attributes
+        this.parseProps( this.props);
+
 		// create component instance
         this.comp = new this.compClass( this.props);
 
-        // set the reference value if specified
+        // add event listeners if any
+        this.events?.mount(this.comp);
+
         if (this.ref)
-        {
-            setRef( this.ref, this.comp);
-
-            // we delete the ref property from the props because it should not be available to
-            // the component
-            delete this.props.ref;
-        }
-
-        // we delete the key property from the props because it should not be available to
-        // the component
-        if (this.key != null)
-            delete this.props.key;
+            setRef( this.ref, this.ownDN);
 
         super.mount( parent, index, anchorDN, beforeDN);
     }
@@ -105,6 +88,9 @@ export class ManagedCompVN extends ClassCompVN
 		if (this.ref)
 			setRef( this.ref, undefined, this.comp);
 
+        // remove event listeners if any
+        this.events?.unmount();
+
         super.unmount( removeFromDOM);
 
         this.comp = undefined;
@@ -117,6 +103,17 @@ export class ManagedCompVN extends ClassCompVN
 	// point to a VN of the same type as this node.
 	public update( newVN: ManagedCompVN, disp: VNDisp): void
 	{
+        // if the new VN was created by a different creator, remember it.
+        let isNewCreator = this.creator !== newVN.creator;
+        if (isNewCreator)
+            this.creator = newVN.creator;
+
+        newVN.parseProps( newVN.props);
+
+		// remember the new value of the key property (even if it is the same)
+		this.key = newVN.key;
+
+        // just to save on lookups
         let comp = this.comp!;
 
 		// if reference specification changed then set or unset it as necessary
@@ -135,17 +132,11 @@ export class ManagedCompVN extends ClassCompVN
 				setRef( this.ref, comp);
 		}
 
-		// remember the new value of the key property (even if it is the same)
-		this.key = newVN.key;
+        // update attributes and events
+        this.updateEvents( newVN.events);
 
-        // remove ref and key from the new props so that they are not available to the component
-        if (newVN.ref)
-            delete newVN.props.ref;
-        if (newVN.key)
-            delete newVN.props.key;
-
-		// let the component know about the new properties (if it is interested in them)
-		let shouldRender = !comp.shouldUpdate || comp.shouldUpdate( newVN.props);
+		// ask the component whether it requires re-rendering because of the new properties
+		let shouldRender = !comp.shouldUpdate || comp.shouldUpdate( newVN.props!);
 
 		// let the component know about the new properties and remember them in our node
         comp.props = this.props = newVN.props;
@@ -156,10 +147,71 @@ export class ManagedCompVN extends ClassCompVN
 
 
 
+	/**
+     * Goes over the original properties and parses them into build-in (ref), events and regular.
+     * Replaces this.props with an object that contains children and regular props only.
+     */
+	private parseProps( props: Record<string,any> | undefined): void
+	{
+        let actualProps: Record<string,any> = {children: this.children};
+
+        // loop over all properties
+        if (props)
+        {
+            for( let [propName, propVal] of Object.entries(props))
+            {
+                if (propName === "ref")
+                    this.ref = propVal as RefPropType<any>;
+                else if (propName.startsWith("$on_"))
+                {
+                    this.events ??= new EventsMixin(this.creator);
+                    this.events.add(propName.substring(4), propVal as EventPropType);
+                }
+                else if (propName !== "key")
+                    actualProps[propName] = propVal;
+            }
+        }
+
+        this.props = actualProps;
+	}
+
+
+
+	/** Updates event listeners by comparing the old and the new ones. */
+	private updateEvents( newEvents: EventsMixin | undefined): void
+	{
+        if (this.events)
+        {
+            if (newEvents)
+                this.events.update(newEvents);
+            else
+            {
+                this.events.unmount();
+                this.events = undefined;
+            }
+        }
+        else if (newEvents)
+        {
+            newEvents.mount(this.comp!);
+            this.events = newEvents;
+        }
+	}
+
+
+
+    /**
+     * Children that should be rendered under the component. We remember them here until they
+     * become part of props.
+     */
+    private children: IVN[] | null;
+
 	// Reference to the component that is specified as a "ref" property. Reference object is
 	// set when analyzing properties in the constructor and during update. Reference value is
 	// set during mount and unset during unmount.
 	private ref: RefPropType<any>;
+
+	// Object that serves as a container for event information.
+	private events: EventsMixin | undefined;
 }
 
 

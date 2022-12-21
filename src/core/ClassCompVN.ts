@@ -100,8 +100,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         else
             this.actRender = this.renderWatcher = createWatcher( render, this.requestUpdate, comp, this);
 
-        if (comp.getUpdateStrategy)
-            this.updateStrategy = comp.getUpdateStrategy();
+        this.updateStrategy = comp.getUpdateStrategy?.();
     }
 
 
@@ -141,12 +140,12 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         let newBeforeDN = this.ownDN ? null : beforeDN;
 
         if (!comp.handleError)
-            mountContent( this, this.actRender(), newAnchorDN, newBeforeDN);
+            mountContent( this, this.render(), newAnchorDN, newBeforeDN);
         else
         {
             try
             {
-                mountContent( this, this.actRender(), newAnchorDN, newBeforeDN);
+                mountContent( this, this.render(), newAnchorDN, newBeforeDN);
             }
             catch( err)
             {
@@ -159,7 +158,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
                 // up in an infinite loop. We also set our component as current again.
                 setCurrentClassComp(comp);
                 comp.handleError(err);
-                mountContent( this, this.actRender(), newAnchorDN, newBeforeDN);
+                mountContent( this, this.render(), newAnchorDN, newBeforeDN);
             }
         }
 
@@ -251,15 +250,17 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	public update( newVN: ClassCompVN, disp: VNDisp): void
 	{
         let comp = this.comp!;
+        this.updateStrategy = comp.getUpdateStrategy?.();
+
         let prevCreator = setCurrentClassComp( comp);
 
         if (!comp.handleError)
-            reconcile( this, disp, this.actRender());
+            reconcile( this, disp, this.render());
         else
         {
             try
             {
-                reconcile( this, disp, this.actRender());
+                reconcile( this, disp, this.render());
             }
             catch( err)
             {
@@ -271,7 +272,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
                 // without try/catch this time; otherwise, we may end up in an infinite loop.
                 setCurrentClassComp(comp);
                 comp.handleError(err);
-                reconcile( this, {oldVN: disp.oldVN}, this.actRender());
+                reconcile( this, {oldVN: disp.oldVN}, this.render());
             }
         }
 
@@ -280,11 +281,19 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
 
-    // Generates list of sub-nodes according to the current state
+    /**
+     * Generates list of sub-nodes according to the current state. This method is invoked in two
+     * situations:
+     * 1. Directly if the component is being updated on its own (that is, not as a result of
+     * parent update). In this case, this component is set as the currently active cmoponent by
+     * the code in Reconciler.
+     * 2. From this class'es mount or update. In this case, this component is set as the currently
+     * active cmoponent by the code in mount and update.
+     */
 	public render(): any
 	{
 		/// #if DEBUG
-			if (this.comp === undefined)
+			if (!this.comp)
 			{
 				console.error( "render() was called on unmounted component.");
 				return null;
@@ -299,10 +308,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 			DetailedStats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-        let prevCreator = setCurrentClassComp( this.comp);
-        let content = this.actRender();
-        setCurrentClassComp( prevCreator);
-        return content;
+        return this.actRender();
 	}
 
 

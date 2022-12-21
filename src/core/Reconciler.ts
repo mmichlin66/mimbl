@@ -86,12 +86,12 @@ const enum SchedulerState
 
 
 
-/** Type defining the information that can be supplied for a callback to be wrapped */
+/** Type defining the information kept about a callback to be wrapped */
 export type CallbackWrapperParams<T extends Function = Function> = CallbackWrappingOptions &
-{
-	/** Callback function */
-	func: T;
-};
+    {
+        /** Callback function */
+        func: T;
+    };
 
 
 

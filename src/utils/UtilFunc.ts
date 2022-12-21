@@ -168,8 +168,11 @@ export function applyMixins(target: any, ...sources: any[]): void
         let sourcePrototype = source.prototype;
         Object.getOwnPropertyNames(sourcePrototype).forEach(name =>
         {
-            Object.defineProperty(targetPrototype, name,
-                Object.getOwnPropertyDescriptor(sourcePrototype, name) || Object.create(null));
+            if (name !== "constructor")
+            {
+                Object.defineProperty(targetPrototype, name,
+                    Object.getOwnPropertyDescriptor(sourcePrototype, name)!);
+            }
         });
     });
 }

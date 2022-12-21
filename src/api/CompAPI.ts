@@ -7,7 +7,7 @@
 import {EventSlot} from "./EventSlotAPI"
 import { ClassCompVN, shadowDecorator } from "../core/ClassCompVN";
 import { TextVN } from "../core/TextVN";
-import { ElmVN, registerElmProp } from "../core/ElmVN";
+import { ElmVN } from "../core/ElmVN";
 import { IndependentCompVN } from "../core/IndependentCompVN";
 import { FuncProxyVN } from "../core/FuncProxyVN";
 import { ManagedCompVN } from "../core/ManagedCompVN";
@@ -20,6 +20,7 @@ import { symRenderNoWatcher, VN } from "../core/VN";
 import { ComponentMixin } from "../core/CompImpl";
 import { applyMixins } from "../utils/UtilFunc";
 import { IVN } from "../core/VNTypes";
+import { registerElmProp } from "../core/Props";
 
 
 /**

@@ -39,7 +39,7 @@ export type DN = Node | null;
  *     readonly $on_titleChanged: EventPropType<CustomEvent<string>>
  * }
  *
- * // this allows using MyComp as follows
+ * // this allows using MyComp as the following
  * <MyComp title="Hello" $on_titleChanged={e => console.log(`Title changed to ${e.detail}`)}
  * ```
  *

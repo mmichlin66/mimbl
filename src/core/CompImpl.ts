@@ -4,6 +4,7 @@
 } from "../api/CompTypes";
 
 
+
 /**
  * Component mixin that contains functionality that is shared between regular components and
  * custom Web elements.

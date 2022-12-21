@@ -4,9 +4,9 @@
 import { mimcss } from "../core/StyleScheduler";
 import { trigger } from "./TriggerAPI";
 import { mount, unmount } from "./CompAPI";
-import { setAttrValue } from "../core/ElmVN";
 import { ComponentMixin } from "../core/CompImpl";
 import { applyMixins } from "../utils/UtilFunc";
+import { setAttrValue } from "../core/Props";
 
 
 
