@@ -46,7 +46,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
         // get the key property. If key property was not specified, use id; if id was not
         // specified key will remain undefined.
-        this.key = props && (props.key || props.id);
+        this.key = props?.key ?? props?.id;
 	}
 
 
@@ -83,13 +83,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         else
             this.propsForPartialUpdate = props;
 
-        if (schedulingType === TickSchedulingType.Sync)
-        {
-            this.updatePropsOnly( this.propsForPartialUpdate)
-            this.propsForPartialUpdate = null;
-        }
-        else
-            this.requestPartialUpdate( schedulingType);
+        this.requestPartialUpdate( schedulingType);
     }
 
 
@@ -339,7 +333,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
         if (this.attrsForPartialUpdate)
         {
-            this.updateAttrsOnly( this.attrsForPartialUpdate)
+            this.updateAttrsFromTrigger( this.attrsForPartialUpdate)
             this.attrsForPartialUpdate = undefined;
         }
     }
@@ -348,7 +342,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
     // Updates properties of this node from the given object containing new properties values. This
     // method is invoked if only properties should be updated without re-rendering the children.
-	public updatePropsOnly( props: any): void
+	private updatePropsOnly( props: any): void
 	{
         // loop over all properties
         for( let [propName, propVal] of Object.entries(props))
@@ -381,7 +375,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
     // Updates attribute values of this element from the given object containing new values. This
     // method is invoked only when one or more attributes with triggers have their values changed.
-	public updateAttrsOnly( newAttrValues: any): void
+	private updateAttrsFromTrigger( newAttrValues: any): void
 	{
         // loop over all properties
         for( let name in newAttrValues)
@@ -393,8 +387,11 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 let newVal = newAttrValues[name];
 
                 // use setElmProp instead of updateElmProp because we don't have the old
-                // attribute value
-                setElmProp( this.ownDN!, name, rtd.info, newVal);
+                // attribute value as it was replaced in the trigger by the new one
+                if (newVal != null)
+                    setElmProp( this.ownDN!, name, rtd.info, newVal);
+                else
+                    removeElmProp( this.ownDN!, name, rtd.info);
             }
 		}
 	}
@@ -852,7 +849,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     // propsForPartialUpdate property because the latter allows changing trigger values to
     // non-trigger values and vice versa, while the attrsForPartialUpdate property only
     // indicates change in the triggers' values.
-    public attrsForPartialUpdate: any;
+    public attrsForPartialUpdate: Record<string,any> | undefined;
 }
 
 

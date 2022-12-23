@@ -1,4 +1,4 @@
-﻿import {ICommonProps, IComponent, ICustomWebElements} from "../api/CompTypes";
+﻿import {ICommonProps, IComponent, ICustomWebElements, RefPropType} from "../api/CompTypes";
 import {IHtmlIntrinsicElements} from "../api/HtmlTypes";
 import {ISvgIntrinsicElements} from "../api/SvgTypes";
 import {IVN} from "../core/VNTypes";
@@ -32,7 +32,9 @@ export namespace JSX
 	export interface IntrinsicAttributes extends ICommonProps {}
 
 	// Properties in this interface apply to class-based components.
-	export interface IntrinsicClassAttributes<T> extends ICommonProps<T> {}
+	export interface IntrinsicClassAttributes<T> extends ICommonProps {
+        ref?: RefPropType<T>;
+    }
 }
 
 

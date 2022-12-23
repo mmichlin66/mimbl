@@ -13,30 +13,34 @@ export type DN = Node | null;
  * Type that combines readonly component properties and component events. For each event, the
  * *ComponentProps* type defines a property named $on_event, where "event" is the name of the
  * property from the *TEvents* generic type. This allows attaching to component events in JSX
- * just like we attach to HTML element events.
+ * just like attaching to HTML element events.
+ *
+ * The *ComponentProps* is not usually used directly by developers; however, it defines the
+ * type of the `props` property in the [[IComponent]] interface that all class-based components
+ * implement.
  *
  * **Example:**
  * ```typescript
  * // Component properties
  * interface IMyCompProps
  * {
- *     title: string
+ *     title?: string
  * }
  *
  * // Component events
  * interface IMyCompEvents
  * {
- *     titleChanged: string;
+ *     titleChanged?: string;
  * }
  *
  * // the following component
  * class MyComp extends Component<IMyCompProps,IMyCompEvents> {...}
  *
  * // would have its properties type equivalent to
- * type CombinedProps =
+ * type PropsAndEvents =
  * {
- *     readonly title: string;
- *     readonly $on_titleChanged: EventPropType<CustomEvent<string>>
+ *     readonly title?: string;
+ *     readonly $on_titleChanged?: EventPropType<CustomEvent<string>>;
  * }
  *
  * // this allows using MyComp as the following
@@ -44,10 +48,12 @@ export type DN = Node | null;
  * ```
  *
  * @typeparam TProps Type defining properties that can be passed to the class-based component
- *		of this type. Default type is an empty object (no properties).
+ * of this type. Note that if the component is expected to accept children then the *TProps*
+ * object must have the `cildren` property (usually of the `any` type). Default type is an empty
+ * object (no properties and no children).
  * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
- * `detail` property of a CustomEvent.
+ * `detail` property of a CustomEvent. Default type is an empty object (no events).
  */
 export type ComponentProps<TProps extends {} = {}, TEvents extends {} = {}> = Readonly<TProps> &
     { readonly [K in keyof TEvents & string as `$on_${K}`]?:
@@ -96,8 +102,9 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
 	readonly displayName?: string;
 
 	/**
-	 * Component properties passed to the constructor. This is normally used only by managed
-	 * components and is usually undefined for independent components.
+	 * Component properties. This is normally used only by managed components and is usually
+     * undefined for independent components. This object can contains every property from the
+     * *TProps* type and `$on_` property for every event defined in the *TEvents* type.
 	 */
 	props?: ComponentProps<TProps,TEvents>;
 
@@ -467,16 +474,14 @@ export type EventPropType<T extends Event = Event> =
 /**
  * The ICommonProps interface defines standard properties that can be used on all JSX elements -
  * intrinsic (HTML and SVG) as well as functional and class-based managed components.
- * @typeparam TRef Type of the element or component used as a reference type.
  */
-export interface ICommonProps<TRef = any>
+export interface ICommonProps
 {
-	/** Unique key that distinguishes this JSX element from its siblings. The key can be of any type. */
-	readonly key?: any;
-
-    // Reference that will be set to the instance of the component after it is mounted. The
-    // reference will be set to undefined after the component is unmounted.
-    readonly ref?: RefPropType<TRef>;
+	/**
+     * Unique key that distinguishes this JSX element from its siblings. The key can be of any type
+     * except null, undefined and boolean.
+     */
+	readonly key?: string | number | bigint | symbol | Function | object;
 }
 
 
@@ -567,26 +572,31 @@ export type ExtendedEvents<T> = {
  * defaults to `any` and usually doesn't need to be specified.
  */
 export type ExtendedElement<TRef extends Element = Element,
-    TAttrs extends IElementAttrs = IElementAttrs,
-    TEvents extends IElementEvents = IElementEvents,
-    TChildren = any> =
-ICommonProps<TRef> & ExtendedAttrs<TAttrs> & ExtendedEvents<TEvents> &
-{
-    /**
-	 * Reference that will be set to the element's virtual node after it is created (mounted). The
-	 * reference will be set to undefined after the element is unmounted.
-	 */
-	vnref?: ElmRefPropType<TRef>;
+        TAttrs extends IElementAttrs = IElementAttrs,
+        TEvents extends IElementEvents = IElementEvents,
+        TChildren = any> =
+    ICommonProps & ExtendedAttrs<TAttrs> & ExtendedEvents<TEvents> &
+    {
+        /**
+         * Reference that will be set to the instance of the element after it is mounted. The
+         * reference will be set to undefined after the element is unmounted.
+         */
+        readonly ref?: RefPropType<TRef>;
 
-	/**
-	 * Update strategy object that determines different aspects of element behavior during updates.
-	 */
-	updateStrategy?: UpdateStrategy;
+        /**
+         * Reference that will be set to the element's virtual node after it is created (mounted). The
+         * reference will be set to undefined after the element is unmounted.
+         */
+        readonly vnref?: ElmRefPropType<TRef>;
 
-	/** Children that can be supplied to the element */
-	children?: TChildren;
-}
+        /**
+         * Update strategy object that determines different aspects of element behavior during updates.
+         */
+        readonly updateStrategy?: UpdateStrategy;
 
+        /** Children that can be supplied to the element */
+        readonly children?: TChildren;
+    }
 
 
 

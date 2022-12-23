@@ -106,7 +106,7 @@ export type Ariaset =
 
 
 /**
- * Represents standard element properties present on all HTML and SVG elements
+ * Represents standard element properties present on all elements
  */
 export interface IElementAttrs
 {

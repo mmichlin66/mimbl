@@ -45,9 +45,22 @@ export class EventsMixin
 
 
     /**
+     * Returns event handler function for the given event. This methid is supposed to be call only
+     * after the events are mounted, in which case it returns an already wrapped handler. However,
+     * if this method is called before the events are mounted, it will return the original handler.
+     */
+	getHandler(name: string): EventFuncType
+	{
+        let rtd = this.events[name];
+        return rtd.wrapper ?? rtd.func;
+	}
+
+
+
+    /**
      * Mounts all events
      */
-	mount(eventTarget: EventTarget): void
+	mount(eventTarget?: EventTarget): void
 	{
         this.eventTarget = eventTarget;
         for( let [name, rtd] of Object.entries<EventRunTimeData>(this.events))
@@ -139,7 +152,7 @@ export class EventsMixin
 	private mountEvent( name: string, rtd: EventRunTimeData): void
 	{
 		rtd.wrapper = CallbackWrapper.bind( rtd);
-		this.eventTarget!.addEventListener( name, rtd.wrapper!, rtd.useCapture);
+		this.eventTarget?.addEventListener( name, rtd.wrapper!, rtd.useCapture);
 
 		/// #if USE_STATS
 			DetailedStats.log( StatsCategory.Event, StatsAction.Added);
@@ -151,7 +164,7 @@ export class EventsMixin
 	/** Removes the given event listener from the event target. */
 	private unmountEvent( name: string, rtd: EventRunTimeData): void
 	{
-		this.eventTarget.removeEventListener( name, rtd.wrapper!, rtd.useCapture);
+		this.eventTarget?.removeEventListener( name, rtd.wrapper!, rtd.useCapture);
 
 		/// #if USE_STATS
 			DetailedStats.log( StatsCategory.Event, StatsAction.Deleted);
@@ -179,11 +192,11 @@ export class EventsMixin
 		else
 		{
 			// remove old event listener
-			this.eventTarget.removeEventListener( name, oldRTD.wrapper!, oldRTD.useCapture);
+			this.eventTarget?.removeEventListener( name, oldRTD.wrapper!, oldRTD.useCapture);
 
 			// create new wrapper and add it as event listener
             newRTD.wrapper = CallbackWrapper.bind( newRTD);
-			this.eventTarget.addEventListener( name, newRTD.wrapper!, newRTD.useCapture);
+			this.eventTarget?.addEventListener( name, newRTD.wrapper!, newRTD.useCapture);
 
 			/// #if USE_STATS
 				DetailedStats.log( StatsCategory.Event, StatsAction.Updated);
@@ -201,22 +214,19 @@ export class EventsMixin
     {
         let rtd: EventRunTimeData;
         if (typeof propVal === "function")
-            rtd = { func: propVal, thisArg: this.creator, schedulingType }
+            rtd = { func: propVal, thisArg: this.creator }
         else if (Array.isArray(propVal))
         {
             rtd = {
                 func: propVal[0],
                 arg: propVal[1],
                 thisArg: propVal[2] ?? this.creator,
-                schedulingType,
             }
         }
         else
-        {
             rtd = Object.assign( {}, propVal);
-            rtd.schedulingType ??= schedulingType;
-        }
 
+        rtd.schedulingType ??= schedulingType ?? TickSchedulingType.Sync;
         rtd.comp = this.creator;
         return rtd;
     }
@@ -227,7 +237,7 @@ export class EventsMixin
     creator?: IComponent | null;
 
     /** Object deriving from EventTarget to which the events are attached. */
-    eventTarget: EventTarget;
+    eventTarget?: EventTarget;
 
     /**
      * Object that serves as a map between names of events and their respective run-time

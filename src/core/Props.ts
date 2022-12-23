@@ -249,7 +249,7 @@ export function updateElmProp(elm: Element, name: string, info: AttrPropInfo | n
 
 
 /** Removes the attribute(s) corresponding to the given property. */
-export function removeElmProp(elm: Element, name: string, info: AttrPropInfo | null, oldVal: any): void
+export function removeElmProp(elm: Element, name: string, info: AttrPropInfo | null, oldVal?: any): void
 {
     // get property info object
     if (!info)

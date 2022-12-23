@@ -166,6 +166,7 @@ export class ManagedCompVN extends ClassCompVN
                 {
                     this.events ??= new EventsMixin(this.creator);
                     this.events.add(propName.substring(4), propVal as EventPropType);
+                    actualProps[propName] = propVal;
                 }
                 else if (propName !== "key")
                     actualProps[propName] = propVal;
