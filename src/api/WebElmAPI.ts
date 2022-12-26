@@ -1,12 +1,13 @@
 ﻿import {
-    WebElmAttrChangeHandler, WebElmAttrOptions, WebElmConstructor, WebElmFromHtmlConverter, WebElmOptions
+    WebElmAttrChangeHandler, WebElmAttrOptions, WebElmConstructor, WebElmFromHtmlConverter, WebElmOptions, WebElmToHtmlConverter
 } from "./WebElmTypes";
 import { mimcss } from "../core/StyleScheduler";
 import { trigger } from "./TriggerAPI";
 import { mount, unmount } from "./CompAPI";
 import { ComponentMixin } from "../core/CompImpl";
 import { applyMixins } from "../utils/UtilFunc";
-import { setAttrValue } from "../core/Props";
+import { registerElmProp, setAttrValue } from "../core/Props";
+import { PropType } from "./CompTypes";
 
 
 
@@ -15,13 +16,19 @@ import { setAttrValue } from "../core/Props";
  */
 export type WebElmAttrDefinition =
 {
-    /** Name of the element attribute */
-    attrName?: string;
+    /** Name of the element attribute. This is always defined */
+    attrName: string;
 
-    /** Name of the element property */
+    /**
+     * Name of the element property. This can be undefined if the attribute definition was created
+     * not via the `@attr` decorator but either in the `@webElm` decorator or in the registerWebElm
+     * function. This can be useful if there is no need to have a property reflecting the attribute
+     * in the custom Web elemetn class, but there is a need to be notified when the attribute's
+     * value is changed.
+     */
     propName?: string;
 
-    /** Optional converter function */
+    /** Optional converter function and some other options controlling the attribute's behavior */
     options?: WebElmAttrOptions;
 }
 
@@ -34,7 +41,7 @@ export type WebElmAttrDefinition =
 type WebElmDefinition =
 {
     /** Custom Web Element name - the name for which the WebElm class is registered. */
-    name?: string;
+    name: string;
 
     /** Shadow DOM and form association options */
     options: WebElmOptions;
@@ -86,15 +93,13 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
     elmClass: new() => TElm): WebElmConstructor<TElm,TAttrs,TEvents>
 {
     // dynamically build the actual element class and implement the necessary interfaces
-    class ActualClass extends (elmClass as (new() => HTMLElement))
+    abstract class ActualClass extends (elmClass as (new() => HTMLElement))
     {
         static get observedAttributes(): string[]
         {
             // return the array of attribute names. Note that since the method is static "this" is
             // the class (that is, the costructor function) itself.
-            let definition = this[symWebElmDef] as WebElmDefinition;
-            let attrs = Object.keys(definition.attrs);
-            return attrs;
+            return Object.keys((this[symWebElmDef] as WebElmDefinition).attrs);
         }
 
         static get formAssociated(): boolean
@@ -117,7 +122,7 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
             this.#definition = this.constructor[symWebElmDef];
             let options = this.#definition.options;
             if (!options?.noShadow)
-                this.#shadowRoot = this.attachShadow({mode: options.mode ?? "open"});
+                this.#shadowRoot = this.attachShadow({mode: options?.mode ?? "open"});
         }
 
         connectedCallback(): void
@@ -141,17 +146,15 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
 
             // get attributes parameters and check whether we actually need to do anything with
             // the new attribute value
-            let {attrName, propName, options} = attrDef;
+            let {propName, options} = attrDef;
             let onchanged = options?.onchanged;
             if (!propName && !onchanged)
                 return;
 
             // determine the actual new value that should be set to the property and convert it to
             // the proper type if necessary
-            let actNewValue: any = newValue;
             let fromHtml = options?.fromHtml;
-            if (fromHtml)
-                actNewValue = fromHtml.call(this, actNewValue, attrName);
+            let actNewValue = fromHtml ? fromHtml(newValue, attrDef.attrName) : newValue;
 
             // set the new value to the property. Since by default properties with the @attr
             // decorators are reactive, this will trigger re-rendering. Note that property may not
@@ -159,12 +162,13 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
             if (propName)
                 this[propName] = actNewValue;
 
-            // call the `onchanged` method if defined.
-            onchanged?.call(this, actNewValue, attrName, propName);
+            // call the `onchanged` method if defined. Note that it is called bound to the instance
+            // of our custom element.
+            onchanged?.call(this, actNewValue, attrDef.attrName, propName);
         }
 
-        /** The render() function should be overridden in the derived class */
-        render(): any {}
+        // /** The render() function should be overridden in the derived class */
+        // abstract render(): any;
 
         // Necessary IWebElm members
         processStyles(flagOrFunc: boolean | (() => void), func?: () => void)
@@ -198,12 +202,7 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
 
         setAttr<K extends string & keyof TAttrs>(attrName: K, value: TAttrs[K] | null | undefined): void
         {
-            let actualValue: typeof value | string = null;
-
-            // if conversion function is defined in the attribute options, use it
-            let toHtml = this.#definition.attrs[attrName]?.options?.toHtml;
-            if (toHtml)
-                actualValue = toHtml.call(this, value, attrName);
+            let actualValue = this.#definition.attrs[attrName]?.options?.toHtml?.(value, attrName);
 
             if (actualValue == null)
                 this.removeAttribute(attrName);
@@ -259,14 +258,24 @@ export const WebElm = <TAttrs extends {} = {}, TEvents extends {} = {}>() =>
  *
  * @param name Name of the custom HTML element
  * @param options Configuration options for the custom element.
- * @param attrs Information about the element's attributes
  */
 export function webElm(name: string, options?: WebElmOptions, attrs?: WebElmAttrDefinition[])
 {
-    return (webElmClass: WebElmConstructor) => {
-        mergeWebElmDefinition(webElmClass, name, options, attrs);
+    return webElmDecorator.bind( undefined, name, options, attrs);
+}
+
+
+
+/**
+ * Decorator function for custom element components.
+ */
+function webElmDecorator(name: string, options: WebElmOptions | undefined,
+    attrs: WebElmAttrDefinition[] | undefined, webElmClass: WebElmConstructor): void
+{
+    mergeWebElmDefinition(webElmClass, name, options, attrs);
+
+    if (!options?.deferred)
         registerWebElm(webElmClass);
-    };
 }
 
 
@@ -307,11 +316,12 @@ export function attr(arg1: any, arg2?: any): any
     else if (arg1.constructor === Object)
         return attrDecorator.bind(undefined, undefined, arg1)
     else
-        attrDecorator(undefined, undefined, arg1, arg2!)
+        attrDecorator(arg2!, undefined, arg1, arg2!)
 }
 
 
 
+/** Actual decorator implementation */
 function attrDecorator(attrName: string | undefined, options: WebElmAttrOptions | undefined,
     target: any, propName: string): any
 {
@@ -319,10 +329,10 @@ function attrDecorator(attrName: string | undefined, options: WebElmAttrOptions 
     // or create a new one associated with the given class.
     let definition = getOrCreateWebElmDefinition(target.constructor);
 
-    addWebElmAttr(definition, {attrName, propName, options})
+    addWebElmAttr(definition, {attrName: attrName ?? propName, propName, options})
 
     // make it a trigger unless the "noTrigger" flag was set to true
-    if (!options?.noTrigger)
+    if (propName && !options?.noTrigger)
         trigger(target, propName);
 }
 
@@ -351,18 +361,25 @@ export function registerWebElm(webElmClass: WebElmConstructor, name?: string,
     // prototype.
     for( let [propName, attrDef] of Object.entries(definition.props))
     {
-        let onchanged = attrDef.options?.onchanged;
+        let options = attrDef.options;
+        let onchanged = options?.onchanged;
         if (!onchanged)
         {
             onchanged = webElmClass.prototype[`onchanged_${propName}`] as WebElmAttrChangeHandler | undefined;
             if (onchanged)
             {
-                if (attrDef.options)
-                    attrDef.options.onchanged = onchanged;
+                if (options)
+                    options.onchanged = onchanged;
                 else
-                    attrDef.options = {onchanged}
+                    attrDef.options = options = {onchanged}
             }
         }
+
+        // if attribute specifies toHtml converter, then register this attribute as JSX property with
+        // the v2s method set to toHtml
+        let toHtml = options?.toHtml;
+        if (toHtml)
+            registerElmProp( attrDef.attrName, {type: PropType.Attr, v2s: toHtml})
     }
     // by now the definition has been adjusted, so we can register the custom element according
     // to the definition values.
@@ -415,45 +432,28 @@ function mergeWebElmDefinition(webElmClass: WebElmConstructor, name?: string,
  */
 function getOrCreateWebElmDefinition(webElmClass: WebElmConstructor): WebElmDefinition
 {
-    // get definition that might be undefined or already set via @webElm and/or @attr decorators.
-    let definition = webElmClass[symWebElmDef] as WebElmDefinition;
-    if (!definition)
-        webElmClass[symWebElmDef] = definition = { options: {}, attrs: {}, props: {} };
-
-    return definition;
+    return webElmClass[symWebElmDef] ??= { name: "", attrs: {}, props: {} }
 }
 
 
 
 /**
- * Merges the given attribute into the given Web Element definition
+ * Merges the given attribute into the given Web Element definition. Note that if multiple `@attr`
+ * decorators with the same attribute name exist within the same class, the latest wins.
  *
  * @param definition Definition object from the custom Web Element class
  * @param attrDef Information about the element attribute
  */
 function addWebElmAttr(definition: WebElmDefinition, attrDef: WebElmAttrDefinition): void
 {
-    let attrName = attrDef.attrName?.toLowerCase();
-    let propName = attrDef.propName;
+    // when attributes' values change custom element is notified with the lower-case attribute
+    // name; therefore, we keep it in the map in lower-case.
+    definition.attrs[attrDef.attrName.toLowerCase()] = attrDef;
 
-    // we must have either attribute or property name.
-    if (!attrName && !propName)
-        return;
-
-    // check if the definition already has such attribute
-    if (attrName && definition.attrs[attrName] || propName && definition.props[propName])
-        return;
-
-    // if attribute name is not defined, it should be the same as the property name (which is
-    // defined as we have already checked)
-    if (!attrName)
-        attrName = attrDef.attrName = propName!.toLowerCase();
-
-    // by now attrName is defined
-    definition.attrs[attrName!] = attrDef;
-
-    if (propName)
-        definition.props[propName] = attrDef;
+    // propName can be undefined if the attribute definition was created not via the `@attr`
+    // decorator but either in the `@webElm` decorator or in the registerWebElm function.
+    if (attrDef.propName)
+        definition.props[attrDef.propName] = attrDef;
 }
 
 
@@ -461,25 +461,40 @@ function addWebElmAttr(definition: WebElmDefinition, attrDef: WebElmAttrDefiniti
 /**
  * Built-in attribute converter that converts string value to a number.
  */
-export const NumberConverter: WebElmFromHtmlConverter = (stringValue: string | null | undefined): number =>
-    stringValue ? parseFloat(stringValue) : NaN;
+export const attrToFloat: WebElmFromHtmlConverter = (stringValue: string | null | undefined): number =>
+    parseFloat(stringValue!);
 
 
 
 /**
  * Built-in attribute converter that converts string value to an integer number.
  */
-export const IntConverter: WebElmFromHtmlConverter = (stringValue: string | null | undefined): number =>
-    stringValue ? parseInt(stringValue) : NaN;
+export const attrToInt: WebElmFromHtmlConverter = (stringValue: string | null | undefined): number =>
+    parseInt(stringValue!);
 
 
 
 /**
  * Built-in attribute converter that converts string value to a Boolean value.
  */
-export const BoolConverter: WebElmFromHtmlConverter = (stringValue: string | null | undefined): boolean =>
-    !!stringValue
+export const attrToBool: WebElmFromHtmlConverter = (stringValue: string | null | undefined): boolean =>
+    !!stringValue;
 
+
+
+/**
+ * Built-in attribute converter that converts string value to a Boolean value.
+ */
+export const attrToObj: WebElmFromHtmlConverter = (stringValue: string | null | undefined): any =>
+    !stringValue ? null : JSON.parse(stringValue);
+
+
+
+/**
+ * Built-in converter that converts property object value to a string by using JSON.stringify.
+ */
+export const objToAttr: WebElmToHtmlConverter = (obj: object | null | undefined): string | null =>
+    !obj ? null : JSON.stringify(obj);
 
 
 

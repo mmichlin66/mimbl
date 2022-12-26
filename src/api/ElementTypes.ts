@@ -31,7 +31,7 @@ export type ReferrerPolicyPropType = "no-referrer" | "no-referrer-when-downgrade
 export type FetchpriorityPropType = "high" | "low" | "auto";
 
 /**
- * Type for custom `data` attribute that Combines `data-*` properties into one object, so that it
+ * Type for `dataset` attribute that Combines `data-*` properties into one object, so that it
  * is easier (less verbose) to specify them.
  */
 export type DatasetPropType = { [K: string]: any };
@@ -39,7 +39,7 @@ export type DatasetPropType = { [K: string]: any };
 
 
 /**
- * Boolean values in aria are specified as strings`"true"` or `"false"`
+ * Boolean values in aria are specified as strings `"true"` or `"false"`
  */
 export type AriaBoolean =  boolean | "true" |"false";
 
@@ -48,7 +48,7 @@ export type AriaBoolean =  boolean | "true" |"false";
 /**
  * Defines a set of aria properties
  */
-export type Ariaset =
+export interface IAriaset
 {
     activedescendant?: IDPropType;
     atomic?: AriaBoolean;
@@ -74,7 +74,7 @@ export type Ariaset =
     hidden?: AriaBoolean | "undefined";
     invalid?: AriaBoolean | "grammar" | "spelling";
     keyshortcuts?: string | string[];
-    label?: AriaBoolean;
+    label?: string;
     labelledby?: IDPropType | IDPropType[];
     level?: number;
     live?: "assertive" | "off" | "polite";
@@ -139,7 +139,7 @@ export interface IElementAttrs
      *   - arrays are converted by converting their items using these rules and joining them with spaces.
      *   - everything else is converted by calling the toString method.
      */
-    aria?: Ariaset;
+    aria?: IAriaset;
 }
 
 

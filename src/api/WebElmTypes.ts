@@ -7,13 +7,10 @@
  * property's type. Converter functions are specified as part of attribute options, e.g. in the
  * [[attr]] decorator.
  *
- * The converter functions are called as part of custom Web element functionality and the
- * `this` parameter points to the instance of the element whose attribute is bein converted.
- *
  * @param stringValue Attribute's string value to convert to the corresponding type.
  * @param attrName Name of the attribute whose value is being converted from string
  */
-export type WebElmFromHtmlConverter = (this: HTMLElement, stringValue: string | null | undefined,
+export type WebElmFromHtmlConverter = (stringValue: string | null | undefined,
     attrName: string) => any;
 
 
@@ -23,13 +20,10 @@ export type WebElmFromHtmlConverter = (this: HTMLElement, stringValue: string | 
  * string. Converter functions are specified as part of attribute options, e.g. in the
  * [[attr]] decorator.
  *
- * The converter functions are called as part of custom Web element functionality and the
- * `this` parameter points to the instance of the element whose attribute is bein converted.
- *
  * @param value Value to convert to string.
  * @param attrName Name of the attribute whose value is being converted to string
  */
-export type WebElmToHtmlConverter = (this: HTMLElement, value: any, attrName: string) => string | null;
+export type WebElmToHtmlConverter = (value: any, attrName: string) => string | null;
 
 
 
@@ -70,6 +64,13 @@ export type WebElmAttrOptions =
 export type WebElmOptions = Partial<ShadowRootInit> &
 {
     /**
+     * Flag indicating that the custom element class should not be immediately registered.
+     * If this is true, the class will be registered when the [[registerWebElm]] function
+     * is called for it.
+     */
+    deferred?: boolean;
+
+    /**
      * If defined, determines the tag name of a built-in HTML element that the custom element
      * extends.
      */
@@ -88,9 +89,9 @@ export type WebElmOptions = Partial<ShadowRootInit> &
  * Maps every property of the given type to an optional "onchanged" function that accepts the old
  * and the new values of a changed property.
  */
-export type OnPropChangeHandlers<T> =
+export type OnPropChangeHandlers<TEvents> =
 {
-    [P in keyof T & string as `onchanged_${P}`]?: (oldValue: T[P], newValue?: T[P]) => any
+    [P in keyof TEvents & string as `onchanged_${P}`]?: (oldValue: TEvents[P], newValue?: TEvents[P]) => any
 }
 
 

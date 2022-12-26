@@ -214,19 +214,14 @@ export class EventsMixin
     {
         let rtd: EventRunTimeData;
         if (typeof propVal === "function")
-            rtd = { func: propVal, thisArg: this.creator }
+            rtd = { func: propVal }
         else if (Array.isArray(propVal))
-        {
-            rtd = {
-                func: propVal[0],
-                arg: propVal[1],
-                thisArg: propVal[2] ?? this.creator,
-            }
-        }
+            rtd = { func: propVal[0], arg: propVal[1], thisArg: propVal[2] }
         else
             rtd = Object.assign( {}, propVal);
 
-        rtd.schedulingType ??= schedulingType ?? TickSchedulingType.Sync;
+        rtd.thisArg ??= this.creator;
+        rtd.schedulingType ??= schedulingType;
         rtd.comp = this.creator;
         return rtd;
     }

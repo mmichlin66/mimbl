@@ -24,8 +24,8 @@ export function createTrigger<T = any>( v?: T, depth?: number): ITrigger<T>
 
 
 /**
- * The Trigger class represents an object that keeps a value and notifies all attached watchers
- * when this value changes.
+ * The Trigger class represents an object that keeps a value and notifies the current watcher (if
+ * any) when this value changes.
  */
 class Trigger<T = any> extends EventSlot<TypeVoidFunc<T>> implements ITrigger<T>
 {
@@ -47,11 +47,11 @@ class Trigger<T = any> extends EventSlot<TypeVoidFunc<T>> implements ITrigger<T>
     public set( v: T): void
     {
         // nothing to do if the value is the same
-        if (v === this.v)
-            return;
-
-        this.v = triggerrize( v, this, this.depth);
-        this.fire(v);
+        if (v !== this.v)
+        {
+            this.v = triggerrize( v, this, this.depth);
+            this.fire(v);
+        }
     }
 
     /** Notifies the current watcher (if exists) that trigger value has been read */
@@ -449,7 +449,7 @@ export const exitMutationScope = (): void =>
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
- * Depending on the given trigger depth and on the value type, either returns the same value if
+ * Depending on the given trigger depth and on the value type, either returns the same value or, if
  * it is a container (object, array, map or set), returns a proxy to the value that knows to
  * notify read and change when its methods and properties are invoked.
  * @param v Value to convert if necessary
@@ -468,16 +468,17 @@ function triggerrize<T = any>( v: T, trigger: Trigger, depth?: number): T
         return v;
 
     let actDepth = depth ? depth - 1 : 0;
-    if (Array.isArray(v))
-        return new Proxy( v, new NonSlotHandler( trigger, actDepth)) as any as T;
-    else if (v instanceof Map)
-        return new Proxy( v, new MapHandler( trigger, actDepth)) as any as T;
+    let handlerClass: new (trigger: Trigger, depth?: number) => ProxyHandler<any>;
+    if (v instanceof Map)
+        handlerClass = MapHandler;
     else if (v instanceof Set)
-        return new Proxy( v, new SetHandler( trigger, actDepth)) as any as T;
-    else if ((v as any).constructor === Object)
-        return new Proxy( v, new NonSlotHandler( trigger, actDepth)) as any as T;
+        handlerClass = SetHandler;
+    else if (Array.isArray(v) || (v as any).constructor === Object)
+        handlerClass = NonSlotHandler;
     else
         return v;
+
+    return new Proxy( v as any as object, new handlerClass(trigger, actDepth)) as any as T;
 }
 
 
@@ -612,15 +613,34 @@ abstract class SlotContainerHandler implements ProxyHandler<any>
     }
 
     /**
-     * Method that must be overridden in the derived classes and which is responsible for calling
-     * a muutator method with the given name.
+     * Method that is responsible for calling a mutator method with the given name. This method
+     * provides implementation for common container methods like `clear` and `delete`. It is
+     * normally overridden in the derived classes, which add handling for other mutators.
      * @param name
      * @param orgMethod
      * @param args Two element tuple where the first element is the return value and the second
      * element is a flag indicating whether the container has changed.
      */
-    protected abstract callMutator( target: any, name: PropertyKey, orgMethod: Function,
-        ...args: any[]): [any, boolean];
+    protected callMutator( target: any, name: PropertyKey, orgMethod: Function,
+        ...args: any[]): [any, boolean]
+    {
+        if (name === "clear")
+        {
+            let isChanged = target.size > 0;
+            orgMethod();
+            return [undefined, isChanged];
+        }
+        else if (name === "delete")
+        {
+            let deleted = orgMethod( args[0]);
+            return [deleted, deleted];
+        }
+        else
+        {
+            // by default treat any other method as having one parameter and always mutating the container
+            return [orgMethod( triggerrize( args[0], this.trigger, this.depth)), true];
+        }
+    }
 
 
 
@@ -661,19 +681,10 @@ class MapHandler extends SlotContainerHandler
      */
     protected callMutator( target: Map<any,any>, name: PropertyKey, orgMethod: Function, ...args: any[]): [any, boolean]
     {
-        if (name === "clear")
-        {
-            let isChanged = target.size > 0;
-            orgMethod();
-            return [undefined, isChanged];
-        }
-        else if (name === "set")
+        if (name === "set")
             return [orgMethod( args[0], triggerrize( args[1], this.trigger, this.depth)), true];
-        else // if (name === "delete")
-        {
-            let deleted = orgMethod( args[0]);
-            return [deleted, deleted];
-        }
+        else
+            return super.callMutator(target, name, orgMethod, ...args);
     }
 }
 
@@ -689,30 +700,6 @@ class SetHandler extends SlotContainerHandler
     constructor( trigger: Trigger, depth: number)
     {
         super( trigger, setMutatorMethodNames, depth);
-    }
-
-    /**
-     * Implements set-specific mutator methods.
-     * @param name
-     * @param orgMethod
-     * @param args Two element tuple where the first element is the return value and the second
-     * element is a flag indicating whether the container has changed.
-     */
-    protected callMutator( target: Map<any,any>, name: PropertyKey, orgMethod: Function, ...args: any[]): [any, boolean]
-    {
-        if (name === "add")
-            return [orgMethod( triggerrize( args[0], this.trigger, this.depth)), true];
-        else if (name === "clear")
-        {
-            let isChanged = target.size > 0;
-            orgMethod();
-            return [undefined, isChanged];
-        }
-        else // if (name === "delete")
-        {
-            let deleted = orgMethod( args[0]);
-            return [deleted, deleted];
-        }
     }
 }
 

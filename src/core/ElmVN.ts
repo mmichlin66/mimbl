@@ -14,7 +14,7 @@ import { isTrigger } from "../api/TriggerAPI"
 import { VN, setRef } from "./VN";
 import { EventsMixin } from "./Events";
 import {
-    AttrPropInfo, cleanElmProps, CustomAttrPropInfo, EventPropInfo, propInfos, removeElmProp,
+    AttrPropInfo, cleanElmProps, CustomAttrPropInfo, EventPropInfo, getPropInfo, removeElmProp,
     setElmProp, updateElmProp
 } from "./Props";
 
@@ -192,7 +192,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             this.parseProps( this.props);
 
             if (this.attrs)
-                this.mountAttrs( this.attrs);
+                this.mountAttrs();
 
             this.events?.mount(elm);
 
@@ -244,7 +244,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
         // if any attributes have triggers, detach from them
         if (this.attrs)
-            this.unmountAttrs( this.attrs);
+            this.unmountAttrs();
 
         // note that we don't need to unmount events, because event listeners are removed when
         // the element is destroyed
@@ -291,8 +291,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
         // need to update attributes and events if the new props are different from the current
         // ones.
-        if (isNewCreator || !s_deepCompare( this.props, newVN.props, 3))
-        {
+        // if (isNewCreator || !s_deepCompare( this.props, newVN.props, 3))
+        // {
             if (newVN.props)
                 newVN.parseProps( newVN.props);
 
@@ -309,7 +309,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             this.updateAttrs( newVN.attrs, isNewCreator);
             this.updateEvents( newVN.events);
             this.updateCustomAttrs( newVN.customAttrs);
-        }
+        // }
 
         // remember new props
         this.props = newVN.props;
@@ -340,6 +340,40 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 
+	// Goes over the original properties and puts them into the buckets of attributes, event
+	// listeners and custom attributes.
+	private parseProps( props: Record<string,any>): void
+	{
+        // loop over all properties ignoring the built-ins
+        for( let [propName, propVal] of Object.entries(props))
+		{
+            // get information about the property and determine its type.
+            let propInfo = getPropInfo(propName);
+            let propType = propInfo?.type ?? getPropTypeFromPropVal(propVal);
+            if (propType === PropType.Attr)
+                (this.attrs ??= {})[propName] = { info: propInfo, val: propVal, valS: null };
+            else if (propType === PropType.Event)
+                (this.events ??= new EventsMixin(this.creator)).add(propName,
+                    propVal as EventPropType, (propInfo as EventPropInfo)?.schedulingType);
+            else if (propType === PropType.Framework)
+            {
+                if (propName === "ref")
+                    this.ref = propVal as RefType<T>;
+                else if (propName === "vnref")
+                    this.vnref = propVal as ElmRefType<T>;
+                else if (propName === "updateStrategy")
+                    this.updateStrategy = propVal as UpdateStrategy;
+            }
+            else // if (propType === PropType.CustomAttr)
+            {
+                // remember custom attributes value. Handler will be created later.
+                (this.customAttrs ??= {})[propName] = { info: propInfo as CustomAttrPropInfo, val: propVal, handler: undefined};
+            }
+		}
+	}
+
+
+
     // Updates properties of this node from the given object containing new properties values. This
     // method is invoked if only properties should be updated without re-rendering the children.
 	private updatePropsOnly( props: any): void
@@ -348,23 +382,23 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         for( let [propName, propVal] of Object.entries(props))
 		{
             // get information about the property and determine its type.
-            let propInfo = propInfos[propName];
+            let propInfo = getPropInfo(propName);
             let propType = propInfo?.type ?? getPropTypeFromPropVal(propVal);
 
             if (propType === PropType.Attr)
-                this.updateAttrOnly( propName, propInfo as AttrPropInfo, propVal);
+                this.updateAttrOnly( propName, propVal, propInfo as AttrPropInfo);
             else if (propType === PropType.Event)
-                this.updateEventOnly( propName, propInfo as EventPropInfo, propVal as EventPropType);
+                this.updateEventOnly( propName, propVal as EventPropType, propInfo as EventPropInfo);
             else if (propType === PropType.CustomAttr)
-                this.updateCustomAttrOnly( propName, propInfo as CustomAttrPropInfo, propVal);
+                this.updateCustomAttrOnly( propName, propVal, propInfo as CustomAttrPropInfo);
             else // if (propType === PropType.Framework)
             {
                 if (propName === "key")
                     this.key = propVal;
                 else if (propName === "ref")
-                    this.ref = propVal as RefType<T>;
+                    this.updateRef(propVal as RefType<T>);
                 else if (propName === "vnref")
-                    this.vnref = propVal as ElmRefType<T>;
+                    this.updateVNref(propVal as ElmRefType<T>);
                 else if (propName === "updateStrategy")
                     this.updateStrategy = propVal as UpdateStrategy;
             }
@@ -386,56 +420,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             {
                 let newVal = newAttrValues[name];
 
-                // use setElmProp instead of updateElmProp because we don't have the old
-                // attribute value as it was replaced in the trigger by the new one
                 if (newVal != null)
-                    setElmProp( this.ownDN!, name, rtd.info, newVal);
+                    rtd.valS = updateElmProp( this.ownDN!, name, rtd.valS, newVal, rtd.info);
                 else
-                    removeElmProp( this.ownDN!, name, rtd.info);
-            }
-		}
-	}
-
-
-
-	// Goes over the original properties and puts them into the buckets of attributes, event
-	// listeners and custom attributes.
-	private parseProps( props: Record<string,any>): void
-	{
-        // loop over all properties ignoring the built-ins
-        for( let [propName, propVal] of Object.entries(props))
-		{
-            // get information about the property and determine its type.
-            let propInfo = propInfos[propName];
-            let propType = propInfo?.type ?? getPropTypeFromPropVal(propVal);
-            if (propType === PropType.Attr)
-            {
-                if (!this.attrs)
-                    this.attrs = {};
-
-                this.attrs[propName] = { info: propInfo, val: propVal };
-            }
-            else if (propType === PropType.Event)
-            {
-                this.events ??= new EventsMixin(this.creator);
-                this.events.add(propName, propVal as EventPropType, (propInfo as EventPropInfo)?.schedulingType);
-            }
-            else if (propType === PropType.Framework)
-            {
-                if (propName === "ref")
-                    this.ref = propVal as RefType<T>;
-                else if (propName === "vnref")
-                    this.vnref = propVal as ElmRefType<T>;
-                else if (propName === "updateStrategy")
-                    this.updateStrategy = propVal as UpdateStrategy;
-            }
-            else // if (propType === PropType.CustomAttr)
-            {
-                if (!this.customAttrs)
-                    this.customAttrs = {};
-
-                // remember custom attributes value. Handler will be created later.
-                this.customAttrs[propName] = { info: propInfo as CustomAttrPropInfo, val: propVal, handler: undefined};
+                    removeElmProp( this.ownDN!, name, rtd.valS, rtd.info), rtd.valS = null;
             }
 		}
 	}
@@ -475,13 +463,13 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 	// Adds DOM attributes to the Element.
-	private mountAttrs( attrs: { [name: string]: AttrRunTimeData }): void
+	private mountAttrs(): void
 	{
-		for( let name in attrs)
-            this.mountAttr( name, attrs[name], false);
+        for( let [name, rtd] of Object.entries(this.attrs))
+            this.mountAttr( name, rtd, false);
 	}
 
-	private mountAttr( name: string, rtd: AttrRunTimeData, isUpdate: boolean): void
+	private mountAttr( name: string, rtd: AttrRunTimeData, addToAttrs: boolean): void
 	{
         let val = rtd.val;
 
@@ -496,16 +484,14 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 val.attach( rtd.onChange!);
             }
 
-            setElmProp( this.ownDN!, name, rtd.info, actVal);
+            rtd.valS = setElmProp( this.ownDN!, name, actVal, rtd.info);
         }
 
-        if (isUpdate)
-        {
-            if (!this.attrs)
-                this.attrs = {};
-
-            this.attrs[name] = rtd;
-        }
+        // `add` means that a new attribute is mounted as a result of updating already existing
+        // element (as opposed to mounting it for the first time), and that we need to remember it
+        // in our attrs object.
+        if (addToAttrs)
+            (this.attrs ??= {})[name] = rtd;
 	}
 
 
@@ -519,17 +505,23 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		// update those whose value has changed
 		if (oldAttrs)
 		{
-			for( let name in oldAttrs)
-                this.updateAttr( name, oldAttrs[name], newAttrs?.[name], isNewCreator);
+            for( let [name, oldRTD] of Object.entries(oldAttrs))
+            {
+                let newRTD = newAttrs?.[name];
+                if (newRTD)
+                    this.updateAttr(name, oldRTD, newRTD, isNewCreator);
+                else
+                    this.unmountAttr(name, oldRTD, true);
+            }
 		}
 
-		// loop over new attributes; add those that are not found among the old ones
+		// loop over new attributes and mount those that are not found among the old ones
 		if (newAttrs)
 		{
-			for( let name in newAttrs)
+            for( let [name, newRTD] of Object.entries(newAttrs))
 			{
-				if (!oldAttrs || !(name in oldAttrs))
-                    this.mountAttr( name, newAttrs[name], true)
+				if (!oldAttrs?.[name])
+                    this.mountAttr( name, newRTD, true)
 			}
 		}
 	}
@@ -539,14 +531,23 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      * value is null, remove the old property and remove the attribute from the element. If the
      * new value is different from the old one, set it to the attribute in the element.
      */
-    private updateAttr( name: string, oldRTD: AttrRunTimeData, newRTD?: AttrRunTimeData, isNewCreator?: boolean): void
+    private updateAttr( name: string, oldRTD: AttrRunTimeData, newRTD: AttrRunTimeData, isNewCreator?: boolean): void
     {
         let oldVal = oldRTD.val;
-        let newVal = newRTD?.val;
-        if (!isNewCreator && newVal === oldVal)
+        let newVal = newRTD.val;
+
+        // if both old and new values are null or undefined, we don't do anything
+        if (newVal == null && oldVal == null)
             return;
 
-        // remember the new value
+        // we skip updating the attribute if the new value is equal to the old one and if it is a
+        // primitive value (not object or array) and there is no new creator. We need to continue
+        // update for objects and arrays because although the value can be the same, the members
+        // could have changed
+        if (newVal === oldVal && (newVal == null || typeof newVal !== "object") && !isNewCreator)
+            return;
+
+        // remember the new value. We will reuse newVal and oldVal with values from triggers (if any)
         oldRTD.val = newVal;
 
         let onChange = oldRTD.onChange;
@@ -570,34 +571,35 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         else
             oldRTD.onChange = undefined;
 
-        // if creator has changed, use "set" instead of "update" as some properties should be
-        // reset as new (e.g. defaultChecked)
-        // if the new value is null and the old one was not, then remove the attribute regardless
-        // of whether
-        if (newVal == null && oldVal != null)
-            removeElmProp( this.ownDN!, name, oldRTD.info, oldRTD.val);
-        else if (isNewCreator && newVal != null)
-            setElmProp(this.ownDN!, name, oldRTD.info, newVal);
-        else if (newVal !== oldVal)
-            updateElmProp( this.ownDN!, name, oldRTD.info, oldVal, newVal);
+        // If the new value is null, remove the attribute; if creator has changed, use "set"
+        // instead of "update" as some properties should be reset as new (e.g. defaultChecked).
+        if (newVal == null)
+            removeElmProp( this.ownDN!, name, oldRTD.valS, oldRTD.info), oldRTD.valS = null;
+        else if (isNewCreator)
+            oldRTD.valS = setElmProp(this.ownDN!, name, newVal, oldRTD.info);
+        else
+            oldRTD.valS = updateElmProp( this.ownDN!, name, oldRTD.valS, newVal, oldRTD.info);
     }
 
 
 
-    private unmountAttrs( attrs: { [name: string]: AttrRunTimeData }): void
+    private unmountAttrs(): void
     {
-        for( let name in attrs)
-            this.unmountAttr( name, attrs[name], false);
+        for( let [name, rtd] of Object.entries(this.attrs))
+            this.unmountAttr( name, rtd, false);
     }
 
-    private unmountAttr( name: string, rtd: AttrRunTimeData, isUpdate: boolean): void
+    private unmountAttr( name: string, rtd: AttrRunTimeData, removeFromAttrs: boolean): void
     {
         if (rtd.onChange)
             rtd.val.detach( rtd.onChange);
 
-        if (isUpdate)
+        // removeFromAttrs means that a new attribute is unmounted as a result of updating the
+        // element (as opposed to unmounting it), and that we need to remove it from our attrs
+        // object and from the DOM element.
+        if (removeFromAttrs)
         {
-            removeElmProp( this.ownDN!, name, rtd.info, rtd.val)
+            removeElmProp( this.ownDN!, name, rtd.valS, rtd.info)
             delete this.attrs[name];
         }
     }
@@ -606,9 +608,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
     // Adds, updates or removes the given DOM attribute of this Element. This method is invoked
     // when the properties of the element are updated as a result of setProps call; that
-    // is when only the properties that should be added, updated or removed were specified and
+    // is, when only the properties that should be added, updated or removed were specified and
     // there is no need to re-render the element's children
-	private updateAttrOnly( name: string, info: AttrPropInfo, val: any ): void
+	private updateAttrOnly( name: string, val: any, info?: AttrPropInfo): void
 	{
         let oldRTD = this.attrs?.[name];
         if (val == null)
@@ -618,10 +620,11 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         }
         else
         {
+            let newRTD: AttrRunTimeData = {info, val, valS: null};
             if (oldRTD)
-                this.updateAttr( name, oldRTD, {info, val});
+                this.updateAttr( name, oldRTD, newRTD);
             else
-                this.mountAttr( name, {info, val}, true);
+                this.mountAttr( name, newRTD, true);
         }
 	}
 
@@ -651,10 +654,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     // when the properties of the element are updated as a result of setProps call; that
     // is when only the properties that should be added, updated or removed were specified and
     // there is no need to re-render the element's children
-	private updateEventOnly( name: string, info: EventPropInfo, val: EventPropType): void
+	private updateEventOnly( name: string, val: EventPropType, info?: EventPropInfo): void
 	{
-        this.events ??= new EventsMixin(this.creator);
-        this.events.updateSingleEvent(name, val, info?.schedulingType);
+        (this.events ??= new EventsMixin(this.creator)).updateSingleEvent(name, val, info?.schedulingType);
 	}
 
 
@@ -665,8 +667,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		// create and initialize custom property handlers
 		for( let name in this.customAttrs)
 		{
-            let customAttr = this.customAttrs[name];
-            if (!this.mountCustomAttr( name, customAttr))
+            // if the custom attribute handler failed to initialize, we remove it from our list
+            if (!this.mountCustomAttr( name, this.customAttrs[name]))
 				delete this.customAttrs[name];
 		}
 	}
@@ -786,7 +788,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     // when the properties of the element are updated as a result of setProps call; that
     // is when only the properties that should be added, updated or removed were specified and
     // there is no need to re-render the element's children
-	private updateCustomAttrOnly( name: string, info: CustomAttrPropInfo, val: any ): void
+	private updateCustomAttrOnly( name: string, val: any, info: CustomAttrPropInfo): void
 	{
         let oldCustomAttr = this.customAttrs && this.customAttrs[name];
         let newCustomAttr = val != null && { info, val, handler: undefined};
@@ -808,10 +810,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             else
             {
                 this.mountCustomAttr( name, newCustomAttr);
-                if (!this.customAttrs)
-                    this.customAttrs = {};
-
-                this.customAttrs[name] = newCustomAttr
+                (this.customAttrs ??= {})[name] = newCustomAttr
             }
         }
 	}
@@ -894,14 +893,25 @@ function onAttrTriggerChanged( this: ElmVN, name: string, val: any): void
 /** Type defining the information we keep about each regular attribute */
 interface AttrRunTimeData
 {
-	// Information about this attribute - can be undefined
-	info: AttrPropInfo;
+	/** Information about this attribute - can be undefined */
+	info?: AttrPropInfo;
 
-	// Current attribute value
+	/**
+     * Current attribute value as passed in the JSX properties. This can be of any type including
+     * a trigger object.
+     */
 	val: any;
 
-    // Bound method reacting on the value change in the trigger. It is created only if the
-    // attribute value is a trigger.
+	/**
+     * Current attribute value converted to string and set in HTML. This can only be null if val
+     * is a trigger because we don't remove attribute with a trigger as its value from our attrs
+     * object even if the trigger's value is null.
+     */
+	valS: string | null;
+
+    /**
+     * Bound method reacting on the value change in the trigger. It is created only if the attribute value is a trigger.
+     */
     onChange?: (s: string) => void;
 };
 
