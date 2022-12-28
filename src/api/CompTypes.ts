@@ -55,7 +55,9 @@ export type DN = Node | null;
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent. Default type is an empty object (no events).
  */
-export type ComponentProps<TProps extends {} = {}, TEvents extends {} = {}> = Readonly<TProps> &
+export type ComponentProps<TProps extends {} = {}, TEvents extends {} = {}> =
+    ICommonProps &
+    Readonly<TProps> &
     { readonly [K in keyof TEvents & string as `$on_${K}`]?:
         EventPropType<TEvents[K] extends Event ? TEvents[K] : CustomEvent<TEvents[K]>> }
 
@@ -106,7 +108,7 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
      * undefined for independent components. This object can contains every property from the
      * *TProps* type and `$on_` property for every event defined in the *TEvents* type.
 	 */
-	props?: ComponentProps<TProps,TEvents>;
+	props: ComponentProps<TProps,TEvents>;
 
 	/**
 	 * Sets, gets or clears the virtual node object of the component. This property is set twice:
@@ -116,6 +118,12 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
      *     must release the remembered object.
 	 */
 	vn?: IClassCompVN;
+
+	/**
+	 * Optional update strategy object that determines different aspects of component behavior
+	 * during updates.
+	 */
+	readonly updateStrategy?: UpdateStrategy;
 
 	/** Returns the component's content that will be ultimately placed into the DOM tree. */
 	render(): any;
@@ -181,12 +189,6 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
 	 * of one of its descendants.
 	 */
 	handleError?( err: unknown): void;
-
-	/**
-	 * Retrieves update strategy object that determines different aspects of component behavior
-	 * during updates.
-	 */
-	getUpdateStrategy?(): UpdateStrategy;
 }
 
 
@@ -232,13 +234,9 @@ export interface IComponentEx<TEvents extends {} = {}>
 	readonly isMounted: boolean;
 
 	/**
-	 * This method is called by the component to request to be updated. If no arguments are
-	 * provided, the entire component is requested to be updated. If arguments are provided, they
-	 * indicate what rendering function should be updated.
-     * @param func Optional rendering function to invoke
-     * @param arg Optional argument to pass to the rendering function.
+	 * This method is called by the component to request to be updated.
      */
-	updateMe( func?: RenderMethodType, arg?: any): void;
+	updateMe(): void;
 
 	/**
 	 * Schedules the given function to be called before any components scheduled to be updated in
@@ -809,13 +807,9 @@ export interface IClassCompVN extends IVNode
     readonly shadowRoot?: ShadowRoot;
 
 	/**
-	 * This method is called by the component to request to be updated. If no arguments are
-	 * provided, the entire component is requested to be updated. If arguments are provided, they
-	 * indicate what rendering functions should be updated.
-     * @param func Optional rendering function to invoke
-     * @param arg Optional argument to pass to the rendering function.
+	 * This method is called by the component to request to be updated.
      */
-	updateMe( func?: RenderMethodType, arg?: any): void;
+	updateMe(): void;
 
 	/**
 	 * Schedules the given function to be called either before any components scheduled to be
@@ -1023,6 +1017,19 @@ export interface ITextVN extends IVNode
 
 
 
+/**
+ * Represents a virtual node for a rendering function virtual node.
+ */
+export interface IFuncProxyVN extends IVNode
+{
+	/**
+     * Requests update of the content produced by the function.
+     */
+	updateMe(): void;
+}
+
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Custom attributes
@@ -1129,6 +1136,36 @@ export type RenderMethodType = (arg?: any) => any;
 
 
 /**
+ * Properties to be used with the FuncProxy component.
+ */
+export interface FuncProxyProps
+{
+	/** Function to be called to render content. */
+	func: RenderMethodType;
+
+    /**
+     * The "this" argument for calling the function. If it is not provided, the current component
+     * is used. This allows passing methods of the current component as rendering functions without
+     * the need to bind them to "this".
+     */
+    thisArg?: any;
+
+    /**
+     * Optional argument to be passed to the rendering function. Only one argument is allowed. If
+     * there is a need to pass several parameters, use either array or object.
+     */
+    arg?: any;
+
+    /**
+     * Optional reference object, which will point to the FuncProxy virtual node when the node is
+     * mounted. Through this reference, the function can be invoked, which will cause re-rendering.
+     */
+    ref?: RefType<IFuncProxyVN>;
+}
+
+
+
+/**
  * Properties to be used with the PromiseProxy component.
  */
 export interface PromiseProxyProps
@@ -1136,12 +1173,11 @@ export interface PromiseProxyProps
 	/** Promise that will be watched by the waiting node. */
 	promise: Promise<any>;
 
-	/** Function that is called if the promise is rejected. */
-	errorContentFunc?: (err: any) => any;
-
+    /** Optional content that is displayed until the promise is settled */
     children?: any;
 
-    key?: any;
+	/** Function that is called if the promise is rejected. */
+	errorContentFunc?: (err: any) => any;
 }
 
 

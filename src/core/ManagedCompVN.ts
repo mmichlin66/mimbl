@@ -1,7 +1,7 @@
 ﻿import {DN, EventPropType, IComponentClass, RefPropType} from "../api/CompTypes"
 import { IVN, VNDisp } from "./VNTypes";
 import { ClassCompVN } from "./ClassCompVN";
-import { VN, setRef } from "./VN";
+import { VN, setRef, updateRef } from "./VN";
 import { EventsMixin } from "./Events";
 
 
@@ -16,7 +16,7 @@ export class ManagedCompVN extends ClassCompVN
 	// Properties that were passed to the component. For managed components this is always defined.
     // Even if no properties were passed to the component, props would include an array of
     // children (which might be null or empty).
-	public props: Record<string,any> | undefined;
+	public props: Record<string,any>;
 
 
 
@@ -25,7 +25,7 @@ export class ManagedCompVN extends ClassCompVN
 		super();
 
 		this.compClass = compClass;
-        this.props = props;
+        this.props = props as Record<string,any>;
         this.children = children;
 
         // get the key (if exists) because we will need it during update even before the
@@ -117,20 +117,8 @@ export class ManagedCompVN extends ClassCompVN
         let comp = this.comp!;
 
 		// if reference specification changed then set or unset it as necessary
-		if (newVN.ref !== this.ref)
-		{
-            // clear our old reference (if exists)
-            if (this.ref)
-                setRef( this.ref, undefined, comp);
-
-            // remember the new reference object
-			this.ref = newVN.ref;
-
-			// if reference is now specified, set it now; note that we already determined that
-			// the reference object is different.
-			if (this.ref)
-				setRef( this.ref, comp);
-		}
+		if (this.ref !== newVN.ref)
+            this.ref = updateRef(this.ref, newVN.ref, comp);
 
         // update attributes and events
         this.updateEvents( newVN.events);

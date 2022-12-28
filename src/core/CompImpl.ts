@@ -1,7 +1,8 @@
 ﻿import {
-    IClassCompVN, IComponentEx, IPublication, IServiceDefinitions, ISubscription, RenderMethodType,
-    ScheduledFuncType, TickSchedulingType
+    IComponentEx, IPublication, IServiceDefinitions, ISubscription, ScheduledFuncType,
+    TickSchedulingType
 } from "../api/CompTypes";
+import { ClassCompVN } from "./ClassCompVN";
 
 
 
@@ -20,7 +21,7 @@ export abstract class ComponentMixin<TEvents extends {} = {}> implements ICompon
 	 * is undefined in the component's costructor but will be defined before the call to the
 	 * (optional) willMount method.
 	 */
-	public vn?: IClassCompVN;
+	public vn?: ClassCompVN;
 
     /**
      * Determines whether the component is currently mounted. If a component has asynchronous
@@ -30,15 +31,11 @@ export abstract class ComponentMixin<TEvents extends {} = {}> implements ICompon
 	get isMounted(): boolean { return this.vn != null; };
 
 	/**
-	 * This method is called by the component to request to be updated. If no arguments are
-	 * provided, the entire component is requested to be updated. If arguments are provided, they
-	 * indicate what rendering function should be updated.
-     * @param func Optional rendering function to invoke
-     * @param arg Optional argument to pass to the rendering function.
+	 * This method is called by the component to request to be updated.
      */
-	updateMe( func?: RenderMethodType, arg?: any): void
+	updateMe(): void
 	{
-		this.vn?.updateMe( func, arg);
+		this.vn?.requestUpdate();
 	}
 
 	/**

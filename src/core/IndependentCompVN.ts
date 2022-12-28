@@ -27,9 +27,7 @@ export class IndependentCompVN extends ClassCompVN
 
 
 
-	// String representation of the virtual node. This is used mostly for tracing and error
-	// reporting. The name can change during the lifetime of the virtual node; for example,
-	// it can reflect an "id" property of an element (if any).
+	/** String representation of the virtual node. */
 	public get name(): string
 	{
 		// components can define the displayName property; if they don't then the default name
@@ -96,10 +94,7 @@ export class IndependentCompVN extends ClassCompVN
         super.update( this, disp);
 
         if (oldComp)
-        {
-            let fn = this.comp.didReplace;
-            fn && fn.call( this.comp, oldComp);
-        }
+            this.comp.didReplace?.call( this.comp, oldComp);
 	}
 
 

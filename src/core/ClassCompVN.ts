@@ -1,5 +1,5 @@
 ﻿import {
-    DN, IClassCompVN, IComponent, RenderMethodType, IComponentClass, ComponentShadowOptions,
+    DN, IClassCompVN, IComponent, IComponentClass, ComponentShadowOptions,
     ScheduledFuncType, TickSchedulingType
 } from "../api/CompTypes"
 import { VNDisp } from "./VNTypes";
@@ -10,11 +10,7 @@ import { IWatcher } from "../api/TriggerTypes";
 /// #endif
 
 import { createWatcher } from "../api/TriggerAPI";
-import { FuncProxyVN } from "./FuncProxyVN";
-import {
-    setCurrentClassComp, mountContent, unmountSubNodes, reconcile, scheduleFuncCall,
-    CallbackWrapper
-} from "./Reconciler";
+import { setCurrentClassComp, mountContent, reconcile, scheduleFuncCall, CallbackWrapper } from "./Reconciler";
 import { symRenderNoWatcher, VN } from "./VN";
 
 
@@ -78,30 +74,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	/// #if USE_STATS
 		public get statsCategory(): StatsCategory { return StatsCategory.Comp; }
 	/// #endif
-
-
-
-	/**
-     * Prepares component for mounting but doesn't render and mount sub-nodes
-     */
-	public prepareMount( comp: IComponent): void
-    {
-        // connect the component to this virtual node
-        comp.vn = this;
-
-        // don't need try/catch because it will be caught up the chain
-        let fn = comp.willMount;
-        fn && fn.call( comp);
-
-        // establish watcher if not disabled using the @noWatcher decorator
-        let render = comp.render;
-        if (render[symRenderNoWatcher])
-            this.actRender = render.bind( comp);
-        else
-            this.actRender = this.renderWatcher = createWatcher( render, this.requestUpdate, comp, this);
-
-        this.updateStrategy = comp.getUpdateStrategy?.();
-    }
 
 
 
@@ -175,39 +147,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
     // Releases reference to the DOM node corresponding to this virtual node.
-    public prepareUnmount( comp: IComponent): void
-    {
-        if (this.renderWatcher)
-        {
-            this.renderWatcher.dispose();
-            this.renderWatcher = undefined;
-        }
-
-        let fn = comp.willUnmount;
-        if (fn)
-        {
-            // need try/catch but only to log
-            let prevCreator = setCurrentClassComp( comp);
-            try
-            {
-                fn.call( comp);
-            }
-            catch( err)
-            {
-                console.error( `Exception in willUnmount of component '${this.name}'`, err);
-            }
-            setCurrentClassComp( prevCreator);
-        }
-
-        // unpublish and unsubscribe
-        this.clearPubSub();
-
-        comp.vn = undefined;
-    }
-
-
-
-    // Releases reference to the DOM node corresponding to this virtual node.
     public unmount( removeFromDOM: boolean): void
     {
         this.prepareUnmount( this.comp!);
@@ -215,14 +154,9 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         if (this.rootHost)
         {
             this.rootHost.remove();
+            removeFromDOM = false;
             this.rootHost = undefined;
             this.ownDN = undefined;
-        }
-
-        if (this.subNodes)
-        {
-            unmountSubNodes( this.subNodes, removeFromDOM);
-            this.subNodes = undefined;
         }
 
         super.unmount( removeFromDOM);
@@ -244,13 +178,14 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
 
-	// Updated this node from the given node. This method is invoked only if update
-	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node.
+	/**
+     * Performs part of the update functionality, which is common for managed and independent
+     * coponents.
+     */
 	public update( newVN: ClassCompVN, disp: VNDisp): void
 	{
         let comp = this.comp!;
-        this.updateStrategy = comp.getUpdateStrategy?.();
+        this.updateStrategy = comp.updateStrategy;
 
         let prevCreator = setCurrentClassComp( comp);
 
@@ -308,19 +243,16 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 			DetailedStats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-        return this.actRender();
+        // return this.actRender();
+        return this.watcher ? this.watcher() : this.comp.render();
 	}
 
 
 
     /** This method is called by the component when it needs to be updated. */
-	public updateMe( func?: RenderMethodType, arg?: any): void
+	public updateMe(): void
     {
-        // if no arguments are provided we request to update the entire component.
-		if (!func)
-			this.requestUpdate();
-		else
-            FuncProxyVN.update( func, arg);
+        this.requestUpdate();
     }
 
 
@@ -352,14 +284,65 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
 
-    // Watcher function wrapping the component's render function. The watcher will notice any
-    // trigger objects being read during the original function execution and will request update
-    // thus triggerring re-rendering.
-	private renderWatcher?: IWatcher;
+	/**
+     * Prepares component for mounting but doesn't render and mount sub-nodes
+     */
+	protected prepareMount( comp: IComponent): void
+    {
+        // connect the component to this virtual node
+        comp.vn = this;
 
-    // Actual function to be invoked during the rendering - it can be either the original func or
-    // the watcher.
-	private actRender: () => any;
+        // don't need try/catch because it will be caught up the chain
+        comp.willMount?.call( comp);
+
+        // establish watcher if not disabled using the @noWatcher decorator
+        this.watcher = comp.render[symRenderNoWatcher]
+            ? undefined
+            : createWatcher( comp.render, this.requestUpdate, comp, this);
+
+        this.updateStrategy = comp.updateStrategy;
+    }
+
+
+
+    // Releases reference to the DOM node corresponding to this virtual node.
+    protected prepareUnmount( comp: IComponent): void
+    {
+        // release the watcher; we don't need to set it to undefined because it will be done
+        // in the next mount (which is only possible in independent components)
+        this.watcher?.dispose();
+
+        let willUnmount = comp.willUnmount;
+        if (willUnmount)
+        {
+            // need try/catch but only to log
+            let prevCreator = setCurrentClassComp( comp);
+            try
+            {
+                willUnmount.call( comp);
+            }
+            catch( err)
+            {
+                /// #if DEBUG
+                console.error( `Exception in willUnmount of component '${this.name}'`, err);
+                /// #endif
+            }
+            setCurrentClassComp( prevCreator);
+        }
+
+        // unpublish and unsubscribe
+        this.clearPubSub();
+
+        comp.vn = undefined;
+    }
+
+
+
+    /**
+     * Watcher function wrapping the component's render function. The watcher will notice any
+     * trigger objects being read during the original function execution and will request update
+     * thus triggerring re-rendering. */
+	private watcher?: IWatcher;
 }
 
 

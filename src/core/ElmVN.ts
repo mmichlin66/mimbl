@@ -8,10 +8,9 @@ import { ChildrenUpdateOperation, IVN, VNDisp } from "./VNTypes";
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
 
-import { mountSubNodes, unmountSubNodes, reconcileSubNodes } from "./Reconciler";
-import { s_deepCompare } from "../utils/UtilFunc";
+import { mountSubNodes, reconcileSubNodes } from "./Reconciler";
 import { isTrigger } from "../api/TriggerAPI"
-import { VN, setRef } from "./VN";
+import { VN, setRef, updateRef } from "./VN";
 import { EventsMixin } from "./Events";
 import {
     AttrPropInfo, cleanElmProps, CustomAttrPropInfo, EventPropInfo, getPropInfo, removeElmProp,
@@ -243,7 +242,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             setRef( this.vnref, undefined, this);
 
         // if any attributes have triggers, detach from them
-        if (this.attrs)
+        if (this.hasTriggers)
             this.unmountAttrs();
 
         // note that we don't need to unmount events, because event listeners are removed when
@@ -253,12 +252,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         if (this.customAttrs)
             this.unmountCustomAttrs();
 
-        if (this.subNodes)
-            unmountSubNodes( this.subNodes, false);
+        super.unmount( removeFromDOM);
 
         this.ownDN = null;
-
-        super.unmount( removeFromDOM);
 	}
 
 
@@ -289,27 +285,24 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             cleanElmProps(this.elmName, this.ownDN!)
         }
 
-        // need to update attributes and events if the new props are different from the current
-        // ones.
-        // if (isNewCreator || !s_deepCompare( this.props, newVN.props, 3))
-        // {
-            if (newVN.props)
-                newVN.parseProps( newVN.props);
+        if (newVN.props)
+            newVN.parseProps( newVN.props);
 
-            // if reference specifications changed then set or unset them as necessary
-            this.updateRef( newVN.ref);
-            this.updateVNref( newVN.vnref);
+        // if reference specifications changed then set or unset them as necessary
+        if (this.ref != newVN.ref)
+            this.ref = updateRef(this.ref, newVN.ref, this.ownDN!);
+        if (this.vnref != newVN.vnref)
+            updateRef(this.vnref, newVN.vnref, this);
 
-            // remember the new value of the key and updateStartegy properties (even if the
-            // values are the same)
-            this.key = newVN.key;
-            this.updateStrategy = newVN.updateStrategy;
+        // remember the new value of the key and updateStartegy properties (even if the
+        // values are the same)
+        this.key = newVN.key;
+        this.updateStrategy = newVN.updateStrategy;
 
-            // update attributes and events
-            this.updateAttrs( newVN.attrs, isNewCreator);
-            this.updateEvents( newVN.events);
-            this.updateCustomAttrs( newVN.customAttrs);
-        // }
+        // update attributes and events
+        this.updateAttrs( newVN.attrs, isNewCreator);
+        this.updateEvents( newVN.events);
+        this.updateCustomAttrs( newVN.customAttrs);
 
         // remember new props
         this.props = newVN.props;
@@ -396,9 +389,15 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 if (propName === "key")
                     this.key = propVal;
                 else if (propName === "ref")
-                    this.updateRef(propVal as RefType<T>);
+                {
+                    if (this.ref !== propVal)
+                        this.ref = updateRef(this.ref, propVal as RefType<T>, this.ownDN!);
+                }
                 else if (propName === "vnref")
-                    this.updateVNref(propVal as ElmRefType<T>);
+                {
+                    if (this.vnref !== propVal)
+                        this.vnref = updateRef(this.vnref, propVal as ElmRefType<T>, this);
+                }
                 else if (propName === "updateStrategy")
                     this.updateStrategy = propVal as UpdateStrategy;
             }
@@ -430,38 +429,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 
-    /**
-     * Updates reference to the DOM element.
-     */
-    private updateRef( newRef: RefType<T>): void
-    {
-        if (newRef !== this.ref)
-        {
-            if (this.ref)
-                setRef( this.ref, undefined);
-            this.ref = newRef;
-            if (this.ref)
-                setRef( this.ref, this.ownDN);
-        }
-    }
-
-    /**
-     * Updates reference to the virtual node.
-     */
-    private updateVNref( newVNref: ElmRefType<T>): void
-    {
-        if (newVNref !== this.vnref)
-        {
-            if (this.vnref)
-                setRef( this.vnref, undefined);
-            this.vnref = newVNref;
-            if (this.vnref)
-                setRef( this.vnref, this);
-        }
-    }
-
-
-
 	// Adds DOM attributes to the Element.
 	private mountAttrs(): void
 	{
@@ -482,6 +449,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 actVal = val.get();
                 rtd.onChange = onAttrTriggerChanged.bind( this, name);
                 val.attach( rtd.onChange!);
+                this.hasTriggers = true;
             }
 
             rtd.valS = setElmProp( this.ownDN!, name, actVal, rtd.info);
@@ -567,6 +535,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 oldRTD.onChange = onAttrTriggerChanged.bind( this, name);
             newVal.attach( oldRTD.onChange!);
             newVal = newVal.get();
+            this.hasTriggers = true;
         }
         else
             oldRTD.onChange = undefined;
@@ -824,13 +793,17 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	public ownDN: T | null;
 
     // Reference to the element that is specified as a "ref" property.
-	private ref: RefType<T>;
+	private ref?: RefType<T>;
 
     // Reference to this virtual node that is specified as a "vnref" property.
-	private vnref: ElmRefType<T>;
+	private vnref?: ElmRefType<T>;
 
 	// Object that serves as a map between attribute names and their current values.
 	private attrs: { [name: string]: AttrRunTimeData };
+
+	// Flag indicating whether at least one of the attributes has triggers. If not then
+    // we can avoid calling unmountAttrs upon element unmounting.
+	private hasTriggers?: boolean;
 
 	// Object that serves as a container for event information.
 	private events: EventsMixin | undefined;

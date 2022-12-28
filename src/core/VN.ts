@@ -10,7 +10,7 @@ import { ChildrenUpdateRequest, IVN } from "./VNTypes";
     import {StatsCategory} from "../utils/Stats"
 /// #endif
 
-import { getCurrentClassComp, requestNodeUpdate } from "./Reconciler";
+import { getCurrentClassComp, requestNodeUpdate, unmountSubNodes } from "./Reconciler";
 
 
 
@@ -126,6 +126,12 @@ export abstract class VN implements IVN
      */
 	public unmount( removeFromDOM: boolean): void
     {
+        if (this.subNodes)
+        {
+            unmountSubNodes( this.subNodes, removeFromDOM);
+            this.subNodes = undefined;
+        }
+
         this.anchorDN = null;
 
         // set null to parent as we don't want to hold on to the reference as our
@@ -358,6 +364,18 @@ export function setRef<T>( ref: RefType<T>, val: T, onlyIf?: T): void
 		ref(val);
 	else if (!onlyIf || ref.r === onlyIf)
         ref.r = val;
+}
+
+
+
+export function updateRef<T>(oldRef: RefType<T> | undefined, newRef: RefType<T> | undefined, val: T): RefType<T> | undefined
+{
+    if (oldRef)
+        setRef(oldRef, undefined, val);
+    if (newRef)
+        setRef(newRef, val);
+
+    return newRef;
 }
 
 

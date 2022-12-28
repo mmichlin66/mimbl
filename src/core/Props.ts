@@ -781,8 +781,8 @@ const propInfos: { [P:string]: PropInfo } =
     keyTimes: ArrayWithSemicolonPropInfo,
     keySplines: ArrayWithSemicolonPropInfo,
 
-    // // global events
-    // click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },
+    // global events
+    click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },
 };
 
 

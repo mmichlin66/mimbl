@@ -1,8 +1,7 @@
 ﻿import {
     CallbackWrappingOptions, ComponentShadowOptions, IComponent, ICustomAttributeHandlerClass,
     IRef, ITextVN, IVNode, PromiseProxyProps, PropType, RefFunc, RenderMethodType, DN, IComponentEx,
-    ComponentProps,
-    ExtendedElement
+    ComponentProps, ExtendedElement, FuncProxyProps
 } from "./CompTypes";
 import {EventSlot} from "./EventSlotAPI"
 import { ClassCompVN, shadowDecorator } from "../core/ClassCompVN";
@@ -220,12 +219,12 @@ export abstract class Component<TProps extends {} = {children?: any}, TEvents ex
 	 * Component properties passed to the constructor. This is normally used only by managed
 	 * components and is usually undefined for independent components.
 	 */
-	public props?: ComponentProps<TProps,TEvents>;
+	public props: ComponentProps<TProps,TEvents>;
 
 	constructor( props?: TProps)
 	{
         super();
-        this.props = props;
+        this.props = props ?? {} as ComponentProps<TProps,TEvents>;
 	}
 
 	/**
@@ -248,59 +247,44 @@ applyMixins(Component, ComponentMixin);
 
 
 /**
- * Creates a Function Proxy virtual node that wraps the given function with the given argument.
+ * Creates a Function Proxy virtual node that wraps the given function with an optional argument.
  * This allows using the same component method with different arguments, for example:
  *
  * ```typescript
  * class ToDoList extends mim.Component
  * {
  *     // array of objects of some externally defined ToDo type
- *     todos: ToDo[] = [];
+ *     @mim.trigger todos: ToDo[] = [];
  *
  *     render(): any
  *     {
  *         return <main>
- *             {this.todos.map( todo => FuncProxy(renderTodo, todo))}
+ *             {this.todos.map( todo => <FuncProxy func={this.renderTodo, arg: todo))}
  *         </main>
  *     }
  *
- *     renderToDo( todo: ToDo): any
+ *     renderToDo(todo: ToDo): any
  *     {
  *         return <div>{todo.description}</div>
  *     }
  * }
  * ```
  *
- * @param func Function (usually a component method) to be wrapped in a virtual node
- * @param arg Argument distinguishing one function invocation from another
- * @param thisArg Optional object to be used as `this` when invoking the function. If omitted,
- * the component instance will be used.
- * @returns
+ *
+ * @param props Properties defining the rendering function and optional parameters.
  */
-export const FuncProxy = (func: RenderMethodType, arg?: any, thisArg?: any): IVNode =>
-    new FuncProxyVN(func, thisArg ?? getCurrentClassComp(), arg);
+export function FuncProxy(props: FuncProxyProps): any {}
 
 
 
 /**
- * The PromiseProxy component wraps a Promise and replaces its content when the promise is settled.
+ * The PromiseProxy function wraps a Promise and replaces its content when the promise is settled.
  * Before the promise is settled, the component displays an optional "in-progress" content
  * specified as children of the component. If the promise is rejected, the component will either
  * display the "error" content obtained by calling a functions specified in the properties or, if
  * such function is not specified, display nothing.
  */
-export class PromiseProxy extends Component<PromiseProxyProps>
-{
-	/**
-	 * Instances of the FuncProxy component are never actually created; istead, the parameters
-	 * passed to it via JSX are used by an internal virtual node that handles function
-	 * invocation.
-	 */
-	private constructor( props: PromiseProxyProps) { super( props); }
-
-	/** The render method of the PromiseProxy component is never actually called */
-	public render(): any {}
-}
+export function PromiseProxy(props: PromiseProxyProps): any {}
 
 
 
@@ -367,7 +351,7 @@ String.prototype[symToVNs] = function(this: string): IVN | IVN[] | null | undefi
 // virtual node or nodes.
 Function.prototype[symToVNs] = function(this: Function): IVN | IVN[] | null | undefined
 {
-    return new FuncProxyVN(this as RenderMethodType, getCurrentClassComp());
+    return new FuncProxyVN({func: this as RenderMethodType});
 };
 
 
@@ -377,10 +361,9 @@ Function.prototype[symToVNs] = function(this: Function): IVN | IVN[] | null | un
 // JSX element is processed (exceptions are when a component has a special treatment of children,
 // which is rare); therefore, the following optimzations are done for most common cases:
 //   - when the array is empty (e.g. element or component without children)
-//   - when there is 1 item in the array (e.g. most of case for elements with text nodes)
+//   - when there is 1 item in the array (e.g. most of cases for elements with text nodes)
 //   - when all array items are already VNs (e.g. when all children are JSX elements)
 //   - when all array items produce VNs one to one; that is, for no array item the toVNs
-//     method returns null/undefined or array
 Array.prototype[symToVNs] = function(this: Array<any>): IVN | IVN[] | null | undefined
 {
     let count = this.length;
@@ -484,6 +467,12 @@ Component[symJsxToVNs] = function(props: Record<string,any> | undefined,
 {
     return new ManagedCompVN( this, props, children);
 }
+
+
+
+// Add jsxToVNs method to the PromiseProxy class object. This method is invoked by the JSX mechanism.
+FuncProxy[symJsxToVNs] = (props: FuncProxyProps | undefined): IVN | IVN[] | null | undefined =>
+    props?.func ? new FuncProxyVN(props) : null;
 
 
 
