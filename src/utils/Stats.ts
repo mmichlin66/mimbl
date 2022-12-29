@@ -75,9 +75,9 @@ export class DetailedStats
 	// increments the number of times the given action was performed on an entity of a given
 	// category. If the entity is a DOM entity (as opposed to a component), then the DOM
 	// total number is also incremented.
-    public static log( category: StatsCategory, action: StatsAction): void
+    public static log( category: StatsCategory, action: StatsAction, qty: number = 1): void
     {
-        DetailedStats.instance?.log( category, action);
+        DetailedStats.instance?.log( category, action, qty);
     }
 
 
@@ -124,7 +124,7 @@ export class DetailedStats
 	// increments the number of times the given action was performed on an entity of a given
 	// category. If the entity is a DOM entity (as opposed to a component), then the DOM
 	// total number is also incremented.
-	private log( category: StatsCategory, action: StatsAction): void
+	private log( category: StatsCategory, action: StatsAction, qty: number): void
 	{
 		let categoryStats: CategoryStats;
 		switch( category)
@@ -139,11 +139,11 @@ export class DetailedStats
 
 		switch( action)
 		{
-			case StatsAction.Added: categoryStats.added++; break;
-			case StatsAction.Deleted: categoryStats.deleted++; break;
-			case StatsAction.Updated: categoryStats.updated++; break;
-			case StatsAction.Moved: categoryStats.moved++; break;
-			case StatsAction.Rendered: categoryStats.rendered++; break;
+			case StatsAction.Added: categoryStats.added += qty; break;
+			case StatsAction.Deleted: categoryStats.deleted += qty; break;
+			case StatsAction.Updated: categoryStats.updated += qty; break;
+			case StatsAction.Moved: categoryStats.moved += qty; break;
+			case StatsAction.Rendered: categoryStats.rendered += qty; break;
 		}
 	}
 

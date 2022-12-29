@@ -96,16 +96,45 @@ export type CallbackWrapperParams<T extends Function = Function> = CallbackWrapp
 
 
 /**
+ * Wraps a callback function using the given parameters and returns a function with identical
+ * signature.
+ */
+export function wrapFunc<T extends Function>(params: CallbackWrapperParams<T>): T
+
+/**
+ * Wraps the given function with the given options and returns a function with identical signature.
+ */
+export function wrapFunc<T extends Function>(func: T, options?: CallbackWrappingOptions): T
+
+// Implementation
+export function wrapFunc<T extends Function>(funcOrParams: T | CallbackWrapperParams<T>,
+    options?: CallbackWrappingOptions): T
+{
+    return CallbackWrapper.bind(typeof funcOrParams === "object"
+        ? funcOrParams
+        : {
+            func: funcOrParams,
+            thisArg: options?.thisArg ?? s_currentClassComp,
+            arg: options?.arg,
+            comp: options?.comp ?? s_currentClassComp,
+            tickType: options?.tickType
+          }
+    );
+}
+
+
+
+/**
  * The CallbackWrapper function is used to wrap callbacks in order to have it executed in a Mimbl
  * context.
  */
-export function CallbackWrapper( this: CallbackWrapperParams): any
+function CallbackWrapper(this: CallbackWrapperParams): any
 {
     // if some scheduling type is set (that is, we are going to schedule a Mimbl tick after
     // the callback), we should ignore requests to schedule a tick made during the callback
     // execution
-    let schedulingType = this.schedulingType;
-    s_ignoreSchedulingRequest = !!schedulingType;
+    let tickType = this.tickType;
+    s_ignoreSchedulingRequest = !!tickType;
 
     // set the current component while remembering the previously set one
     let prevComponent = s_currentClassComp;
@@ -131,8 +160,8 @@ export function CallbackWrapper( this: CallbackWrapperParams): any
     }
 
     // schedule a Mimbl tick if instructed to do so
-    if (schedulingType)
-        scheduleTick(schedulingType);
+    if (tickType)
+        scheduleTick(tickType);
 
     return retVal;
 }
@@ -142,9 +171,9 @@ export function CallbackWrapper( this: CallbackWrapperParams): any
 /**
  * Schedule (or executes) Mimbl tick according to the given type.
  */
-const scheduleTick = (schedulingType: TickSchedulingType = TickSchedulingType.AnimationFrame): void =>
+const scheduleTick = (tickType: TickSchedulingType = TickSchedulingType.AnimationFrame): void =>
 {
-    switch (schedulingType)
+    switch (tickType)
     {
         case TickSchedulingType.Sync:
             performMimbleTick();
@@ -168,7 +197,7 @@ const scheduleTick = (schedulingType: TickSchedulingType = TickSchedulingType.An
 
 
 // Schedules an update for the given node.
-export const requestNodeUpdate = (vn: IVN, req?: ChildrenUpdateRequest, schedulingType?: TickSchedulingType): void =>
+export const requestNodeUpdate = (vn: IVN, req?: ChildrenUpdateRequest, tickType?: TickSchedulingType): void =>
 {
     if (!vn.anchorDN)
     {
@@ -189,15 +218,17 @@ export const requestNodeUpdate = (vn: IVN, req?: ChildrenUpdateRequest, scheduli
     // canceled. The update is scheduled in the next tick unless the request is made during a
     // "before update" function execution.
     if (!s_ignoreSchedulingRequest && s_schedulerState !== SchedulerState.BeforeUpdate)
-        scheduleTick( schedulingType || TickSchedulingType.AnimationFrame);
+        scheduleTick( tickType || TickSchedulingType.AnimationFrame);
 }
 
 
 
-// Schedules to call the given function either before or after all the scheduled components
-// have been updated.
-export const scheduleFuncCall = (func: ScheduledFuncType, beforeUpdate: boolean,
-    thisArg?: any, comp?: IComponent, schedulingType?: TickSchedulingType): void =>
+/**
+ * Schedules the given function to be called either before or after all the scheduled components
+ * have been updated.
+ */
+export const scheduleFunc = (func: ScheduledFuncType, beforeUpdate: boolean,
+    options?: CallbackWrappingOptions): void =>
 {
 	/// #if DEBUG
 	if (!func)
@@ -211,26 +242,26 @@ export const scheduleFuncCall = (func: ScheduledFuncType, beforeUpdate: boolean,
 	{
 		if (!s_callsScheduledBeforeUpdate.has( func))
 		{
-			s_callsScheduledBeforeUpdate.set( func, CallbackWrapper.bind({func, thisArg, comp}));
+			s_callsScheduledBeforeUpdate.set( func, wrapFunc(func, options));
 
 			// a "before update" function is always scheduled in the next frame even if the
 			// call is made from another "before update" function.
             if (!s_ignoreSchedulingRequest)
-                scheduleTick( schedulingType || TickSchedulingType.AnimationFrame);
+                scheduleTick(TickSchedulingType.AnimationFrame);
 		}
 	}
 	else
 	{
 		if (!s_callsScheduledAfterUpdate.has( func))
 		{
-			s_callsScheduledAfterUpdate.set( func, CallbackWrapper.bind({func, thisArg, comp}));
+			s_callsScheduledAfterUpdate.set( func, wrapFunc(func, options));
 
 			// an "after update" function is scheduled in the next cycle unless the request is made
 			// either from a "before update" function execution or during a node update.
             if (!s_ignoreSchedulingRequest &&
                 s_schedulerState !== SchedulerState.BeforeUpdate && s_schedulerState !== SchedulerState.Update)
             {
-                scheduleTick( schedulingType || TickSchedulingType.AnimationFrame);
+                scheduleTick(TickSchedulingType.AnimationFrame);
             }
 		}
 	}
@@ -502,7 +533,7 @@ const spliceNodeChildren = (vn: IVN, req: SpliceRequest): void =>
 
         // determine the node before which the new nodes should be mounted
         let ownDN = vn.ownDN;
-        let anchorDN = ownDN ? ownDN : vn.anchorDN;
+        let anchorDN = ownDN ?? vn.anchorDN;
         let beforeDN = index + newSubNodes.length < oldSubNodes.length
             ? oldSubNodes[index + newSubNodes.length].getFirstDN()
             : ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN!);
@@ -591,7 +622,7 @@ const swapNodeChildren = (vn: IVN, req: SwapRequest): void =>
 
     // first stage is to move actual DOM nodes
     let ownDN = vn.ownDN;
-    let anchorDN = ownDN ? ownDN : vn.anchorDN;
+    let anchorDN = ownDN ?? vn.anchorDN;
 
     // determine whether both ranges should be moved or just one - the latter can happen if the
     // ranges are adjacent.
@@ -767,7 +798,7 @@ const growNodeChildren = (vn: IVN, req: GrowRequest): void =>
 
     let oldSubNodes = vn.subNodes;
     let ownDN = vn.ownDN;
-    let anchorDN = ownDN ? ownDN : vn.anchorDN;
+    let anchorDN = ownDN ?? vn.anchorDN;
 
     // if the node didn't have any nodes before, we just mount all new nodes
     if (!oldSubNodes)
@@ -833,7 +864,7 @@ const reverseNodeChildren = (vn: IVN, req: ReverseRequest): void =>
     // find the DOM node after the last element in the range - this will be the node before which
     // we will move all our nodes from one before last back to the first
     let ownDN = vn.ownDN;
-    let anchorDN = ownDN ? ownDN : vn.anchorDN;
+    let anchorDN = ownDN ?? vn.anchorDN;
     let beforeDN = endIndex === oldLen
         ? ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN!)
         : oldSubNodes[endIndex].getFirstDN();
@@ -905,6 +936,9 @@ function removeAllSubNodes( vn: IVN)
 
     vn.subNodes?.forEach( svn => svn.unmount( !ownDN));
 
+    /// #if DEBUG
+    DetailedStats.log( StatsCategory.Elm, StatsAction.Deleted, vn.subNodes?.length ?? 0);
+    /// #endif
 }
 
 
@@ -959,7 +993,7 @@ export const reconcileSubNodes = (vn: IVN, disp: VNDisp, newSubNodes: IVN[] | nu
         // our node has its own DN, it will be the anchor for the sub-nodes; otherwise, our node's
         // anchor will be the anchor for the sub-nodes too.
         let ownDN = vn.ownDN;
-        let anchorDN = ownDN || vn.anchorDN;
+        let anchorDN = ownDN ?? vn.anchorDN;
 
         // if this virtual node doesn't define its own DOM node (true for components), we will
         // need to find a DOM node before which to start inserting new nodes. Null means
@@ -1142,10 +1176,6 @@ const updateSubNodesByGroups = (parentVN: IVN, disp: VNDisp, anchorDN: DN, befor
 
                 if (oldVN !== newVN)
                 {
-                    // // if the creator for the new element is not determined yet, use current component
-                    // if (!newVN.creator)
-                    //     newVN.creator = s_currentClassComp;
-
                     /// #if VERBOSE_NODE
                         console.debug( `Calling update() on node ${oldVN.name}`);
                     /// #endif
@@ -1180,7 +1210,7 @@ const updateSubNodesByGroups = (parentVN: IVN, disp: VNDisp, anchorDN: DN, befor
 
 		// if the group has at least one DN, its first DN becomes the node before which the next
         // group of new nodes (if any) should be inserted.
-		currBeforeDN = group.firstDN || currBeforeDN;
+		currBeforeDN = group.firstDN ?? currBeforeDN;
 	}
 
     // Arrange the groups in order as in the new sub-node list, moving them if necessary.
@@ -1325,7 +1355,7 @@ const buildSubNodeDispositions = (disp: VNDisp, newChain: IVN[] | null | undefin
     let newLen = newChain ? newChain.length : 0;
 
     // if either old or new or both chains are empty, we do special things
-    if (newLen === 0 && oldLen === 0)
+    if (!newLen && !oldLen)
     {
         // both chains are empty - do nothing
         disp.noChanges = true;
@@ -1333,7 +1363,7 @@ const buildSubNodeDispositions = (disp: VNDisp, newChain: IVN[] | null | undefin
     }
 
     disp.allProcessed = oldLen === (oldChain ? oldChain.length : 0);
-    if (newLen === 0 || oldLen === 0)
+    if (!newLen || !oldLen)
     {
         // either old or new chain is empty - either delete all old nodes or insert all new nodes
         disp.replaceAll = true;
@@ -1416,12 +1446,7 @@ const buildSubNodeDispositions = (disp: VNDisp, newChain: IVN[] | null | undefin
     // if we don't have any updates, this means that all old nodes should be deleted and all new
     // nodes should be inserted.
     if (!hasUpdates)
-    {
         disp.replaceAll = true;
-        // disp.subNodeDisps = null;
-        // disp.subNodesToRemove = null;
-        // disp.subNodeGroups = null;
-    }
     else
     {
         // if the number of sub-nodes is big enough and groups were not built yet, built them now.

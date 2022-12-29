@@ -1,6 +1,6 @@
 import { EventFuncType, EventPropType, IComponent, TickSchedulingType } from "../api/CompTypes";
 import { DetailedStats, StatsAction, StatsCategory } from "../utils/Stats";
-import { CallbackWrapper, CallbackWrapperParams } from "./Reconciler";
+import { CallbackWrapperParams, wrapFunc } from "./Reconciler";
 
 
 
@@ -151,7 +151,7 @@ export class EventsMixin
     /** Adds the given event listener to the event target. */
 	private mountEvent( name: string, rtd: EventRunTimeData): void
 	{
-		rtd.wrapper = CallbackWrapper.bind( rtd);
+		rtd.wrapper = wrapFunc(rtd);
 		this.eventTarget?.addEventListener( name, rtd.wrapper!, rtd.useCapture);
 
 		/// #if USE_STATS
@@ -195,7 +195,7 @@ export class EventsMixin
 			this.eventTarget?.removeEventListener( name, oldRTD.wrapper!, oldRTD.useCapture);
 
 			// create new wrapper and add it as event listener
-            newRTD.wrapper = CallbackWrapper.bind( newRTD);
+            newRTD.wrapper = wrapFunc(newRTD);
 			this.eventTarget?.addEventListener( name, newRTD.wrapper!, newRTD.useCapture);
 
 			/// #if USE_STATS
@@ -221,7 +221,7 @@ export class EventsMixin
             rtd = Object.assign( {}, propVal);
 
         rtd.thisArg ??= this.creator;
-        rtd.schedulingType ??= schedulingType;
+        rtd.tickType ??= schedulingType;
         rtd.comp = this.creator;
         return rtd;
     }

@@ -239,26 +239,19 @@ export interface IComponentEx<TEvents extends {} = {}>
 	updateMe(): void;
 
 	/**
-	 * Schedules the given function to be called before any components scheduled to be updated in
-	 * the Mimbl tick are updated.
+	 * Schedules the given function to be called either before or after components update cycle.
 	 * @param func Function to be called
+	 * @param beforeUpdate If true, the function is called before the component updates cycle; if
+     * false - after the cycle.
+	 * @param arg Argument that will be passed to the function.
 	 * @param thisArg Object that will be used as "this" value when the function is called. If this
 	 *   parameter is undefined, the component instance will be used (which allows scheduling
 	 *   regular unbound components' methods). This parameter will be ignored if the function
 	 *   is already bound or is an arrow function.
+     * @param tickType Defines whether and how Mimbl tick is scheduled after the function is called
 	 */
-	callMeBeforeUpdate( func: ScheduledFuncType, thisArg?: any): void;
-
-	/**
-	 * Schedules the given function to be called after all components scheduled to be updated in
-	 * the Mimbl tick have already been updated.
-	 * @param func Function to be called
-	 * @param thisArg Object that will be used as "this" value when the function is called. If this
-	 *   parameter is undefined, the component instance will be used (which allows scheduling
-	 *   regular unbound components' methods). This parameter will be ignored if the function
-	 *   is already bound or is an arrow function.
-	 */
-	callMeAfterUpdate( func: ScheduledFuncType, thisArg?: any): void;
+	callMe(func: ScheduledFuncType, beforeUpdate: boolean, arg?: any, thisArg?: any,
+        tickType?: TickSchedulingType): void;
 
     /**
      *
@@ -273,6 +266,20 @@ export interface IComponentEx<TEvents extends {} = {}>
      * @returns Wrapped callback that will run the original callback in the proper context.
      */
     wrap<T extends Function>( func: T, arg?: any, thisArg?: any, schedulingType?: TickSchedulingType): T;
+
+    /**
+	 * Retrieves the value for a service with the given ID registered by a closest ancestor
+	 * component or the default value if none of the ancestor components registered a service with
+	 * this ID. This method doesn't establish a subscription and only reflects the current state.
+	 * @param id Unique service identifier
+	 * @param defaultValue Default value to return if no publish service is found.
+	 * @param useSelf Flag indicating whether the search for the service should start from the
+     * virtual node that calls this method. The default value is `false` meaning the search starts
+     * from the parent virtual node.
+     * @returns Current value of the service or default value if no published service is found.
+	 */
+	getService<K extends keyof IServiceDefinitions>( id: K, defaultValue?: IServiceDefinitions[K],
+        useSelf?: boolean): IServiceDefinitions[K];
 
     /**
 	 * Registers the given value as a service with the given ID that will be available for
@@ -310,21 +317,6 @@ export interface IComponentEx<TEvents extends {} = {}>
 	 */
 	subscribeService<K extends keyof IServiceDefinitions>( id: K, defaultValue?: IServiceDefinitions[K],
         useSelf?: boolean): ISubscription<K>;
-
-
-    /**
-	 * Retrieves the value for a service with the given ID registered by a closest ancestor
-	 * component or the default value if none of the ancestor components registered a service with
-	 * this ID. This method doesn't establish a subscription and only reflects the current state.
-	 * @param id Unique service identifier
-	 * @param defaultValue Default value to return if no publish service is found.
-	 * @param useSelf Flag indicating whether the search for the service should start from the
-     * virtual node that calls this method. The default value is `false` meaning the search starts
-     * from the parent virtual node.
-     * @returns Current value of the service or default value if no published service is found.
-	 */
-	getService<K extends keyof IServiceDefinitions>( id: K, defaultValue?: IServiceDefinitions[K],
-        useSelf?: boolean): IServiceDefinitions[K];
 
     /**
      * Fires an event of the given type. The `detail` parameter is interpreted differently for
@@ -394,7 +386,7 @@ export type CallbackWrappingOptions =
 	comp?: IComponent | null;
 
 	/** Type of scheduling the Mimbl tick after the callback function returns. */
-	schedulingType?: TickSchedulingType;
+	tickType?: TickSchedulingType;
 };
 
 
@@ -640,7 +632,7 @@ export interface IErrorBoundary
 /**
  * Type of functions scheduled to be called either before or after the update cycle.
  */
-export type ScheduledFuncType = () => void;
+export type ScheduledFuncType = (arg?: any) => void;
 
 
 
@@ -811,67 +803,6 @@ export interface IClassCompVN extends IVNode
      */
 	updateMe(): void;
 
-	/**
-	 * Schedules the given function to be called either before any components scheduled to be
-     * updated in the Mimbl tick are updated or after all components have been updated.
-	 * @param func Function to be called
-     * @param beforeUpdate Flag indicating whether the function will be called just before the Mimbl
-     * tick (true) or right after (false)
-	 * @param thisArg Object that will be used as "this" value when the function is called. If this
-	 *   parameter is undefined, the component instance will be used (which allows scheduling
-	 *   regular unbound components' methods). This parameter will be ignored if the function
-	 *   is already bound or is an arrow function.
-	 */
-    callMe( func: ScheduledFuncType, beforeUpdate: boolean, thisArg?: any): void;
-
-    /**
-     * Returns a function that wraps the given callback so that when the return function is called
-     * the original callback is invoked in a proper context.
-     * @param func Callback function to be wrapped
-     * @param thisArg Object to be used as `this` when calling the callback
-     * @param arg Optional argument to be passed to the callback in addition to the original
-     * callback arguments.
-     * @param schedulingType Type of scheduling the Mimbl tick after the callback function returns.
-     * @returns Wrapped callback that will run the original callback in the proper context.
-     */
-    wrap<T extends Function>( func: T, thisArg: any, arg?: any, schedulingType?: TickSchedulingType): T;
-
-    /**
-	 * Registers the given value as a service with the given ID that will be available for
-     * consumption by descendant components.
-     * @param id Unique service identifier
-     * @param value Current value of the service
-     * @param depth Number of level to watch for changes. The default value is 1; that is, the
-     * subscribers will be notified if the service's value or the values of its properties have
-     * changed.
-     * @returns Publication object, which allows setting a new value of the service or changing
-     * values of its properties.
-     */
-	publishService<K extends keyof IServiceDefinitions>( id: K, value: IServiceDefinitions[K],
-        depth?: number): IPublication<K>;
-
-	/**
-	 * Subscribes to a service with the given ID. If the service with the given ID is registered
-	 * by this or one of the ancestor components, the returned subscription object's `value`
-     * property will reference it; otherwise, the value will be set to the defaultValue (if
-     * specified) or will remain undefined. Whenever the value of the service that is registered by
-     * this or a closest ancestor component is changed, the subscription's `value` property will
-     * receive the new value.
-     *
-     * If the subscription object's `value` property is used in a component's rendering code, the
-     * component will be re-rendered every time the service value is changed.
-     *
-	 * @param id Unique service identifier
-	 * @param defaultValue Optional default value that will be assigned if the service is not
-     * published yet.
-	 * @param useSelf Flag indicating whether the search for the service should start from the
-     * virtual node that calls this method. The default value is `false` meaning the search starts
-     * from the parent virtual node.
-     * @returns Subscription object, which provides the value of the service and allowes attaching
-     * to the event fired when the value is changed.
-	 */
-	subscribeService<K extends keyof IServiceDefinitions>( id: K, defaultValue?: IServiceDefinitions[K],
-        useSelf?: boolean): ISubscription<K>;
 }
 
 

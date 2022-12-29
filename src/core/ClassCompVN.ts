@@ -1,7 +1,4 @@
-﻿import {
-    DN, IClassCompVN, IComponent, IComponentClass, ComponentShadowOptions,
-    ScheduledFuncType, TickSchedulingType
-} from "../api/CompTypes"
+﻿import { DN, IClassCompVN, IComponent, IComponentClass, ComponentShadowOptions } from "../api/CompTypes"
 import { VNDisp } from "./VNTypes";
 import { IWatcher } from "../api/TriggerTypes";
 
@@ -10,7 +7,7 @@ import { IWatcher } from "../api/TriggerTypes";
 /// #endif
 
 import { createWatcher } from "../api/TriggerAPI";
-import { setCurrentClassComp, mountContent, reconcile, scheduleFuncCall, CallbackWrapper } from "./Reconciler";
+import { setCurrentClassComp, mountContent, reconcile } from "./Reconciler";
 import { symRenderNoWatcher, VN } from "./VN";
 
 
@@ -253,33 +250,6 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	public updateMe(): void
     {
         this.requestUpdate();
-    }
-
-
-
-	/**
-	 * Schedules the given function to be called before any components scheduled to be updated in
-	 * the Mimbl tick are updated.
-	 * @param func Function to be called
-	 * @param thisArg Object that will be used as "this" value when the function is called. If this
-	 *   parameter is undefined, the component instance will be used (which allows scheduling
-	 *   regular unbound components' methods). This parameter will be ignored if the function
-	 *   is already bound or is an arrow function.
-	 */
-	public callMe( func: ScheduledFuncType, beforeUpdate: boolean, thisArg?: any): void
-	{
-		scheduleFuncCall( func, beforeUpdate, thisArg ?? this.comp, this.comp);
-	}
-
-
-
-    /**
-     * Returns a function that wraps the given callback so that when the return function is called
-     * the original callback is invoked in a proper context.
-     */
-    public wrap<T extends Function>( func: T, thisArg: any, arg?: any, schedulingType?: TickSchedulingType): T
-    {
-        return CallbackWrapper.bind( { func, thisArg: thisArg ?? this.comp, arg, comp: this, schedulingType}) as T;
     }
 
 

@@ -1,5 +1,5 @@
 import {IScheduler} from "mimcss"
-import { scheduleFuncCall } from "./Reconciler";
+import { scheduleFunc } from "./Reconciler";
 
 
 export type MimcssModuleType = typeof import("mimcss");
@@ -73,7 +73,7 @@ class StyleScheduler implements IScheduler
 	 */
     public scheduleDOMUpdate(): void
     {
-		scheduleFuncCall( this.onUpdate, false, this);
+		scheduleFunc( this.onUpdate, false, {thisArg: this});
     }
 
 	/**

@@ -1,8 +1,9 @@
 ﻿import {
     CallbackWrappingOptions, ComponentShadowOptions, IComponent, ICustomAttributeHandlerClass,
-    IRef, ITextVN, IVNode, PromiseProxyProps, PropType, RefFunc, RenderMethodType, DN, IComponentEx,
+    IRef, ITextVN, PromiseProxyProps, PropType, RefFunc, RenderMethodType, DN, IComponentEx,
     ComponentProps, ExtendedElement, FuncProxyProps
 } from "./CompTypes";
+import { IVN } from "../core/VNTypes";
 import {EventSlot} from "./EventSlotAPI"
 import { ClassCompVN, shadowDecorator } from "../core/ClassCompVN";
 import { TextVN } from "../core/TextVN";
@@ -12,13 +13,12 @@ import { FuncProxyVN } from "../core/FuncProxyVN";
 import { ManagedCompVN } from "../core/ManagedCompVN";
 import { PromiseProxyVN } from "../core/PromiseProxyVN";
 import { mountRoot, unmountRoot } from "../core/RootVN";
-import { CallbackWrapper, content2VNs, getCurrentClassComp, symJsxToVNs, symToVNs } from "../core/Reconciler";
+import { content2VNs, symJsxToVNs, symToVNs, wrapFunc } from "../core/Reconciler";
 import { s_initStyleScheduler } from "../core/StyleScheduler";
 import { isTrigger } from "./TriggerAPI";
 import { symRenderNoWatcher, VN } from "../core/VN";
 import { ComponentMixin } from "../core/CompImpl";
 import { applyMixins } from "../utils/UtilFunc";
-import { IVN } from "../core/VNTypes";
 import { registerElmProp } from "../core/Props";
 
 
@@ -56,17 +56,8 @@ export const withShadow = (options: Function | ComponentShadowOptions): any =>
  * Wraps the given callback and returns a function with identical signature.
  * @param options
  */
-export function wrapCallback<T extends Function>( func: T, options?: CallbackWrappingOptions): T
-{
-    let comp = getCurrentClassComp();
-    return CallbackWrapper.bind( {
-        func,
-        thisArg: options?.thisArg ?? comp,
-        arg: options?.arg,
-        comp: options?.comp ?? comp,
-        schedulingType: options?.schedulingType
-    });
-}
+export const wrapCallback = <T extends Function>(func: T, options?: CallbackWrappingOptions): T =>
+    wrapFunc(func, options)
 
 
 
