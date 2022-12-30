@@ -8,13 +8,11 @@ import { VN } from "./VN";
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// The RootVN class is used as a top-level virtual node for all rendered trees. RootVN serves
-// as an error boundary of last resort. When it catches an error that wasn't caught by any
-// descendand node, it displays a simple UI that shows the error.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
+/**
+ * The RootVN class is used as a top-level virtual node for all rendered trees. RootVN serves as
+ * an error boundary of last resort. When it catches an error that wasn't caught by any descendand
+ * node, it displays a simple UI that shows the error.
+ */
 export class RootVN extends VN implements IErrorBoundary
 {
 	public constructor( anchorDN: DN)

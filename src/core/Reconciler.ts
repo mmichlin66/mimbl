@@ -1252,9 +1252,7 @@ export const moveNode = (vn: IVN, anchorDN: DN, beforeDN: DN): void =>
 {
     // check whether the last of the DOM nodes already resides right before the needed node
     let dns = vn.getImmediateDNs();
-    if (!dns)
-        return;
-    else if (Array.isArray(dns))
+    if (dns?.length)
     {
         if (dns[dns.length - 1]!.nextSibling === beforeDN)
             return;
@@ -1267,23 +1265,12 @@ export const moveNode = (vn: IVN, anchorDN: DN, beforeDN: DN): void =>
                 DetailedStats.log( StatsCategory.Elm, StatsAction.Moved);
             /// #endif
         }
-    }
-    else
-    {
-        if (dns.nextSibling === beforeDN)
-            return;
-
-        anchorDN!.insertBefore( dns, beforeDN);
 
         /// #if USE_STATS
-            DetailedStats.log( StatsCategory.Elm, StatsAction.Moved);
+            if (!vn.ownDN)
+                DetailedStats.log( vn.statsCategory, StatsAction.Moved);
         /// #endif
     }
-
-    /// #if USE_STATS
-        if (!vn.ownDN)
-            DetailedStats.log( vn.statsCategory, StatsAction.Moved);
-    /// #endif
 }
 
 
@@ -1296,9 +1283,7 @@ const moveGroup = (group: VNDispGroup, disps: VNDisp[], anchorDN: DN, beforeDN: 
 	for( let i = group.first, last = group.last; i <= last; i++)
 	{
         dns = (useNewVN ? disps[i].newVN! : disps[i].oldVN!).getImmediateDNs();
-        if (!dns)
-            continue;
-        else if (Array.isArray(dns))
+        if (dns?.length)
         {
             for( let dn of dns)
             {
@@ -1308,22 +1293,11 @@ const moveGroup = (group: VNDispGroup, disps: VNDisp[], anchorDN: DN, beforeDN: 
                     DetailedStats.log( StatsCategory.Elm, StatsAction.Moved);
                 /// #endif
             }
-        }
-        else
-        {
-            if (dns.nextSibling === beforeDN)
-                return;
-
-            anchorDN!.insertBefore( dns, beforeDN);
 
             /// #if USE_STATS
-                DetailedStats.log( StatsCategory.Elm, StatsAction.Moved);
+                DetailedStats.log( (useNewVN ? disps[i].newVN! : disps[i].oldVN!).statsCategory, StatsAction.Moved);
             /// #endif
         }
-
-        /// #if USE_STATS
-            DetailedStats.log( (useNewVN ? disps[i].newVN! : disps[i].oldVN!).statsCategory, StatsAction.Moved);
-        /// #endif
 	}
 }
 

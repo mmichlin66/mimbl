@@ -84,8 +84,9 @@ export class FuncProxyVN extends VN implements IFuncProxyVN
 
 
     /** Cleans up the node object before it is released. */
-    public unmount( removeFromDOM: boolean): void
+    public unmount(removeFromDOM: boolean): void
     {
+        this.unmountSubNodes(removeFromDOM);
         this.prepareUnmount();
         super.unmount( removeFromDOM);
 

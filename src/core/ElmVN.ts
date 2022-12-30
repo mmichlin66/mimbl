@@ -224,12 +224,16 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	{
         if (removeFromDOM)
         {
-            this.ownDN?.remove();
+            this.ownDN!.remove();
 
             /// #if USE_STATS
                 DetailedStats.log( StatsCategory.Elm, StatsAction.Deleted);
             /// #endif
         }
+
+        // sub-nodes will not have to remove themselves from DOM, because either this or one
+        // of the ancestor nodes have already been removed.
+        this.unmountSubNodes(false);
 
         // unset the reference value if specified. We check whether the reference still points
         // to our element before setting it to undefined. If the same ElmRef object is used for

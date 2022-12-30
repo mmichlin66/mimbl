@@ -143,9 +143,11 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 
 
-    // Releases reference to the DOM node corresponding to this virtual node.
-    public unmount( removeFromDOM: boolean): void
+    /** Recursively removes the content of this virtual node from DOM. */
+    public unmount(removeFromDOM: boolean): void
     {
+        this.unmountSubNodes(removeFromDOM);
+
         this.prepareUnmount( this.comp!);
 
         if (this.rootHost)

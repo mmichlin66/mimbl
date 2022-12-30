@@ -431,14 +431,14 @@ export const exitMutationScope = (): void =>
         return;
     }
 
-    if (--mutationScopesRefCount === 0)
+    if (--mutationScopesRefCount === 0 && deferredWatchers.size)
     {
         // since when watchers respond, they can execute their watcher functions and that could
         // mess with the same set of watchers we are iterating over. Therefore, we make a copy
         // of this set first.
-        let watchers = Array.from( deferredWatchers.keys());
+        let watchers = Array.from(deferredWatchers.keys());
         deferredWatchers.clear();
-        watchers.forEach( watcher => watcher.respond());
+        watchers.forEach(watcher => watcher.respond());
     }
 }
 

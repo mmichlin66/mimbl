@@ -75,9 +75,9 @@ export class PromiseProxyVN extends VN
 
 
     /** Cleans up the node object before it is released. */
-    public unmount( removeFromDOM: boolean): void
+    public unmount(removeFromDOM: boolean): void
     {
-        // setting the promise to undefined means we are unmounted
+        this.unmountSubNodes(removeFromDOM);
 	    this.promise = undefined;
         super.unmount( removeFromDOM);
 

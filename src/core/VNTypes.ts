@@ -116,7 +116,7 @@ export interface IVN extends IVNode
     // Returns the list of DOM nodes that are immediate children of this virtual node; that is, are
     // NOT children of sub-nodes that have their own DOM node. May return null but never returns
     // empty array.
-    getImmediateDNs(): DN | DN[] | null;
+    getImmediateDNs(): DN[] | null;
 
 
 

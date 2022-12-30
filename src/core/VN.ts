@@ -101,7 +101,7 @@ export abstract class VN implements IVN
 
 
     /// #if USE_STATS
-    public get statsCategory(): StatsCategory { return StatsCategory.Comp; }
+    public abstract get statsCategory(): StatsCategory;
 	/// #endif
 
     /// #if DEBUG
@@ -121,17 +121,14 @@ export abstract class VN implements IVN
         this.anchorDN = anchorDN;
     }
 
+
+
     /**
      * Recursively removes the content of this virtual node from DOM.
      */
 	public unmount( removeFromDOM: boolean): void
     {
-        if (this.subNodes)
-        {
-            unmountSubNodes( this.subNodes, removeFromDOM);
-            this.subNodes = undefined;
-        }
-
+        // this indicates that our node is unmounted
         this.anchorDN = null;
 
         // set null to parent as we don't want to hold on to the reference as our
@@ -140,6 +137,22 @@ export abstract class VN implements IVN
         this.parent = null;
     }
 
+
+
+    /**
+     * Recursively removes the sub-nodes of this virtual node from DOM.
+     */
+	public unmountSubNodes( removeFromDOM: boolean): void
+    {
+        if (this.subNodes)
+        {
+            unmountSubNodes( this.subNodes, removeFromDOM);
+            this.subNodes = undefined;
+        }
+    }
+
+
+
     /**
      * Removes all publications and subscriptions
      */
@@ -147,7 +160,7 @@ export abstract class VN implements IVN
     {
         if (this.pubs)
         {
-            this.pubs?.forEach( publication => publication.unpublish());
+            this.pubs.forEach( publication => publication.unpublish());
             this.pubs = undefined;
         }
 
@@ -165,8 +178,10 @@ export abstract class VN implements IVN
 
 
 
-    // Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
-    // This method is only called on the mounted nodes.
+    /**
+     * Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
+     * This method is only called on the mounted nodes.
+     */
     public getFirstDN(): DN
     {
         if (this.ownDN)
@@ -186,8 +201,10 @@ export abstract class VN implements IVN
         return null;
     }
 
-    // Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
-    // This method is only called on the mounted nodes.
+    /**
+     * Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
+     * This method is only called on the mounted nodes.
+     */
     public getLastDN(): DN
     {
         if (this.ownDN)
@@ -207,13 +224,15 @@ export abstract class VN implements IVN
         return null;
     }
 
-    // Returns the list of DOM nodes that are immediate children of this virtual node; that is, are
-    // NOT children of sub-nodes that have their own DOM node. May return null but never returns
-    // empty array.
-    public getImmediateDNs(): DN | DN[] | null
+    /**
+     * Returns the list of DOM nodes that are immediate children of this virtual node; that is, are
+     * NOT children of sub-nodes that have their own DOM node. May return null but never returns
+     * empty array.
+     */
+    public getImmediateDNs(): DN[] | null
     {
         if (this.ownDN)
-            return this.ownDN;
+            return [this.ownDN];
         if (!this.subNodes)
             return null;
 
@@ -236,7 +255,7 @@ export abstract class VN implements IVN
 
 
 
-    // Schedules an update for this node.
+    /** Schedules an update for this node. */
 	public requestUpdate( req?: ChildrenUpdateRequest, schedulingType?: TickSchedulingType): void
 	{
 		if (!this.updateRequested)
@@ -248,7 +267,7 @@ export abstract class VN implements IVN
 
 
 
-	// Schedules an update for this node.
+	/** Schedules an update for this node. */
 	public requestPartialUpdate( schedulingType?: TickSchedulingType): void
 	{
 		if (!this.partialUpdateRequested)
@@ -266,20 +285,15 @@ export abstract class VN implements IVN
      */
 	public publishService( id: string, value: any, depth?: number): Publication
 	{
-		if (!this.pubs)
-			this.pubs = new Map<string,any>();
+        let publication = this.pubs?.get( id);
+        if (publication)
+            publication.value = value;
         else
         {
-            let publication = this.pubs.get( id);
-            if (publication)
-            {
-                publication.value = value;
-                return publication;
-            }
+            publication = new Publication( id, this, value, depth);
+            (this.pubs ??= new Map()).set(id, publication);
         }
 
-        let publication = new Publication( id, this, value, depth);
-        this.pubs.set(id, publication);
         return publication;
 	}
 
@@ -295,49 +309,45 @@ export abstract class VN implements IVN
 	 */
     public subscribeService( id: string, defaultValue?: any, useSelf?: boolean): ISubscription<any>
     {
-		if (!this.subs)
-			this.subs = new Map();
-        else
-        {
-            let subscription = this.subs.get( id);
-            if (subscription)
-                return subscription;
-        }
+        let subscription = this.subs?.get( id);
+        if (subscription)
+            return subscription;
 
         // find the service and create the subscription object
-        let publication = findPublication( this, id, useSelf);
-        let subscription = new Subscription( id, this, publication, defaultValue, useSelf);
-		this.subs.set( id, subscription);
-
+        subscription = new Subscription(id, this, findPublication(this, id, useSelf), defaultValue, useSelf);
+		(this.subs ??= new Map()).set(id, subscription);
         return subscription;
     }
 
 
 
-	// Retrieves the value for a service with the given ID registered by a closest ancestor
-	// node or the default value if none of the ancestor nodes registered a service with
-	// this ID. This method doesn't establish a subscription and only reflects the current state.
+	/**
+     * Retrieves the value for a service with the given ID registered by a closest ancestor node
+     * or the default value if none of the ancestor nodes registered a service with this ID. This
+     * method doesn't establish a subscription and only reflects the current state. Note that only
+     * undefined return value serves as the indication that the service was not found. All other
+     * values including null, empty string, zero and false might be valid service values.
+     */
 	public getService( id: string, defaultService?: any, useSelf?: boolean): any
 	{
-        // not that only undefined return value serves as the indication that the service was not
-        // found. All other values including empty string, zero and false are valid service values.
-        let publication = findPublication( this, id, useSelf);
-		return publication?.value ?? defaultService;
+		return findPublication(this, id, useSelf)?.value ?? defaultService;
 	}
 
 
 
-	// Map of service IDs to objects constituting publications made by this node.
+	/** Map of service IDs to objects constituting publications made by this node. */
 	public pubs?: Map<string,Publication>;
 
-	// Map of service IDs to objects constituting subscriptions made by this node.
+	/** Map of service IDs to objects constituting subscriptions made by this node. */
 	private subs?: Map<string,Subscription>;
 }
 
 
 
-// Collects all DOM nodes that are the immediate children of this virtual node (that is,
-// are NOT children of sub-nodes that have their own DOM node) into the given array.
+/**
+ * Collects all DOM nodes that are the immediate children of this virtual node (that is, are NOT
+ * children of sub-nodes that have their own DOM node) into the given array.
+ */
 function collectImmediateDNs(vn: IVN, arr: DN[]): void
 {
     if (vn.ownDN)
@@ -368,6 +378,18 @@ export function setRef<T>( ref: RefType<T>, val: T, onlyIf?: T): void
 
 
 
+/**
+ * Helper function to handle reference update, whcih happens when a node holding an old reference
+ * is updated by the node holding a new reference. This releases the previous reference in a safe
+ * way and sets the given value to the new reference. The "safe way" means, the old reference is
+ * set to undefined only if its current value is the given value. This might not be the case if
+ * the old reference was already used by a different node.
+ *
+ * Either or both references can be null, although usually the case when the old and the new
+ * references are the same object (or null) is handled by the caller.
+ *
+ * Returns the new reference - just for convenience.
+ */
 export function updateRef<T>(oldRef: RefType<T> | undefined, newRef: RefType<T> | undefined, val: T): RefType<T> | undefined
 {
     if (oldRef)
@@ -558,16 +580,16 @@ function findPublication( vn: VN, id: string, useSelf?: boolean): Publication | 
     if (useSelf)
     {
         let publication = vn.pubs?.get( id);
-        if (publication !== undefined)
+        if (publication)
             return publication;
     }
 
-    // go up the chain; note that we don't pass the useSelf parameter on bus pass `true`. If the
+    // go up the chain; note that we don't pass the useSelf parameter on but pass `true`. If the
     // parent is undefined (that is, this is a root VN), check whether it has a creator. If it
     // does, this means that there is another, higher-level, component hierarchy, so we keep
     // looking there.
     let higherVN = vn.parent ?? vn.creator?.vn;
-    return higherVN ? findPublication( higherVN as VN, id, true) : undefined;
+    return higherVN && findPublication( higherVN as VN, id, true);
 }
 
 
@@ -576,25 +598,25 @@ function findPublication( vn: VN, id: string, useSelf?: boolean): Publication | 
  * Information about service publications and subscriptions. The same service can be published
  * and subscribed to by multiple nodes.
  */
-class ServiceInfo
+type ServiceInfo =
 {
-	pubs = new Map<VN,Publication>();
-	subs = new Map<VN,Subscription>();
+	pubs: Map<VN,Publication>;
+	subs: Map<VN,Subscription>;
 }
 
-// Map of service IDs to sets of virtual nodes that subscribed to this service.
+/** Map of service IDs to sets of virtual nodes that subscribed to this service. */
 let s_serviceInfos = new Map<string,ServiceInfo>();
 
 
 
 /** Retrieves existing or creates new ServiceInfo object for the given service ID */
-function getOrCreateServiceInfo( id: string): ServiceInfo
+function getOrCreateServiceInfo(id: string): ServiceInfo
 {
-	let info = s_serviceInfos.get( id);
+	let info = s_serviceInfos.get(id);
 	if (!info)
 	{
-		info = new ServiceInfo();
-		s_serviceInfos.set( id, info);
+		info = {pubs: new Map(), subs: new Map()};
+		s_serviceInfos.set(id, info);
 	}
 
     return info;
@@ -603,49 +625,54 @@ function getOrCreateServiceInfo( id: string): ServiceInfo
 
 
 /** Informs that a service with the given ID was published by the given node. */
-function notifyServicePublished( publication: Publication): void
+function notifyServicePublished(publication: Publication): void
 {
-	let info = getOrCreateServiceInfo( publication.id);
-	info.pubs.set( publication.vn, publication);
+	let info = getOrCreateServiceInfo(publication.id);
+	info.pubs.set(publication.vn, publication);
 
 	// notify all subscriptions that information about the service has changed
-	info.subs.forEach( subscription => subscription.notifyServiceChanged());
+	info.subs.forEach(subscription => subscription.notifyServiceChanged());
 }
 
 
 
 /** Informs that a service with the given ID was unpublished by the given node. */
-function notifyServiceUnpublished( publication: Publication): void
+function notifyServiceUnpublished(publication: Publication): void
 {
-	let info = s_serviceInfos.get( publication.id);
-	if (!info)
-		return;
+	let info = s_serviceInfos.get(publication.id);
+	if (info)
+    {
+        info.pubs.delete(publication.vn);
 
-	info.pubs.delete( publication.vn);
+        // notify all subscribed nodes that information about the service has changed
+        info.subs.forEach(subscription => subscription.notifyServiceChanged());
 
-    // notify all subscribed nodes that information about the service has changed
-	info.subs.forEach( subscription => subscription.notifyServiceChanged());
+        if (!info.pubs.size && !info.subs.size)
+            s_serviceInfos.delete(publication.id);
+    }
 }
 
 
 
 /** Informs that the given node has subscribed to a service with the given ID. */
-function notifyServiceSubscribed( subscription: Subscription): void
+function notifyServiceSubscribed(subscription: Subscription): void
 {
-	let info = getOrCreateServiceInfo( subscription.id);
-	info.subs.set( subscription.vn, subscription);
+	getOrCreateServiceInfo(subscription.id).subs.set(subscription.vn, subscription);
 }
 
 
 
 /** Informs that the given node has unsubscribed from a service with the given ID. */
-function notifyServiceUnsubscribed( subscription: Subscription): void
+function notifyServiceUnsubscribed(subscription: Subscription): void
 {
-	let info = s_serviceInfos.get( subscription.id);
-	if (!info)
-		return;
+	let info = s_serviceInfos.get(subscription.id);
+	if (info)
+    {
+    	info.subs.delete(subscription.vn);
 
-	info.subs.delete( subscription.vn);
+        if (!info.pubs.size && !info.subs.size)
+            s_serviceInfos.delete(subscription.id);
+    }
 }
 
 
