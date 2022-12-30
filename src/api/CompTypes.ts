@@ -624,7 +624,7 @@ export interface IServiceDefinitions
  */
 export interface IErrorBoundary
 {
-	reportError( err: unknown): void;
+	reportError(err: unknown): void;
 }
 
 
@@ -777,6 +777,17 @@ export interface IVNode
 /**
  * The IClassCompVN interface represents a virtual node for a JSX-based component.
  */
+export interface IRootVN extends IVNode, IErrorBoundary
+{
+	/** Sets the content to be rendered under this root node and triggers update. */
+	setContent(content: any): void;
+}
+
+
+
+/**
+ * The IClassCompVN interface represents a virtual node for a JSX-based component.
+ */
 export interface IClassCompVN extends IVNode
 {
 	/** Gets the component instance. */
@@ -802,7 +813,6 @@ export interface IClassCompVN extends IVNode
 	 * This method is called by the component to request to be updated.
      */
 	updateMe(): void;
-
 }
 
 

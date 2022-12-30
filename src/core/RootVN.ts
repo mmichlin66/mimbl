@@ -1,10 +1,11 @@
-﻿import {DN, IErrorBoundary} from "../api/CompTypes"
+﻿import {DN, IRootVN} from "../api/CompTypes"
 
 /// #if USE_STATS
 	import {StatsCategory} from "../utils/Stats"
 /// #endif
 
 import { VN } from "./VN";
+import { mountContent } from "./Reconciler";
 
 
 
@@ -13,13 +14,13 @@ import { VN } from "./VN";
  * an error boundary of last resort. When it catches an error that wasn't caught by any descendand
  * node, it displays a simple UI that shows the error.
  */
-export class RootVN extends VN implements IErrorBoundary
+export class RootVN extends VN implements IRootVN
 {
-	public constructor( anchorDN: DN)
+	public constructor(content: any)
 	{
 		super();
 
-		this.anchorDN = anchorDN;
+        this.content = content;
 	}
 
 
@@ -35,12 +36,31 @@ export class RootVN extends VN implements IErrorBoundary
 
 
 
-	// Sets the content to be rendered under this root node and triggers update.
-	public setContent( content: any): void
-	{
-		this.content = content;
-		this.requestUpdate();
-	}
+	/**
+     * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
+     * and before the given node.
+     */
+	public mount(parent: VN | null, index: number, anchorDN: DN, beforeDN: DN = null): void
+    {
+        super.mount(parent, index, anchorDN, beforeDN);
+
+        // publish ErrorBoundary service
+        this.publishService( "ErrorBoundary", this);
+
+        mountContent(this, this.content, anchorDN, beforeDN);
+    }
+
+
+
+    /**
+     * Recursively removes the content of this virtual node from DOM.
+     */
+	public unmount(removeFromDOM: boolean): void
+    {
+        this.unmountSubNodes(removeFromDOM);
+        this.clearPubSub();
+        super.unmount(removeFromDOM);
+    }
 
 
 
@@ -53,41 +73,53 @@ export class RootVN extends VN implements IErrorBoundary
 
 
 
-    // This method is called after an exception was thrown during rendering of the node's
-    // sub-nodes. The method returns the new content to display.
-    public reportError( err: unknown): void
-    {
-        this.handleError(err);
-        this.requestUpdate();
-    }
+	/** Sets the content to be rendered under this root node and triggers update. */
+	public setContent(content: any): void
+	{
+		this.content = content;
 
-    // This method is called after an exception was thrown during rendering of the node's
-    // sub-nodes.
-    public handleError( err: unknown): void
-    {
-		if (err instanceof Promise)
-		{
-			let promise = err as Promise<any>;
-			this.thrownPromises.add( promise);
-			promise.then( () => { this.onPromiseFulfilled( promise); });
-			promise.catch( () => { this.onPromiseFulfilled( promise); });
-            this.waitMsg = "Please wait...";
-		}
-		else
-		{
-            console.error( `Unhandled error\n`, err);
-			this.errMsg = (err as any).toString();
-        }
+        // since the new content is set, we need to forget about previous errors and promises
+        this.errMsg = this.waitMsg = this.promises = null;
+
+		this.requestUpdate();
 	}
 
 
 
-	// Removes the fulfilled promise from our internal list and if the list is empty asks to
-	// re-render
-	private onPromiseFulfilled( promise: Promise<any>): void
+    /**
+     * This method is called after an exception was thrown during rendering of the node's
+     * sub-nodes. The method returns the new content to display.
+     */
+    public reportError(err: any): void
+    {
+		if (err instanceof Promise)
+		{
+            // add the promise to our set of promises we are waiting for
+			(this.promises ??= new Set()).add( err);
+
+            // use callback that will remove the promise after it is settled
+			err.finally(() => this.onPromise( err));
+
+            // put simple message that will be rendered until all promises are settled
+            this.waitMsg = "Waiting...";
+            this.errMsg = null;
+		}
+		else
+			this.errMsg = err?.message ?? err?.toString() ?? "Error";
+
+        this.requestUpdate();
+    }
+
+
+
+	/**
+     * Removes the fulfilled promise from our internal list and if the list is empty asks to
+     * re-render
+     */
+	private onPromise( promise: Promise<any>): void
 	{
-		this.thrownPromises.delete( promise);
-		if (this.thrownPromises.size === 0)
+		this.promises?.delete( promise);
+		if (this.promises?.delete( promise) && !this.promises.size)
 		{
 			this.waitMsg = null;
 			this.requestUpdate();
@@ -100,13 +132,13 @@ export class RootVN extends VN implements IErrorBoundary
 	private content: any;
 
 	/** Message from the error that was caught from descendand nodes. */
-	private errMsg: string | null = null;
+	private errMsg: string | null | undefined;
 
 	/** Message about waiting for a promise thrown as exception that was caught from descendand nodes. */
-	private waitMsg: string | null = null;
+	private waitMsg: string | null | undefined;
 
 	/** Set of promises thrown by descendant nodes and not yet fulfilled. */
-	private thrownPromises = new Set<Promise<any>>();
+	private promises: Set<Promise<any>> | null | undefined;
 }
 
 
@@ -117,7 +149,7 @@ let symRootMountPoint = Symbol("rootMountPoint");
 
 // Renders the given content (usually a result of JSX expression or a component instance)
 // under the given HTML element.
-export function mountRoot( content: any, anchorDN: DN): void
+export function mountRoot( content: any, anchorDN: DN): IRootVN | null
 {
 	let realAnchorDN = anchorDN ?? document.body;
 	if (!realAnchorDN)
@@ -126,24 +158,23 @@ export function mountRoot( content: any, anchorDN: DN): void
         console.error( `Trying to mount under non-existing '<body>' element`);
         /// #endif
 
-		return;
+		return null;
     }
 
 	// check whether we already have root node remembered in the anchor element's well-known
 	// property
 	let rootVN = realAnchorDN[symRootMountPoint] as RootVN;
-	if (!rootVN)
+	if (rootVN)
+        rootVN.setContent(content);
+    else
 	{
 		// create root node and remember it in the anchor element's well-known property
-		rootVN = new RootVN( realAnchorDN);
+		rootVN = new RootVN(content);
         realAnchorDN[symRootMountPoint] = rootVN;
+        rootVN.mount( null, 0, realAnchorDN);
 	}
 
-    // publish ErrorBoundary service
-    rootVN.publishService( "ErrorBoundary", rootVN);
-
-	// set content to the root node, which will trigger update
-	rootVN.setContent(content);
+    return rootVN;
 }
 
 
@@ -155,7 +186,7 @@ export function unmountRoot( anchorDN: DN): void
 	if (!realAnchorDN)
     {
         /// #if DEBUG
-        console.error( `Trying to unmount under non-existing '<body>' element`);
+        console.error( "Trying to unmount under non-existing '<body>' element");
         /// #endif
 
 		return;
@@ -163,17 +194,14 @@ export function unmountRoot( anchorDN: DN): void
 
 	// get our root node from the anchor element's well-known property.
 	let rootVN = realAnchorDN[symRootMountPoint] as RootVN;
-	if (!rootVN)
-		return;
+	if (rootVN)
+    {
+        // remove our root node from the anchor element's well-known property
+        delete realAnchorDN[symRootMountPoint];
 
-    // unpublish ErrorBoundary service
-    rootVN.clearPubSub();
-
-	// remove our root node from the anchor element's well-known property
-	delete realAnchorDN[symRootMountPoint];
-
-	// destruct the root node (asynchronously)
-	rootVN.setContent(null);
+        // remove content from DOM
+        rootVN.unmount(true);
+    }
 }
 
 

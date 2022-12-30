@@ -112,28 +112,11 @@ export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}>
      *
      * @param func Function that is called while Mimcss adoption context related to the element's
      * shadow root is set.
-     */
-    processStyles(func: () => void): void;
-
-    /**
-     * Invokes the given function in the "style adoption context"; which allows all Mimcss style
-     * manipulations to be reflected in the adoption context of the element's shadow DOM. The
-     * `useAdoption` parameter can be set to false if the intention is to create styles under
-     * the shadow root element instead of using adoption. This can be useful if the styles are
-     * intended to be manipulated directly by the custom element's code, in which case each
-     * custom element instance will have its own style sheet (while adoption allows sharing the
-     * same style sheet between multiple instances of custom elements).
-     *
      * @param useAdoption Flag indicating that stylesheets should be adopted by instead of
      * created under the shadow root. The flag is ignored if the adoption is not supported or if
      * the shadow root does not exist.
-     * @param func Function that is called while Mimcss adoption context related to the element's
-     * shadow root is set.
      */
-    processStyles(useAdoption: boolean, func: () => void): void;
-
-    // implementation
-    processStyles(flagOrFunc: boolean | (() => void), func?: () => void): void;
+    processStyles(func: () => void, useAdoption?: boolean): void;
 
     /**
      * Sets the value of the given attribute converting it to string if necessary.

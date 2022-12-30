@@ -171,27 +171,19 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
         // abstract render(): any;
 
         // Necessary IWebElm members
-        processStyles(flagOrFunc: boolean | (() => void), func?: () => void)
+        processStyles(func: () => void, useAdoption: boolean = true)
         {
-            // if the first parameter is Boolean, then it is the `useAdoption` flag. In this case
-            // the function to run is in the second parameter.
-            let useAdoption = true;
-            if (typeof flagOrFunc === "boolean")
-                useAdoption = flagOrFunc;
-            else
-                func = flagOrFunc;
-
             // no matter what useAdoption says, if we don't have Mimcss library or if the element
             // doesn't have a shadow DOM root, we call the function with the current context (which,
             // normally, will create/remove style elements in the document's head).
             if (!mimcss || !this.#shadowRoot)
-                func!();
+                func();
             else
             {
                 mimcss.pushRootContext(this.#shadowRoot, useAdoption);
                 try
                 {
-                    func!();
+                    func();
                 }
                 finally
                 {
@@ -202,8 +194,8 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
 
         setAttr<K extends string & keyof TAttrs>(attrName: K, value: TAttrs[K] | null | undefined): void
         {
-            let actualValue = this.#definition.attrs[attrName]?.options?.toHtml?.(value, attrName);
-
+            let toHtml = this.#definition.attrs[attrName]?.options?.toHtml;
+            let actualValue = toHtml ? toHtml(value, attrName) : value;
             if (actualValue == null)
                 this.removeAttribute(attrName);
             else
