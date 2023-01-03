@@ -498,3 +498,93 @@ s_initStyleScheduler().then( n => mimblStyleSchedulerType = n);
 
 
 
+/**
+ * Given a promise returns an object, which will throw a promise for any property access until
+ * the promise is settled. If the promise is successfully resolved, property access will proceed
+ * to the object returned by the promise. If the promise is rejected, property access will throw
+ * `null-property-access` exception.
+ *
+ * Although this can be used with any promise, this should be primarily used for dynamic imports
+ * in conjunction with code-splitting, for example:
+ *
+ * ```tsx
+ * // dynamically import OtherModule
+ * const OtherModule = mim.lazy(import("./delayed/OtherModule"));
+ *
+ * function MyComp(): any
+ * {
+ *     // render OtherComp component from OtherModule
+ *     return <OtherModule.OtherComp />
+ * }
+ * ```
+ *
+ * @param importPromise Promise to wait for
+ * @returns Object providing property access to the object returned when the promise is resolved.
+ */
+export const lazy = <T>(importPromise: Promise<T>): T =>
+    new Proxy(DummyConstructor, new LazyHandler(importPromise)) as T;
+
+
+
+/**
+ * Constructor function, which does nothing and only serves as the basis for creating a proxy
+ * with LazyHandler. We need a function and not just an object in order to be able to call
+ * the "new" operator on the Proxy.
+ */
+function DummyConstructor() {}
+
+/**
+ * Proxy handler for lazy loading modules and module members
+ */
+class LazyHandler implements ProxyHandler<any>
+{
+    /**
+     * Initially keeps the promise from the dynamic import. After the promise is resolved, keeps
+     * the loaded module. If the promise is rejected, is set to null, which will cause any get()
+     * access to throw an error.
+     */
+    public module: any;
+
+    /**
+     * Name of the module member for which the member-level proxy was created. This is undefined
+     * for the module-level proxy.
+     */
+    member?: PropertyKey
+
+    constructor(importPromise: Promise<any>, prop?: PropertyKey)
+    {
+        this.module = importPromise;
+        this.member = prop;
+        importPromise
+            .then(module => this.module = module)
+            .catch(() => this.module = null);
+    }
+    get(target: any, prop: PropertyKey, receiver: any): any
+    {
+        if (this.module instanceof Promise)
+        {
+            // if this is a member-level proxy, then we just throw the promise; otherwise, we
+            // create a member-level proxy
+            if (this.member)
+                throw this.module;
+            else
+                return new Proxy(DummyConstructor, new LazyHandler(this.module, prop));
+        }
+        else
+        {
+            let moduleOrMember = this.member ? this.module[this.member] : this.module;
+            return moduleOrMember[prop];
+        }
+    }
+
+    construct?(target: any, argArray: any[], newTarget: Function): object
+    {
+        if (this.module instanceof Promise)
+            throw this.module;
+        else
+            return new this.module[this.member!](...argArray);
+    }
+}
+
+
+

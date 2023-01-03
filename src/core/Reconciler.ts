@@ -353,9 +353,12 @@ const performMimbleTick = (): void =>
             catch( err)
             {
                 // find the nearest error handling service.
-                let errorService = vn.getService( "ErrorBoundary");
+                let errorService = vn.getService( "ErrorBoundary", undefined, true);
                 if (errorService)
+                {
                     errorService.reportError( err);
+                    performChildrenOperation( vn);
+                }
 
                 /// #if DEBUG
                 else
@@ -402,7 +405,7 @@ const callScheduledFunctions = (funcs: Map<ScheduledFuncType,ScheduledFuncType>,
 
 
 // Performs the specified operation on the sub-nodes of the given node.
-const performChildrenOperation = (vn: IVN, req: ChildrenUpdateRequest): void =>
+const performChildrenOperation = (vn: IVN, req?: ChildrenUpdateRequest): void =>
 {
     s_currentClassComp = vn.comp ?? vn.creator;
 

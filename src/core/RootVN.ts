@@ -16,15 +16,6 @@ import { mountContent } from "./Reconciler";
  */
 export class RootVN extends VN implements IRootVN
 {
-	public constructor(content: any)
-	{
-		super();
-
-        this.content = content;
-	}
-
-
-
 	/// #if USE_STATS
     public get statsCategory(): StatsCategory { return StatsCategory.Root; }
 	/// #endif
@@ -47,7 +38,14 @@ export class RootVN extends VN implements IRootVN
         // publish ErrorBoundary service
         this.publishService( "ErrorBoundary", this);
 
-        mountContent(this, this.content, anchorDN, beforeDN);
+        // try
+        // {
+        //     mountContent(this, this.content, anchorDN, beforeDN);
+        // }
+        // catch(err)
+        // {
+        //     this.reportError(err);
+        // }
     }
 
 
@@ -73,6 +71,28 @@ export class RootVN extends VN implements IRootVN
 
 
 
+    // This method is called after an exception was thrown during rendering of the node's
+    // sub-nodes.
+    public handleError( err: any): void
+    {
+		if (err instanceof Promise)
+		{
+            // add the promise to our set of promises we are waiting for
+			(this.promises ??= new Set()).add( err);
+
+            // use callback that will remove the promise after it is settled
+			err.finally(() => this.onPromise( err));
+
+            // put simple message that will be rendered until all promises are settled
+            this.waitMsg = "Waiting...";
+            this.errMsg = null;
+		}
+		else
+			this.errMsg = err?.message ?? err?.toString() ?? "Error";
+    }
+
+
+
 	/** Sets the content to be rendered under this root node and triggers update. */
 	public setContent(content: any): void
 	{
@@ -92,21 +112,7 @@ export class RootVN extends VN implements IRootVN
      */
     public reportError(err: any): void
     {
-		if (err instanceof Promise)
-		{
-            // add the promise to our set of promises we are waiting for
-			(this.promises ??= new Set()).add( err);
-
-            // use callback that will remove the promise after it is settled
-			err.finally(() => this.onPromise( err));
-
-            // put simple message that will be rendered until all promises are settled
-            this.waitMsg = "Waiting...";
-            this.errMsg = null;
-		}
-		else
-			this.errMsg = err?.message ?? err?.toString() ?? "Error";
-
+        this.handleError(err);
         this.requestUpdate();
     }
 
@@ -118,7 +124,6 @@ export class RootVN extends VN implements IRootVN
      */
 	private onPromise( promise: Promise<any>): void
 	{
-		this.promises?.delete( promise);
 		if (this.promises?.delete( promise) && !this.promises.size)
 		{
 			this.waitMsg = null;
@@ -164,16 +169,15 @@ export function mountRoot( content: any, anchorDN: DN): IRootVN | null
 	// check whether we already have root node remembered in the anchor element's well-known
 	// property
 	let rootVN = realAnchorDN[symRootMountPoint] as RootVN;
-	if (rootVN)
-        rootVN.setContent(content);
-    else
+	if (!rootVN)
 	{
 		// create root node and remember it in the anchor element's well-known property
-		rootVN = new RootVN(content);
+		rootVN = new RootVN();
         realAnchorDN[symRootMountPoint] = rootVN;
         rootVN.mount( null, 0, realAnchorDN);
 	}
 
+    rootVN.setContent(content);
     return rootVN;
 }
 
