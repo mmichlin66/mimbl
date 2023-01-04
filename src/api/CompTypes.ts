@@ -777,7 +777,7 @@ export interface IVNode
 /**
  * The IClassCompVN interface represents a virtual node for a JSX-based component.
  */
-export interface IRootVN extends IVNode, IErrorBoundary
+export interface IRootVN extends IVNode
 {
 	/** Sets the content to be rendered under this root node and triggers update. */
 	setContent(content: any): void;
@@ -1119,6 +1119,14 @@ export interface PromiseProxyProps
 
 	/** Function that is called if the promise is rejected. */
 	errorContentFunc?: (err: any) => any;
+
+    /**
+     * Flag indicating whether or not the promise should be passed to the nearest Boundary
+     * component instead of rendering its own content. If this flag is set to true, the
+     * `children` property is ignored and the entire tree under the nearest Boundary component
+     * will be re-rendered.
+     */
+    bounce?: boolean
 }
 
 

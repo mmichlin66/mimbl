@@ -5,7 +5,6 @@
 /// #endif
 
 import { VN } from "./VN";
-import { mountContent } from "./Reconciler";
 
 
 
@@ -20,9 +19,11 @@ export class RootVN extends VN implements IRootVN
     public get statsCategory(): StatsCategory { return StatsCategory.Root; }
 	/// #endif
 
-	// String representation of the virtual node. This is used mostly for tracing and error
-	// reporting. The name can change during the lifetime of the virtual node; for example,
-	// it can reflect an "id" property of an element (if any).
+	/**
+     * String representation of the virtual node. This is used mostly for tracing and error
+     * reporting. The name can change during the lifetime of the virtual node; for example, it
+     * can reflect an "id" property of an element (if any).
+     */
 	public get name(): string { return "Root"; }
 
 
@@ -34,18 +35,6 @@ export class RootVN extends VN implements IRootVN
 	public mount(parent: VN | null, index: number, anchorDN: DN, beforeDN: DN = null): void
     {
         super.mount(parent, index, anchorDN, beforeDN);
-
-        // publish ErrorBoundary service
-        this.publishService( "ErrorBoundary", this);
-
-        // try
-        // {
-        //     mountContent(this, this.content, anchorDN, beforeDN);
-        // }
-        // catch(err)
-        // {
-        //     this.reportError(err);
-        // }
     }
 
 
@@ -56,7 +45,6 @@ export class RootVN extends VN implements IRootVN
 	public unmount(removeFromDOM: boolean): void
     {
         this.unmountSubNodes(removeFromDOM);
-        this.clearPubSub();
         super.unmount(removeFromDOM);
     }
 
@@ -66,30 +54,8 @@ export class RootVN extends VN implements IRootVN
 	// sub-nodes, null should be returned.
 	public render(): any
 	{
-		return this.errMsg ?? this.waitMsg ?? this.content;
+		return this.content;
 	}
-
-
-
-    // This method is called after an exception was thrown during rendering of the node's
-    // sub-nodes.
-    public handleError( err: any): void
-    {
-		if (err instanceof Promise)
-		{
-            // add the promise to our set of promises we are waiting for
-			(this.promises ??= new Set()).add( err);
-
-            // use callback that will remove the promise after it is settled
-			err.finally(() => this.onPromise( err));
-
-            // put simple message that will be rendered until all promises are settled
-            this.waitMsg = "Waiting...";
-            this.errMsg = null;
-		}
-		else
-			this.errMsg = err?.message ?? err?.toString() ?? "Error";
-    }
 
 
 
@@ -97,53 +63,13 @@ export class RootVN extends VN implements IRootVN
 	public setContent(content: any): void
 	{
 		this.content = content;
-
-        // since the new content is set, we need to forget about previous errors and promises
-        this.errMsg = this.waitMsg = this.promises = null;
-
 		this.requestUpdate();
-	}
-
-
-
-    /**
-     * This method is called after an exception was thrown during rendering of the node's
-     * sub-nodes. The method returns the new content to display.
-     */
-    public reportError(err: any): void
-    {
-        this.handleError(err);
-        this.requestUpdate();
-    }
-
-
-
-	/**
-     * Removes the fulfilled promise from our internal list and if the list is empty asks to
-     * re-render
-     */
-	private onPromise( promise: Promise<any>): void
-	{
-		if (this.promises?.delete( promise) && !this.promises.size)
-		{
-			this.waitMsg = null;
-			this.requestUpdate();
-		}
 	}
 
 
 
 	/** Content rendered under this root node. */
 	private content: any;
-
-	/** Message from the error that was caught from descendand nodes. */
-	private errMsg: string | null | undefined;
-
-	/** Message about waiting for a promise thrown as exception that was caught from descendand nodes. */
-	private waitMsg: string | null | undefined;
-
-	/** Set of promises thrown by descendant nodes and not yet fulfilled. */
-	private promises: Set<Promise<any>> | null | undefined;
 }
 
 

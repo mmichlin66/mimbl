@@ -522,7 +522,7 @@ s_initStyleScheduler().then( n => mimblStyleSchedulerType = n);
  * @returns Object providing property access to the object returned when the promise is resolved.
  */
 export const lazy = <T>(importPromise: Promise<T>): T =>
-    new Proxy(DummyConstructor, new LazyHandler(importPromise)) as T;
+    createNewLazyProxy(importPromise) as T;
 
 
 
@@ -533,58 +533,195 @@ export const lazy = <T>(importPromise: Promise<T>): T =>
  */
 function DummyConstructor() {}
 
+
+
 /**
  * Proxy handler for lazy loading modules and module members
  */
 class LazyHandler implements ProxyHandler<any>
 {
     /**
-     * Initially keeps the promise from the dynamic import. After the promise is resolved, keeps
-     * the loaded module. If the promise is rejected, is set to null, which will cause any get()
-     * access to throw an error.
+     * Keeps the promise from the dynamic import or from the lower-level opertaions. After the
+     * promise settles, this is set to null.
      */
-    public module: any;
+    promise?: Promise<any> | undefined;
 
     /**
-     * Name of the module member for which the member-level proxy was created. This is undefined
-     * for the module-level proxy.
+     * Value after the promise has settled. It contains different things for different kinds
+     * of promises:
+     *   - For original promises, contains the object the promise has resolved to.
+     *   - For get operations, contains the result of the get opertion
+     *   - For construct operations, contains the result of the new opertion
+     *   - For function calls, contains the return value from the function.
      */
-    member?: PropertyKey
+    value?: any;
 
-    constructor(importPromise: Promise<any>, prop?: PropertyKey)
+    /**
+     * Error if the promise has been rejected.
+     */
+    err?: any | undefined;
+
+    constructor(promise: Promise<any>)
     {
-        this.module = importPromise;
-        this.member = prop;
-        importPromise
-            .then(module => this.module = module)
-            .catch(() => this.module = null);
+        this.promise = promise;
+        promise
+            .then(value => this.value = value)
+            .catch(err => this.err = err)
+            .finally(() => this.promise = undefined);
     }
+
     get(target: any, prop: PropertyKey, receiver: any): any
     {
-        if (this.module instanceof Promise)
+        if (this.promise)
         {
-            // if this is a member-level proxy, then we just throw the promise; otherwise, we
-            // create a member-level proxy
-            if (this.member)
-                throw this.module;
+            if (prop === symToVNs || prop === symJsxToVNs)
+                return lazyHandlerToVNs.bind(this, prop);
             else
-                return new Proxy(DummyConstructor, new LazyHandler(this.module, prop));
+                return createNewLazyProxy(this.promise.then(obj => obj[prop]));
         }
         else
-        {
-            let moduleOrMember = this.member ? this.module[this.member] : this.module;
-            return moduleOrMember[prop];
-        }
+            return this.value?.[prop];
     }
 
-    construct?(target: any, argArray: any[], newTarget: Function): object
+    construct(target: any, args: any[], newTarget: Function): object
     {
-        if (this.module instanceof Promise)
-            throw this.module;
-        else
-            return new this.module[this.member!](...argArray);
+        return this.promise
+            ? createNewLazyProxy(this.promise.then(obj => new obj(...args)))
+            : new this.value(...args);
+    }
+
+    apply(target: any, thisArg: any, args: any[]): any
+    {
+        return this.promise
+            ? createNewLazyProxy(this.promise.then((func: Function) => func.apply(thisArg, args)))
+            : this.value?.apply(thisArg, args);
     }
 }
 
 
 
+/** Creates a Proxy object using LazyHandler watching the given promise */
+const createNewLazyProxy = (promise: Promise<any>): any =>
+    new Proxy(DummyConstructor, new LazyHandler(promise));
+
+/**
+ * Implementation of `toVNs` and `jsxToVNs` functions for the lazy module loader. When either
+ * `symToVNs` or `symJsxToVNs` properties are requested from the member of the lazy loading
+ * module, this function bound to the LazyHandler instance is returned. If the promise is still
+ * pending, it returns PromiseProxyVN for a new promise, which will be resolved with the
+ * corresponding function called on the module member. If the promise is already resolved, it
+ * calls the corresponding function.
+ */
+function lazyHandlerToVNs(this: LazyHandler, sym: symbol, ...args: any[]): any
+{
+    return this.promise
+        ? new PromiseProxyVN({
+                promise: this.promise.then(obj => obj[sym](...args)),
+                bounce: true
+            })
+        : this.value?.(...args);
+}
+
+
+
+/**
+ * Component that serves as a boundary for errors and unsettled promises. If descendent components
+ * throw any error, the nearest to them Boundary component catches and handles them. The component
+ * can be derived from by classes that override the way the component displays information about
+ * the errors and the waiting status.
+ */
+export class Boundary extends Component
+{
+	/** String representation of the component */
+	get displayName(): string { return "Boundary"; }
+
+    constructor(props: {children: any[]})
+    {
+        super(props);
+        this.content = props.children;
+    }
+
+	willMount(): void
+    {
+        // publish ErrorBoundary service
+        this.publishService( "ErrorBoundary", this);
+    }
+
+    shouldUpdate(newProps: {children: any[]}): boolean
+    {
+        this.content = newProps.children;
+        return true;
+    }
+
+    @noWatcher
+    render()
+    {
+        return this.content;
+    }
+
+    /**
+     * This method is called after an exception was thrown during rendering of the node's
+     * sub-nodes.
+     */
+    handleError( err: any): void
+    {
+		if (err instanceof Promise)
+		{
+            // add the promise to our set of promises we are waiting for
+			(this.promises ??= new Set()).add( err);
+
+            // use callback that will remove the promise after it is settled
+			err.finally(() => this.onPromise( err));
+
+            // put simple message that will be rendered until all promises are settled
+            this.content = this.getWaitingContent();
+		}
+		else
+			this.content = this.getErrorContent(err);
+    }
+
+    /**
+     * This method implements the gist of the IErrorBoundary interface.
+     */
+    reportError(err: any): void
+    {
+        this.handleError(err);
+        this.updateMe();
+    }
+
+	/**
+     * Removes the fulfilled promise from our internal list and if the list is empty asks to
+     * re-render
+     */
+	private onPromise(promise: Promise<any>): void
+	{
+		if (this.promises?.delete(promise) && !this.promises.size)
+            this.reRender();
+	}
+
+    /** This method can be overridden to provide content to display while waiting for promises */
+    protected getWaitingContent(): any { return "Waiting..."}
+
+    /** This method can be overridden to provide content to display information about the given error */
+    protected getErrorContent(err: any): any { return err?.message ?? err?.toString() ?? "Error"}
+
+    /**
+     * Re-renders the component with either the given content or, if the content parameter is
+     * undefined, with the original children provided to the component in the props.
+     * @param content New content to render the component with or undefined to render with the
+     * original children.
+     */
+    protected reRender(content?: any): void
+    {
+        this.content = content ?? this.props.children;
+        this.updateMe();
+    }
+
+
+
+	/** Content rendered under this component. */
+	private content: any;
+
+	/** Set of promises thrown by descendant nodes and not yet fulfilled. */
+	private promises: Set<Promise<any>> | null | undefined;
+}

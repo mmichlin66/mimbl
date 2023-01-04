@@ -19,8 +19,8 @@ export class PromiseProxyVN extends VN
 	{
 		super();
 
+		this.props = props;
 		this.promise = props.promise;
-		this.errorContentFunc = props.errorContentFunc;
 		this.key = props.key;
 		this.content = children;
 	}
@@ -53,6 +53,13 @@ export class PromiseProxyVN extends VN
 	/** Initializes internal stuctures of the virtual node. */
 	public mount( parent: VN, index: number, anchorDN: DN, beforeDN: DN): void
 	{
+        if (this.promise)
+        {
+            this.watch();
+            if (this.props.bounce)
+                throw this.promise;
+        }
+
         super.mount( parent, index, anchorDN);
 
 		/// #if USE_STATS
@@ -68,8 +75,6 @@ export class PromiseProxyVN extends VN
                 DetailedStats.log( StatsCategory.Comp, StatsAction.Rendered);
             /// #endif
         }
-
-        this.watch();
 	}
 
 
@@ -78,7 +83,6 @@ export class PromiseProxyVN extends VN
     public unmount(removeFromDOM: boolean): void
     {
         this.unmountSubNodes(removeFromDOM);
-	    this.promise = undefined;
         super.unmount( removeFromDOM);
 
         /// #if USE_STATS
@@ -107,15 +111,17 @@ export class PromiseProxyVN extends VN
      */
 	public update( newVN: PromiseProxyVN, disp: VNDisp): void
 	{
+        let newPromise = newVN.promise;
+        if (newPromise && newVN.props.bounce)
+            throw newPromise;
+
 		// remember the new value of the key property (even if it is the same)
+		this.props = newVN.props;
 		this.key = newVN.key;
-		this.errorContentFunc = newVN.errorContentFunc;
 
         // if the new promise is different from the current one an is unsettled, we need to start
         // watching it.
-        let oldPromise = this.promise;
-        let newPromise = newVN.promise;
-        if (oldPromise !== newPromise)
+        if (this.promise !== newPromise)
         {
             this.promise = newPromise;
             if (newPromise)
@@ -148,11 +154,11 @@ export class PromiseProxyVN extends VN
 		catch( err)
 		{
             // if we still have our promise and we have an error content function, call it
-            if (this.promise === orgPromise && this.errorContentFunc)
+            if (this.promise === orgPromise && this.props.errorContentFunc)
             {
                 try
                 {
-                    content = this.errorContentFunc( err);
+                    content = this.props.errorContentFunc( err);
                 }
                 catch(err1)
                 {
@@ -168,11 +174,16 @@ export class PromiseProxyVN extends VN
         // after update, which is already being watched.
         if (this.promise === orgPromise)
         {
+            this.promise = undefined;
             this.content = content;
             this.requestUpdate();
-            this.promise = undefined;
         }
 	}
+
+
+
+	/** Properties passed to this node. */
+	private props: PromiseProxyProps;
 
 	/**
      * Promise that this node watches. It gets its non-null value in the constructor and becomes
@@ -189,8 +200,8 @@ export class PromiseProxyVN extends VN
      */
 	private content?: any;
 
-	/** Optional function that provides content in case the promise is rejected. */
-	private errorContentFunc?: (err: any) => any;
+	// /** Optional function that provides content in case the promise is rejected. */
+	// private errorContentFunc?: (err: any) => any;
 }
 
 
