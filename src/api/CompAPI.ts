@@ -1,7 +1,7 @@
 ﻿import {
     CallbackWrappingOptions, ComponentShadowOptions, IComponent, ICustomAttributeHandlerClass,
-    IRef, ITextVN, PromiseProxyProps, PropType, RefFunc, RenderMethodType, DN, IComponentEx,
-    ComponentProps, ExtendedElement, FuncProxyProps, IRootVN
+    IRef, ITextVN, PropType, RefFunc, RenderMethodType, DN, IComponentEx,
+    ComponentProps, ExtendedElement, FuncProxyProps, IRootVN, AwaiterProps
 } from "./CompTypes";
 import { IVN } from "../core/VNTypes";
 import {EventSlot} from "./EventSlotAPI"
@@ -11,7 +11,6 @@ import { ElmVN } from "../core/ElmVN";
 import { IndependentCompVN } from "../core/IndependentCompVN";
 import { FuncProxyVN } from "../core/FuncProxyVN";
 import { ManagedCompVN } from "../core/ManagedCompVN";
-import { PromiseProxyVN } from "../core/PromiseProxyVN";
 import { mountRoot, unmountRoot } from "../core/RootVN";
 import { content2VNs, symJsxToVNs, symToVNs, wrapFunc } from "../core/Reconciler";
 import { s_initStyleScheduler } from "../core/StyleScheduler";
@@ -275,17 +274,6 @@ export function FuncProxy(props: FuncProxyProps): any {}
 
 
 /**
- * The PromiseProxy function wraps a Promise and replaces its content when the promise is settled.
- * Before the promise is settled, the component displays an optional "in-progress" content
- * specified as children of the component. If the promise is rejected, the component will either
- * display the "error" content obtained by calling a functions specified in the properties or, if
- * such function is not specified, display nothing.
- */
-export function PromiseProxy(props: PromiseProxyProps): any {}
-
-
-
-/**
  * Renders the given content (usually result of JSX expression) under the given HTML element
  * asynchronously.
  * @param content Content to render.
@@ -446,7 +434,7 @@ Component.prototype[symToVNs] = function(this: IComponent): IVN | IVN[] | null |
 // virtual node or nodes.
 Promise.prototype[symToVNs] = function(this: Promise<any>): IVN | IVN[] | null | undefined
 {
-    return new PromiseProxyVN( { promise: this});
+    return new ManagedCompVN(Awaiter, {promise: this}, null);
 };
 
 
@@ -464,13 +452,6 @@ Component[symJsxToVNs] = function(props: Record<string,any> | undefined,
 // Add jsxToVNs method to the PromiseProxy class object. This method is invoked by the JSX mechanism.
 FuncProxy[symJsxToVNs] = (props: FuncProxyProps | undefined): IVN | IVN[] | null | undefined =>
     props?.func ? new FuncProxyVN(props) : null;
-
-
-
-// Add jsxToVNs method to the PromiseProxy class object. This method is invoked by the JSX mechanism.
-PromiseProxy[symJsxToVNs] = (props: PromiseProxyProps | undefined,
-    children: IVN[] | null): IVN | IVN[] | null | undefined =>
-        props?.promise ? new PromiseProxyVN( props, children) : null;
 
 
 
@@ -589,7 +570,7 @@ class LazyHandler implements ProxyHandler<any>
 
     get(target: any, prop: PropertyKey, receiver: any): any
     {
-        if (prop === symToVNs || prop === symJsxToVNs)
+        if ((prop === symToVNs || prop === symJsxToVNs) && (this.promise || this.err))
             return lazyHandlerToVNs.bind(this, prop);
         else
             return this.helper(obj => obj[prop]);
@@ -770,3 +751,102 @@ export class Boundary extends Component
 	/** Set of promises thrown by descendant nodes and not yet fulfilled. */
 	private promises: Set<Promise<any>> | null | undefined;
 }
+
+
+
+/**
+ * Component that accepts a single promise and when it resolves displays its content. If the
+ * promise is rejected, it throws the error out of its `render` method, which cause the error to
+ * propagate up the hierarchy to the nearest [[Boundary]] component. While the promise is pending,
+ * it displays whatever content was provided to it as children. This component provides a minimal
+ * UI informing the user about the error or the fact that it is waiting for a promise. Derived
+ * components can provide their own way to display information about the errors and the waiting
+ * status.
+ */
+export class Awaiter extends Component<AwaiterProps>
+{
+	/** String representation of the component */
+	get displayName(): string { return "Awaiter"; }
+
+    constructor(props: AwaiterProps)
+    {
+        super(props);
+        this.promise = props.promise;
+        this.watch();
+    }
+
+    shouldUpdate(newProps: AwaiterProps): boolean
+    {
+        if (this.promise === newProps.promise)
+            return false;
+
+        this.promise = newProps.promise;
+        this.watch();
+        return true;
+    }
+
+    @noWatcher
+    render()
+    {
+        return this.promise ? this.props.children :
+            this.err ? this.getErrorContent(this.err) :
+            this.getResolvedContent(this.val);
+    }
+
+	/**
+	 * Waits for the current promise to settle
+	 */
+	private async watch(): Promise<void>
+	{
+        // remember the original promise because this.promise can be changed during an update
+        // while we are still awaiting.
+        let orgPromise = this.promise!;
+        let newVal: any, newErr: any;
+		try
+		{
+			newVal = await orgPromise;
+		}
+		catch( err)
+		{
+            newErr = err;
+		}
+
+        // if we still have our promise, we are still mounted, so request re-rendering with the
+        // new content; otherwise, we are either already unmounted or have a different promise
+        // after update, which is already being watched.
+        if (this.promise === orgPromise)
+        {
+            this.promise = null;
+            this.val = newVal;
+            this.err = newErr;
+            this.updateMe();
+        }
+	}
+
+    /**
+     * This method can be overridden to provide content to display for the resolved content. By
+     * default, the resolved value itself serves as the content.
+     */
+    protected getResolvedContent(val: any): any { return val}
+
+    /**
+     * This method can be overridden to provide content to display information about the given
+     * error. By default, the error is thrown and is supposed to propagate up to the nearest
+     * Boundary component.
+     */
+    protected getErrorContent(err: any): any { throw err}
+
+
+
+	/** Promises being watched by this component. */
+	private promise: Promise<any> | null;
+
+	/** Resolved promise value. */
+	private val: any;
+
+	/** Rejected promise error. */
+	private err: any;
+}
+
+
+

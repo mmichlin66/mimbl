@@ -1120,26 +1120,15 @@ export interface FuncProxyProps
 
 
 /**
- * Properties to be used with the PromiseProxy component.
+ * Properties to be used with the Awaiter component.
  */
-export interface PromiseProxyProps
+export interface AwaiterProps
 {
 	/** Promise that will be watched by the waiting node. */
 	promise: Promise<any>;
 
     /** Optional content that is displayed until the promise is settled */
     children?: any;
-
-	/** Function that is called if the promise is rejected. */
-	errorContentFunc?: (err: any) => any;
-
-    /**
-     * Flag indicating whether or not the promise should be passed to the nearest Boundary
-     * component instead of rendering its own content. If this flag is set to true, the
-     * `children` property is ignored and the entire tree under the nearest Boundary component
-     * will be re-rendered.
-     */
-    bounce?: boolean
 }
 
 
