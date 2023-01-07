@@ -47,11 +47,16 @@ export namespace JSX
  * "compilerOptions":
  * {
  *     "jsx": "react",
- *     "jsxFactory": "mim.jsx"
+ *     "jsxFactory": "mim.jsx",
+       "jsxFragmentFactory": "mim.Fragment"
  * }
  * ```
  *
- * The .tsx files must import the mimbl module as mim: import * as mim from "mimbl"
+ * The .tsx files must import the mimbl module as mim:
+ * ```tsx
+ * import * as mim from "mimbl"
+ * ```
+ *
  * @param tag
  * @param props
  * @param children
@@ -59,7 +64,7 @@ export namespace JSX
 export function jsx( tag: any, props: any, ...children: any[]): any
 {
     // The children parameter is always an array. A component can specify that its children are
-    // an array of a certain type, e.g. class A extends Component<{},T[]>. In this case
+    // an array of a certain type, e.g. class A extends Component<{children: T[]}>. In this case
     // there are two ways to specify children in JSX that would be accepted by the TypeScript
     // compiler:
     //	1) <A>{t1}{t2}</A>. In this case, children will be [t1, t2] (as expected by A).

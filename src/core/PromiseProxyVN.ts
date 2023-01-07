@@ -55,6 +55,11 @@ export class PromiseProxyVN extends VN
 	{
         if (this.promise)
         {
+            // we need to watch the promise even if we throw it in the next statement. This is
+            // because our VN may not be deleted even after it is unmounted (for example, if it is
+            // an immediate child of the Boundary component). In this case, the this.promise and
+            // this.props.bounce would still have the original values and we will throw the promise
+            // in an infinite loop
             this.watch();
             if (this.props.bounce)
                 throw this.promise;
@@ -82,6 +87,9 @@ export class PromiseProxyVN extends VN
     /** Cleans up the node object before it is released. */
     public unmount(removeFromDOM: boolean): void
     {
+        // note that we don't set the promise to undefined. This is because our VN can still be
+        // reused after being unmounted. For example, this would happen if our VN is the
+        // immediate child of the Boundary component.
         this.unmountSubNodes(removeFromDOM);
         super.unmount( removeFromDOM);
 
@@ -199,9 +207,6 @@ export class PromiseProxyVN extends VN
      * as content.
      */
 	private content?: any;
-
-	// /** Optional function that provides content in case the promise is rejected. */
-	// private errorContentFunc?: (err: any) => any;
 }
 
 

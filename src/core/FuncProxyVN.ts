@@ -34,12 +34,13 @@ export class FuncProxyVN extends VN implements IFuncProxyVN
 	constructor(props: ComponentProps<FuncProxyProps>)
 	{
 		super();
+        this.props = props;
 
-        // remember data from the props.
-		this.func = props.func;
-		this.thisArg = props.thisArg ?? this.creator;
-		this.arg = props.arg;
-        this.ref = props.ref;
+        // // remember data from the props.
+		// this.func = props.func;
+		// this.thisArg = props.thisArg ?? this.creator;
+		// this.arg = props.arg;
+        // this.vnref = props.vnref as RefType<IFuncProxyVN>;
         this.key = props.key;
 	}
 
@@ -51,12 +52,14 @@ export class FuncProxyVN extends VN implements IFuncProxyVN
 
 
     /** String representation of the virtual node. */
-	public get name(): string { return this.func.name; }
+	public get name(): string { return this.props.func.name; }
 
 
 
     /**
-     * Causes rerendering
+     * Causes rerendering - this method can be called via the virtual node reference set using the
+     * `vnref` property. This is usually only needed if the function doesn't use the trigger/watcher
+     * mechanism.
      */
     public updateMe(): void
     {
@@ -108,26 +111,32 @@ export class FuncProxyVN extends VN implements IFuncProxyVN
 		this.key = newVN.key;
 
         // we allow any FuncProxyVN update; however, if the method or the object to
-        // which this method belongs are different, we unmount the old
-        if (this.func === newVN.func && this.thisArg === newVN.thisArg)
+        // which this method belongs are different, we "unmount" the old and "mount" the new one
+        let oldProps = this.props;
+        let newProps = newVN.props;
+        if (oldProps.func === newProps.func &&
+            oldProps.thisArg === newProps.thisArg && (oldProps.thisArg || this.creator === newVN.creator) &&
+            oldProps.watch === newProps.watch)
         {
             // update reference if needed
-            if (this.ref !== newVN.ref)
-                this.ref = updateRef(this.ref, newVN.ref, this);
+            if (oldProps.vnref !== newProps.vnref)
+                updateRef(oldProps.vnref as RefType<IFuncProxyVN>, newProps.vnref as RefType<IFuncProxyVN>, this);
 
             // we need to re-render only if the arguments are not the same.
-            if (this.arg === newVN.arg)
+            if (oldProps.arg === newProps.arg)
                 return;
 
-            this.arg = newVN.arg;
+            this.props = newProps;
         }
         else
         {
             this.prepareUnmount();
-            this.func = newVN.func;
-            this.thisArg = newVN.thisArg;
-            this.arg = newVN.arg;
-            this.ref = newVN.ref;
+            this.props = newProps;
+            this.creator = newVN.creator;
+            // this.func = newVN.func;
+            // this.thisArg = newVN.thisArg;
+            // this.arg = newVN.arg;
+            // this.vnref = newVN.vnref;
             this.prepareMount();
         }
 
@@ -147,7 +156,9 @@ export class FuncProxyVN extends VN implements IFuncProxyVN
 			DetailedStats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
-        return this.watcher ? this.watcher(this.arg) : this.func(this.arg);
+        return this.watcher
+            ? this.watcher(this.props.arg)
+            : this.props.func.call(this.props.thisArg ?? this.creator, this.props.arg);
 	}
 
 
@@ -157,13 +168,14 @@ export class FuncProxyVN extends VN implements IFuncProxyVN
      */
 	private prepareMount(): void
 	{
-        // establish watcher if not disabled using the @noWatcher decorator
-        this.watcher = this.func[symRenderNoWatcher]
-            ? undefined
-            : createWatcher( this.func, this.requestUpdate, this.thisArg, this);
+        // establish watcher if not disabled using the `watch` flag or the @noWatcher decorator
+        let props = this.props;
+        this.watcher = (props.watch ?? !props.func[symRenderNoWatcher])
+            ? createWatcher( props.func, this.requestUpdate, props.thisArg ?? this.creator, this)
+            : undefined;
 
-        if (this.ref)
-            setRef( this.ref, this);
+        if (props.vnref)
+            setRef(props.vnref as RefType<IFuncProxyVN>, this);
 	}
 
 
@@ -173,8 +185,8 @@ export class FuncProxyVN extends VN implements IFuncProxyVN
      */
     private prepareUnmount(): void
     {
-        if (this.ref)
-            setRef( this.ref, undefined, this);
+        if (this.props.vnref)
+            setRef(this.props.vnref as RefType<IFuncProxyVN>, undefined, this);
 
         // release the watcher; we don't need to set it to undefined because it will be done
         // in the next mount (if it comes)
@@ -183,17 +195,20 @@ export class FuncProxyVN extends VN implements IFuncProxyVN
 
 
 
-	/** Original rendering function */
-	private func: RenderMethodType;
+    /** Properties passed to the component */
+    props: ComponentProps<FuncProxyProps>;
 
-	/** Object to be used as "this" when invoking the function. */
-	private thisArg?: any;
+	// /** Original rendering function */
+	// private func: RenderMethodType;
 
-	/** Optional arguments to be passed to the function. */
-	private arg?: any;
+	// /** Object to be used as "this" when invoking the function. */
+	// private thisArg?: any;
 
-	/** Optional arguments to be passed to the function. */
-	private ref?: RefType<IFuncProxyVN>;
+	// /** Optional arguments to be passed to the function. */
+	// private arg?: any;
+
+	// /** Optional arguments to be passed to the function. */
+	// private vnref?: RefType<IFuncProxyVN>;
 
     /**
      * Watcher function wrapping the original function. The watcher will notice any trigger objects

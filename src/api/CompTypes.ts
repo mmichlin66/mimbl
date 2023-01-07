@@ -1101,7 +1101,20 @@ export interface FuncProxyProps
      * Optional reference object, which will point to the FuncProxy virtual node when the node is
      * mounted. Through this reference, the function can be invoked, which will cause re-rendering.
      */
-    ref?: RefType<IFuncProxyVN>;
+    vnref?: RefPropType<IFuncProxyVN>;
+
+    /**
+     * Optional flag indicating whether or not the function should be wrapped in a watcher so that
+     * it can be re-invoked when one of the observed triggers changes its value. The flag is
+     * Boolean but is used as a tri-value:
+     * - if the flag is undefined, the function will be wrapped or not wrapped in a watcher
+     *   depending on whether it has the [[@noWatcher]] decorator applied to it.
+     * - if the flag is true, the function will be wrapped in a watcher regardless of the
+     *   [[@noWatcher]] decorator.
+     * - if the flag is false, the function will NOT be wrapped in a watcher regardless of the
+     *   [[@noWatcher]] decorator.
+     */
+    watch?: boolean | undefined;
 }
 
 

@@ -101,9 +101,9 @@ export class Ref<T = any> extends EventSlot<RefFunc<T>> implements IRef<T>
  * instances. This allows for the following code pattern:
  *
  * ```typescript
- * class A extends Component
+ * class A extends mim.Component
  * {
- *     @ref myDiv: HTMLDivElement;
+ *     @mim.ref myDiv: HTMLDivElement;
  *     render() { return <div ref={this.myDiv}>Hello</div>; }
  * }
  * ```
@@ -135,7 +135,7 @@ export function ref( target: any, name: string)
 
 /**
  * The RefProxyHandler is a proxy handler for the objects created when reference is defined using
- * the @ref decorator. Only the "r" property has special handling (because it is used by the
+ * the @mim.ref decorator. Only the "r" property has special handling (because it is used by the
  * setRef function); everything else is reflected from the remembered referenced object.
  */
 class RefProxyHandler implements ProxyHandler<any>
@@ -193,15 +193,21 @@ export function registerCustomAttribute<T>( attrName: string, handlerClass: ICus
 
 
 /**
- * Base class for components. Components that derive from this class must implement the render
+ * Base class for components. Components must derive from this class and must implement the render
  * method.
  *
- * @typeparam TProps type of the components properties object. By default, it contains an optional
+ * @typeparam TProps Type of the components properties object. By default, it contains an optional
  * `children` property of type `any`. This allows components that don't explicitly specify any
  * type, to accept children. Note that if a component provides its own type for the properties
  * object and wants to accept children, this type must have the `children` property of the desired
  * type. If not, the component will not be able to accept children (which, oftentimes, might be a
- * desired behavior)
+ * desired behavior).
+ * @typeparam TEvents Interface defining the component's event. This interface should map event
+ * names (e.g. "change") to the types of event objects. The event object types could be either
+ * types derived from the built-in Event type, in which case this will be the type passed to the
+ * event handler function. If the event object type doesn't derive from the built-in Event type,
+ * then the CustomEvent object will be passed to the event handler function with its `detail`
+ * property of the specified type.
  */
 export abstract class Component<TProps extends {} = {children?: any}, TEvents extends {} = {}>
     extends EventTarget implements IComponent<TProps,TEvents>, IComponentEx<TEvents>
@@ -513,8 +519,19 @@ s_initStyleScheduler().then( n => mimblStyleSchedulerType = n);
  *
  * function MyComp(): any
  * {
- *     // render OtherComp component from OtherModule
  *     return <OtherModule.OtherComp />
+ * }
+ * ```
+ *
+ * OR alternatively:
+ *
+ * ```tsx
+ * // dynamically import OtherModule
+ * const OtherComp = mim.lazy(import("./delayed/OtherModule")).OtherComp;
+ *
+ * function MyComp(): any
+ * {
+ *     return <OtherComp />
  * }
  * ```
  *
@@ -554,7 +571,7 @@ class LazyHandler implements ProxyHandler<any>
      *   - For construct operations, contains the result of the new opertion
      *   - For function calls, contains the return value from the function.
      */
-    value?: any;
+    val?: any;
 
     /**
      * Error if the promise has been rejected.
@@ -565,36 +582,37 @@ class LazyHandler implements ProxyHandler<any>
     {
         this.promise = promise;
         promise
-            .then(value => this.value = value)
+            .then(value => this.val = value)
             .catch(err => this.err = err)
             .finally(() => this.promise = undefined);
     }
 
     get(target: any, prop: PropertyKey, receiver: any): any
     {
-        if (this.promise)
-        {
-            if (prop === symToVNs || prop === symJsxToVNs)
-                return lazyHandlerToVNs.bind(this, prop);
-            else
-                return createNewLazyProxy(this.promise.then(obj => obj[prop]));
-        }
+        if (prop === symToVNs || prop === symJsxToVNs)
+            return lazyHandlerToVNs.bind(this, prop);
         else
-            return this.value?.[prop];
+            return this.helper(obj => obj[prop]);
     }
 
     construct(target: any, args: any[], newTarget: Function): object
     {
-        return this.promise
-            ? createNewLazyProxy(this.promise.then(obj => new obj(...args)))
-            : new this.value(...args);
+        return this.helper(obj => new obj(...args));
     }
 
     apply(target: any, thisArg: any, args: any[]): any
     {
-        return this.promise
-            ? createNewLazyProxy(this.promise.then((func: Function) => func.apply(thisArg, args)))
-            : this.value?.apply(thisArg, args);
+        return this.helper((func: Function) => func.apply(thisArg, args));
+    }
+
+    private helper(action: (v: any) => any): any
+    {
+        if (this.promise)
+            return createNewLazyProxy(this.promise.then(action))
+        else if (this.err)
+            throw this.err;
+        else
+            return action(this.val);
     }
 }
 
@@ -607,28 +625,55 @@ const createNewLazyProxy = (promise: Promise<any>): any =>
 /**
  * Implementation of `toVNs` and `jsxToVNs` functions for the lazy module loader. When either
  * `symToVNs` or `symJsxToVNs` properties are requested from the member of the lazy loading
- * module, this function bound to the LazyHandler instance is returned. If the promise is still
- * pending, it returns PromiseProxyVN for a new promise, which will be resolved with the
- * corresponding function called on the module member. If the promise is already resolved, it
- * calls the corresponding function.
+ * module, this function bound to the LazyHandler instance is returned (if the promise is still
+ * pending). It returns FuncProxyVN for the [[lazyHandlerFunc]] function, which will either
+ * throw a promise (while it is still pending), or throw an error (if the promise is rejected),
+ * or call the actual `symToVNs` or `symJsxToVNs` function on the promise's resolved value.
  */
 function lazyHandlerToVNs(this: LazyHandler, sym: symbol, ...args: any[]): any
 {
-    return this.promise
-        ? new PromiseProxyVN({
-                promise: this.promise.then(obj => obj[sym](...args)),
-                bounce: true
-            })
-        : this.value?.(...args);
+    return new FuncProxyVN({
+        func: lazyHandlerFunc,
+        thisArg: this,
+        arg: [sym, args],
+        watch: false
+    });
+}
+
+
+
+/**
+ * Function that is wrapped in FuncProxyVN when either `symToVNs` or `symJsxToVNs` properties are
+ * requested from the member of the lazy loading module. This function is called with `this` set
+ * to the instance of the LazyHandler class and does the following:
+ * - if the promise is still pending, throws it (this is supposed to be caught by a Boundary)
+ *   component up the hierarchy).
+ * - if the promise is rejected, throws the error (this is supposed to be caught by a Boundary
+ *   component up the hierarchy).
+ * - if the promise is resolved, calls either `symToVNs` or `symJsxToVNs` functions on the
+ *   resolved value.
+ *
+ * Since functions wrapped in FunProxyVN node can accept a single parameter only, the symbol
+ * (symToVNs or symJsxToVNs) and the original argument array are passed as a tuple.
+ */
+function lazyHandlerFunc(this: LazyHandler, arg: [sym: symbol, args: any[]]): any
+{
+    if (this.promise)
+        throw this.promise;
+    else if (this.err)
+        throw this.err;
+    else
+        return this.val[arg[0]](...arg[1]);
 }
 
 
 
 /**
  * Component that serves as a boundary for errors and unsettled promises. If descendent components
- * throw any error, the nearest to them Boundary component catches and handles them. The component
- * can be derived from by classes that override the way the component displays information about
- * the errors and the waiting status.
+ * throw any error, the nearest to them Boundary component catches and handles them. This component
+ * provides a minimal UI informing the user about the error or the fact that it is waiting for a
+ * promise. Derived components can provide their own way to display information about the errors
+ * and the waiting status.
  */
 export class Boundary extends Component
 {
@@ -690,8 +735,8 @@ export class Boundary extends Component
     }
 
 	/**
-     * Removes the fulfilled promise from our internal list and if the list is empty asks to
-     * re-render
+     * Removes the given (settled) promise from our internal list and if the list is empty asks to
+     * re-render.
      */
 	private onPromise(promise: Promise<any>): void
 	{
