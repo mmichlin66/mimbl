@@ -1,7 +1,7 @@
 ﻿import {
     CallbackWrappingOptions, ComponentShadowOptions, IComponent, ICustomAttributeHandlerClass,
     IRef, ITextVN, PropType, RefFunc, RenderMethodType, DN, IComponentEx,
-    ComponentProps, ExtendedElement, FuncProxyProps, IRootVN, AwaiterProps
+    ComponentProps, ExtendedElement, FuncProxyProps, IRootVN, AwaiterProps, AwaiterEvents
 } from "./CompTypes";
 import { IVN } from "../core/VNTypes";
 import {EventSlot} from "./EventSlotAPI"
@@ -755,19 +755,22 @@ export class Boundary extends Component
 
 
 /**
- * Component that accepts a single promise and when it resolves displays its content. If the
- * promise is rejected, it throws the error out of its `render` method, which cause the error to
+ * Component that accepts a single promise and when it resolves, displays its content. If the
+ * promise is rejected, it throws the error out of its `render` method, which causes the error to
  * propagate up the hierarchy to the nearest [[Boundary]] component. While the promise is pending,
- * it displays whatever content was provided to it as children. This component provides a minimal
- * UI informing the user about the error or the fact that it is waiting for a promise. Derived
- * components can provide their own way to display information about the errors and the waiting
- * status.
+ * it displays whatever content was provided to it as children. Derived components can augment how
+ * the resolved content is displayed as well as how to react on promise rejection error.
  */
-export class Awaiter extends Component<AwaiterProps>
+export class Awaiter extends Component<AwaiterProps, AwaiterEvents>
 {
 	/** String representation of the component */
 	get displayName(): string { return "Awaiter"; }
 
+    /**
+     * Awaiter is normally used as a managed component and thus is created by the Mimbl
+     * infrastructure and passed its properties.
+     * @param props Awaiter component properties
+     */
     constructor(props: AwaiterProps)
     {
         super(props);
@@ -775,18 +778,27 @@ export class Awaiter extends Component<AwaiterProps>
         this.watch();
     }
 
+    /**
+     * Updates component with new properties.
+     * @ignore
+     */
     shouldUpdate(newProps: AwaiterProps): boolean
     {
+        // if the promise is the same we don't need to update anything
         if (this.promise === newProps.promise)
             return false;
 
+        // otherwise, start watching the new promise and update.
         this.promise = newProps.promise;
         this.watch();
         return true;
     }
 
-    @noWatcher
-    render()
+    /**
+     * Renders content depending on the current state of the promise - pending, resolved or rejected.
+     * @ignore
+     */
+    @noWatcher render(): any
     {
         return this.promise ? this.props.children :
             this.err ? this.getErrorContent(this.err) :
@@ -801,38 +813,44 @@ export class Awaiter extends Component<AwaiterProps>
         // remember the original promise because this.promise can be changed during an update
         // while we are still awaiting.
         let orgPromise = this.promise!;
-        let newVal: any, newErr: any;
 		try
 		{
-			newVal = await orgPromise;
+			let val = await orgPromise;
+            if (this.promise === orgPromise)
+            {
+                this.promise = null;
+                this.val = val;
+                this.updateMe();
+                this.fireEvent("resolved", new CustomEvent("resolved", {detail: val}));
+            }
 		}
 		catch( err)
 		{
-            newErr = err;
+            if (this.promise === orgPromise)
+            {
+                this.promise = null;
+                this.err = err;
+                this.updateMe();
+                this.fireEvent("rejected", new CustomEvent("rejected", {detail: err}));
+            }
 		}
-
-        // if we still have our promise, we are still mounted, so request re-rendering with the
-        // new content; otherwise, we are either already unmounted or have a different promise
-        // after update, which is already being watched.
-        if (this.promise === orgPromise)
-        {
-            this.promise = null;
-            this.val = newVal;
-            this.err = newErr;
-            this.updateMe();
-        }
 	}
 
     /**
      * This method can be overridden to provide content to display for the resolved content. By
      * default, the resolved value itself serves as the content.
+     *
+     * @param val Promise's resolved value
+     * @returns Content to rendered
      */
     protected getResolvedContent(val: any): any { return val}
 
     /**
      * This method can be overridden to provide content to display information about the given
      * error. By default, the error is thrown and is supposed to propagate up to the nearest
-     * Boundary component.
+     * [[Boundary]] component.
+     *
+     * @param err Promise rejection error.
      */
     protected getErrorContent(err: any): any { throw err}
 

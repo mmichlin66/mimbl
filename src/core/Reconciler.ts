@@ -355,14 +355,11 @@ const performMimbleTick = (): void =>
                 // find the nearest error handling service.
                 let errorService = vn.getService( "ErrorBoundary", undefined, true);
                 if (errorService)
-                {
                     errorService.reportError( err);
-                    performChildrenOperation( vn);
-                }
 
                 /// #if DEBUG
                 else
-                    console.error( "BUG: performChildrenOperation threw exception but ErrorBoundary service was not found.", err);
+                    console.error( "Boundary service was not found to handle exception", err);
                 /// #endif
             }
         });

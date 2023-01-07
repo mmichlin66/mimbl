@@ -1133,3 +1133,23 @@ export interface AwaiterProps
 
 
 
+/**
+ * Properties to be used with the Awaiter component.
+ */
+export interface AwaiterEvents
+{
+	/**
+     * Event fired when the promise is resolved. The `detail` property of the CustomEvent object
+     * will be set to the resolved value.
+     */
+	resolved: CustomEvent<any>;
+
+    /**
+     * Event filred whether the promise is rejected. The `detail` property of the CustomEvent object
+     * will be set to the rejection error.
+     */
+    rejected: CustomEvent<any>;
+}
+
+
+
