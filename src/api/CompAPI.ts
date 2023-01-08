@@ -1,7 +1,7 @@
 ﻿import {
     CallbackWrappingOptions, ComponentShadowOptions, IComponent, ICustomAttributeHandlerClass,
     IRef, ITextVN, PropType, RefFunc, RenderMethodType, DN, IComponentEx,
-    ComponentProps, ExtendedElement, FuncProxyProps, IRootVN, AwaiterProps, AwaiterEvents
+    ComponentProps, ExtendedElement, IRootVN, AwaiterProps, AwaiterEvents, FunctorProps
 } from "./CompTypes";
 import { IVN } from "../core/VNTypes";
 import {EventSlot} from "./EventSlotAPI"
@@ -9,16 +9,16 @@ import { ClassCompVN, shadowDecorator } from "../core/ClassCompVN";
 import { TextVN } from "../core/TextVN";
 import { ElmVN } from "../core/ElmVN";
 import { IndependentCompVN } from "../core/IndependentCompVN";
-import { FuncProxyVN } from "../core/FuncProxyVN";
 import { ManagedCompVN } from "../core/ManagedCompVN";
 import { mountRoot, unmountRoot } from "../core/RootVN";
-import { content2VNs, symJsxToVNs, symToVNs, wrapFunc } from "../core/Reconciler";
+import { content2VNs, setCurrentClassComp, symJsxToVNs, symToVNs, wrapFunc } from "../core/Reconciler";
 import { s_initStyleScheduler } from "../core/StyleScheduler";
-import { isTrigger } from "./TriggerAPI";
+import { createWatcher, isTrigger } from "./TriggerAPI";
 import { symRenderNoWatcher, VN } from "../core/VN";
 import { ComponentMixin } from "../core/CompImpl";
 import { applyMixins } from "../utils/UtilFunc";
 import { registerElmProp } from "../core/Props";
+import { IWatcher } from "./TriggerTypes";
 
 
 /**
@@ -73,24 +73,24 @@ export class Ref<T = any> extends EventSlot<RefFunc<T>> implements IRef<T>
         if (listener)
             this.attach( listener);
 
-		this.v = initialReference as T;
+		this.v = initialReference;
 	}
 
 	/** Get accessor for the reference value */
-	public get r(): T { return this.v; }
+	public get r(): T | undefined { return this.v; }
 
 	/** Set accessor for the reference value */
-	public set r( v: T)
+	public set r( v: T | undefined)
 	{
 		if (this.v !== v)
 		{
 			this.v = v;
-			this.fire( v);
+			this.fire(v as any);
 		}
 	}
 
 	/** Current referenced value */
-	private v: T;
+	private v?: T;
 }
 
 
@@ -243,37 +243,6 @@ applyMixins(Component, ComponentMixin);
 
 
 /**
- * Creates a Function Proxy virtual node that wraps the given function with an optional argument.
- * This allows using the same component method with different arguments, for example:
- *
- * ```typescript
- * class ToDoList extends mim.Component
- * {
- *     // array of objects of some externally defined ToDo type
- *     @mim.trigger todos: ToDo[] = [];
- *
- *     render(): any
- *     {
- *         return <main>
- *             {this.todos.map( todo => <FuncProxy func={this.renderTodo, arg: todo))}
- *         </main>
- *     }
- *
- *     renderToDo(todo: ToDo): any
- *     {
- *         return <div>{todo.description}</div>
- *     }
- * }
- * ```
- *
- *
- * @param props Properties defining the rendering function and optional parameters.
- */
-export function FuncProxy(props: FuncProxyProps): any {}
-
-
-
-/**
  * Renders the given content (usually result of JSX expression) under the given HTML element
  * asynchronously.
  * @param content Content to render.
@@ -330,7 +299,7 @@ String.prototype[symToVNs] = function(this: string): IVN | IVN[] | null | undefi
 // virtual node or nodes.
 Function.prototype[symToVNs] = function(this: Function): IVN | IVN[] | null | undefined
 {
-    return new FuncProxyVN({func: this as RenderMethodType});
+    return new ManagedCompVN(Functor, {func: this as RenderMethodType});
 };
 
 
@@ -434,7 +403,7 @@ Component.prototype[symToVNs] = function(this: IComponent): IVN | IVN[] | null |
 // virtual node or nodes.
 Promise.prototype[symToVNs] = function(this: Promise<any>): IVN | IVN[] | null | undefined
 {
-    return new ManagedCompVN(Awaiter, {promise: this}, null);
+    return new ManagedCompVN(Awaiter, {promise: this});
 };
 
 
@@ -446,12 +415,6 @@ Component[symJsxToVNs] = function(props: Record<string,any> | undefined,
 {
     return new ManagedCompVN( this, props, children);
 }
-
-
-
-// Add jsxToVNs method to the PromiseProxy class object. This method is invoked by the JSX mechanism.
-FuncProxy[symJsxToVNs] = (props: FuncProxyProps | undefined): IVN | IVN[] | null | undefined =>
-    props?.func ? new FuncProxyVN(props) : null;
 
 
 
@@ -607,13 +570,13 @@ const createNewLazyProxy = (promise: Promise<any>): any =>
  * Implementation of `toVNs` and `jsxToVNs` functions for the lazy module loader. When either
  * `symToVNs` or `symJsxToVNs` properties are requested from the member of the lazy loading
  * module, this function bound to the LazyHandler instance is returned (if the promise is still
- * pending). It returns FuncProxyVN for the [[lazyHandlerFunc]] function, which will either
+ * pending). It returns Functor for the [[lazyHandlerFunc]] function, which will either
  * throw a promise (while it is still pending), or throw an error (if the promise is rejected),
  * or call the actual `symToVNs` or `symJsxToVNs` function on the promise's resolved value.
  */
 function lazyHandlerToVNs(this: LazyHandler, sym: symbol, ...args: any[]): any
 {
-    return new FuncProxyVN({
+    return new ManagedCompVN(Functor, {
         func: lazyHandlerFunc,
         thisArg: this,
         arg: [sym, args],
@@ -624,7 +587,7 @@ function lazyHandlerToVNs(this: LazyHandler, sym: symbol, ...args: any[]): any
 
 
 /**
- * Function that is wrapped in FuncProxyVN when either `symToVNs` or `symJsxToVNs` properties are
+ * Function that is wrapped in Functor when either `symToVNs` or `symJsxToVNs` properties are
  * requested from the member of the lazy loading module. This function is called with `this` set
  * to the instance of the LazyHandler class and does the following:
  * - if the promise is still pending, throws it (this is supposed to be caught by a Boundary)
@@ -864,6 +827,146 @@ export class Awaiter extends Component<AwaiterProps, AwaiterEvents>
 
 	/** Rejected promise error. */
 	private err: any;
+}
+
+
+
+/**
+ * Component that wraps a function or a class method and invokes it in its `render` method. The
+ * component remembers the `this` value for the function, which allows it to invoke class methods
+ * with the proper `this`. A function can accept a single argument, which can be passed in the
+ * `arg` property to the *Functor* component.
+ *
+ * Normally, the *Functor* component wraps the function in a watcher, which allows it to react to
+ * triggers. It is possible to disable this functionality either by applying the [[noWatcher]]
+ * decorator to a class method or by passing `false` to the `watch` property.
+ *
+ * The primary use of the *Functor* component is to allow class-based components' methods to render
+ * different parts of the component and to update these parts independently. If the class method
+ * doesn't accept any parameters, then there is no need to use the *Functor* component explicitly.
+ * Such methods can be passed as JSX content and Mimbl will create the *Functor* components for
+ * them.
+ *
+ * **Example:**
+ *
+ * ```typescript
+ * class ToDoList extends mim.Component
+ * {
+ *     // array of objects of some externally defined ToDo type
+ *     @mim.trigger todos: ToDo[] = [];
+ *
+ *     render(): any
+ *     {
+ *         return <main>
+ *             {this.todos.map( todo => <mim.Functor func={this.renderTodo} arg={todo} />}
+ *         </main>
+ *     }
+ *
+ *     renderToDo(todo: ToDo): any
+ *     {
+ *         return <div>{todo.description}</div>
+ *     }
+ * }
+ * ```
+ */
+export class Functor extends Component<FunctorProps>
+{
+	/** String representation of the component */
+	get displayName(): string { return this.props.func.name; }
+
+    /**
+     * Prepares the component to be mounted.
+     * @ignore
+     */
+    willMount(): void
+    {
+        // establish watcher if not disabled using the `watch` flag or the @noWatcher decorator
+        this.init(this.props);
+    }
+
+    /**
+     * Prepares the component to be unmounted.
+     * @ignore
+     */
+    willUnmount(): void
+    {
+        // release the watcher; we don't need to set it to undefined because it will be done
+        // in the next mount (if it comes)
+        this.watcher?.dispose();
+    }
+
+    /**
+     * Updates component with new properties.
+     * @ignore
+     */
+    shouldUpdate(newProps: FunctorProps): boolean
+    {
+        // if all the properties remain the same, there is no need to re-render
+        let oldProps = this.props as FunctorProps;
+        if (oldProps.func === newProps.func && oldProps.thisArg === newProps.thisArg &&
+            oldProps.watch === newProps.watch && oldProps.arg === newProps.arg)
+        {
+            return false;
+        }
+
+        // release the watcher if existed
+        if (this.watcher)
+        {
+            this.watcher?.dispose();
+            this.watcher = undefined;
+        }
+
+        // create a new watcher if necessary
+        this.init(newProps);
+
+        // indicate that re-rendering is necessary
+        return true;
+    }
+
+    /**
+     * Invokes the wrapped function.
+     * @ignore
+     */
+    @noWatcher render(): any
+    {
+        // the render method is called with the current component set to this Functor instance. We
+        // want, however, to call the function while the current component is set to the creator of
+        // the Functor.
+        let prevComp = setCurrentClassComp(this.vn!.creator);
+        try
+        {
+            return this.watcher
+                ? this.watcher(this.props.arg)
+                : this.props.func.call(this.props.thisArg, this.props.arg);
+        }
+        finally
+        {
+            setCurrentClassComp(prevComp);
+        }
+    }
+
+    /** Establishes watcher if necessary */
+    private init(props: FunctorProps): void
+    {
+        this.thisArg = props.thisArg ?? this.vn!.creator;
+        if (props.watch ?? !props.func[symRenderNoWatcher])
+            this.watcher = createWatcher(props.func, this.updateMe, this.thisArg, this);
+    }
+
+
+
+    /**
+     * The "this" argument for calling the function. If it is not provided, the current component
+     * is used.
+     */
+    thisArg: any;
+
+    /**
+     * Watcher function wrapping the original function. The watcher will notice any trigger objects
+     * being read during the original function execution and will request update thus triggerring
+     * re-rendering.
+     */
+	private watcher?: IWatcher;
 }
 
 

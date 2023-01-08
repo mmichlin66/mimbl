@@ -20,7 +20,7 @@ export class ManagedCompVN extends ClassCompVN
 
 
 
-    constructor( compClass: IComponentClass, props: Record<string,any> | undefined, children: IVN[] | null)
+    constructor( compClass: IComponentClass, props: Record<string,any> | undefined, children: IVN[] | null = null)
 	{
 		super();
 
@@ -71,7 +71,7 @@ export class ManagedCompVN extends ClassCompVN
         this.events?.mount(this.comp);
 
         if (this.ref)
-            setRef( this.ref, this.ownDN);
+            setRef( this.ref, this.comp);
 
         super.mount( parent, index, anchorDN, beforeDN);
     }

@@ -646,7 +646,7 @@ export type RefFunc<T = any> = (newRef: T) => void;
  */
 export interface IRef<T = any> extends IEventSlot<RefFunc<T>>
 {
-    r: T;
+    r?: T;
 }
 
 /**
@@ -958,19 +958,6 @@ export interface ITextVN extends IVNode
 
 
 
-/**
- * Represents a virtual node for a rendering function virtual node.
- */
-export interface IFuncProxyVN extends IVNode
-{
-	/**
-     * Requests update of the content produced by the function.
-     */
-	updateMe(): void;
-}
-
-
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Custom attributes
@@ -1077,11 +1064,14 @@ export type RenderMethodType = (arg?: any) => any;
 
 
 /**
- * Properties to be used with the FuncProxy component.
+ * Properties to be used with the FunctorProps component.
  */
-export interface FuncProxyProps
+export interface FunctorProps
 {
-	/** Function to be called to render content. */
+	/**
+     * Function to be called to render content. Functions wrapped by the [[Functor]] component
+     * can accept at most one argument.
+     */
 	func: RenderMethodType;
 
     /**
@@ -1096,12 +1086,6 @@ export interface FuncProxyProps
      * there is a need to pass several parameters, use either array or object.
      */
     arg?: any;
-
-    /**
-     * Optional reference object, which will point to the FuncProxy virtual node when the node is
-     * mounted. Through this reference, the function can be invoked, which will cause re-rendering.
-     */
-    vnref?: RefPropType<IFuncProxyVN>;
 
     /**
      * Optional flag indicating whether or not the function should be wrapped in a watcher so that
