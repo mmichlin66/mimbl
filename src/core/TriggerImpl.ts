@@ -12,7 +12,6 @@ import {EventSlot} from "../api/EventSlotAPI";
 /**
  * The Trigger class represents an object that keeps a value and notifies the current watcher (if
  * any) when this value changes.
- * @ignore
  */
 export class Trigger<T = any> extends EventSlot<TypeVoidFunc<T>> implements ITrigger<T>
 {
@@ -59,6 +58,16 @@ export class Trigger<T = any> extends EventSlot<TypeVoidFunc<T>> implements ITri
     // Value being get and set
     private v: T;
 }
+
+
+
+/**
+ * Checks whether the given object is a trigger.
+ * @param obj Object to check whether it is a trigger
+ * @returns True if the object is a trigger and false otherwise
+ */
+export const isTrigger = (obj: object): obj is ITrigger =>
+    obj instanceof Trigger;
 
 
 
@@ -414,7 +423,7 @@ function triggerrize<T = any>( v: T, trigger: Trigger, depth?: number): T
     if (!v || depth === 0 || typeof v !== "object")
         return v;
 
-    let actDepth = depth ? depth - 1 : 0;
+    let newDepth = depth ? depth - 1 : 0;
     let handlerClass: new (trigger: Trigger, depth?: number) => ProxyHandler<any>;
     if (v instanceof Map)
         handlerClass = MapHandler;
@@ -425,7 +434,7 @@ function triggerrize<T = any>( v: T, trigger: Trigger, depth?: number): T
     else
         return v;
 
-    return new Proxy( v as any as object, new handlerClass(trigger, actDepth)) as any as T;
+    return new Proxy( v as any as object, new handlerClass(trigger, newDepth)) as any as T;
 }
 
 

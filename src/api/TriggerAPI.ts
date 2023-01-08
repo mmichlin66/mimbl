@@ -4,78 +4,27 @@ import { ComputedTrigger, startMutations, stopMutations, Trigger, triggerDecorat
 
 
 /**
- * Creates a trigger object of the given depth with the given initial value.
+ * Creates a trigger object of the given depth with the given initial value. Triggers fire events
+ * when their value changes. They also work in conjunction with watchers (see [[createWatcher]])
+ * and notify watchers when the trigger's value is read.
+ *
+ * The `depth` parameter determines how many levels of nested properties of arrays, maps, sets and
+ * objects should trigger read and write events. If the depth is 0, changing nested
+ * properties doesn't cause the trigger to fire - only changing the property itself does. If the
+ * depth is undefined, arrays, objects, maps and sets get the depth of 1, meaning that operations
+ * that add or remove items will trigger events, but modifications to the items will not.
+ * The `depth` parameter is ignored for primitive types.
+ *
  * @typeparam T Type of the trigger value.
- * @param depth Depth of the trigger, which determines how many levels of nested properties of
- * arrays, maps, sets and objects should trigger changes.
  * @param v Optional initial value
+ * @param depth Depth of the trigger, which determines how many levels of nested properties of
+ * arrays, maps, sets and objects should trigger changes. Ignored for primitive types.
+ * @returns [[ITrigger]] through which the value can be set and retrieved.
  */
-export const createTrigger = <T = any>( v?: T, depth?: number): ITrigger<T> =>
+export const createTrigger = <T = any>(v?: T, depth?: number): ITrigger<T> =>
     new Trigger( v, depth);
 
 
-
-/**
- * Checks whether the given object is a trigger.
- * @param obj Object to check whether it is a trigger
- * @returns True if the object is a trigger and false otherwise
- */
-export const isTrigger = (obj: object): obj is ITrigger =>
-    obj instanceof Trigger;
-
-
-
-/**
- * Creates a watcher function with the same signature as the given regular function. When the
- * watcher function is invoked it invokes the original function and it notices all trigger objects
- * that were read during its execution. When any of these trigger objects have their values
- * changed, the responder function will be called.
- *
- * @typeparam T Type (signature) of the function to be watched.
- * @param func Function to be watched
- * @param responder Function to be invoked when values of the trigger objects encountered during
- * the original function's last execution change.
- * @param funcThis Optional value of "this" that will be used to call the original function.
- * @param responderThis Optional value of "this" that will be used to call the responder function.
- * If this value is undefined, the "this" value for the original function will be used.
- */
-export const createWatcher = <T extends AnyAnyFunc>( func: T, responder: NoneVoidFunc,
-        funcThis?: any, responderThis?: any): IWatcher<T> =>
-    Watcher.create(func, responder, funcThis, responderThis);
-
-
-
-/**
- * Creates a computed trigger object whose value is calculated by the given function and with an
- * optional initial value.
- *
- * @typeparam T Type of the computed value.
- * @param func Function, method or get accessor that produces the computed value.
- * @param thisArg Optional `this` value to use when invoking the computing function.
- * @returns Trigger object that will trigger changes only when the computed value changes.
- */
-export const createComputedTrigger = <T = any>( func: NoneTypeFunc<T>, thisArg?: any): ITrigger<T> =>
-    new ComputedTrigger( func, thisArg);
-
-
-
-/**
- * Increments mutation scope reference count
- */
-export const enterMutationScope = startMutations;
-
-/**
- * Decrements mutation scope reference count. If it reaches zero, notifies all deferred watchers.
- */
-export const exitMutationScope = stopMutations;
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Decorators
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
  * Decorator function for defining properties so that changing their value will any watcher
@@ -99,6 +48,43 @@ export const trigger = (targetOrDepth: any, name?: string): any =>
         return triggerDecoratorHelper( undefined, targetOrDepth, name!);
     }
 }
+
+
+
+/**
+ * Creates a watcher function with the same signature as the given regular function. When the
+ * watcher function is invoked it invokes the original function and it notices all trigger objects
+ * that were read during its execution. When any of these trigger objects have their values
+ * changed, the responder function will be called.
+ *
+ * @typeparam T Type (signature) of the function to be watched.
+ * @param func Function to be watched
+ * @param responder Function to be invoked when values of the trigger objects encountered during
+ * the original function's last execution change.
+ * @param funcThis Optional value of "this" that will be used to call the original function.
+ * @param responderThis Optional value of "this" that will be used to call the responder function.
+ * If this value is undefined, the "this" value for the original function will be used.
+ * @returns The callable [[IWatcher]] interface, whcih represent a function with the same sigature
+ * as the original function. In addition, the returned function has the `dispose` method, which
+ * must be called when the watcher is not needed anymore.
+ */
+export const createWatcher = <T extends AnyAnyFunc>( func: T, responder: NoneVoidFunc,
+        funcThis?: any, responderThis?: any): IWatcher<T> =>
+    Watcher.create(func, responder, funcThis, responderThis);
+
+
+
+/**
+ * Creates a computed trigger object whose value is calculated by the given function or get
+ * accessor.
+ *
+ * @typeparam T Type of the computed value.
+ * @param func Function, method or get accessor that produces the computed value.
+ * @param thisArg Optional `this` value to use when invoking the computing function.
+ * @returns Trigger object that will trigger changes only when the computed value changes.
+ */
+export const createComputedTrigger = <T = any>(func: NoneTypeFunc<T>, thisArg?: any): ITrigger<T> =>
+    new ComputedTrigger( func, thisArg);
 
 
 
@@ -135,9 +121,9 @@ export const computed = (target: any, name: string, propDescr: PropertyDescripto
             let orgSet = propDescr.set;
             propDescr.set = function(v: any): void
             {
-                enterMutationScope();
+                startMutations();
                 try { orgSet.call( this, v); }
-                finally { exitMutationScope(); }
+                finally { stopMutations(); }
             }
         }
     }
@@ -147,6 +133,18 @@ export const computed = (target: any, name: string, propDescr: PropertyDescripto
         propDescr.value = function(): any { return getTriggerValue(orgFunc, this); }
     }
 }
+
+
+
+/**
+ * Increments mutation scope reference count
+ */
+export const enterMutationScope = startMutations;
+
+/**
+ * Decrements mutation scope reference count. If it reaches zero, notifies all deferred watchers.
+ */
+export const exitMutationScope = stopMutations;
 
 
 

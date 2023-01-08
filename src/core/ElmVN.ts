@@ -9,13 +9,13 @@ import { ChildrenUpdateOperation, IVN, VNDisp } from "./VNTypes";
 /// #endif
 
 import { mountSubNodes, reconcileSubNodes } from "./Reconciler";
-import { isTrigger } from "../api/TriggerAPI"
 import { VN, setRef, updateRef } from "./VN";
 import { EventsMixin } from "./Events";
 import {
     AttrPropInfo, cleanElmProps, CustomAttrPropInfo, EventPropInfo, getPropInfo, removeElmProp,
     setElmProp, updateElmProp
 } from "./Props";
+import { isTrigger } from "./TriggerImpl";
 
 
 
