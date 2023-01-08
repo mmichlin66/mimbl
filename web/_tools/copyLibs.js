@@ -7,9 +7,9 @@ console.log("Current directory: " + ps.cwd());
 
 console.log("Copy libraries to " + p.join(ps.cwd(), "lib"));
 exec("xcopy ..\\..\\mimcss\\lib\\mimcss.js      lib\\ /i /y /d");
-exec("xcopy ..\\..\\mimcss\\lib\\mimcss.dev.js  lib\\ /i /y /d");
-exec("xcopy ..\\..\\mimurl\\lib\\mimurl.js      lib\\ /i /y /d");
 exec("xcopy ..\\..\\mimbl\\lib\\mimbl.js        lib\\ /i /y /d");
+exec("xcopy ..\\..\\mimbl\\lib\\mimbl.dev.js    lib\\ /i /y /d");
+exec("xcopy ..\\..\\mimurl\\lib\\mimurl.js      lib\\ /i /y /d");
 exec("xcopy ..\\..\\mimcl\\lib\\mimcl.js        lib\\ /i /y /d");
 
 
