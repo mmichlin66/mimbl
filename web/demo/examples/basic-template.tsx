@@ -6,7 +6,7 @@ class MyComponent extends mim.Component
 {
 	public render()
 	{
-		return <div/>
+		return <div>Hello!</div>
 	}
 }
 
