@@ -1,7 +1,7 @@
 ﻿import {
     CallbackWrappingOptions, ComponentShadowOptions, IComponent, ICustomAttributeHandlerClass,
     IRef, ITextVN, PropType, RefFunc, RenderMethodType, DN, IComponentEx,
-    ComponentProps, ExtendedElement, IRootVN, AwaiterProps, AwaiterEvents, FunctorProps
+    ComponentProps, ExtendedElement, IRootVN, AwaiterProps, AwaiterEvents, FunctorProps, IComponentClass
 } from "./CompTypes";
 import { IVN } from "../core/VNTypes";
 import {EventSlot} from "./EventSlotAPI"
@@ -13,12 +13,14 @@ import { ManagedCompVN } from "../core/ManagedCompVN";
 import { mountRoot, unmountRoot } from "../core/RootVN";
 import { content2VNs, setCurrentClassComp, symJsxToVNs, symToVNs, wrapFunc } from "../core/Reconciler";
 import { s_initStyleScheduler } from "../core/StyleScheduler";
-import { createWatcher, isTrigger } from "./TriggerAPI";
+import { createWatcher } from "./TriggerAPI";
 import { symRenderNoWatcher, VN } from "../core/VN";
 import { ComponentMixin } from "../core/CompImpl";
 import { applyMixins } from "../utils/UtilFunc";
 import { registerElmProp } from "../core/Props";
 import { IWatcher } from "./TriggerTypes";
+import { Trigger } from "../core/TriggerImpl";
+
 
 
 /**
@@ -279,10 +281,19 @@ export function noWatcher( target: any, name: string, propDescr: PropertyDescrip
 
 
 
-// Add toVNs method to the Boolean class. This method is invoked to convert rendered content to
-// virtual node or nodes. For Booleans, it simply returns null, so neither true nor false create
-// any rendered content. For Symbols, it simply returns null.
+// Add toVNs method to the Symbol and Boolean classes. This method is invoked to convert rendered
+// content to virtual node or nodes. For Booleans, it simply returns null, so neither true nor
+// false create any rendered content. For Symbols, it simply returns null.
 Symbol.prototype[symToVNs] = Boolean.prototype[symToVNs] = () => null
+
+
+
+// Add toVNs method to the VN class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+VN.prototype[symToVNs] = function(this: VN): IVN | IVN[] | null | undefined
+{
+    return this;
+}
 
 
 
@@ -300,7 +311,7 @@ String.prototype[symToVNs] = function(this: string): IVN | IVN[] | null | undefi
 Function.prototype[symToVNs] = function(this: Function): IVN | IVN[] | null | undefined
 {
     return new ManagedCompVN(Functor, {func: this as RenderMethodType});
-};
+}
 
 
 
@@ -358,44 +369,27 @@ Array.prototype[symToVNs] = function(this: Array<any>): IVN | IVN[] | null | und
             nodes.push(vn as IVN);
     }
     return nodes.length > 0 ? nodes : null;
-};
+}
 
 
 
-// Add toVNs method to the Object class. This method is invoked to convert rendered content to
+// Add toVNs method to the Trigger class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-Object.prototype[symToVNs] = function(): IVN | IVN[] | null | undefined
+Trigger.prototype[symToVNs] = function(this: Trigger): IVN | IVN[] | null | undefined
 {
-    if (typeof this.render === "function")
-        return this.vn ?? new IndependentCompVN( this);
-    else if (isTrigger(this))
-        return new TextVN( this);
-    else
-    {
-        let s = this.toString();
-        return !s ? null : new TextVN( s);
-    }
-};
-
-
-
-// Add toVNs method to the VN class. This method is invoked to convert rendered content to
-// virtual node or nodes.
-VN.prototype[symToVNs] = function(this: VN): IVN | IVN[] | null | undefined
-{
-    return this;
-};
+    return new TextVN( this);
+}
 
 
 
 // Add toVNs method to the Component class. This method is invoked to convert rendered content to
 // virtual node or nodes.
-Component.prototype[symToVNs] = function(this: IComponent): IVN | IVN[] | null | undefined
+Component.prototype[symToVNs] = function(this: Component): IVN | IVN[] | null | undefined
 {
     // if the component (this can only be an Instance component) is already attached to VN,
     // return this existing VN; otherwise create a new one.
     return this.vn as ClassCompVN ?? new IndependentCompVN( this);
-};
+}
 
 
 
@@ -404,40 +398,50 @@ Component.prototype[symToVNs] = function(this: IComponent): IVN | IVN[] | null |
 Promise.prototype[symToVNs] = function(this: Promise<any>): IVN | IVN[] | null | undefined
 {
     return new ManagedCompVN(Awaiter, {promise: this});
-};
+}
+
+
+
+// Add toVNs method to the Object class. This method is invoked to convert rendered content to
+// virtual node or nodes.
+Object.prototype[symToVNs] = function(): IVN | IVN[] | null | undefined
+{
+    let s = this.toString();
+    return !s ? null : new TextVN(s);
+}
 
 
 
 // Add jsxToVNs method to the Component class object, which creates virtual node for managed
 // components. This method is invoked by the JSX mechanism.
-Component[symJsxToVNs] = function(props: Record<string,any> | undefined,
+Component[symJsxToVNs] = function(this: IComponentClass, props: Record<string,any> | undefined,
     children: IVN[] | null): IVN | IVN[] | null | undefined
 {
-    return new ManagedCompVN( this, props, children);
+    return new ManagedCompVN(this, props, children);
 }
 
 
 
 // Add jsxToVNs method to the String class, which creates ElmVN with the given parameters. This
 // method is invoked by the JSX mechanism.
-String.prototype[symJsxToVNs] = function(props: ExtendedElement<Element> | undefined,
+String.prototype[symJsxToVNs] = function(this: string, props: ExtendedElement<Element> | undefined,
     children: IVN[] | null): IVN | IVN[] | null | undefined
 {
-    return new ElmVN( this, props, children);
-};
+    return new ElmVN(this, props, children);
+}
 
 
 
 // Add jsxToVNs method to the Function class, which works for functional components. This method
 // is invoked by the JSX mechanism.
-Function.prototype[symJsxToVNs] = function(props: Record<string,any> | undefined,
+Function.prototype[symJsxToVNs] = function(this: Function, props: Record<string,any> | undefined,
     children: IVN[] | null): IVN | IVN[] | null | undefined
 {
     // invoke the function right away. The return value is treated as rendered content. This way,
     // the function runs under the current Mimbl context (e.g. creator object used as "this" for
     // event handlers).
     return content2VNs(this(props, children));
-};
+}
 
 
 

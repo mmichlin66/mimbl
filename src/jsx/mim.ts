@@ -98,7 +98,8 @@ export function jsx( tag: any, props: any, ...children: any[]): any
  *	}
   ```
 
- * @param props
+  Note that you have the `mim.Fragment` in scope (using `import * as mim from "mimbl"`) evn though
+  it is not used explicitly.
  */
 export function Fragment(): any {}
 
@@ -106,7 +107,7 @@ export function Fragment(): any {}
 
 // Add jsxToVNs method to the Fragment class object. This method is invoked by the JSX mechanism.
 Fragment[symJsxToVNs] = (props: Record<string,any> | undefined,
-    children: IVN[] | null): IVN | IVN[] | null | undefined => content2VNs(children);
+    children: IVN[] | null): IVN | IVN[] | null | undefined => children;
 
 
 

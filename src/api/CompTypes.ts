@@ -56,7 +56,6 @@ export type DN = Node | null;
  * `detail` property of a CustomEvent. Default type is an empty object (no events).
  */
 export type ComponentProps<TProps extends {} = {}, TEvents extends {} = {}> =
-    ICommonProps &
     Readonly<TProps> &
     { readonly [K in keyof TEvents & string as `$on_${K}`]?:
         EventPropType<TEvents[K] extends Event ? TEvents[K] : CustomEvent<TEvents[K]>> }

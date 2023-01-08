@@ -1,13 +1,17 @@
 ﻿import {
     WebElmAttrChangeHandler, WebElmAttrOptions, WebElmConstructor, WebElmFromHtmlConverter, WebElmOptions, WebElmToHtmlConverter
 } from "./WebElmTypes";
+import { IVN } from "../core/VNTypes";
+import { IComponent, PropType } from "./CompTypes";
 import { mimcss } from "../core/StyleScheduler";
 import { trigger } from "./TriggerAPI";
 import { mount, unmount } from "./CompAPI";
 import { ComponentMixin } from "../core/CompImpl";
 import { applyMixins } from "../utils/UtilFunc";
 import { registerElmProp, setAttrValue } from "../core/Props";
-import { PropType } from "./CompTypes";
+import { symToVNs } from "../core/Reconciler";
+import { IndependentCompVN } from "../core/IndependentCompVN";
+import { ClassCompVN } from "../core/ClassCompVN";
 
 
 
@@ -127,12 +131,12 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
 
         connectedCallback(): void
         {
-            mount( this, this.#shadowRoot ?? this);
+            mount(this, this.#shadowRoot ?? this);
         }
 
         disconnectedCallback(): void
         {
-            unmount( this.#shadowRoot ?? this);
+            unmount(this.#shadowRoot ?? this);
         }
 
         attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void
@@ -215,6 +219,16 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
 
     // apply the ComponentMixin, which makes the actual class to implement all IComponentEx methods
     applyMixins(ActualClass, ComponentMixin);
+
+    // Add toVNs method to the actual class. This method is invoked to convert rendered content to
+    // virtual node or nodes.
+    ActualClass.prototype[symToVNs] = function(this: IComponent): IVN | IVN[] | null | undefined
+    {
+        // if the component (this can only be an Instance component) is already attached to VN,
+        // return this existing VN; otherwise create a new one.
+        return this.vn as ClassCompVN ?? new IndependentCompVN( this);
+    }
+
     return ActualClass as unknown as WebElmConstructor<TElm,TAttrs,TEvents>;
 }
 
