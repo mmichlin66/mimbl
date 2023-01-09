@@ -4,7 +4,7 @@ unit: 5
 title: "Mimbl Guide: Custom Attributes"
 ---
 
-# Mimbl Guide: Custom Attributes
+# Custom Attributes
 A unique Mimbl feature is the ability to implement custom element attributes. As their name implies, custom element attributes are attributes that can be directly applied to the JSX representation of HTML and SVG elements and that have associated JavaScript code executing the custom functionality at run-time. The code is provided in the form of Custom Attribute Handlers - classes that are registered to implement functionality for named attributes. The consumers of custom attributes specify the named attributes in JSX representation of HTML or SVG elements in the same way they specify standard attributes.
 
 ## Use Case

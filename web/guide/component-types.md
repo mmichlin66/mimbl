@@ -5,7 +5,7 @@ title: "Mimbl Guide: Component Types"
 description: Mimbl supports several component types. This unit discusses them in details.
 ---
 
-# Mimbl Guide: Component Types
+# Component Types
 In this unit we will look at the different types of components that Mimbl supports and discuss which type is better suited to different circumstances.
 
 Mimbl supports three types of components:

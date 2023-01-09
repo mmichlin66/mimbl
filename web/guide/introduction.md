@@ -5,7 +5,7 @@ title: "Mimbl Guide: Introduction"
 description: Brief introduction to using the Mimbl library for authoring Web UI.
 ---
 
-# Mimbl Guide: Introduction
+# Introduction
 
 Mimbl is a Web UI authoring library and this guide will help you get started with building Web UI using Mimbl. If you are familiar with React, you will find many concepts of Mimbl to be very close to those of React. Mimbl builds on the same principles React was built on and then goes further in an attempt to improve in certain areas where React is lacking.
 

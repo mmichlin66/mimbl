@@ -4,7 +4,7 @@ unit: 7
 title: "Mimbl Guide: Callbacks and this"
 ---
 
-# Mimbl Guide: Callbacks and this
+# Callbacks and this
 Callbacks are used heavily in JavaScript and, consequently, in Mimbl. Using callbacks as DOM event handlers was described in the previous unit; however, there are many other places where callbacks are used. Since Mimbl encourages developing class-based components, the callbacks will often be class methods, which will need to have access to the class instance properties via the `this` keyword. JavaScript is notorious for making it difficult to combine callbacks and `this` access. This unit describes the techniques available in Mimbl that make this process a bit easier.
 
 ## Callbacks and this in JavaScript

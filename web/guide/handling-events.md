@@ -4,7 +4,7 @@ unit: 3
 title: "Mimbl Guide: Handling Events"
 ---
 
-# Mimbl Guide: Handling Events
+# Handling Events
 Mimbl allows developers to attach functions to DOM Element events so that when an event occurs the function is invoked. Although the concept is very simple, there are a lot of caveats and nuances involved:
 
 - How do we identify events?

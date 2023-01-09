@@ -1,10 +1,10 @@
 ---
 layout: mimbl-guide
 unit: 8
-title: "Mimbl Guide: Mimbl Tick and Component Life Cycle"
+title: "Mimbl Guide: Component Life Cycle"
 ---
 
-# Mimbl Guide: Mimbl Tick and Component Life Cycle
+# Mimbl Tick and Component Life Cycle
 As the user interacts with the Mimbl-based application, components that require change request to be updated by calling the `updateMe` method. As a result, component's `render` method is called and the DOM is updated reflecting the new content. The `render` method, however, isn't called directly from the `updateMe` method; instead, the Mimbl infrastructure schedules the component for update and the actual update happens during the so called *Mimbl Tick*. The tick consists of several phases and components can implement *life cycle methods*, which are called during these phases. This section describes the Mimbl tick process and the life cycle methods.
 
 ## Scheduling Component Updates

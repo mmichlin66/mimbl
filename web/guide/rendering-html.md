@@ -4,7 +4,7 @@ unit: 2
 title: "Mimbl Guide: Rendering HTML Content"
 ---
 
-# Mimbl Guide: Rendering HTML Content
+# Rendering HTML Content
 The ultimate goal of any Web UI library is to produce HTML content and make it easy for developers. Mimbl mostly relies on JSX for laying out the HTML structure; however, it can also work with regular JavaScript types such as strings, numbers, arrays and objects.
 
 There are several places in Mimbl that accept content to be converted to HTML:

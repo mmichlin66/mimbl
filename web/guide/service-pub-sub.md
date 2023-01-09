@@ -1,10 +1,10 @@
 ---
 layout: mimbl-guide
 unit: 6
-title: "Mimbl Guide: Publishing and Subscribing to Services"
+title: "Mimbl Guide: Publishing/Subscribe Mechanism"
 ---
 
-# Mimbl Guide: Publishing and Subscribing to Services
+# Publishing and Subscribing to Services
 Mimbl components can publish and subscribe to services. In Mimbl, a service is an object that is exposed by a component under a certain name and is available to the components down the hierarchy from the publishing component. The service publish/subscribe mechanism is an extension of the React's Context concept. Mimbl components can publish and subscribe to multiple services. Whenever the service's value changes, the subscribed components are notified. Note that component's are not automatically re-rendered when the value of the service changes; it is up to the component how to react on the change notification.
 
 Service publish/subscribe mechanism provides the way to make information maintained by an upstream component available to the downstream components without passing this information through layers of intermediary components between the publisher and the subscriber. For these intermediary components, there is no need to know anything about the service.
@@ -23,7 +23,7 @@ Let's define our *UserProfile* service:
 ```tsx
 type UserProfileService = null | { username: string , fullName: string, email?: string };
 
-declare module "mimbl/lib/core/mim"
+declare module "mimbl"
 {
     interface IServiceDefinitions
     {

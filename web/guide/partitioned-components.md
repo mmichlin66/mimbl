@@ -4,7 +4,7 @@ unit: 4
 title: "Mimbl Guide: Partitioned Components"
 ---
 
-# Mimbl Guide: Partitioned Components
+# Partitioned Components
 ### Rendering Complex Components
 We often deal with creating complex components that contain multiple sections, which in turn can be divided into sub-sections. Having a single `render` method is usually too cumbersome - there is too much JSX. On the other hand, the sections of our complex components are probably only used on this page and are not leveraged in any other part of the application; therefore, creating a separate component for them is not really worth the time and effort. The standard solution is to use private rendering methods - methods that return JSX content that is ultimately used in the `render` method.
 
