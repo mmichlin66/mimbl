@@ -1,6 +1,6 @@
 {
 	"name": "mimbl",
-	"version": "0.9.2",
+	"version": "0.10.1",
 	"description": "MiM Base Library for Web UI Authoring",
 	"homepage": "https://mmichlin66.github.io/mimbl/about.html",
 	"repository": "github:mmichlin66/mimbl",
@@ -19,13 +19,14 @@
 	"keywords": [
 		"Mimbl",
 		"Component",
+        "Web Elements",
 		"Virtual DOM",
 		"Web UI"
 	],
 	"license": "MIT",
 	"devDependencies": {
 		"ifdef-loader": "^2.3.2",
-		"mimcss": "^0.11.16",
+		"mimcss": "^0.11.17",
 		"source-map-loader": "^4.0.1",
 		"typescript": "^4.9.4",
 		"webpack": "^5.75.0",
