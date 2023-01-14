@@ -55,11 +55,11 @@ class ResizeObserverHandler implements mim.ICustomAttributeHandler<ResizeObserve
 
     // This method is called if the element is updated (which may bring a new value or have the same
     // value for the custom attribute)
-	public update(newAttrVal: ResizeObserverAttrType): boolean
+	public update(newAttrVal: ResizeObserverAttrType): void
 	{
         // if the attribute value didn't change we don't need to change anything
         if (this.observer === newAttrVal)
-            return false;
+            return;
 
         // if the attribute value did change, we need to discard the old observer and create
         // a new one
@@ -71,8 +71,6 @@ class ResizeObserverHandler implements mim.ICustomAttributeHandler<ResizeObserve
             this.observer = new ResizeObserver(newAttrVal);
 
         this.observer.observe(this.elm)
-
-		return true;
 	}
 }
 

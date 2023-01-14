@@ -88,7 +88,7 @@ class BorderBlinkHandler implements mim.ICustomAttributeHandler<BorderBlinkType>
         // detach from element events
     }
 
-    public update(newPropVal: BorderBlinkType): boolean
+    public update(newPropVal: BorderBlinkType): void
     {
         // parse new property value and determine color and delay parameters
         // change border color and delay values if necessary
