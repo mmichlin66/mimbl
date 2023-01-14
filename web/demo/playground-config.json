@@ -67,6 +67,14 @@
             "name": "Hello World!",
             "path": "examples/hello-world.tsx",
             "description": "Simple but real example of defining component styles."
+        },
+
+        { "name": "Custom Attributes" },
+
+        {
+            "name": "Resize Observer",
+            "path": "examples/resize-observer.tsx",
+            "description": "Using ResizeObserver as a custom element attrbute."
         }
     ],
 

@@ -106,7 +106,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
         this.prepareMount( comp);
 
         let newAnchorDN = this.ownDN ?? anchorDN;
-        let newBeforeDN = this.ownDN ?? beforeDN;
+        let newBeforeDN = this.ownDN ? null : beforeDN;
 
         if (!comp.handleError)
             mountContent( this, this.render(), newAnchorDN, newBeforeDN);
