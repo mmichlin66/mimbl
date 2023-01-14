@@ -1,23 +1,24 @@
 # Mimbl - Component Authoring Library
-Mimbl is a TypeScript/JavaScript UI authoring library that combines declarative and imperative programming in one package. Mimbl is proposed as an alternative to React. The accompanying document [React Discussion](http://mmichlin66.github.io/2019/08/10/React-Discussion.html) provides more information about aspects of React that this library strives to improve upon.
+Mimbl is a TypeScript/JavaScript UI authoring library that combines declarative and imperative programming in one package. Mimbl is React-like library, which leverages Virtual DOM and employs constructs very similar to those of React. Mimbl also provides some unique features allowing more flexibility for developers.
 
-## Installation
+## Features
+Mimbl provides all the standard functionality that developers expect from component authoring libraries: declarative laying out of HTML structure, function- and class-based components, references, error boundaries, lazy-loading, etc. In addition to this functionality Mimbl provides the following unique features:
+
+- Functional and class–based components as well as custom Web elements.
+- Built-in trigger-watcher mechanism that re-renders components upon changes in the observable properties.
+- Partitioned components that allow independent re-rendering of portions of a component.
+- Component events - just like HTML element events.
+- Custom HTML and SVG attributes defined by developers and supported via handler objects.
+- Service publish/subscribe mechanism.
+- Defining styles using [Mimcss](https://www.mimcss.com/guide/introduction.html) CSS-in-JS library.
+
+## Installation and Usage
+Mimbl is provided as an NPM package. Install it with the following command:
 
 ```
 npm install mimbl
 ```
 
-## Features
-Mimbl provides all the standard React-style functionality that developers expect from component authoring libraries: declarative laying out of HTML structure, function- and class-based components, references, error boundaries, lazy-loading, etc. In addition to this functionality Mimbl provides the following unique features:
-
-- Components whose lifecycle is controlled by developers and which can be accessed via standard property and method invocation.
-- Built-in mechanism for initiating component updates by triggering state changes.
-- Partitioning components into multiple independently updatable areas just by using rendering methods.
-- Custom HTML and SVG attributes defined by developers and supported via handler objects.
-- Service publish/subscribe mechanism.
-- [Mimcss](https://mmichlin66.github.io/mimcss/guide/introduction.html) library for style definitions.
-
-## Usage
 The Mimbl library provides a custom JSX factory function called `jsx`. In order for this function to be invoked by the TypeScript compiler, the tsconfig.json file must have the following option:
 
 ```json
@@ -25,7 +26,9 @@ The Mimbl library provides a custom JSX factory function called `jsx`. In order 
 {
     "jsx": "react",
     "jsxFactory": "mim.jsx",
-    "jsxFragmentFactory": "mim.Fragment"
+    "jsxFragmentFactory": "mim.Fragment",
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
 }
  ```
 
@@ -38,7 +41,7 @@ import * as css from "mimcss"
 // Define a component
 class HelloWorld extends mim.Component
 {
-    color: css.CssColor;
+    @mim.trigger color: css.CssColor;
 
     constructor( color: css.CssColor = "black")
     {
@@ -48,11 +51,21 @@ class HelloWorld extends mim.Component
 
     render(): any
     {
-        return <span style={ {color: this.color} }>Hello World!</span>;
+        return <div>
+            <button click={[this.onChangeColor, "red"]}>Red</button>
+            <button click={[this.onChangeColor, "green"]}>Green</button>
+            <button click={[this.onChangeColor, "blue"]}>Blue</button>
+            <span style={ {color: this.color} }>Hello World!</span>;
+        </div>
+    }
+
+    onChangeColor(e: MouseEvent, color: css.CssColor)
+    {
+        this.color = color;
     }
 }
 
-mim.mount( new HelloWorld("red"));
+mim.mount( new HelloWorld());
 ```
 
 For more details please see the following resources:

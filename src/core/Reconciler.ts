@@ -149,6 +149,12 @@ function CallbackWrapper(this: CallbackWrapperParams): any
 	{
 		retVal = this.func.call( this.thisArg, ...arguments, this.arg);
 	}
+    /// #if DEBUG
+    catch(err)
+    {
+        console.error(`Exception calling '${this.func.name}' callback.`, err);
+    }
+    /// #endif
 	finally
 	{
         // restore the previous component as the current one (if any)
@@ -169,7 +175,7 @@ function CallbackWrapper(this: CallbackWrapperParams): any
 
 
 /**
- * Schedule (or executes) Mimbl tick according to the given type.
+ * Schedules (or executes right away) Mimbl tick according to the given type.
  */
 const scheduleTick = (tickType: TickSchedulingType = TickSchedulingType.AnimationFrame): void =>
 {
@@ -212,6 +218,17 @@ export const requestNodeUpdate = (vn: IVN, req?: ChildrenUpdateRequest, tickType
 	// deletion is scheduled. Note that a node will only be present once in the map no
 	// matter how many times it calls requestUpdate().
 	s_vnsScheduledForUpdate.set( vn, req);
+
+    // if the node is for a component check if it has beforeUpdate and/or afterUpdate methods
+    // and schedule them for running duering the Mimbl tick.
+    if (vn.comp)
+    {
+        let comp = vn.comp;
+        if (comp.beforeUpdate)
+            scheduleFunc(comp.beforeUpdate, true, {thisArg: comp});
+        if (comp.afterUpdate)
+            scheduleFunc(comp.afterUpdate, false, {thisArg: comp});
+    }
 
     // schedule Mimbl tick using animation frame. If this call comes from a wrapped callback, the
     // callback might schedule a tick using microtask. In this case, the animation frame will be

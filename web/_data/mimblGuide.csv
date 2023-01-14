@@ -1,10 +1,11 @@
 unit,title,file
-0,Introduction,introduction.html
+0,Getting Started,introduction.html
 1,Component Types,component-types.html
 2,Rendering HTML Content,rendering-html.html
 3,Handling Events,handling-events.html
-4,Partitioned Components,partitioned-components.html
-5,Custom Attributes,custom-attributes.html
-6,Publish/Subscribe Mechanism,service-pub-sub.html
-7,Callbacks and this,callbacks-and-this.html
-8,Component Life Cycle,mimbl-tick-and-component-lifecycle.html
+4,Trigger/Watcher Mechanism,trigger-watcher.html
+5,Partitioned Components,partitioned-components.html
+6,Custom Attributes,custom-attributes.html
+7,Publish/Subscribe Mechanism,service-pub-sub.html
+8,Callbacks and this,callbacks-and-this.html
+9,Component Life Cycle,component-lifecycle.html

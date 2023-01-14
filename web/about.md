@@ -35,7 +35,7 @@ Read more about component types in the [Component Types](guide/component-types.h
 ### Trigger/Watcher Mechanism
 For a class-based component (both managed and independent), its internal properties can be specified as *triggers* by using the `@trigger` decorator. From the moment such component is mounted, every run of the `render` method remembers what triggers were accessed. Later, when a trigger's value is changed, the component will be re-rendered automatically. Triggers can be of primitive types (strings, numbers) as well as more complex types such as arrays, objects, maps and sets. Triggers can be setup to notify changes in nested levels of the trigger variable - for example, when elements are added/removed to/from the array, map or set, or when object properties are assigned new values.
 
-Read more about the trigger/watcher mechanism in the [Trigger/Watcher](trigger-watcher.html) unit of the Mimbl Guide.
+Read more about the trigger/watcher mechanism in the [Trigger/Watcher](guide/trigger-watcher.html) unit of the Mimbl Guide.
 
 ### Partitioned Components
 It is ubiquitous that complex components don't have their entire JSX-related code reside in one big `render` method, but instead, use private methods (usually called `renderSomething`) responsible for rendering portions of the component. These methods are then invoked from the `render` method. In Mimbl, such methods are automatically converted to internally managed components that can be updated independently of the *parent* component and of each other. Just like the `render` method, these methods use the trigger-watcher mechanism to re-render portions of the component when the values of the triggers change.

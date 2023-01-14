@@ -1,6 +1,6 @@
 ---
 layout: mimbl-guide
-unit: 5
+unit: 6
 title: "Mimbl Guide: Custom Attributes"
 ---
 
@@ -27,13 +27,13 @@ type BorderBlinkType = true | string | number | BorderBlinkObjType |
 type BorderBlinkObjType = { color?: string; delay?: number };
 ```
 
-Next, we need to satisfy the TypeScript JSX type-checking mechanism so that it will allow us to specify this attribute on the HTML `<input>` elements. This is accomplished using the TypeScript's module augmentation technique. Mimbl includes interfaces that define properties for all HTML and SVG elements. The module that defines HTML element interfaces is `HtmlTypes.d.ts` that lives under `lib/core/` directory of the `mimbl` directory under `node_modules`. Therefore, the module path we need to use for augmentation is `mimbl/lib/core/HtmlTypes`. The following code adds the new `borderBlink` attribute to the `IHtmlInputElementProps` interface:
+Next, we need to satisfy the TypeScript JSX type-checking mechanism so that it will allow us to specify this attribute on the HTML `<input>` elements. This is accomplished using the TypeScript's module augmentation technique. Mimbl includes interfaces that define properties for all DOM elements. The module that defines HTML element interfaces is `HtmlTypes.d.ts`. The following code adds the new `borderBlink` attribute to the `IHtmlInputElementAttrs` interface:
 
 ```tsx
-declare module "mimbl/lib/core/HtmlTypes"
+declare module "mimbl"
 {
     // define the custom attribute as applicable to any input element
-    interface IHtmlInputElementProps
+    interface IHtmlInputElementAttrs
     {
         borderBlink?: BorderBlinkType;
     }
@@ -48,14 +48,14 @@ With the above code, TypeScript will allow us to write JSX that specifies `borde
 If we want to have the same functionality applied to the `textarea` and `select` elements, we just add the definition of the custom attribute under the corresponding interfaces:
 
 ```tsx
-declare module "mimbl/lib/core/HtmlTypes"
+declare module "mimbl"
 {
-    interface IHtmlTextareaElementProps
+    interface IHtmlTextareaElementAttrs
     {
         borderBlink?: BorderBlinkType;
     }
 
-    interface IHtmlSelectElementProps
+    interface IHtmlSelectElementAttrs
     {
         borderBlink?: BorderBlinkType;
     }
@@ -75,20 +75,20 @@ Now we need to write the code that will handle our custom attribute in the form 
 ```tsx
 class BorderBlinkHandler implements mim.ICustomAttributeHandler<BorderBlinkType>
 {
-    constructor( elmVN: mim.IElmVN, propVal: BorderBlinkType)
+    constructor(elmVN: mim.IElmVN, propVal: BorderBlinkType)
     {
         // parse property value and determine color and delay parameters
         // attach to element events
         // establish user idleness timer
     }
 
-    public terminate( isRemoval: boolean): void
+    public terminate(isRemoval: boolean): void
     {
         // terminate user idleness timer
         // detach from element events
     }
 
-    public update( newPropVal: BorderBlinkType): boolean
+    public update(newPropVal: BorderBlinkType): boolean
     {
         // parse new property value and determine color and delay parameters
         // change border color and delay values if necessary
@@ -99,7 +99,7 @@ class BorderBlinkHandler implements mim.ICustomAttributeHandler<BorderBlinkType>
 Module augmentation only makes the new attribute available to the TypeScript type-checking mechanism but to make this attribute available at run-time and to map our handler class to the attribute, we need to register it with the attribute's name:
 
 ```tsx
-mim.registerCustomAttribute( "borderBlink", BorderBlickHandler);
+mim.registerCustomAttribute("borderBlink", BorderBlickHandler);
 ```
 
 ## Custom Attribute Handler Life Cycle
@@ -114,5 +114,5 @@ When the element's parent renders it without applying the custom attribute or be
 The handler is free to manipulate the element in any way as well as create, remove and manipulate other DOM elements. For example, in our case, the handler would have to attach to the element's `input`, `focus` and `blur` events and establish a timer to wait for user idleness.
 
 ## Conclusion
-Custom attributes are well suited for tasks that on one hand don't fit well to the declarative nature of HTML layout and on the other hand can be applicable to a wide class of HTML or SVG elements. Just like CSS animations, custom attributes allow declarative specification of rather complex run-time behavior.
+Custom attributes are well suited for tasks that on one hand don't fit well to the declarative nature of HTML layout and on the other hand can be applicable to a wide class of DOM elements. Custom attributes allow declarative specification of rather complex run-time behavior.
 

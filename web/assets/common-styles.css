@@ -19,7 +19,7 @@ body {
 	margin: 0px;
 	font-family: "Segoe UI", Verdana, Geneva, Tahoma, sans-serif;
 	font-size: 15px;
-	line-height: 1.7;
+	line-height: 1.6;
 }
 
 pre, code, code > span {
@@ -30,12 +30,12 @@ pre, code, code > span {
 }
 
 li {
-	line-height: 1.7;
+	line-height: 1.6;
 }
 
 p {
-	margin-top: 0.4em;
-	margin-bottom: 0.4em;
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
 }
 
 .vbox {

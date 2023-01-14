@@ -1,13 +1,13 @@
 ---
 layout: mimbl-guide
-unit: 4
+unit: 5
 title: "Mimbl Guide: Partitioned Components"
 ---
 
 # Partitioned Components
-### Rendering Complex Components
-We often deal with creating complex components that contain multiple sections, which in turn can be divided into sub-sections. Having a single `render` method is usually too cumbersome - there is too much JSX. On the other hand, the sections of our complex components are probably only used on this page and are not leveraged in any other part of the application; therefore, creating a separate component for them is not really worth the time and effort. The standard solution is to use private rendering methods - methods that return JSX content that is ultimately used in the `render` method.
+We often deal with complex components that contain multiple sections, which in turn can be divided into sub-sections. Having a single `render` method is usually too cumbersome - there is too much JSX and some parts of it are created only based on certain conditions. On the other hand, the sections of our complex components are probably only used on this page and are not leveraged in any other part of the application; therefore, creating a separate component for them is not really worth the time and effort. The standard solution is to use private rendering methods - methods that return JSX content that is ultimately used in the `render` method.
 
+## Rendering Complex Components
 The rendering code of a complex component often looks like the following:
 
 ```tsx
@@ -27,9 +27,9 @@ public render(): any
 private renderHeader(): any
 {
     return <div>
-        <button click={() => this.setRightSidebarColor( "red")}>Red</button>
-        <button click={() => this.setRightSidebarColor( "green")}>Green</button>
-        <button click={() => this.setRightSidebarColor( "blue")}>Blue</button>
+        <button click={[this.onRightSidebarColorChange, "red"]}>Red</button>
+        <button click={[this.onRightSidebarColorChange, "green"]}>Green</button>
+        <button click={[this.onRightSidebarColorChange, "blue"]}>Blue</button>
   </div>;
 }
 
@@ -40,7 +40,7 @@ private renderRightSidebar(): any
     </div>;
 }
 
-private setRightSidebarColor( color: css.CssColor): void
+private onRightSidebarColorChange(e: MouseEvent, color: css.CssColor): void
 {
     this.rightSidebarColor = color;
 }
@@ -55,6 +55,7 @@ The above code presents a page divided into five sections. The header has three 
 
 It is possible to create components for each of the sections, which would be rendered independently, but this requires an extra effort and, most importantly, we will have to pass the proper pieces of the internal state to each of the components. With such components being used in exactly one place, the extra effort seems unjustified. What we really want is a way to say "re-render only the part for which the *renderSomething* method is responsible" and Mimbl provides exactly this functionality.
 
+## Functions as Content
 Here is the syntax that Mimbl allows (only the `render` method has changes):
 
 ```tsx
@@ -72,107 +73,78 @@ public render(): any
 }
 ```
 
-The only differences from the previous code is that while in the first example, the *renderSomething* methods are called, in the second excerpt, the methods themselves are provided as content (note the lack of `()`). The outcome is exactly what we wanted: when a color button is clicked in the header, only the right sidebar area is re-rendered.
+The only difference from the previous code is that while in the first example, the *renderSomething* methods are called, in the second excerpt, the methods themselves are provided as content (note the lack of `()`). The outcome is exactly what we wanted: when a color button is clicked in the header, only the right sidebar area is re-rendered.
 
-There is no magic of course. Behind the scene, whenever Mimbl encounters a function passed as content, it creates a small component (called `FuncProxy`) and keeps it linked to the function. As with the main `render` method the other rendering methods react on the changes in the triggers that they use. Mimbl also makes sure to pass the reference to our entire component as *this* when it calls the rendering method.
+There is no magic of course. Behind the scenes, whenever Mimbl encounters a function passed as content, it creates a small component (called `Functor`) and keeps it linked to the function. As with the main `render` method the other rendering methods react on the changes in the triggers that they use. Mimbl also makes sure to pass the reference to our component as *this* when it calls the rendering method, so that they have access to all data members and other methods.
 
 In short, the mechanism converts methods into components - that is, it does automatically what developers would otherwise have to do by hand.
 
-### FuncProxy Component
-The code above is the simplest scenario where the *renderSomething* functions don't accept any parameters, are instance methods of our component and are called only once each in our component's main `render` method. In real life, this might not be the case and Mimbl provides a solution that covers all these cases.
+## Functor Component
+The code above is the simplest scenario where the *renderSomething* functions don't accept any parameters, are instance methods of our component and are called only once each in our component's main `render` method. Although this already covers a lot of scenarios, in real life, this might not be the case and Mimbl provides a solution that covers all these cases.
 
-Mimbl has a special component called `FuncProxy` that is used in JSX:
+The already mentioned special component called `Functor` is actually a regular component available to developers who can use it in JSX. In fact, passing the function as content is equivalent to using the `Functor` component with a single property `func` - as in the following code:
 
 ```tsx
-<FuncProxy func={this.renderSomething} />;
+<Functor func={this.renderSomething} />;
 ```
 
-The `FuncProxy` component, however, accepts several additional properties that allow us to solve the problems listed above. These are discussed in the sections below.
-
-### Rendering Methods with Arguments
-While rendering methods that don't accept any parameters are pretty common, rendering methods that do accept parameters are not less common. Imagine a scenario when there is code that calculates a certain value and then passes it on to a rendering function. Why wouldn't the rendering function itself calculate the value? Perhaps the value is used in more than one place or maybe the same rendering function is called more than once with different parameters.
-
-Let's have a component where the left and right sidebars use different colors depending on some "urgency" parameter. The idea is that the "urgency" is not part of the state, but is calculated based on other state parameters. Here is an example of the rendering code - first using an old approach:
+The `Functor` component accepts several additional properties that allow us to solve the problems listed above. For example, it is pretty common to have a component that should render a list of objects - think of a "to-do" component rendering a list of "to-do" items. In some cases, the objects in the list deserve to be represented by their own components, but in other cases they are such an intrinsic part of the "outer" component that it doesn't make sense to create a separate component for them. Still, we do want them to be updated independently of each other and of the outer component. To accomplish this, the `Functor` component allows specifying an argument using the `arg` property. Here is the "to-do" component using the same rendering function for every "to-do" item passing the item object as an argument:
 
 ```tsx
-public render()
+type TodoItem =
 {
-    let urgency: number = this.calculateUrgency();
-    return <div class="hbox">
-        { () => this.renderLeftSidebar( urgency) }
-        { ... }
-        { () => this.renderRightSidebar( urgency) }
-    </div>;
+    title: string;
+    text: string;
+    time: Date;
 }
 
-private renderLeftSidebar( urgency: number): void
+class TodoList extends mim.Component
 {
-    return <div style={ {color: price > 100 : "red" : "green"} }>...</div>;
-}
+    @mim.trigger private items: TodoItem[] = [];
 
-private renderRightSidebar( urgency: number): void
-{
-    return <div style={ {color: price > 100 : "orange" : "cyan"} }>...</div>;
-}
+    render(): any
+    {
+        return <div>
+            <button click={this.onAddItem}>Add New Item</button>
+            {this.items.map(item => <mim.Functor func={this.renderItem} arg={item} key={item} />)}
+        </div>
+    }
 
-private onSomeStateChanges(): void
-{
-    this.updateMe();
-}
-```
+    renderItem(item: TodoItem): any
+    {
+        return <div>
+            <h3>{item.title}</h3>
+            <p>{item.text</p>
+            <span>{item.time.toDateString()</span>
+            <button click={[this.onRemoveItem, item]}>Remove</button>
+        <div>
+    }
 
-Using the `FuncProxy` component the code will look as follows:
+    onAddItem(): void
+    {
+        this.items.push({title: "New item", text: "Do something useful", time: new Date()});
+    }
 
-```tsx
-public render()
-{
-    let urgency: number = this.calculateUrgency();
-    return <div class="hbox">
-        <FuncProxy func={this.renderLeftSidebar} args={[urgency]} replaceArgs />
-        { ... }
-        <FuncProxy func={this.renderRightSidebar} args={[urgency]} replaceArgs />
-    </div>;
-}
-
-private onSomeStateChanges(): void
-{
-    let urgency: number = this.calculateUrgency();
-    this.updateMe( {func: this.renderLeftSidebar, args: [urgency]}, {func: this.renderRightSidebar, args: [urgency]});
+    onRemoveItem(e: MouseEvent, item: TodoItem): void
+    {
+        let index = this.items.indexOf(item);
+        if (index >= 0)
+            this.items.splice(index, 1);
+    }
 }
 ```
 
-We are using the `FuncProxy` component and specifying not only the function to be called but also an array of arguments to be passed to it. Note that it should always be an array. When the component's state changes, we calculate the urgency value again and pass it to the `this.updateMe` calls. The `this.updateMe` method accepts variable argument list; therefore, there is no need to wrap the `urgency` variable in an array. Whenever the `this.updateMe` method is called, the arguments passed to it are remembered in the instance of the FuncProxy component and are passed to the rendering function when it is called.
+In the example above, the `Functor` component is used in a loop for every "to-do" item with the same `renderItem` function, which will be passed the item object when invoked. Since the `renderItem` is a regular method of the `TodoList` component, it has access to all its fields and methods; in particular, it can assign the `onRemoveItem` method to the `click` event of its `<button>` element with the item object as a parameter.
 
-We are also using the `replaceArgs` Boolean property of the `FuncProxy` component. This informs the component instance that the arguments passed to it should replace the parameters that are remembered in that instance from the prior renderings or from the `this.updateMe` calls. The default value of the `replaceArgs` parameter is `false` (and this is also what's used when it is omitted), which indicates that the arguments passed to it will not replace the arguments already remembered in the component instance. This essentially means that the arguments passed to the `FuncProxy` component will be treated as "initialization" parameters: they will be used in the first rendering (when the component instance is created) and ignored in all subsequent renderings (when the component instance is updated).
+Note also the use of the `key` property: since we are rendering a list, it is essential to provide unique keys so that the list can be properly maintained when items are added to or removed from it. The item objects themselves are the perfect candidates for key values.
 
-Omitting the `replaceArgs` property allows for the following code:
+The `Functor` component allows specifying only one argument, but it can be of any type including an array or an object.
 
-```tsx
-public render()
-{
-    let urgency: number = this.calculateInitialUrgency();
-    return <div class="hbox">
-        <FuncProxy func={this.renderLeftSidebar} args={[urgency]} />
-        { ... }
-        <FuncProxy func={this.renderRightSidebar} args={[urgency]} />
-    </div>;
-}
+Normally, the rendering functions are just methods of the component class, and Mimbl uses the component's instance to setup `this` when calling them. In rare cases, there might be a need to use a rendering function, which is a method on another class. In such cases, the `Functor` component allows passing the required object instance in the `thisArg` property.
 
-private onSomeStateChanges(): void
-{
-    let urgency: number = this.calculateUrgency();
-    this.updateMe( {func: this.renderLeftSidebar, args: [urgency]}, {func: this.renderRightSidebar, args: [urgency]});
-}
-```
+## Rendering Functions without Triggers
+As it was previously mentioned, a rendering function will be called to re-render its content if any of the triggers it encountered during its last execution has its value changed. That is, Mimbl establishes a watcher for each rendering function. Usually, this is all what's needed for the rendering functions to serve their purpose. Sometimes, however, there might be a need to force a function to re-render even if no trigger values have changed. The simplest example is when the content depends on time.
 
-In the code above, the `FunProxy` instances will be initialize with the initial value of the urgency parameter. During repeated renderings of our component, the `FuncProxy` instance will not be re-rendered. It will be re-rendered only when the `this.updateMe` method is called in the `onSomeStateChanges` event handler.
-
-### Multiple Uses of Rendering Methods
-We already noticed that when a rendering method is returned as content or when the `FuncProxy` component is used, Mimbl creates an internal structure (a special kind of virtual node) and links it to the function. This linking is what allows the `this.updateMe` method to find the right node to re-render. When the rendering function is used only once by the parent component, the linking is one-to-one. A question arises, however, how the linking works if the rendering method is used more than once. For example, it is common that a similar code is used to render a table's header and footer.
-
-A solution might be to have two different very thin methods - say, *renderTableHeader* and *renderTableFooter* - which would call the same method - maybe with different parameters. This will obviously work, although developers would have to create these extra methods - and we don't want developers to do any extra work. But what if the number of times a rendering method is used is not known at development time? For example, what if we need to render a sequence of small objects? We might develop a separate component for rendering such an object, but it might be an overkill.
-
-The problem we are trying to solve is how to uniquely identify each instance of calling the same rendering function so that when we call the `this.updateMe` method the right node is re-rendered. The solution Mimbl provides is that the `FuncProxy` component accepts a `key` property, which must be unique every time the same rendering function is used. The key becomes part of the link between the function and the internal node. The same key is then passed to the `this.updateMe` call.
-
+Since the `Functor` component is a regular managed component, it supports the `ref` property, which will point to the instance of the `Functor` component when mounted. Then, the owner of the reference can call the `updateMe` method (that every component supports), which will cause the function to re-render.
 
 

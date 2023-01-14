@@ -16,7 +16,7 @@ export type DN = Node | null;
  * just like attaching to HTML element events.
  *
  * The *ComponentProps* is not usually used directly by developers; however, it defines the
- * type of the `props` property in the [[IComponent]] interface that all class-based components
+ * type of the `props` property in the {@link IComponent} interface that all class-based components
  * implement.
  *
  * **Example:**
@@ -80,12 +80,12 @@ export interface IComponentClass<TProps extends {} = {}, TEvents extends {} = {}
 
 /**
  * Interface that must be implemented by all components. Although it has many methods that
- * components can implement, in practice, there is only one mandatory method - [[render]].
+ * components can implement, in practice, there is only one mandatory method - {@link render}.
  * Components should be ready to have the `vn` property set, although they don't have to declare
  * it.
  *
  * Note that you normally don't need to implement this interface because your components will
- * usually derive from the [[Component]] class that implements it.
+ * usually derive from the {@link Component} class that implements it.
  *
  * @typeparam TProps Type defining properties that can be passed to this class-based component.
  *		Default type is an empty object (no properties).
@@ -135,19 +135,12 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
 	willMount?(): void;
 
     /**
-     * Notifies the component that it was successfully mounted. This method is called after the
-     * component is rendered for the first time and the content of all its sub-nodes is added to
-     * the DOM tree.
-     */
-    didMount?(): void;
-
-    /**
 	 * This method is only used by independent components.
 	 *
      * Notifies the component that it replaced the given component. This allows the new
      * component to copy whatever internal state it needs from the old component.
      */
-    didReplace?( oldComp: IComponent<TProps>): void;
+    didReplace?(oldComp: IComponent<TProps>): void;
 
     /**
 	 * Notifies that the component's content is going to be removed from the DOM tree. After
@@ -164,7 +157,7 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
 	 * method will be called. If the component doesn't implement the `shouldUpdate` method it is
      * as though true is returned. If the component returns false, the render method is not
      * called and the DOM tree of the component remains unchanged. The component will have its
-     * [[props]] member set to the new properties regardless of this method's return value.
+     * {@link props} member set to the new properties regardless of this method's return value.
      *
      * If the component creates its internal structures based on properties, this call is the
      * opportunity to change the internal structures to correspond to the new properties.
@@ -172,7 +165,7 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
 	 * @param newProps The new properties that the parent component provides to this component.
 	 * @returns True if the component should have its render method called and false otherwise.
 	 */
-	shouldUpdate?( newProps: TProps): boolean;
+	shouldUpdate?(newProps: TProps): boolean;
 
 	/**
 	 * Handles an exception that occurred during the rendering of one of the component's children.
@@ -180,20 +173,40 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
      * the chain of components until it reaches a component that handles it. If none of the
      * components can handle the error, the entire tree will be unmounted.
      *
-     * This method should only change the internal state of the component so that the [[render]]
+     * This method should only change the internal state of the component so that the {@link render}
      * method, which will be invoked right after the `handleError` method returns, will return
      * content reflecting the error.
      *
 	 * @param err An error object that was thrown during the component's own rendering or rendering
 	 * of one of its descendants.
 	 */
-	handleError?( err: unknown): void;
+	handleError?(err: unknown): void;
+
+	/**
+	 * If the component is scheduled to be updated, this method is invoked during the Mimbl tick
+     * before any component scheduled to be updated in this tick (including this one) are updated.
+     * This method should be implemented by components that require some DOM-based calculations
+     * (like sizes and positions) for rendering. When this method is called, reading DOM
+     * information should be safe in regards to not causing layout thrashing. Don't do any DOM-
+     * writing activities in this method.
+	 */
+	beforeUpdate?(): void;
+
+	/**
+	 * If the component is scheduled to be updated, this method is invoked during the Mimbl tick
+     * after all components scheduled to be updated in this tick (including this one) has already
+     * been updated. This method should be implemented by components that require some
+     * DOM-writing after rendering. When this method is called, writing DOM information should be
+     * safe in regards to not causing layout thrashing. Don't do any DOM-reading activities in
+     * this method.
+	 */
+	afterUpdate?(): void;
 }
 
 
 
 /**
- * Type for the `shadow` property in the [[IComponent]] interface. This can be one of the following:
+ * Type for the `shadow` property in the {@link IComponent} interface. This can be one of the following:
  * - boolean - if the value is true, a `<div>` element will be created and shadow root attached to
  *   it with mode "open".
  * - string - an element with this name will be created and shadow root attached to
@@ -400,7 +413,7 @@ export type CallbackWrappingOptions =
  * Type that can be passed as a callback to a component's property. It allows passing a callback
  * in one of the following forms:
  * - as a function object. Note that if the function is a method of another component (or just a
- *   class), then it should be wrapped (using the [[wrap]] method) so that the `this` parameter
+ *   class), then it should be wrapped (using the {@link wrap} method) so that the `this` parameter
  *   is properly set up when the callback is invoked.
  * - a two element tuple. The first element is the function to be called and the second element is
  *   the value to be used as the `this` parameter.
@@ -409,6 +422,45 @@ export type CallbackWrappingOptions =
  */
 export type CallbackPropType<T extends Function = Function> =
     T | [func: T, thisArg?: any] | {func: T, thisArg?: any};
+
+
+
+/**
+ * Defines event handler that is invoked when reference value changes.
+ */
+export type RefFunc<T = any> = (newRef: T) => void;
+
+/**
+ * Defines event handler that is invoked when reference value changes.
+ */
+export interface IRef<T = any> extends IEventSlot<RefFunc<T>>
+{
+    r?: T;
+}
+
+/**
+ * Type of ref property that can be passed to JSX elements and components. This can be either the
+ * {@link IRef]] interface or [[RefFunc} function.
+ */
+export type RefType<T = any> = IRef<T> | RefFunc<T>;
+
+/**
+ * Type of ref property value. This can be either the {@link IRef]] interface or [[RefFunc} function
+ * or the type itself.
+ */
+export type RefPropType<T = any> = T | RefType<T>;
+
+
+
+/**
+ * Type of the vnref property value.
+ */
+export type ElmRefType<T extends Element = Element> = RefType<IElmVN<T>>;
+
+/**
+ * Type of vnref property that can be passed to JSX elements.
+ */
+export type ElmRefPropType<T extends Element = Element> = RefPropType<IElmVN<T>>;
 
 
 
@@ -461,23 +513,8 @@ export type EventPropType<T extends Event = Event> =
 
 
 /**
- * The ICommonProps interface defines standard properties that can be used on all JSX elements -
- * intrinsic (HTML and SVG) as well as functional and class-based managed components.
- */
-export interface ICommonProps
-{
-	/**
-     * Unique key that distinguishes this JSX element from its siblings. The key can be of any type
-     * except null, undefined and boolean.
-     */
-	readonly key?: string | number | bigint | symbol | Function | object;
-}
-
-
-
-/**
  * Internal type containing names of attributes that are not "triggerized" when applying
- * the [[ExtendedAttrs]] type to the element attributes interface.
+ * the {@link ExtendedAttrs} type to the element attributes interface.
  */
 export type NoTriggerAttrNames = "xmlns";
 
@@ -485,7 +522,7 @@ export type NoTriggerAttrNames = "xmlns";
 
 /**
  * Converts the given interface T to a type that maps an extended attribute type to each property
- * of T. The extended property contains the property type, the [[ITrigger]] for this type as well as
+ * of T. The extended property contains the property type, the {@link ITrigger} for this type as well as
  * `null` and `undefined`. This is primarily useful for defining attributes of HTML elements - both
  * built-in and custom.
  *
@@ -564,8 +601,14 @@ export type ExtendedElement<TRef extends Element = Element,
         TAttrs extends IElementAttrs = IElementAttrs,
         TEvents extends IElementEvents = IElementEvents,
         TChildren = any> =
-    ICommonProps & ExtendedAttrs<TAttrs> & ExtendedEvents<TEvents> &
+    ExtendedAttrs<TAttrs> & ExtendedEvents<TEvents> &
     {
+        /**
+         * Unique key that distinguishes this JSX element from its siblings. The key can be of any type
+         * except null, undefined and boolean.
+         */
+        readonly key?: string | number | bigint | symbol | Function | object;
+
         /**
          * Reference that will be set to the instance of the element after it is mounted. The
          * reference will be set to undefined after the element is unmounted.
@@ -636,41 +679,21 @@ export type ScheduledFuncType = (arg?: any) => void;
 
 
 /**
- * Defines event handler that is invoked when reference value changes.
+ * The IManagedComponentProps interface defines standard properties that can be used on managed
+ * components, which include `key` and `ref`. These properties are not available for the components
+ * themselves and should not be part of the *props* object defined by component authors.
  */
-export type RefFunc<T = any> = (newRef: T) => void;
-
-/**
- * Defines event handler that is invoked when reference value changes.
- */
-export interface IRef<T = any> extends IEventSlot<RefFunc<T>>
+export interface IManagedComponentProps<T extends IComponent>
 {
-    r?: T;
+	/**
+     * Unique key that distinguishes this JSX element from its siblings. The key can be of any type
+     * except null, undefined and boolean.
+     */
+	readonly key?: string | number | bigint | symbol | Function | object;
+
+    /** Object that receives the reference to the component instance */
+    readonly ref?: RefPropType<T>;
 }
-
-/**
- * Type of ref property that can be passed to JSX elements and components. This can be either the
- * [[IRef]] interface or [[RefFunc]] function.
- */
- export type RefType<T = any> = IRef<T> | RefFunc<T>;
-
- /**
-  * Type of ref property value. This can be either the [[IRef]] interface or [[RefFunc]] function
-  * or the type itself.
-  */
- export type RefPropType<T = any> = T | RefType<T>;
-
-
-
-/**
- * Type of the vnref property value.
- */
-export type ElmRefType<T extends Element = Element> = RefType<IElmVN<T>>;
-
-/**
- * Type of vnref property that can be passed to JSX elements.
- */
-export type ElmRefPropType<T extends Element = Element> = RefPropType<IElmVN<T>>;
 
 
 
@@ -711,7 +734,7 @@ export interface ISubscription<K extends keyof IServiceDefinitions>
 
     /**
      * Detaches the given callback from the "change" event.
-     * @param callback Function that was attached to the "change" event by the [[aattach]] method.
+     * @param callback Function that was attached to the "change" event by the {@link aattach} method.
      */
     detach( callback: (value?: IServiceDefinitions[K]) => void): void;
 
@@ -800,9 +823,9 @@ export interface IClassCompVN extends IVNode
 	readonly props: any;
 
     /**
-     * If the component specifies the [[shadow]] property, the `shadowRoot` property will be set
+     * If the component specifies the {@link shadow} property, the `shadowRoot` property will be set
      * to the shadow root element under which the component's content returned from the `render()`
-     * method will be placed. If the component doesn't specify the [[shadow]] property, the
+     * method will be placed. If the component doesn't specify the {@link shadow} property, the
      * `shadowRoot` property will be undefined. Components can access the shadow root via their
      * `vn.shadowRoot` property.
      */
@@ -1068,7 +1091,7 @@ export type RenderMethodType = (arg?: any) => any;
 export interface FunctorProps
 {
 	/**
-     * Function to be called to render content. Functions wrapped by the [[Functor]] component
+     * Function to be called to render content. Functions wrapped by the {@link Functor} component
      * can accept at most one argument.
      */
 	func: RenderMethodType;
@@ -1091,11 +1114,11 @@ export interface FunctorProps
      * it can be re-invoked when one of the observed triggers changes its value. The flag is
      * Boolean but is used as a tri-value:
      * - if the flag is undefined, the function will be wrapped or not wrapped in a watcher
-     *   depending on whether it has the [[@noWatcher]] decorator applied to it.
+     *   depending on whether it has the {@link @noWatcher} decorator applied to it.
      * - if the flag is true, the function will be wrapped in a watcher regardless of the
-     *   [[@noWatcher]] decorator.
+     *   {@link @noWatcher} decorator.
      * - if the flag is false, the function will NOT be wrapped in a watcher regardless of the
-     *   [[@noWatcher]] decorator.
+     *   {@link @noWatcher} decorator.
      */
     watch?: boolean | undefined;
 }

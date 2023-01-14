@@ -1,4 +1,4 @@
-﻿import {ICommonProps, IComponent, ICustomWebElements, RefPropType} from "../api/CompTypes";
+﻿import {IManagedComponentProps, IComponent, ICustomWebElements} from "../api/CompTypes";
 import {IHtmlIntrinsicElements} from "../api/HtmlTypes";
 import {ISvgIntrinsicElements} from "../api/SvgTypes";
 import {IVN} from "../core/VNTypes";
@@ -18,23 +18,44 @@ export type RenderableContent = object | string | number | bigint | Function | R
  */
 export namespace JSX
 {
+    /**
+     * Represents type returned from functional coponents and from the `render` functions of
+     * class-based components. We allow any type to be returned.
+     */
 	export type Element = any;
 
-	export interface ElementClass extends IComponent {}
-
-	export interface ElementAttributesProperty { props: {} }
-
-	export interface ElementChildrenAttribute { children: any }
-
+    /**
+     * Represents HTML and SVG tag names mapped to types defining their JSX properties.
+     */
 	export interface IntrinsicElements extends IHtmlIntrinsicElements, ISvgIntrinsicElements, ICustomWebElements {}
 
-	// Properties in this interface apply to intrinsic elements and to functional components.
-	export interface IntrinsicAttributes extends ICommonProps {}
+    /**
+     * Represents the instance type of class-based components that can be used in JSX. That is,
+     * all managed components must implement this interface.
+     */
+	export interface ElementClass extends IComponent {}
 
-	// Properties in this interface apply to class-based components.
-	export interface IntrinsicClassAttributes<T> extends ICommonProps {
-        ref?: RefPropType<T>;
-    }
+    /**
+     * Defines the name of the property defining the type of the *props* object for managed
+     * components. The {@link Component} base class has this property with the type defined as a
+     * combination of component's property and event interfaces: {@link ComponentProps}.
+     */
+	export interface ElementAttributesProperty { props: {} }
+
+    /**
+     * Defines the name of the property inside the *props* object defining the type of children
+     * accepted by the functional and managed components.
+     */
+	export interface ElementChildrenAttribute { children: {} }
+
+	/**
+     * Properties in this interface apply to functional and class-based components. Since our
+     * functional components don't support keys, this interface is empty.
+     */
+	export interface IntrinsicAttributes {}
+
+	/** Properties in this interface apply only to class-based components. */
+	export interface IntrinsicClassAttributes<T extends IComponent> extends IManagedComponentProps<T> {}
 }
 
 
