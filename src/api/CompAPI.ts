@@ -20,6 +20,7 @@ import { applyMixins } from "../utils/UtilFunc";
 import { registerElmProp } from "../core/Props";
 import { IWatcher } from "./TriggerTypes";
 import { Trigger } from "../core/TriggerImpl";
+import { Fragment } from "./jsx";
 
 
 
@@ -442,6 +443,12 @@ Function.prototype[symJsxToVNs] = function(this: Function, props: Record<string,
     // event handlers).
     return content2VNs(this(props, children));
 }
+
+
+
+// Add jsxToVNs method to the Fragment class object. This method is invoked by the JSX mechanism.
+Fragment[symJsxToVNs] = (props: Record<string,any> | undefined,
+    children: IVN[] | null): IVN | IVN[] | null | undefined => children;
 
 
 

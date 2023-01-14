@@ -32,7 +32,7 @@
             "text": "build libs",
             "color": "white",
             "commandType": "exec",
-            "command": "node web/_tools/buildLibs.js",
+            "command": "node src/web/_tools/buildLibs.js",
             "alignment": "left",
             "priority": 1
         },
@@ -40,7 +40,7 @@
             "text": "copy libs",
             "color": "yellow",
             "commandType": "exec",
-            "command": "node web/_tools/copyLibs.js",
+            "command": "node src/web/_tools/copyLibs.js",
             "alignment": "left",
             "priority": 1
         }

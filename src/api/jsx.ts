@@ -1,15 +1,14 @@
-﻿import {IManagedComponentProps, IComponent, ICustomWebElements} from "../api/CompTypes";
-import {IHtmlIntrinsicElements} from "../api/HtmlTypes";
-import {ISvgIntrinsicElements} from "../api/SvgTypes";
-import {IVN} from "../core/VNTypes";
+﻿import {IManagedComponentProps, IComponent, ICustomWebElements} from "./CompTypes";
+import {IHtmlIntrinsicElements} from "./HtmlTypes";
+import {ISvgIntrinsicElements} from "./SvgTypes";
 import { content2VNs, symJsxToVNs } from "../core/Reconciler";
 
 
 
-/**
- * Type that of entities that can become renderable content
- */
-export type RenderableContent = object | string | number | bigint | Function | RenderableContent[];
+// /**
+//  * Type of entities that can become renderable content.
+//  */
+// export type RenderableContent = object | string | number | bigint | Function | RenderableContent[];
 
 
 
@@ -25,7 +24,7 @@ export namespace JSX
 	export type Element = any;
 
     /**
-     * Represents HTML and SVG tag names mapped to types defining their JSX properties.
+     * Represents DOM tag names mapped to types defining their JSX properties.
      */
 	export interface IntrinsicElements extends IHtmlIntrinsicElements, ISvgIntrinsicElements, ICustomWebElements {}
 
@@ -69,7 +68,7 @@ export namespace JSX
  * {
  *     "jsx": "react",
  *     "jsxFactory": "mim.jsx",
-       "jsxFragmentFactory": "mim.Fragment"
+ *     "jsxFragmentFactory": "mim.Fragment"
  * }
  * ```
  *
@@ -77,6 +76,9 @@ export namespace JSX
  * ```tsx
  * import * as mim from "mimbl"
  * ```
+ *
+ * This ensures that you have the `mim.jsx` function in scope even though it is usually not used
+ * explicitly.
  *
  * @param tag
  * @param props
@@ -104,7 +106,7 @@ export function jsx( tag: any, props: any, ...children: any[]): any
  *
  * The `Fragment` component can be used directly; however, the better way is to set the
  * `jsxFragmentFactory` compiler option in the `tsconfig.json` file to `mim.Fragment` and use the
- * TypeScripts `<>...</> construct as in the following example:
+ * TypeScripts `<>...</>` construct as in the following example:
  *
  * ```tsx
  *	import * as mim from "mimbl"
@@ -117,18 +119,12 @@ export function jsx( tag: any, props: any, ...children: any[]): any
  *			<div3/>
  *		</>
  *	}
-  ```
-
-  Note that you have the `mim.Fragment` in scope (using `import * as mim from "mimbl"`) evn though
-  it is not used explicitly.
+ * ```
+ *
+ * Note that you must have the `mim.Fragment` function in scope (using `import * as mim from "mimbl"`)
+ * even though it is not used explicitly.
  */
 export function Fragment(): any {}
-
-
-
-// Add jsxToVNs method to the Fragment class object. This method is invoked by the JSX mechanism.
-Fragment[symJsxToVNs] = (props: Record<string,any> | undefined,
-    children: IVN[] | null): IVN | IVN[] | null | undefined => children;
 
 
 

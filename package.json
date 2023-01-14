@@ -48,7 +48,7 @@
 		"lib/api/ElementTypes.d.ts",
 		"lib/api/HtmlTypes.d.ts",
 		"lib/api/SvgTypes.d.ts",
-		"lib/jsx/mim.d.ts"
+		"lib/api/jsx.d.ts"
 	],
 	"dependencies": {
 	}

@@ -12,6 +12,6 @@ export * from "./api/WebElmAPI"
 export * from "./api/ElementTypes"
 export * from "./api/HtmlTypes"
 export * from "./api/SvgTypes"
-export * from "./jsx/mim"
+export * from "./api/jsx"
 
 

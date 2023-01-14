@@ -24,10 +24,14 @@
 		"lib": [ "esnext", "dom" ],
 		"rootDir": "src",
 		"outDir": "./lib/",
-		// "jsx": "react",
-		// "jsxFactory": "mim.jsx",
-        // "jsxFragmentFactory": "mim.Fragment",
-        "types": []
+		"jsx": "react",
+		"jsxFactory": "mim.jsx",
+        "jsxFragmentFactory": "mim.Fragment",
+        "types": [],
+        "baseUrl": ".",
+        "paths": {
+            "mimbl": ["src/index.ts"]
+        }
 	},
 
 	"include": [
