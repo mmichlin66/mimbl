@@ -16,6 +16,7 @@ import {
     setElmProp, updateElmProp
 } from "./Props";
 import { isTrigger } from "./TriggerImpl";
+import { s_deepCompare } from "../utils/UtilFunc";
 
 
 
@@ -506,11 +507,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         let oldVal = oldRTD.val;
         let newVal = newRTD.val;
 
-        // if the value is the same, we don't do anything. If the value is a trigger, we don't need
-        // to compare it to the previous value, because this is done in a different code path.
-        if (newVal === oldVal && !isNewCreator)
-            return;
-
         // we skip updating the attribute if the new value is equal to the old one and if it is a
         // primitive value (not object or array) and there is no new creator. We need to continue
         // update for objects and arrays because although the value can be the same, the members
@@ -521,28 +517,29 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         // remember the new value. We will reuse newVal and oldVal with values from triggers (if any)
         oldRTD.val = newVal;
 
-        let onChange = oldRTD.onChange;
-        if (onChange)
-        {
-            // if onChange is defined then oldVal is a trigger. We detach from it but
-            // don't clear the onChange callback - because it can be used if the new value
-            // is also a trigger.
-            oldVal.detach(onChange);
-            oldVal = oldVal.get();
-        }
-
-        // check whether the new value is a trigger and get the actual value from it.
+        // check whether the new value is a trigger and get the actual value from it for comparison.
         if (isTrigger(newVal))
         {
-            newVal.attach(oldRTD.onChange ??= onAttrTriggerChanged.bind(this, name));
+            newVal.attach(oldRTD.onChange ?? onAttrTriggerChanged.bind(this, name));
             this.hasTriggers = true;
             newVal = newVal.get();
         }
-        else
-            oldRTD.onChange = undefined;
 
-        // If the new value is null, remove the attribute; if creator has changed, use "set"
-        // instead of "update" as some properties should be reset as new (e.g. defaultChecked).
+        // if the old value was a trigger get the actual value from it for comparison
+        if (oldRTD.onChange)
+        {
+            oldVal.detach(oldRTD.onChange);
+            oldRTD.onChange = undefined;
+            oldVal = oldVal.get();
+        }
+
+        // check again as we could have taken the values from the triggers
+        if (oldVal === newVal && (newVal == null || typeof newVal !== "object") && !isNewCreator)
+            return;
+
+        // if the new value is null but the old string value is not, remove the attribute;
+        // if creator has changed, use "set" instead of "update" as some properties should be
+        // reset as new (e.g. defaultChecked).
         if (newVal == null)
             removeElmProp(this.ownDN!, name, oldRTD.valS, oldRTD.info), oldRTD.valS = null;
         else if (isNewCreator)
