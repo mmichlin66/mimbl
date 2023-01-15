@@ -445,18 +445,16 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         let val = rtd.val;
 
         // the value can actually be a trigger and we need to listen to its changes then
-        let actVal = val;
-        if (actVal != null)
+        if (val != null)
         {
             if (isTrigger(val))
             {
-                actVal = val.get();
-                rtd.onChange = onAttrTriggerChanged.bind( this, name);
-                val.attach( rtd.onChange!);
+                val.attach(rtd.onChange = onAttrTriggerChanged.bind( this, name));
                 this.hasTriggers = true;
+                val = val.get();
             }
 
-            rtd.valS = setElmProp( this.ownDN!, name, actVal, rtd.info);
+            rtd.valS = setElmProp( this.ownDN!, name, val, rtd.info);
         }
 
         // `add` means that a new attribute is mounted as a result of updating already existing
@@ -508,8 +506,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         let oldVal = oldRTD.val;
         let newVal = newRTD.val;
 
-        // if both old and new values are null or undefined, we don't do anything
-        if (newVal == null && oldVal == null)
+        // if the value is the same, we don't do anything. If the value is a trigger, we don't need
+        // to compare it to the previous value, because this is done in a different code path.
+        if (newVal === oldVal && !isNewCreator)
             return;
 
         // we skip updating the attribute if the new value is equal to the old one and if it is a
@@ -528,18 +527,16 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             // if onChange is defined then oldVal is a trigger. We detach from it but
             // don't clear the onChange callback - because it can be used if the new value
             // is also a trigger.
-            oldVal.detach( onChange);
+            oldVal.detach(onChange);
             oldVal = oldVal.get();
         }
 
         // check whether the new value is a trigger and get the actual value from it.
         if (isTrigger(newVal))
         {
-            if (!onChange)
-                oldRTD.onChange = onAttrTriggerChanged.bind( this, name);
-            newVal.attach( oldRTD.onChange!);
-            newVal = newVal.get();
+            newVal.attach(oldRTD.onChange ??= onAttrTriggerChanged.bind(this, name));
             this.hasTriggers = true;
+            newVal = newVal.get();
         }
         else
             oldRTD.onChange = undefined;
@@ -547,11 +544,11 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         // If the new value is null, remove the attribute; if creator has changed, use "set"
         // instead of "update" as some properties should be reset as new (e.g. defaultChecked).
         if (newVal == null)
-            removeElmProp( this.ownDN!, name, oldRTD.valS, oldRTD.info), oldRTD.valS = null;
+            removeElmProp(this.ownDN!, name, oldRTD.valS, oldRTD.info), oldRTD.valS = null;
         else if (isNewCreator)
             oldRTD.valS = setElmProp(this.ownDN!, name, newVal, oldRTD.info);
         else
-            oldRTD.valS = updateElmProp( this.ownDN!, name, oldRTD.valS, newVal, oldRTD.info);
+            oldRTD.valS = updateElmProp(this.ownDN!, name, oldRTD.valS, newVal, oldRTD.info);
     }
 
 
@@ -565,14 +562,14 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     private unmountAttr( name: string, rtd: AttrRunTimeData, removeFromAttrs: boolean): void
     {
         if (rtd.onChange)
-            rtd.val.detach( rtd.onChange);
+            rtd.val.detach(rtd.onChange);
 
         // removeFromAttrs means that a new attribute is unmounted as a result of updating the
         // element (as opposed to unmounting it), and that we need to remove it from our attrs
         // object and from the DOM element.
         if (removeFromAttrs)
         {
-            removeElmProp( this.ownDN!, name, rtd.valS, rtd.info)
+            removeElmProp(this.ownDN!, name, rtd.valS, rtd.info)
             delete this.attrs[name];
         }
     }
