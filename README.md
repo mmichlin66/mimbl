@@ -69,7 +69,7 @@ mim.mount( new HelloWorld());
 ```
 
 For more details please see the following resources:
-- [Documentation](https://mmichlin66.github.io/mimbl/introduction.html)
-- [API Reference](https://mmichlin66.github.io/mimbl/reference.html)
-- [Playground](https://mmichlin66.github.io/mimbl/playground.html) (work in progress)
+- [Documentation](https://www.mimjs.com/guide/introduction.html)
+- [API Reference](https://www.mimjs.com/typedoc.html)
+- [Playground](https://www.mimjs.com/demo/playground.html)
 
