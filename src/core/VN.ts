@@ -379,7 +379,7 @@ export function setRef<T>( ref: RefType<T>, val: T, onlyIf?: T): void
 
 
 /**
- * Helper function to handle reference update, whcih happens when a node holding an old reference
+ * Helper function to handle reference update, which happens when a node holding an old reference
  * is updated by the node holding a new reference. This releases the previous reference in a safe
  * way and sets the given value to the new reference. The "safe way" means, the old reference is
  * set to undefined only if its current value is the given value. This might not be the case if

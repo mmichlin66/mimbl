@@ -1,4 +1,5 @@
 ﻿import * as mim from "mimbl";
+import * as css from "mimcss";
 
 
 /**
@@ -91,7 +92,7 @@ function colorResizer(entries: ResizeObserverEntry[]): void
         return;
 
     let elm = entries[0]?.target as unknown as ElementCSSInlineStyle;
-    elm.style.backgroundColor = `hsl(${size.blockSize + size.inlineSize}deg 50% 50%)`;
+    elm.style.$.backgroundColor = css.hsl(css.deg(size.blockSize + size.inlineSize), 50, 50);
 }
 
 
@@ -106,8 +107,6 @@ function fontResizer(entries: ResizeObserverEntry[]): void
 
     let elm = entries[0]?.target as unknown as ElementCSSInlineStyle;
     elm.style.fontSize = `${size.blockSize / 1.5}px`;
-
-    console.log(`Font size changed to `, size.blockSize / 1.5)
 }
 
 
@@ -123,10 +122,16 @@ export class MyComponent extends mim.Component
             <div resizeObserver={colorResizer}
                 style={{height: 200, width: 200, resize: "both", overflow: "auto", border: [1, "solid"]}} />
             <div/>
+            <br/>
             <span>The textarea box will have its font size changed when resized</span>
             <textarea resizeObserver={fontResizer} style={{height: 20, width: 500, resize: "both", overflow: "auto"}}>
                 The font size should change when you resize this box
             </textarea>
+            <br/>
+            <span>The box will change color when the viewport width changes</span>
+            <div resizeObserver={colorResizer}
+                style={{height: 200, width: "100%", border: [1, "solid"]}} />
+            <div/>
         </div>
     }
 }

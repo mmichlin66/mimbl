@@ -64,7 +64,7 @@ export const trigger = (targetOrDepth: any, name?: string): any =>
  * @param funcThis Optional value of "this" that will be used to call the original function.
  * @param responderThis Optional value of "this" that will be used to call the responder function.
  * If this value is undefined, the "this" value for the original function will be used.
- * @returns The callable [[IWatcher]] interface, whcih represent a function with the same sigature
+ * @returns The callable [[IWatcher]] interface, which represent a function with the same sigature
  * as the original function. In addition, the returned function has the `dispose` method, which
  * must be called when the watcher is not needed anymore.
  */
