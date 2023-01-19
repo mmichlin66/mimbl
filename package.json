@@ -48,6 +48,7 @@
 		"lib/api/ElementTypes.d.ts",
 		"lib/api/HtmlTypes.d.ts",
 		"lib/api/SvgTypes.d.ts",
+		"lib/api/MathmlTypes.d.ts",
 		"lib/api/jsx.d.ts"
 	],
 	"dependencies": {

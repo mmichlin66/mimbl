@@ -11,6 +11,7 @@ Mimbl provides all the standard functionality that developers expect from compon
 - Custom HTML and SVG attributes defined by developers and supported via handler objects.
 - Service publish/subscribe mechanism.
 - Defining styles using [Mimcss](https://www.mimcss.com/guide/introduction.html) CSS-in-JS library.
+- Full support for MathML elements.
 
 ## Installation and Usage
 Mimbl is provided as an NPM package. Install it with the following command:

@@ -16,6 +16,7 @@ Mimbl provides all the standard functionality that developers expect from compon
 - Custom HTML and SVG attributes defined by developers and supported via handler objects.
 - Service publish/subscribe mechanism.
 - Defining styles using <a href="https://www.mimcss.com/guide/introduction.html" target="mimcss">Mimcss</a> CSS-in-JS library.
+- Full support for MathML elements
 
 ### Components
 Mimbl components can be developed as functions or as classes. Function-based components are regular TypeScript/JavaScript functions that accept a "props" object and return an object that represents DOM content. Function components are stateless and are updated only when a parent component passes to it a different set of properties during its update.

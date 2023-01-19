@@ -591,13 +591,21 @@ const setDefaultValueProp = (elm: HTMLInputElement, val: string): string | null 
 
 
 /**
+ * Converts the given value to string using the Mimcss conversion rules for the given syntax,
+ * whcih is either a property name or a syntax like "<length>".
+ */
+const mimcssPropToString = (val: any, syntax: string): string =>
+    mimcss ? mimcss.getStylePropValue(syntax, val) : typeof val === "string" ? val : "";
+
+
+
+/**
  * SVG presentation attributes can be used as CSS style properties and, therefore, there
  * conversions to strings are already handled by Mimcss library. If Mimcss library is not included,
  * then value can only be a string. If it is not, we set the attribute to empty string. Note that
  * SVG attribute names can be provided in camelCase, so they are converted to dash-case.
  */
-const svgAttrToStylePropString = (val: any, name: string): string =>
-    mimcss ? mimcss.getStylePropValue(name, val) : typeof val === "string" ? val : "";
+const svgAttrToStylePropString = (val: any, name: string): string => mimcssPropToString(val, name)
 
 
 
@@ -676,6 +684,9 @@ const ArrayWithCommaPropInfo: AttrPropInfo = { type: PropType.Attr, v2s: (val: a
 
 // Produces semicolon-separated list from array of values
 const ArrayWithSemicolonPropInfo: AttrPropInfo = { type: PropType.Attr, v2s: (val: any[]): string => array2s(val, ";") };
+
+// Handles conversion of SVG presentation attributes as Mimcss style properties to strings
+const CssLengthPropInfo: AttrPropInfo = { type: PropType.Attr, v2s: (val: any) => mimcssPropToString(val, "<length>") };
 
 // Handles conversion of SVG presentation attributes as Mimcss style properties to strings
 const SvgAttrAsStylePropInfo: AttrPropInfo = { type: PropType.Attr, v2s: svgAttrToStylePropString };
@@ -780,6 +791,17 @@ const propInfos: { [P:string]: PropInfo } =
     end: ArrayWithSemicolonPropInfo,
     keyTimes: ArrayWithSemicolonPropInfo,
     keySplines: ArrayWithSemicolonPropInfo,
+
+    // MathML element atributes
+    linethickness: CssLengthPropInfo,
+    lspace: CssLengthPropInfo,
+    maxsize: CssLengthPropInfo,
+    minsize: CssLengthPropInfo,
+    rspace: CssLengthPropInfo,
+    depth: CssLengthPropInfo,
+    height: CssLengthPropInfo,
+    voffset: CssLengthPropInfo,
+    width: CssLengthPropInfo,
 
     // global events
     click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },

@@ -2,6 +2,7 @@
 import {IHtmlIntrinsicElements} from "./HtmlTypes";
 import {ISvgIntrinsicElements} from "./SvgTypes";
 import { content2VNs, symJsxToVNs } from "../core/Reconciler";
+import { IMathmlIntrinsicElements } from "./MathmlTypes";
 
 
 
@@ -26,7 +27,13 @@ export namespace JSX
     /**
      * Represents DOM tag names mapped to types defining their JSX properties.
      */
-	export interface IntrinsicElements extends IHtmlIntrinsicElements, ISvgIntrinsicElements, ICustomWebElements {}
+	export interface IntrinsicElements extends
+        IHtmlIntrinsicElements,
+        ISvgIntrinsicElements,
+        IMathmlIntrinsicElements,
+        ICustomWebElements
+    {
+    }
 
     /**
      * Represents the instance type of class-based components that can be used in JSX. That is,
