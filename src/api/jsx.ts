@@ -1,15 +1,9 @@
 ﻿import {IManagedComponentProps, IComponent, ICustomWebElements} from "./CompTypes";
-import {IHtmlIntrinsicElements} from "./HtmlTypes";
-import {ISvgIntrinsicElements} from "./SvgTypes";
-import { content2VNs, symJsxToVNs } from "../core/Reconciler";
+import { JsxElm } from "./ElementTypes";
+import { IHtmlIntrinsicElements } from "./HtmlTypes";
+import { ISvgIntrinsicElements } from "./SvgTypes";
 import { IMathmlIntrinsicElements } from "./MathmlTypes";
-
-
-
-// /**
-//  * Type of entities that can become renderable content.
-//  */
-// export type RenderableContent = object | string | number | bigint | Function | RenderableContent[];
+import { content2VNs, symJsxToVNs } from "../core/Reconciler";
 
 
 
@@ -22,7 +16,7 @@ export namespace JSX
      * Represents type returned from functional coponents and from the `render` functions of
      * class-based components. We allow any type to be returned.
      */
-	export type Element = any;
+	export type Element = JsxElm;
 
     /**
      * Represents DOM tag names mapped to types defining their JSX properties.

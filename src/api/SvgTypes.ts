@@ -9,8 +9,8 @@ import {
     HorizontalPositionKeyword, ImageRendering_StyleType, IPathBuilder, LengthUnits,
     Marker_StyleType, MediaStatement, OneOrMany, PercentUnits, PointerEvents_StyleType,
     ShapeRendering_StyleType, StrokeLinecap_StyleType, StrokeLinejoin_StyleType, TextAnchor_StyleType,
-    TextRendering_StyleType, Transform_StyleType, UnicodeBidi_StyleType, VectorEffect_StyleType, VerticalPositionKeyword,
-    Visibility_StyleType, WritingMode_StyleType
+    TextRendering_StyleType, Transform_StyleType, UnicodeBidi_StyleType, VectorEffect_StyleType,
+    VerticalPositionKeyword, Visibility_StyleType, WritingMode_StyleType
 } from "mimcss";
 
 
@@ -78,7 +78,12 @@ export type SvgLength = SvgPercent | `${number}${LengthUnits}`;
  * - strings that have a number followed by one of the length units, like `"100deg"` or `"1rad"`
  * - a number
  */
- export type SvgAngle = number | `${number}${AngleUnits}`;
+export type SvgAngle = number | `${number}${AngleUnits}`;
+
+/**
+ * Type used for presentaion properties fill (fillColor) and stroke
+ */
+export type SvgPaint = "none" | CssColor | "context-fill" | "context-stroke";
 
 
 
@@ -107,11 +112,11 @@ export interface ISvgPresentationAttrs
 	display?: Display_StyleType;
 	dominantBaseline?: DominantBaseline_StyleType | "inherit";
 	fill?: "freeze" | "remove";
-	fillColor?: CssColor;
+	fillColor?: SvgPaint;
 	fillOpacity?: SvgPercent;
 	fillRule?: FillRule | "inherit";
 	filter?: Filter_StyleType;
-	floodColor?: CssColor;
+	floodColor?: SvgPaint;
 	floodOpacity?: SvgPercent;
 	fontFamily?: string;
 	fontSize?: FontSizeKeyword | SvgLength | "inherit";
@@ -122,7 +127,7 @@ export interface ISvgPresentationAttrs
 	fontWeight?: number | "normal" | "bold" | "bolder" | "lighter" | "inherit";
 	imageRendering?: ImageRendering_StyleType | "inherit";
 	letterSpacing?: "normal" | SvgLength | "inherit";
-	lightingColor?: CssColor;
+	lightingColor?: SvgPaint;
 	markerEnd?: Marker_StyleType | "inherit";
 	markerMid?: Marker_StyleType | "inherit";
 	markerStart?: Marker_StyleType | "inherit";
@@ -131,9 +136,9 @@ export interface ISvgPresentationAttrs
 	overflow?: "visible" | "hidden" | "scroll" | "auto" | "inherit";
 	pointerEvents?: PointerEvents_StyleType;
 	shapeRendering?: ShapeRendering_StyleType | "inherit";
-	stopColor?: CssColor;
+	stopColor?: SvgPaint;
 	stopOpacity?: number;
-	stroke?: CssColor;
+	stroke?: SvgPaint;
 	strokeDasharray?: "none" | OneOrMany<SvgLength>;
 	strokeDashoffset?: SvgLength;
 	strokeLinecap?: StrokeLinecap_StyleType;

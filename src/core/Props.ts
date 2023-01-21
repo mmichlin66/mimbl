@@ -602,10 +602,33 @@ const mimcssPropToString = (val: any, syntax: string): string =>
 /**
  * SVG presentation attributes can be used as CSS style properties and, therefore, there
  * conversions to strings are already handled by Mimcss library. If Mimcss library is not included,
- * then value can only be a string. If it is not, we set the attribute to empty string. Note that
- * SVG attribute names can be provided in camelCase, so they are converted to dash-case.
+ * then value can only be a string. If it is not, we set the attribute to empty string.
+ *
+ * Since for most transformations SVG only supports unitless lengths and angles, we disable units
+ * in number conversions before calling the Mimcss's getStylePropValue function and restore them
+ * after it returns.
  */
-const svgAttrToStylePropString = (val: any, name: string): string => mimcssPropToString(val, name)
+const svgAttrToStylePropString = (val: any, name: string): string => {
+    if (mimcss)
+    {
+        // don't add default units when converting numbers to strings
+        let oldLenIntUnit = mimcss.Len.setIntUnit("");
+        let oldLenFloatUnit = mimcss.Len.setFloatUnit("");
+        let oldAngleIntUnit = mimcss.Angle.setIntUnit("");
+        let oldAngleFloatUnit = mimcss.Angle.setFloatUnit("");
+
+        let ret = mimcssPropToString(val, name);
+
+        // restore default unit processing
+        mimcss.Len.setIntUnit(oldLenIntUnit);
+        mimcss.Len.setFloatUnit(oldLenFloatUnit);
+        mimcss.Angle.setIntUnit(oldAngleIntUnit);
+        mimcss.Angle.setFloatUnit(oldAngleFloatUnit);
+        return ret;
+    }
+    else
+        return typeof val === "string" ? val : "";
+}
 
 
 
@@ -685,8 +708,11 @@ const ArrayWithCommaPropInfo: AttrPropInfo = { type: PropType.Attr, v2s: (val: a
 // Produces semicolon-separated list from array of values
 const ArrayWithSemicolonPropInfo: AttrPropInfo = { type: PropType.Attr, v2s: (val: any[]): string => array2s(val, ";") };
 
-// Handles conversion of SVG presentation attributes as Mimcss style properties to strings
+// Handles conversion of CssLength-typed attributes to strings
 const CssLengthPropInfo: AttrPropInfo = { type: PropType.Attr, v2s: (val: any) => mimcssPropToString(val, "<length>") };
+
+// Handles conversion of CssColor-typed attributes to strings
+const CssColorPropInfo: AttrPropInfo = { type: PropType.Attr, v2s: (val: any) => mimcssPropToString(val, "color") };
 
 // Handles conversion of SVG presentation attributes as Mimcss style properties to strings
 const SvgAttrAsStylePropInfo: AttrPropInfo = { type: PropType.Attr, v2s: svgAttrToStylePropString };
@@ -793,6 +819,9 @@ const propInfos: { [P:string]: PropInfo } =
     keySplines: ArrayWithSemicolonPropInfo,
 
     // MathML element atributes
+    mathbackground: CssColorPropInfo,
+    mathcolor: CssColorPropInfo,
+    mathsize: CssLengthPropInfo,
     linethickness: CssLengthPropInfo,
     lspace: CssLengthPropInfo,
     maxsize: CssLengthPropInfo,

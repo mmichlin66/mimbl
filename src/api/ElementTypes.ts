@@ -3,6 +3,19 @@
 
 
 /**
+ * Type of entities that can become renderable content. This type should be used when defining
+ * types of children that elements and coponents can accept. This type is also set as the
+ * Element type in the global JSX namespace.
+ *
+ * Note that functional components and `render()` methods in class-based components DO NOT need to
+ * use this type as their return type - they can use `any`. Moreover, they can return `null` or
+ * `undefined` (or even `true` and `false`) to indicate no-content.
+ */
+export type JsxElm = object | string | number | bigint | Function;
+
+
+
+/**
  * Type for defining the id property of HTML elements
  */
 export type IDPropType = string | number | IIDRule;

@@ -1,9 +1,6 @@
-﻿import {CssColor, CssLength, MediaStatement} from "mimcss"
+﻿import {CssColor, CssLength} from "mimcss"
 import {ExtendedElement} from "./CompTypes"
-import {
-    ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType, FormenctypePropType,
-    FormmethodPropType, IElementAttrs, IElementEvents, FetchpriorityPropType, IDPropType
-} from "./ElementTypes"
+import {IElementAttrs, IElementEvents, JsxElm} from "./ElementTypes"
 
 
 
@@ -254,6 +251,21 @@ export interface IMathmlMunderoverElementAttrs extends IMathmlElementAttrs
 // <semantics>
 export interface IMathmlSemanticsElementAttrs extends IMathmlElementAttrs
 {
+}
+
+
+
+// <semantics>
+export interface IMathmlAnnotationElementAttrs extends IMathmlElementAttrs
+{
+	encoding?: string;
+}
+
+
+
+// <semantics>
+export interface IMathmlAnnotationXmlElementAttrs extends IMathmlElementAttrs
+{
 	encoding?: string;
 }
 
@@ -263,31 +275,33 @@ export interface IMathmlIntrinsicElements
 {
     math: ExtendedElement<MathMLElement, IMathmlMathElementAttrs>;
     merror: ExtendedElement<MathMLElement, IMathmlMerrorElementAttrs>;
-    mfrac: ExtendedElement<MathMLElement, IMathmlMfracElementAttrs>;
+    mfrac: ExtendedElement<MathMLElement, IMathmlMfracElementAttrs, IElementEvents, [JsxElm, JsxElm]>;
     mi: ExtendedElement<MathMLElement, IMathmlMiElementAttrs>;
     mmultiscripts: ExtendedElement<MathMLElement, IMathmlMmultiscriptsElementAttrs>;
     mn: ExtendedElement<MathMLElement, IMathmlMnElementAttrs>;
     mo: ExtendedElement<MathMLElement, IMathmlMoElementAttrs>;
-    mover: ExtendedElement<MathMLElement, IMathmlMoverElementAttrs>;
+    mover: ExtendedElement<MathMLElement, IMathmlMoverElementAttrs, IElementEvents, [JsxElm, JsxElm]>;
     mpadded: ExtendedElement<MathMLElement, IMathmlMpaddedElementAttrs>;
     mphantom: ExtendedElement<MathMLElement, IMathmlMphantomElementAttrs>;
     mprescripts: ExtendedElement<MathMLElement, IMathmlMprescriptsElementAttrs>;
-    mroot: ExtendedElement<MathMLElement, IMathmlMrootElementAttrs>;
+    mroot: ExtendedElement<MathMLElement, IMathmlMrootElementAttrs, IElementEvents, [JsxElm, JsxElm]>;
     mrow: ExtendedElement<MathMLElement, IMathmlMrowElementAttrs>;
     ms: ExtendedElement<MathMLElement, IMathmlMsElementAttrs>;
     mspace: ExtendedElement<MathMLElement, IMathmlMspaceElementAttrs>;
-    msqrt: ExtendedElement<MathMLElement, IMathmlMsqrtElementAttrs>;
+    msqrt: ExtendedElement<MathMLElement, IMathmlMsqrtElementAttrs, IElementEvents, JsxElm>;
     mstyle: ExtendedElement<MathMLElement, IMathmlMstyleElementAttrs>;
-    msub: ExtendedElement<MathMLElement, IMathmlMsubElementAttrs>;
-    msubsup: ExtendedElement<MathMLElement, IMathmlMsubsupElementAttrs>;
-    msup: ExtendedElement<MathMLElement, IMathmlMsupElementAttrs>;
+    msub: ExtendedElement<MathMLElement, IMathmlMsubElementAttrs, IElementEvents, [JsxElm, JsxElm]>;
+    msubsup: ExtendedElement<MathMLElement, IMathmlMsubsupElementAttrs, IElementEvents, [JsxElm, JsxElm, JsxElm]>;
+    msup: ExtendedElement<MathMLElement, IMathmlMsupElementAttrs, IElementEvents, [JsxElm, JsxElm]>;
     mtable: ExtendedElement<MathMLElement, IMathmlMtableElementAttrs>;
     mtd: ExtendedElement<MathMLElement, IMathmlMtdElementAttrs>;
     mtext: ExtendedElement<MathMLElement, IMathmlMtextElementAttrs>;
     mtr: ExtendedElement<MathMLElement, IMathmlMtrElementAttrs>;
-    munder: ExtendedElement<MathMLElement, IMathmlMunderElementAttrs>;
-    munderover: ExtendedElement<MathMLElement, IMathmlMunderoverElementAttrs>;
+    munder: ExtendedElement<MathMLElement, IMathmlMunderElementAttrs, IElementEvents, [JsxElm, JsxElm]>;
+    munderover: ExtendedElement<MathMLElement, IMathmlMunderoverElementAttrs, IElementEvents, [JsxElm, JsxElm, JsxElm]>;
     semantics: ExtendedElement<MathMLElement, IMathmlSemanticsElementAttrs>;
+    annotation: ExtendedElement<MathMLElement, IMathmlAnnotationElementAttrs>;
+    "annotation-xml": ExtendedElement<MathMLElement, IMathmlAnnotationXmlElementAttrs>;
 }
 
 
