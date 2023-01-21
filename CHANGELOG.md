@@ -1,4 +1,9 @@
-# 0.0.1
+# 0.10.2
+
+1. Support MathML elements.
+
+
+# 0.10.1
 
 1. Support for creating custom Web elements.
 1. Support for module lazy-loading.
