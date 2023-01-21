@@ -1,3 +1,15 @@
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Element namespace constants.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const HtmlNamespace = "http://www.w3.org/1999/xhtml";
+export const SvgNamespace = "http://www.w3.org/2000/svg";
+export const MathmlNamespace = "http://www.w3.org/1998/Math/MathML";
+
+
+
 /**
  * Compares the two given values going only one level down to their properties (if objects or arrays)
  * @param o1

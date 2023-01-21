@@ -111,12 +111,11 @@ export interface ISvgPresentationAttrs
 	direction?: Direction | "inherit";
 	display?: Display_StyleType;
 	dominantBaseline?: DominantBaseline_StyleType | "inherit";
-	fill?: "freeze" | "remove";
-	fillColor?: SvgPaint;
+	fill?: SvgPaint;
 	fillOpacity?: SvgPercent;
 	fillRule?: FillRule | "inherit";
 	filter?: Filter_StyleType;
-	floodColor?: SvgPaint;
+	floodColor?: CssColor;
 	floodOpacity?: SvgPercent;
 	fontFamily?: string;
 	fontSize?: FontSizeKeyword | SvgLength | "inherit";
@@ -127,7 +126,7 @@ export interface ISvgPresentationAttrs
 	fontWeight?: number | "normal" | "bold" | "bolder" | "lighter" | "inherit";
 	imageRendering?: ImageRendering_StyleType | "inherit";
 	letterSpacing?: "normal" | SvgLength | "inherit";
-	lightingColor?: SvgPaint;
+	lightingColor?: CssColor;
 	markerEnd?: Marker_StyleType | "inherit";
 	markerMid?: Marker_StyleType | "inherit";
 	markerStart?: Marker_StyleType | "inherit";
@@ -136,7 +135,7 @@ export interface ISvgPresentationAttrs
 	overflow?: "visible" | "hidden" | "scroll" | "auto" | "inherit";
 	pointerEvents?: PointerEvents_StyleType;
 	shapeRendering?: ShapeRendering_StyleType | "inherit";
-	stopColor?: SvgPaint;
+	stopColor?: CssColor;
 	stopOpacity?: number;
 	stroke?: SvgPaint;
 	strokeDasharray?: "none" | OneOrMany<SvgLength>;
@@ -269,7 +268,7 @@ export interface ISvgElementEvents extends IElementEvents
  * Represents SVG elements of the Animation category
  */
 export interface ISvgAnimationCategoryAttrs extends ISvgElementAttrs, ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "clipRule" | "fill">
+    Pick<ISvgPresentationAttrs, "clipRule">
 {
 }
 
@@ -366,7 +365,7 @@ export interface ISvgRenderableCategoryAttrs extends ISvgElementAttrs,
  * Represents SVG elements of the Shape category
  */
 export interface ISvgShapeCategoryAttrs extends ISvgElementAttrs, ISvgConditionalProcessingAttrs,
-    Pick<ISvgPresentationAttrs, "clipRule" | "fillColor" | "fillOpacity" | "markerEnd" |
+    Pick<ISvgPresentationAttrs, "clipRule" | "fill" | "fillOpacity" | "markerEnd" |
         "markerMid" | "markerStart" | "mask" | "opacity" | "pointerEvents" | "shapeRendering" |
         "stroke" | "strokeDasharray" | "strokeDashoffset" | "strokeLinecap" | "strokeLinejoin" |
         "strokeMiterlimit" | "strokeOpacity" | "strokeWidth" | "vectorEffect" | "visibility">
@@ -390,7 +389,7 @@ export interface ISvgStructuralCategoryAttrs extends ISvgElementAttrs,
  */
 export interface ISvgTextContentCategoryAttrs extends ISvgElementAttrs,
     Pick<ISvgPresentationAttrs, "colorInterpolation" | "direction" | "dominantBaseline" |
-        "fillColor" | "fillOpacity" | "fillRule" | "fontFamily" | "fontSize" |
+        "fill" | "fillOpacity" | "fillRule" | "fontFamily" | "fontSize" |
         "fontSizeAdjust" | "fontStretch" | "fontStyle" | "fontVariant" | "fontWeight" |
         "letterSpacing" | "pointerEvents" | "stroke" | "strokeDasharray" | "strokeDashoffset" |
         "strokeLinecap" | "strokeLinejoin" | "strokeMiterlimit" | "strokeOpacity" |
@@ -510,9 +509,10 @@ export interface ISvgDeskElementProps extends
 
 // <discard>
 export interface ISvgDiscardElementProps extends
-    ISvgAnimationCategoryAttrs,
-    ISvgAnimationTimingAttrs
+    ISvgAnimationCategoryAttrs
 {
+	begin?: string | string[];
+	href?: string;
 }
 
 
@@ -970,8 +970,7 @@ export interface ISvgMetadataElementProps extends
 
 
 // <mpath>
-export interface ISvgMPathElementProps extends
-    ISvgAnimationCategoryAttrs
+export interface ISvgMPathElementProps extends ISvgElementAttrs
 {
 	href?: string;
 }

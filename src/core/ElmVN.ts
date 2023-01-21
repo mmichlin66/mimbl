@@ -16,7 +16,7 @@ import {
     setElmProp, updateElmProp
 } from "./Props";
 import { isTrigger } from "./TriggerImpl";
-import { s_deepCompare } from "../utils/UtilFunc";
+import { HtmlNamespace, MathmlNamespace, SvgNamespace, s_deepCompare } from "../utils/UtilFunc";
 
 
 
@@ -346,7 +346,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         for( let [propName, propVal] of Object.entries(props))
 		{
             // get information about the property and determine its type.
-            let propInfo = getPropInfo(propName);
+            let propInfo = getPropInfo(this.elmName, propName);
             let propType = propInfo?.type ?? getPropTypeFromPropVal(propVal);
             if (propType === PropType.Attr)
                 (this.attrs ??= {})[propName] = { info: propInfo, val: propVal, valS: null };
@@ -380,7 +380,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         for( let [propName, propVal] of Object.entries(props))
 		{
             // get information about the property and determine its type.
-            let propInfo = getPropInfo(propName);
+            let propInfo = getPropInfo(this.elmName, propName);
             let propType = propInfo?.type ?? getPropTypeFromPropVal(propVal);
 
             if (propType === PropType.Attr)
@@ -916,9 +916,9 @@ const enum ElementNamespace
 
 /** Object containing namespace URIs of known namespaces */
 const ElementNamespaceNames = {
-    [ElementNamespace.HTML]: "http://www.w3.org/1999/xhtml",
-    [ElementNamespace.SVG]: "http://www.w3.org/2000/svg",
-    [ElementNamespace.MATHML]: "http://www.w3.org/1998/Math/MathML",
+    [ElementNamespace.HTML]: HtmlNamespace,
+    [ElementNamespace.SVG]: SvgNamespace,
+    [ElementNamespace.MATHML]: MathmlNamespace,
 }
 
 // The ElmInfo type defines information that helps creating an element. This information can be

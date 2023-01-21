@@ -8,6 +8,7 @@ import { IAriaset, DatasetPropType } from "../api/ElementTypes";
 
 import { mimcss } from "./StyleScheduler";
 import { CheckedPropType } from "../api/HtmlTypes";
+import { SvgNamespace } from "../utils/UtilFunc";
 
 
 
@@ -47,9 +48,10 @@ export interface AttrPropInfo extends PropInfoBase
      *
      * @param val Value to be converted to string
      * @param name Attribute name - just in case the conversion depends on an attribute
+     * @param elm Element whose attribute is being converted to string
      * @returns String value to be assigned to an attribute or null.
      */
-	v2s?: (val: any, name: string) => string | null;
+	v2s?: (val: any, name: string, elm: Element) => string | null;
 
 	/**
      * Function that sets the value of the attribute. If this function is not defined, then the
@@ -150,7 +152,7 @@ export function registerElmProp( propName: string, info: AttrPropInfo | EventPro
  */
 export function setAttrValue(elm: Element, name: string, val: any): void
 {
-    let info = propInfos[name];
+    let info = getPropInfo(elm.localName, name);
     if (!info || info.type === PropType.Attr)
         setElmProp(elm, name, val, info as AttrPropInfo);
 }
@@ -191,8 +193,8 @@ export function setElmProp(elm: Element, name: string, val: any, info?: AttrProp
             s = set( elm, val, name);
         else
         {
-            let {v2s} = info;
-            s = v2s ? v2s(val, name) : valToString( val);
+            let v2s = info.v2s;
+            s = v2s ? v2s(val, name, elm) : valToString( val);
             if (s != null)
             {
                 setAttrValueToElement(elm, name, s, info);
@@ -302,7 +304,7 @@ function convertCompareAndUpdateOrRemoveAttr(elm: Element, name: string, oldS: s
     newVal: any, info?: AttrPropInfo): string | null
 {
     let v2s = info?.v2s;
-    let newS = v2s ? v2s(newVal, name) : valToString( newVal);
+    let newS = v2s ? v2s(newVal, name, elm) : valToString( newVal);
     if (oldS !== newS)
     {
         if (newS != null)
@@ -633,6 +635,28 @@ const svgAttrToStylePropString = (val: any, name: string): string => {
 
 
 /**
+ * SVG presentation attributes can be used as CSS style properties and, therefore, there
+ * conversions to strings are already handled by Mimcss library. If Mimcss library is not included,
+ * then value can only be a string. If it is not, we set the attribute to empty string.
+ *
+ * Since for most transformations SVG only supports unitless lengths and angles, we disable units
+ * in number conversions before calling the Mimcss's getStylePropValue function and restore them
+ * after it returns.
+ */
+const numAttrToStylePropString = (val: any, name: string, elm: Element): string => {
+    if (mimcss)
+    {
+        return elm.namespaceURI === SvgNamespace
+            ? svgAttrToStylePropString(val, name)
+            : mimcssPropToString(val, name);
+    }
+    else
+        return typeof val === "string" ? val : "";
+}
+
+
+
+/**
  * Converts style property value using Mimcss library if available.
  */
 const styleToString = (val: string | Styleset): string | null =>
@@ -717,6 +741,11 @@ const CssColorPropInfo: AttrPropInfo = { type: PropType.Attr, v2s: (val: any) =>
 // Handles conversion of SVG presentation attributes as Mimcss style properties to strings
 const SvgAttrAsStylePropInfo: AttrPropInfo = { type: PropType.Attr, v2s: svgAttrToStylePropString };
 
+// Handles conversion of numeric attributes to strings depending on whether the element that uses
+// them is an SVG element. For SVG elements, units are not added, for others (in particular,
+// MathML), they are added.
+const NumericAttrAsStylePropInfo: AttrPropInfo = { type: PropType.Attr, v2s: numAttrToStylePropString };
+
 // Handles conversion of SVG presentation attributes' names from camelCase to dash case
 const SvgAttrNameConversionPropInfo: AttrPropInfo = { type: PropType.Attr, name: camelToDash };
 
@@ -727,8 +756,16 @@ const SvgAttrAsStyleWithNameConversionPropInfo: AttrPropInfo = { type: PropType.
 /**
  * Object that maps property names to PropInfo-derived objects. Information about custom
  * attributes is added to this object when the registerProperty method is called.
+ *
+ * There are a few attributes that have different meaning when applied to different elements.
+ * For exampe, the `fill` attribute means shape-filling color when applied to such elements as
+ * circle, rect or path, while it means the final state of animation when applied to such
+ * elements as animate or animateMotion. To distinguish between different meaning (and,
+ * therefore different treatment) of the attributes, the attribute name can be set to a
+ * function, which will return the actual AttrPropInfo given the attribute and element names.
  */
-const propInfos: { [P:string]: PropInfo } =
+const propInfos: { [P:string]: PropInfo | ((elmName: string, attrName: string) => PropInfo) } =
+// const propInfos: { [P:string]: PropInfo } =
 {
     // framework attributes.
     key: StdFrameworkPropInfo,
@@ -759,7 +796,14 @@ const propInfos: { [P:string]: PropInfo } =
 	baselineShift: SvgAttrAsStylePropInfo,
 	color: SvgAttrAsStylePropInfo,
 	cursor: SvgAttrAsStylePropInfo,
-	fillColor: { type: PropType.Attr, v2s: svgAttrToStylePropString, name: "fill" },
+    cx: SvgAttrAsStylePropInfo,
+    cy: SvgAttrAsStylePropInfo,
+	fill: (elmName) => ({
+        type: PropType.Attr,
+        v2s: elmName.startsWith("animate") || elmName === "set"
+            ? undefined
+            : svgAttrToStylePropString
+    }),
 	fillOpacity: SvgAttrAsStyleWithNameConversionPropInfo,
 	filter: SvgAttrAsStylePropInfo,
 	floodColor: SvgAttrAsStyleWithNameConversionPropInfo,
@@ -772,12 +816,17 @@ const propInfos: { [P:string]: PropInfo } =
 	markerMid: SvgAttrAsStyleWithNameConversionPropInfo,
 	markerStart: SvgAttrAsStyleWithNameConversionPropInfo,
 	mask: SvgAttrAsStylePropInfo,
+    r: SvgAttrAsStylePropInfo,
+    rx: SvgAttrAsStylePropInfo,
+    ry: SvgAttrAsStylePropInfo,
 	stopColor: SvgAttrAsStyleWithNameConversionPropInfo,
 	stopOpacity: SvgAttrAsStyleWithNameConversionPropInfo,
 	stroke: SvgAttrAsStylePropInfo,
 	strokeOpacity: SvgAttrAsStyleWithNameConversionPropInfo,
 	transform: SvgAttrAsStylePropInfo,
 	transformOrigin: SvgAttrAsStyleWithNameConversionPropInfo,
+    x: SvgAttrAsStylePropInfo,
+    y: SvgAttrAsStylePropInfo,
 
     // SVG attributes that don't require conversion of the value but do require conversion of the
     // attribute name from camelCase to dash-case. All SVG presentation atributes with a dash
@@ -811,7 +860,7 @@ const propInfos: { [P:string]: PropInfo } =
 	wordSpacing: SvgAttrNameConversionPropInfo,
 	writingMode: SvgAttrNameConversionPropInfo,
 
-    // SVG element atributes
+    // SVG element atributes where multiple values are separated by semicolon
     values: ArrayWithSemicolonPropInfo,
     begin: ArrayWithSemicolonPropInfo,
     end: ArrayWithSemicolonPropInfo,
@@ -828,9 +877,9 @@ const propInfos: { [P:string]: PropInfo } =
     minsize: CssLengthPropInfo,
     rspace: CssLengthPropInfo,
     depth: CssLengthPropInfo,
-    height: CssLengthPropInfo,
+    height: NumericAttrAsStylePropInfo,
     voffset: CssLengthPropInfo,
-    width: CssLengthPropInfo,
+    width: NumericAttrAsStylePropInfo,
 
     // global events
     click: { type: PropType.Event, schedulingType: TickSchedulingType.Sync },
@@ -841,7 +890,12 @@ const propInfos: { [P:string]: PropInfo } =
 /**
  * Retrieves info about a registered property
  */
-export const getPropInfo = (name: string): PropInfo | undefined => propInfos[name];
+// export const getPropInfo = (name: string): PropInfo | undefined => propInfos[name];
+export function getPropInfo(elmName: string, attrName: string): PropInfo | undefined
+{
+    let info = propInfos[attrName];
+    return typeof info === "function" ? info(elmName, attrName) : info;
+}
 
 
 
