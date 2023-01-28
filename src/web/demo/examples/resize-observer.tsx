@@ -1,4 +1,8 @@
-﻿import * as mim from "mimbl";
+﻿// This example demonstrates how Mimbl custom attributes can be used to work with Resize
+// Observer in declarative manner. Read more about custom attributes at
+// https://www.mimjs.com/guide/custom-attributes.html
+
+import * as mim from "mimbl";
 import * as css from "mimcss";
 
 
@@ -124,7 +128,8 @@ export class MyComponent extends mim.Component
             <div/>
             <br/>
             <span>The textarea box will have its font size changed when resized</span>
-            <textarea resizeObserver={fontResizer} style={{height: 20, width: 500, resize: "both", overflow: "auto"}}>
+            <textarea resizeObserver={fontResizer}
+                    style={{height: 20, width: 500, resize: "both", overflow: "hidden", whiteSpace: "nowrap"}}>
                 The font size should change when you resize this box
             </textarea>
             <br/>

@@ -9,3 +9,4 @@ unit,title,file
 7,Publish/Subscribe Mechanism,service-pub-sub.html
 8,Callbacks and this,callbacks-and-this.html
 9,Component Life Cycle,component-lifecycle.html
+10,Component Lazy-Loading,component-lazy-loading.html

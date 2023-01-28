@@ -460,17 +460,17 @@ s_initStyleScheduler().then( n => mimblStyleSchedulerType = n);
 
 
 /**
- * Given a promise returns an object, which will throw a promise for any property access until
- * the promise is settled. If the promise is successfully resolved, property access will proceed
- * to the object returned by the promise. If the promise is rejected, property access will throw
- * `null-property-access` exception.
+ * Accepts a promise or a function that returns a promise, and returns an object, which will throw
+ * a promise for any property access until the promise is settled. If the promise is successfully
+ * resolved, property access will proceed to the object returned by the promise. If the promise is
+ * rejected, property access will throw the rejection error.
  *
  * Although this can be used with any promise, this should be primarily used for dynamic imports
  * in conjunction with code-splitting, for example:
  *
  * ```tsx
  * // dynamically import OtherModule
- * const OtherModule = mim.lazy(import("./delayed/OtherModule"));
+ * const OtherModule = mim.lazy(() => import("./OtherModule"));
  *
  * function MyComp(): any
  * {
@@ -482,7 +482,7 @@ s_initStyleScheduler().then( n => mimblStyleSchedulerType = n);
  *
  * ```tsx
  * // dynamically import OtherModule
- * const OtherComp = mim.lazy(import("./delayed/OtherModule")).OtherComp;
+ * const OtherComp = mim.lazy(import("./OtherModule")).OtherComp;
  *
  * function MyComp(): any
  * {
@@ -490,20 +490,20 @@ s_initStyleScheduler().then( n => mimblStyleSchedulerType = n);
  * }
  * ```
  *
- * @param importPromise Promise to wait for
+ * For more inormation see <a href="https://www.mimjs.com/guide/component-lazy-loading.html" target="ref">
+ *     Component Lazy-Loading
+ * </a>
+ *
+ * @typeparam T Type to which the promise resolves. Since this function is intended to be called
+ * with dynamic `import()` statement, this type will normally be `typeof import(...)`; that is,
+ * it will be an object containing all exported module members.
+ * @param funcOrPromise Either a promise returned from the dynamic import statement or a function
+ * that returns such promise. If the parameter is a function, it will be called when the returned
+ * object is first used. This can defer downloading until the object is really needed.
  * @returns Object providing property access to the object returned when the promise is resolved.
  */
-export const lazy = <T>(importPromise: Promise<T>): T =>
-    createNewLazyProxy(importPromise) as T;
-
-
-
-/**
- * Constructor function, which does nothing and only serves as the basis for creating a proxy
- * with LazyHandler. We need a function and not just an object in order to be able to call
- * the "new" operator on the Proxy.
- */
-function DummyConstructor() {}
+export const lazy = <T extends object>(funcOrPromise: Promise<T> | (() => Promise<T>)) =>
+    createNewLazyProxy(funcOrPromise) as Promise<T> & { [K in keyof T]: T[K] & Promise<T[K]> };
 
 
 
@@ -513,10 +513,19 @@ function DummyConstructor() {}
 class LazyHandler implements ProxyHandler<any>
 {
     /**
-     * Keeps the promise from the dynamic import or from the lower-level opertaions. After the
-     * promise settles, this is set to null.
+     * Function returning the promise to watch.
      */
-    promise?: Promise<any> | undefined;
+    func?: () => Promise<any>;
+
+    /**
+     * Keeps the promise from the dynamic import or from the lower-level opertaions.
+     */
+    promise?: Promise<any>;
+
+    /**
+     * Flag indicating whether the promise has been settled.
+     */
+    done?: boolean | undefined;
 
     /**
      * Value after the promise has settled. It contains different things for different kinds
@@ -533,19 +542,29 @@ class LazyHandler implements ProxyHandler<any>
      */
     err?: any | undefined;
 
-    constructor(promise: Promise<any>)
+    constructor(funcOrPromise: Promise<any> | (() => Promise<any>))
     {
-        this.promise = promise;
-        promise
-            .then(value => this.val = value)
-            .catch(err => this.err = err)
-            .finally(() => this.promise = undefined);
+        if (funcOrPromise instanceof Promise)
+        {
+            this.promise = funcOrPromise;
+            this.watch();
+        }
+        else
+            this.func = funcOrPromise;
     }
 
     get(target: any, prop: PropertyKey, receiver: any): any
     {
-        if ((prop === symToVNs || prop === symJsxToVNs) && (this.promise || this.err))
+        if ((prop === symToVNs || prop === symJsxToVNs) && (!this.done || this.err))
+        {
+            this.start();
             return lazyHandlerToVNs.bind(this, prop);
+        }
+        else if (["then", "catch", "finally"].includes(prop as string))
+        {
+            this.start();
+            return (...args: any[]) => this.promise![prop](...args);
+        }
         else
             return this.helper(obj => obj[prop]);
     }
@@ -562,26 +581,59 @@ class LazyHandler implements ProxyHandler<any>
 
     private helper(action: (v: any) => any): any
     {
-        if (this.promise)
-            return createNewLazyProxy(this.promise.then(action))
+
+        if (!this.done)
+        {
+            this.start();
+            return createNewLazyProxy(this.promise!.then(action))
+        }
         else if (this.err)
             throw this.err;
         else
             return action(this.val);
+    }
+
+    /**
+     * If the promise doesn't exist yet, calls the function supplied in the constructor and starts
+     * watching the promise returned from it.
+     */
+    private start(): void
+    {
+        if (!this.promise)
+        {
+            this.promise = this.func!();
+            this.watch();
+        }
+    }
+
+    /** Starts watching the promise */
+    private watch(): void
+    {
+        this.promise!
+            .then(value => this.val = value)
+            .catch(err => this.err = err)
+            .finally(() => this.done = true);
     }
 }
 
 
 
 /** Creates a Proxy object using LazyHandler watching the given promise */
-const createNewLazyProxy = (promise: Promise<any>): any =>
-    new Proxy(DummyConstructor, new LazyHandler(promise));
+const createNewLazyProxy = (funcOrPromise: Promise<any> | (() => Promise<any>)): any =>
+    new Proxy(DummyConstructor, new LazyHandler(funcOrPromise));
+
+/**
+ * Constructor function, which does nothing and only serves as the basis for creating a proxy
+ * with LazyHandler. We need a function and not just an object in order to be able to call
+ * the "new" and "()" operators on the Proxy.
+ */
+function DummyConstructor() {}
 
 /**
  * Implementation of `toVNs` and `jsxToVNs` functions for the lazy module loader. When either
  * `symToVNs` or `symJsxToVNs` properties are requested from the member of the lazy loading
  * module, this function bound to the LazyHandler instance is returned (if the promise is still
- * pending). It returns Functor for the [[lazyHandlerFunc]] function, which will either
+ * pending). It returns Functor for the {@link lazyHandlerFunc} function, which will either
  * throw a promise (while it is still pending), or throw an error (if the promise is rejected),
  * or call the actual `symToVNs` or `symJsxToVNs` function on the promise's resolved value.
  */
@@ -595,8 +647,6 @@ function lazyHandlerToVNs(this: LazyHandler, sym: symbol, ...args: any[]): any
     });
 }
 
-
-
 /**
  * Function that is wrapped in Functor when either `symToVNs` or `symJsxToVNs` properties are
  * requested from the member of the lazy loading module. This function is called with `this` set
@@ -608,12 +658,12 @@ function lazyHandlerToVNs(this: LazyHandler, sym: symbol, ...args: any[]): any
  * - if the promise is resolved, calls either `symToVNs` or `symJsxToVNs` functions on the
  *   resolved value.
  *
- * Since functions wrapped in FunProxyVN node can accept a single parameter only, the symbol
- * (symToVNs or symJsxToVNs) and the original argument array are passed as a tuple.
+ * Since functions wrapped in Functor component node can accept a single parameter only, the symbol
+ * (symToVNs or symJsxToVNs) and the original argument are passed in a tuple.
  */
 function lazyHandlerFunc(this: LazyHandler, arg: [sym: symbol, args: any[]]): any
 {
-    if (this.promise)
+    if (!this.done)
         throw this.promise;
     else if (this.err)
         throw this.err;
@@ -625,7 +675,7 @@ function lazyHandlerFunc(this: LazyHandler, arg: [sym: symbol, args: any[]]): an
 
 /**
  * Component that serves as a boundary for errors and unsettled promises. If descendent components
- * throw any error, the nearest to them Boundary component catches and handles them. This component
+ * throw errors, the nearest to them Boundary component catches and handles them. This component
  * provides a minimal UI informing the user about the error or the fact that it is waiting for a
  * promise. Derived components can provide their own way to display information about the errors
  * and the waiting status.
@@ -639,6 +689,7 @@ export class Boundary extends Component
     {
         super(props);
         this.content = props.children;
+        this.promises = new Set();
     }
 
 	willMount(): void
@@ -660,33 +711,34 @@ export class Boundary extends Component
     }
 
     /**
-     * This method is called after an exception was thrown during rendering of the node's
-     * sub-nodes.
-     */
-    handleError( err: any): void
-    {
-		if (err instanceof Promise)
-		{
-            // add the promise to our set of promises we are waiting for
-			(this.promises ??= new Set()).add( err);
-
-            // use callback that will remove the promise after it is settled
-			err.finally(() => this.onPromise( err));
-
-            // put simple message that will be rendered until all promises are settled
-            this.content = this.getWaitingContent();
-		}
-		else
-			this.content = this.getErrorContent(err);
-    }
-
-    /**
-     * This method implements the gist of the IErrorBoundary interface.
+     * Implements the functionality of the {@link IErrorBoundary} interface.
      */
     reportError(err: any): void
     {
         this.handleError(err);
         this.updateMe();
+    }
+
+    /**
+     * This method is called after an exception was thrown during rendering of the node's
+     * sub-nodes.
+     */
+    private handleError( err: any): void
+    {
+		if (err instanceof Promise)
+		{
+            // add the promise to our set of promises we are waiting for
+			this.promises.add(err);
+
+            // use callback that will remove the promise after it is settled
+			err.finally(() => this.onPromise(err));
+
+            // display content for the waiting state
+            this.content = this.getWaitingContent();
+		}
+		else
+            // display content derived from the error
+			this.content = this.getErrorContent(err);
     }
 
 	/**
@@ -695,7 +747,7 @@ export class Boundary extends Component
      */
 	private onPromise(promise: Promise<any>): void
 	{
-		if (this.promises?.delete(promise) && !this.promises.size)
+		if (this.promises.delete(promise) && !this.promises.size)
             this.reRender();
 	}
 
@@ -723,7 +775,7 @@ export class Boundary extends Component
 	private content: any;
 
 	/** Set of promises thrown by descendant nodes and not yet fulfilled. */
-	private promises: Set<Promise<any>> | null | undefined;
+	private promises: Set<Promise<any>>;
 }
 
 
@@ -772,7 +824,7 @@ export class Awaiter extends Component<AwaiterProps, AwaiterEvents>
      * Renders content depending on the current state of the promise - pending, resolved or rejected.
      * @ignore
      */
-    @noWatcher render(): any
+    render(): any
     {
         return this.promise ? this.props.children :
             this.err ? this.getErrorContent(this.err) :
@@ -817,16 +869,16 @@ export class Awaiter extends Component<AwaiterProps, AwaiterEvents>
      * @param val Promise's resolved value
      * @returns Content to rendered
      */
-    protected getResolvedContent(val: any): any { return val}
+    protected getResolvedContent(val: any): any { return val; }
 
     /**
      * This method can be overridden to provide content to display information about the given
      * error. By default, the error is thrown and is supposed to propagate up to the nearest
-     * [[Boundary]] component.
+     * {@link Boundary} component.
      *
      * @param err Promise rejection error.
      */
-    protected getErrorContent(err: any): any { throw err}
+    protected getErrorContent(err: any): any { throw err; }
 
 
 
