@@ -688,42 +688,34 @@ export class Boundary extends Component
     constructor(props: {children: any[]})
     {
         super(props);
-        this.content = props.children;
         this.promises = new Set();
     }
 
+    /**
+     * @ignore
+     */
 	willMount(): void
     {
         // publish ErrorBoundary service
         this.publishService( "ErrorBoundary", this);
     }
 
-    shouldUpdate(newProps: {children: any[]}): boolean
-    {
-        this.content = newProps.children;
-        return true;
-    }
-
-    @noWatcher
-    render()
-    {
-        return this.content;
-    }
-
     /**
-     * Implements the functionality of the {@link IErrorBoundary} interface.
+     * @ignore
      */
-    reportError(err: any): void
+    @noWatcher render()
     {
-        this.handleError(err);
-        this.updateMe();
+        return this.promises.size > 0 ? this.getWaitingContent() :
+            this.err ? this.getErrorContent(this.err) :
+            this.props.children;
     }
 
     /**
      * This method is called after an exception was thrown during rendering of the node's
      * sub-nodes.
+     * @ignore
      */
-    handleError( err: any): void
+    handleError(err: any): void
     {
 		if (err instanceof Promise)
 		{
@@ -732,13 +724,20 @@ export class Boundary extends Component
 
             // use callback that will remove the promise after it is settled
 			err.finally(() => this.onPromise(err));
-
-            // display content for the waiting state
-            this.content = this.getWaitingContent();
 		}
 		else
             // display content derived from the error
-			this.content = this.getErrorContent(err);
+			this.err = err;
+    }
+
+    /**
+     * Implements the functionality of the {@link IErrorBoundary} interface.
+     * @ignore
+     */
+    reportError(err: any): void
+    {
+        this.handleError(err);
+        this.updateMe();
     }
 
 	/**
@@ -748,7 +747,10 @@ export class Boundary extends Component
 	private onPromise(promise: Promise<any>): void
 	{
 		if (this.promises.delete(promise) && !this.promises.size)
-            this.reRender();
+        {
+            this.err = undefined;
+            this.updateMe();
+        }
 	}
 
     /** This method can be overridden to provide content to display while waiting for promises */
@@ -757,25 +759,13 @@ export class Boundary extends Component
     /** This method can be overridden to provide content to display information about the given error */
     protected getErrorContent(err: any): any { return err?.message ?? err?.toString() ?? "Error"}
 
-    /**
-     * Re-renders the component with either the given content or, if the content parameter is
-     * undefined, with the original children provided to the component in the props.
-     * @param content New content to render the component with or undefined to render with the
-     * original children.
-     */
-    protected reRender(content?: any): void
-    {
-        this.content = content ?? this.props.children;
-        this.updateMe();
-    }
 
-
-
-	/** Content rendered under this component. */
-	private content: any;
 
 	/** Set of promises thrown by descendant nodes and not yet fulfilled. */
 	private promises: Set<Promise<any>>;
+
+	/** Latest error caught by the component. */
+	private err: any;
 }
 
 
