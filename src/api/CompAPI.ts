@@ -723,7 +723,7 @@ export class Boundary extends Component
      * This method is called after an exception was thrown during rendering of the node's
      * sub-nodes.
      */
-    private handleError( err: any): void
+    handleError( err: any): void
     {
 		if (err instanceof Promise)
 		{

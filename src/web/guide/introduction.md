@@ -141,7 +141,7 @@ In addition, Mimbl provides the following unique features:
 - Built-in trigger-watcher mechanism that re-renders components upon changes in the observable properties.
 - Partitioned components - independent re-rendering of portions of a component encapsulated in a method.
 - Custom HTML and SVG attributes defined by developers and supported via handler objects.
-- Using [Mimcss](https:/www.mimcss.com/guide/introduction.html) library for defining element styles and classes.
+- Using <a href="https://www.mimcss.com/guide/introduction.html" target="mimcss" data-external>Mimcss</a> library for defining element styles and classes.
 - Service publish/subscribe mechanism.
 
 The following units discuss these features in more details.

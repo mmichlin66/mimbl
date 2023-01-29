@@ -4,6 +4,7 @@
     "extraLibs": [{
             "libName": "mimcss",
             "url": "/lib/mimcss",
+            "rootPath": "types/mimcss/",
             "files": [
                 "index.d.ts",
                 "api/CoreTypes.d.ts",
@@ -25,13 +26,13 @@
                 "api/StyleTypes.d.ts",
                 "api/Stylesets.d.ts",
                 "api/StyleAPI.d.ts"
-            ],
-            "rootPath": "types/mimcss/"
+            ]
         },
 
         {
             "libName": "mimbl",
             "url": "/lib/mimbl",
+            "rootPath": "types/mimbl/",
             "files": [
                 "index.d.ts",
                 "api/UtilAPI.d.ts",
@@ -48,8 +49,7 @@
                 "api/SvgTypes.d.ts",
                 "api/MathmlTypes.d.ts",
                 "api/jsx.d.ts"
-            ],
-            "rootPath": "types/mimbl/"
+            ]
         }
     ],
 
@@ -59,15 +59,21 @@
         {
             "name": "Basic Template",
             "path": "examples/basic-template.tsx",
-            "description": "Empty style definition and component classes."
+            "description": "Rudimentary component class."
         },
 
         { "name": "Basic" },
 
         {
-            "name": "Hello World!",
-            "path": "examples/hello-world.tsx",
-            "description": "Simple but real example of defining component styles."
+            "name": "Array of Numbers",
+            "path": "examples/array-of-numbers.tsx",
+            "description": "Demonstrates triggers and computed properties."
+        },
+
+        {
+            "name": "Hello World in Style!",
+            "path": "examples/hello-world-in-style.tsx",
+            "description": "Simple example of defining styles using Mimcss."
         },
 
         { "name": "Custom Attributes" },
@@ -79,5 +85,5 @@
         }
     ],
 
-    "firstExample": "examples/hello-world.tsx"
+    "firstExample": "examples/basic-template.tsx"
 }

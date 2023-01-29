@@ -15,8 +15,8 @@ rootpath: "."
 - Component [events](guide/handling-events.html) - just like HTML element events.
 - [Custom attributes](guide/custom-attributes.html) for HTML/SVG elements defined by developers and supported via handler objects.
 - Service [publish/subscribe](guide/service-pub-sub.html) mechanism.
-- Module [lazy-loading](guide/lazy-loading.html).
-- Defining styles using <a href="https://www.mimcss.com/guide/introduction.html" target="mimcss">Mimcss</a> CSS-in-JS library.
+- Module [lazy-loading](guide/component-lazy-loading.html).
+- Defining styles using <a href="https://www.mimcss.com/guide/introduction.html" target="mimcss" data-external>Mimcss</a> CSS-in-JS library.
 
 ### Explore Mimbl
 
@@ -28,5 +28,6 @@ rootpath: "."
 **Mimbl** was created by Michael Michlin. You can contact me directly at <a href="mailto:mmulya@outlook.com" rel="nofollow">mmulya@outlook.com</a>.
 
 ### Performance
-Compare Mimbl performance to other libraries in <a href="https://krausest.github.io/js-framework-benchmark/" target="bench">JS Web Frameworks Benchmark</a> by [Stefan Krause](https://github.com/krausest).
+Compare Mimbl performance to other libraries in <a href="https://krausest.github.io/js-framework-benchmark/" target="bench" data-external>JS Web Frameworks Benchmark</a> by <a href="https://github.com/krausest" target="bench" data-external>Stefan Krause</a>.
+
 

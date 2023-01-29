@@ -62,8 +62,60 @@ type Node = { name: string; subnodes: Node[] }
 
 Specifying the `@trigger` decorator without parameters is equivalent to specifying level 1. This works well for primitive types (that have only level 0 anyway) as well as for complex types, for which triggering re-rendering when elements/properties one level deep change, is a reasonable default.
 
+## Computed properties
+We often find ourselves in a situation when we need to use a property during rendering, which itself is a result of some computations over other properties. As an example, let's implement a component that shows an average salaries of employees in a list:
+
+```tsx
+type Employee = { name: string; salary: number }
+
+// we skip methods that add/remove Employee objects to/from the list;
+class MyComp extends mim.Component
+{
+    // use trigger depth of 2 to be triggerred when changes to the Employee object properties occur
+    @mim.trigger(2) employees: Employee[] = [];
+
+    render(): any
+    {
+        let average = this.employees.reduce((prev, curr) => prev + curr.salary, 0) / this.employees.length;
+        return <div>
+            Average ssalary is {average}
+        </div>
+    }
+}
+```
+
+Since the `employees` property is a trigger, every type a new `Employee` object is is added to the list (or an existing object is removed from it), the component will is re-rendered and shows the correct value of the average salary. There are, however, some subtle inefficiencies in the above approach. First, we are doing the calculations during the rendering phase, which is better to be avoided. Second, what if the addition or removal of objects from the list doesn't actually change the average value? Our component will still be re-rendered.
+
+One approach would be to have a trigger property that keeps the average salary and have a method that calculates the average salary and assigns it to this property. This method should be called on every possible change that can lead to average salary change: addition of an employee, removal of an employee, direct change of the `salary` field in the employee object.
+
+A better approach is to use the Mimbl's `@computed` decorator, which will do all of the above work for us. The property decorated with `@computed` is a combination of a watcher and a trigger. As a watcher, it *watches* the changes of the triggers encountered during the computation; as a trigger, it *triggers* re-rendering when its computed value changes. The `@computed` decorator should be applied to a `get` property accessor. Here is how we can use the computed property to improve our component:
+
+```tsx
+type Employee = { name: string; salary: number }
+
+// we skip methods that add/remove Employee objects to/from the list;
+class MyComp extends mim.Component
+{
+    // use trigger depth of 2 to be triggerred when changes to the Employee object properties occur
+    @mim.trigger(2) employees: Employee[] = [];
+
+    @mim.computed get average(): number
+    {
+        return this.employees.reduce((prev, curr) => prev + curr.salary, 0) / this.employees.length;
+    }
+
+    render(): any
+    {
+        return <div>
+            Average ssalary is {this.average}
+        </div>
+    }
+}
+```
+
+
 ## Trigger Object
-A trigger object can be created independently of the `@trigger` decorator using the `createTrigger` function. A trigger created this way can be used as an attribute value or in place of a text node. Although in most cases it is not needed, under certain circumstances this can optimize rendering behavior. To understand how this occurs let's compare two implementations of a simple component displaying an element in different color when it is clicked.
+A trigger object can be created independently of the `@trigger` decorator using the `createTrigger` function. A trigger created this way can be used as an attribute value or in place of a text node. Although in most cases it is not needed, under certain circumstances this can optimize the reactive behavior. To understand how this occurs let's compare two implementations of a simple component displaying an element in different color when it is clicked.
 
 ```tsx
 class CompWithDecorator extends mim.Component

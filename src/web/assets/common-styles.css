@@ -82,6 +82,17 @@ p {
 	margin-right: 8px;
 } */
 
+a[data-external]::after {
+    /* content: url('./external-link-svgrepo-com.svg'); */
+    /* content: url("data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KCjwhLS0gVXBsb2FkZWQgdG86IFNWRyBSZXBvLCB3d3cuc3ZncmVwby5jb20sIEdlbmVyYXRvcjogU1ZHIFJlcG8gTWl4ZXIgVG9vbHMgLS0+Cjxzdmcgdmlld0JveD0iMCAwIDI0IDI0IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgogICAgPGc+CiAgICAgICAgPHBhdGggZmlsbD0ibm9uZSIgZD0iTTAgMGgyNHYyNEgweiIvPgogICAgICAgIDxwYXRoIGQ9Ik0xMCA2djJINXYxMWgxMXYtNWgydjZhMSAxIDAgMCAxLTEgMUg0YTEgMSAwIDAgMS0xLTFWN2ExIDEgMCAwIDEgMS0xaDZ6bTExLTN2OGgtMlY2LjQxM2wtNy43OTMgNy43OTQtMS40MTQtMS40MTRMMTcuNTg1IDVIMTNWM2g4eiIvPgogICAgPC9nPgo8L3N2Zz4="); */
+    content: url("data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgICA8Zz4KICAgICAgICA8cGF0aCBmaWxsPSJub25lIiBkPSJNMCAwaDI0djI0SDB6Ii8+CiAgICAgICAgPHBhdGggZmlsbD0iY3VycmVudENvbG9yIiBkPSJNMTAgNnYySDV2MTFoMTF2LTVoMnY2YTEgMSAwIDAgMS0xIDFINGExIDEgMCAwIDEtMS0xVjdhMSAxIDAgMCAxIDEtMWg2em0xMS0zdjhoLTJWNi40MTNsLTcuNzkzIDcuNzk0LTEuNDE0LTEuNDE0TDE3LjU4NSA1SDEzVjNoOHoiLz4KICAgIDwvZz4KPC9zdmc+");
+    color: inherit;
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-inline-start: 2px;
+}
+
 .mainHeader {
 	position: sticky;
 	width: 100%;

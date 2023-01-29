@@ -1,4 +1,6 @@
-﻿import * as mim from "mimbl";
+﻿// Simplest class-based component
+
+import * as mim from "mimbl";
 
 
 // Define component

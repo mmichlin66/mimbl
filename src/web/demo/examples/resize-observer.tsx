@@ -1,6 +1,5 @@
 ﻿// This example demonstrates how Mimbl custom attributes can be used to work with Resize
-// Observer in declarative manner. Read more about custom attributes at
-// https://www.mimjs.com/guide/custom-attributes.html
+// Observer in declarative manner.
 
 import * as mim from "mimbl";
 import * as css from "mimcss";
@@ -89,28 +88,38 @@ mim.registerCustomAttribute( "resizeObserver", ResizeObserverHandler);
 // Define callback passed to the resizeObserver property. This implementation will use
 // the sum of width and height element as a number of degrees in the HSL color space.
 // The resulting color is set as the element's background color.
-function colorResizer(entries: ResizeObserverEntry[]): void
+function colorResizerFunc(entries: ResizeObserverEntry[]): void
 {
-    let size = entries[0]?.contentBoxSize?.[0];
-    if (!size)
-        return;
+    for( let entry of entries)
+    {
+        let size = entry.contentBoxSize?.[0];
+        if (!size)
+            return;
 
-    let elm = entries[0]?.target as unknown as ElementCSSInlineStyle;
-    elm.style.$.backgroundColor = css.hsl(css.deg(size.blockSize + size.inlineSize), 50, 50);
+        let elm = entry.target as unknown as ElementCSSInlineStyle;
+        elm.style.$.backgroundColor = css.hsl(css.deg(size.blockSize + size.inlineSize), 50, 50);
+    }
 }
+
+// Create resizer object that will be used for two elements
+const colorResizer = new ResizeObserver(colorResizerFunc);
+
 
 
 
 // Define callback passed to the resizeObserver property. This implementation will use
-// the height of the element to set the element's font size.
-function fontResizer(entries: ResizeObserverEntry[]): void
+// the height and width of the element to set the element's font size.
+function fontResizerFunc(entries: ResizeObserverEntry[]): void
 {
-    let size = entries[0]?.contentBoxSize?.[0];
-    if (!size)
-        return;
+    for( let entry of entries)
+    {
+        let size = entry.contentBoxSize?.[0];
+        if (!size)
+            return;
 
-    let elm = entries[0]?.target as unknown as ElementCSSInlineStyle;
-    elm.style.fontSize = `${size.blockSize / 1.5}px`;
+        let elm = entry.target as unknown as ElementCSSInlineStyle;
+        elm.style.$.fontSize = css.px(Math.min(size.blockSize / 1.5, size.inlineSize / 30));
+    }
 }
 
 
@@ -122,20 +131,23 @@ export class MyComponent extends mim.Component
     render(): any
     {
         return <div style={{display: "flex", flexDirection: "column", gap: 8}}>
+
             <span>The box will change color when resized</span>
             <div resizeObserver={colorResizer}
-                style={{height: 200, width: 200, resize: "both", overflow: "auto", border: [1, "solid"]}} />
+                style={{height: 100, width: 200, resize: "both", overflow: "auto", border: [1, "solid"]}} />
             <div/>
             <br/>
+
             <span>The textarea box will have its font size changed when resized</span>
-            <textarea resizeObserver={fontResizer}
+            <textarea resizeObserver={fontResizerFunc}
                     style={{height: 20, width: 500, resize: "both", overflow: "hidden", whiteSpace: "nowrap"}}>
                 The font size should change when you resize this box
             </textarea>
             <br/>
+
             <span>The box will change color when the viewport width changes</span>
             <div resizeObserver={colorResizer}
-                style={{height: 200, width: "100%", border: [1, "solid"]}} />
+                style={{height: 150, width: "100%", border: [1, "solid"]}} />
             <div/>
         </div>
     }
