@@ -642,8 +642,7 @@ function lazyHandlerToVNs(this: LazyHandler, sym: symbol, ...args: any[]): any
     return new ManagedCompVN(Functor, {
         func: lazyHandlerFunc,
         thisArg: this,
-        arg: [sym, args],
-        watch: false
+        arg: [sym, args]
     });
 }
 
@@ -890,9 +889,9 @@ export class Awaiter extends Component<AwaiterProps, AwaiterEvents>
  * with the proper `this`. A function can accept a single argument, which can be passed in the
  * `arg` property to the *Functor* component.
  *
- * Normally, the *Functor* component wraps the function in a watcher, which allows it to react to
- * triggers. It is possible to disable this functionality either by applying the [[noWatcher]]
- * decorator to a class method or by passing `false` to the `watch` property.
+ * The function wrapped by the *Functor* component is called under a watcher; therefore, any
+ * triggers encountered during the function execution are remembered and when their values change,
+ * the function will be called again thus re-rendering the content.
  *
  * The primary use of the *Functor* component is to allow class-based components' methods to render
  * different parts of the component and to update these parts independently. If the class method
@@ -928,59 +927,22 @@ export class Functor extends Component<FunctorProps>
 	get displayName(): string { return this.props.func.name; }
 
     /**
-     * Prepares the component to be mounted.
-     * @ignore
-     */
-    willMount(): void
-    {
-        // establish watcher if not disabled using the `watch` flag or the @noWatcher decorator
-        this.init(this.props);
-    }
-
-    /**
-     * Prepares the component to be unmounted.
-     * @ignore
-     */
-    willUnmount(): void
-    {
-        // release the watcher; we don't need to set it to undefined because it will be done
-        // in the next mount (if it comes)
-        this.watcher?.dispose();
-    }
-
-    /**
      * Updates component with new properties.
      * @ignore
      */
     shouldUpdate(newProps: FunctorProps): boolean
     {
         // if all the properties remain the same, there is no need to re-render
-        let oldProps = this.props as FunctorProps;
-        if (oldProps.func === newProps.func && oldProps.thisArg === newProps.thisArg &&
-            oldProps.watch === newProps.watch && oldProps.arg === newProps.arg)
-        {
-            return false;
-        }
-
-        // release the watcher if existed
-        if (this.watcher)
-        {
-            this.watcher?.dispose();
-            this.watcher = undefined;
-        }
-
-        // create a new watcher if necessary
-        this.init(newProps);
-
-        // indicate that re-rendering is necessary
-        return true;
+        return this.props.func !== newProps.func ||
+            this.props.thisArg !== newProps.thisArg ||
+            this.props.arg !== newProps.arg;
     }
 
     /**
      * Invokes the wrapped function.
      * @ignore
      */
-    @noWatcher render(): any
+    render(): any
     {
         // the render method is called with the current component set to this Functor instance. We
         // want, however, to call the function while the current component is set to the creator of
@@ -988,38 +950,13 @@ export class Functor extends Component<FunctorProps>
         let prevComp = setCurrentClassComp(this.vn!.creator);
         try
         {
-            return this.watcher
-                ? this.watcher(this.props.arg)
-                : this.props.func.call(this.props.thisArg, this.props.arg);
+            return this.props.func.call(this.props.thisArg ?? this.vn!.creator, this.props.arg);
         }
         finally
         {
             setCurrentClassComp(prevComp);
         }
     }
-
-    /** Establishes watcher if necessary */
-    private init(props: FunctorProps): void
-    {
-        this.thisArg = props.thisArg ?? this.vn!.creator;
-        if (props.watch ?? !props.func[symRenderNoWatcher])
-            this.watcher = createWatcher(props.func, this.updateMe, this.thisArg, this);
-    }
-
-
-
-    /**
-     * The "this" argument for calling the function. If it is not provided, the current component
-     * is used.
-     */
-    thisArg: any;
-
-    /**
-     * Watcher function wrapping the original function. The watcher will notice any trigger objects
-     * being read during the original function execution and will request update thus triggerring
-     * re-rendering.
-     */
-	private watcher?: IWatcher;
 }
 
 

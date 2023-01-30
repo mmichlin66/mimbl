@@ -1107,19 +1107,6 @@ export interface FunctorProps
      * there is a need to pass several parameters, use either array or object.
      */
     arg?: any;
-
-    /**
-     * Optional flag indicating whether or not the function should be wrapped in a watcher so that
-     * it can be re-invoked when one of the observed triggers changes its value. The flag is
-     * Boolean but is used as a tri-value:
-     * - if the flag is undefined, the function will be wrapped or not wrapped in a watcher
-     *   depending on whether it has the {@link @noWatcher} decorator applied to it.
-     * - if the flag is true, the function will be wrapped in a watcher regardless of the
-     *   {@link @noWatcher} decorator.
-     * - if the flag is false, the function will NOT be wrapped in a watcher regardless of the
-     *   {@link @noWatcher} decorator.
-     */
-    watch?: boolean | undefined;
 }
 
 

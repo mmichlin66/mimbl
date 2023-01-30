@@ -34,7 +34,7 @@ declare module "mimbl"
 
 Defining the service this way allows type checking when publishing and subscribing to a service. The service name can only be the name of a property declared in the `mim.IServiceDefinitions` interface and the service value can be only of the type declared for this property.
 
-Publishing a service is performed by calling the `publishService` method of the `mim.Component` base class. To publish a service, a component specifies the service name and provides the service value. Publishing a service is usually performed in the `willMount` lifecycle method. The `publishService` method returns an object that implements the `IPublication` interface. This object can be used to change the value of the service and to unpublish it. Note that if the service should remain publish until the component is unmounted, there is no need to explicitly unpublish it as all published services will be automatically unpublished after the component is unmounted.
+Publishing a service is performed by calling the `publishService` method of the `mim.Component` base class. To publish a service, a component specifies the service name and provides the service value. Publishing a service is usually performed in the `willMount` lifecycle method. The `publishService` method returns an object that implements the `IPublication` interface. This object can be used to change the value of the service and to unpublish it. Note that if the service should remain published until the component is unmounted, there is no need to explicitly unpublish it as all published services will be automatically unpublished when the component is unmounted.
 
 Our component `ContainerWithUserProfile` can be implemented the following way:
 
@@ -48,7 +48,7 @@ class ContainerWithUserProfile extends mim.Component
 }
 ```
 
-Subscribing to a service is performed by calling the `subscribeService` method of the `mim.Component` base class. Subscribing to a service is usually performed in the `willMount` lifecycle method. The `subscribeService` method returns an object that implements the `ISubscription` interface. This object can be used to retrieve the current value of the service and to unsubscribe from it. Note that if the service should remain subscribed until the component is unmounted, there is no need to explicitly unsubscribe from it as all subscribed services will be automatically unsubscribed after the component is unmounted.
+Subscribing to a service is performed by calling the `subscribeService` method of the `mim.Component` base class. Subscribing to a service is usually performed in the `willMount` lifecycle method. The `subscribeService` method returns an object that implements the `ISubscription` interface. This object can be used to retrieve the current value of the service and to unsubscribe from it. Note that if the service should remain subscribed until the component is unmounted, there is no need to explicitly unsubscribe from it as all subscribed services will be automatically unsubscribed when the component is unmounted.
 
 Our component `UserProfileConsumer` can be implemented the following way:
 
