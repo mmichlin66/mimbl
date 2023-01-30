@@ -8,9 +8,9 @@ Mimbl provides all the standard functionality that developers expect from compon
 - Built-in trigger-watcher mechanism that re-renders components upon changes in the observable properties.
 - Partitioned components that allow independent re-rendering of portions of a component.
 - Component events - just like HTML element events.
-- Custom HTML and SVG attributes defined by developers and supported via handler objects.
+- Custom DOM attributes defined by developers and supported via handler objects.
 - Service publish/subscribe mechanism.
-- Defining styles using [Mimcss](https://www.mimcss.com/guide/introduction.html) CSS-in-JS library.
+- Defining styles using [Mimcss](https://mimcss.com) CSS-in-JS library.
 - Full support for MathML elements.
 
 ## Installation and Usage
