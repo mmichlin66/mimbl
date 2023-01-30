@@ -28,7 +28,7 @@ class ArrayOfNumbers extends mim.Component
             <div style={{display: "flex", gap: 8}}>
                 <span><button click={this.onAddItem}>Add Item</button></span>
                 <span><button click={this.onRemoveItem} disabled={this.arr.length === 0}>Remove Item</button></span>
-                <span><button click={this.onReplaceValues} disabled={this.arr.length === 0}>Replace Value</button></span>
+                <span><button click={this.onReplaceValues} disabled={this.arr.length === 0}>Replace Values</button></span>
                 <span><button click={this.onSort} disabled={this.arr.length <= 1}>Sort</button></span>
                 <span><button click={this.onClear} disabled={this.arr.length === 0}>Clear</button></span>
             </div>

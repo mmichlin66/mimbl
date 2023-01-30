@@ -414,17 +414,17 @@ export const stopMutations = (): void =>
  * @param depth The depth on the level (starting from the trigger) that called this function.
  * If this parameter is 0, no conversion occurs and the value is returned as is. When this function
  * is called from the trigger, this parameter can be undefined: in this case, we will assign the
- * depth depending on the type of the value. Arrays, objects, maps and sets get depths of 1,
- * meaning that operations that add or remove items will trigger events, but modifications to the
- * items will not. Primitive types will be returned as is.
+ * depth depending on the type of the value. Arrays, objects, maps and sets get depths of 10,
+ * meaning that operations that add or remove items will trigger events as well as modifications to
+ * the items up to the 9 levels. Primitive types are always returned as is.
  */
 function triggerrize<T = any>( v: T, trigger: Trigger, depth?: number): T
 {
     if (!v || depth === 0 || typeof v !== "object")
         return v;
 
-    let newDepth = depth ? depth - 1 : 0;
-    let handlerClass: new (trigger: Trigger, depth?: number) => ProxyHandler<any>;
+    let newDepth = depth ? depth - 1 : 9;
+    let handlerClass: new (trigger: Trigger, depth: number) => ProxyHandler<any>;
     if (v instanceof Map)
         handlerClass = MapHandler;
     else if (v instanceof Set)

@@ -702,6 +702,16 @@ export class Boundary extends Component
     /**
      * @ignore
      */
+	shouldUpdate(newProps: {children: any[]}): boolean
+    {
+        // we are updated only due to the parent's update; clear the error
+        this.err = null;
+        return true;
+    }
+
+    /**
+     * @ignore
+     */
     @noWatcher render()
     {
         return this.promises.size > 0 ? this.getWaitingContent() :
@@ -747,7 +757,7 @@ export class Boundary extends Component
 	{
 		if (this.promises.delete(promise) && !this.promises.size)
         {
-            this.err = undefined;
+            this.err = null;
             this.updateMe();
         }
 	}
