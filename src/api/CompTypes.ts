@@ -85,7 +85,7 @@ export interface IComponentClass<TProps extends {} = {}, TEvents extends {} = {}
  * it.
  *
  * Note that you normally don't need to implement this interface because your components will
- * usually derive from the {@link Component} class that implements it.
+ * usually derive from the {@link CompAPI!Component} class that implements it.
  *
  * @typeparam TProps Type defining properties that can be passed to this class-based component.
  *		Default type is an empty object (no properties).
@@ -413,8 +413,8 @@ export type CallbackWrappingOptions =
  * Type that can be passed as a callback to a component's property. It allows passing a callback
  * in one of the following forms:
  * - as a function object. Note that if the function is a method of another component (or just a
- *   class), then it should be wrapped (using the {@link wrap} method) so that the `this` parameter
- *   is properly set up when the callback is invoked.
+ *   class), then it should be wrapped (using the {@link CompAPI!Component.wrap} method) so that the
+ *   `this` parameter is properly set up when the callback is invoked.
  * - a two element tuple. The first element is the function to be called and the second element is
  *   the value to be used as the `this` parameter.
  * - an object with the properties `func` specifying the function to be called and `thisArg`
@@ -440,12 +440,12 @@ export interface IRef<T = any> extends IEventSlot<RefFunc<T>>
 
 /**
  * Type of ref property that can be passed to JSX elements and components. This can be either the
- * {@link IRef]] interface or [[RefFunc} function.
+ * {@link IRef} interface or {@link RefFunc} function.
  */
 export type RefType<T = any> = IRef<T> | RefFunc<T>;
 
 /**
- * Type of ref property value. This can be either the {@link IRef]] interface or [[RefFunc} function
+ * Type of ref property value. This can be either the {@link IRef} interface or {@link RefFunc} function
  * or the type itself.
  */
 export type RefPropType<T = any> = T | RefType<T>;
@@ -522,7 +522,7 @@ export type NoTriggerAttrNames = "xmlns";
 
 /**
  * Converts the given interface T to a type that maps an extended attribute type to each property
- * of T. The extended property contains the property type, the {@link ITrigger} for this type as well as
+ * of T. The extended property contains the property type, the {@link TriggerTypes!ITrigger} for this type as well as
  * `null` and `undefined`. This is primarily useful for defining attributes of HTML elements - both
  * built-in and custom.
  *
@@ -734,7 +734,7 @@ export interface ISubscription<K extends keyof IServiceDefinitions>
 
     /**
      * Detaches the given callback from the "change" event.
-     * @param callback Function that was attached to the "change" event by the {@link aattach} method.
+     * @param callback Function that was attached to the "change" event by the {@link attach} method.
      */
     detach( callback: (value?: IServiceDefinitions[K]) => void): void;
 
@@ -823,11 +823,11 @@ export interface IClassCompVN extends IVNode
 	readonly props: any;
 
     /**
-     * If the component specifies the {@link shadow} property, the `shadowRoot` property will be set
-     * to the shadow root element under which the component's content returned from the `render()`
-     * method will be placed. If the component doesn't specify the {@link shadow} property, the
-     * `shadowRoot` property will be undefined. Components can access the shadow root via their
-     * `vn.shadowRoot` property.
+     * If the component specifies the {@link CompAPI!withShadow} decorator, the `shadowRoot`
+     * property will be set to the shadow root element under which the component's content returned
+     * from the `render()` method will be placed. If the component doesn't specify the
+     * {@link CompAPI!withShadow} decorator, the `shadowRoot` property will be undefined.
+     * Components can access the shadow root via their `vn.shadowRoot` property.
      */
     readonly shadowRoot?: ShadowRoot;
 
@@ -1090,7 +1090,7 @@ export type RenderMethodType = (arg?: any) => any;
 export interface FunctorProps
 {
 	/**
-     * Function to be called to render content. Functions wrapped by the {@link Functor} component
+     * Function to be called to render content. Functions wrapped by the {@link CompAPI!Functor} component
      * can accept at most one argument.
      */
 	func: RenderMethodType;

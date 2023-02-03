@@ -782,7 +782,7 @@ export class Boundary extends Component
 /**
  * Component that accepts a single promise and when it resolves, displays its content. If the
  * promise is rejected, it throws the error out of its `render` method, which causes the error to
- * propagate up the hierarchy to the nearest [[Boundary]] component. While the promise is pending,
+ * propagate up the hierarchy to the nearest {@link Boundary} component. While the promise is pending,
  * it displays whatever content was provided to it as children. Derived components can augment how
  * the resolved content is displayed as well as how to react on promise rejection error.
  */

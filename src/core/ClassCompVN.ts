@@ -58,9 +58,9 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
     public declare ownDN?: ShadowRoot;
 
 	/**
-     * If the component specifies the [[shadow]] property, the `shadowRoot` property will be set
+     * If the component specifies the {@link shadow} property, the `shadowRoot` property will be set
      * to the shadow root element under which the component's content returned from the `render()`
-     * method will be placed. If the component doesn't specify the [[shadow]] property, the
+     * method will be placed. If the component does not specify the {@link shadow} property, the
      * `shadowRoot` property will be undefined. Components can access the shadow root via their
      * `vn.shadowRoot` property.
      */

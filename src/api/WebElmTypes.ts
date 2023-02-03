@@ -5,7 +5,7 @@
 /**
  * Defines function signature for converting an attribute string value to the corresponding
  * property's type. Converter functions are specified as part of attribute options, e.g. in the
- * [[attr]] decorator.
+ * {@link WebElmAPI!attr} decorator.
  *
  * @param stringValue Attribute's string value to convert to the corresponding type.
  * @param attrName Name of the attribute whose value is being converted from string
@@ -18,7 +18,7 @@ export type WebElmFromHtmlConverter = (stringValue: string | null | undefined,
 /**
  * Defines function signature for converting a value to the corresponding attributes's
  * string. Converter functions are specified as part of attribute options, e.g. in the
- * [[attr]] decorator.
+ * {@link WebElmAPI!attr} decorator.
  *
  * @param value Value to convert to string.
  * @param attrName Name of the attribute whose value is being converted to string
@@ -65,7 +65,7 @@ export type WebElmOptions = Partial<ShadowRootInit> &
 {
     /**
      * Flag indicating that the custom element class should not be immediately registered.
-     * If this is true, the class will be registered when the [[registerWebElm]] function
+     * If this is true, the class will be registered when the {@link WebElmAPI!registerWebElm} function
      * is called for it.
      */
     deferred?: boolean;

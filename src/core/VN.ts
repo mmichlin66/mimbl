@@ -363,7 +363,7 @@ function collectImmediateDNs(vn: IVN, arr: DN[]): void
  * references. The optional `onlyIf` parameter may specify a value so that only if the reference
  * currently has the same value it will be replaced. This might be needed to not clear a
  * reference if it already points to a different object.
- * @param ref [[Ref]] object to which the new value will be set
+ * @param ref {@link Ref} object to which the new value will be set
  * @param val Reference value to set to the Ref object
  * @param onlyIf An optional value to which to compare the current (old) value of the reference.
  * The new value will be set only if the old value equals the `onlyIf` value.
@@ -518,7 +518,7 @@ class Subscription implements ISubscription<any>
 
     /**
      * Detaches the given callback from the "change" event.
-     * @param callback Function that was attached to the "change" event by the [[attach]] method.
+     * @param callback Function that was attached to the "change" event by the {@link attach} method.
      */
     public detach( callback: (value?: any) => void): void
     {

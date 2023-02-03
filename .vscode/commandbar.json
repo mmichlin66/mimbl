@@ -8,7 +8,7 @@
             "text": "mimbl build",
             "color": "white",
             "commandType": "exec",
-            "command": "tsc -b && webpack --no-color",
+            "command": "npx tsc -b && webpack --no-color",
             "alignment": "left",
             "priority": 1
         },

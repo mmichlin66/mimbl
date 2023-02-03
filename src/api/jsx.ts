@@ -37,8 +37,8 @@ export namespace JSX
 
     /**
      * Defines the name of the property defining the type of the *props* object for managed
-     * components. The {@link Component} base class has this property with the type defined as a
-     * combination of component's property and event interfaces: {@link ComponentProps}.
+     * components. The {@link CompAPI!Component} base class has this property with the type defined as a
+     * combination of component's property and event interfaces: {@link CompTypes!ComponentProps}.
      */
 	export interface ElementAttributesProperty { props: {} }
 
@@ -91,8 +91,8 @@ export function jsx( tag: any, props: any, ...children: any[]): any
     // an array of a certain type, e.g. class A extends Component<{children: T[]}>. In this case
     // there are two ways to specify children in JSX that would be accepted by the TypeScript
     // compiler:
-    //	1) <A>{t1}{t2}</A>. In this case, children will be [t1, t2] (as expected by A).
-    //	2) <A>{[t1, t2]}</A>. In this case, children will be [[t1,t2]] (as NOT expected by A).
+    //	1) <A>{t1}{t2}</A>. In this case, children will be `[t1, t2]` (as expected by A).
+    //	2) <A>{[t1, t2]}</A>. In this case, children will be `[[t1,t2]]` (as NOT expected by A).
     //		This looks like a TypeScript bug.
     let realChildren = children.length === 1 && Array.isArray(children[0]) ? children[0] : children;
     return tag[symJsxToVNs](props, content2VNs(realChildren));

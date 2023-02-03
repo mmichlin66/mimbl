@@ -428,7 +428,7 @@ function stringifyObjectProp(val: ObjectPropValueType,
 
 
 /**
- * Parse the string created by [[stringifyObjectProp]] into object, where each key has a
+ * Parse the string created by {@link stringifyObjectProp} into object, where each key has a
  * string value.
  */
 function unstringifyObjectProp(s: string): ObjectPropValueType

@@ -5,7 +5,7 @@ import { ComputedTrigger, startMutations, stopMutations, Trigger, triggerDecorat
 
 /**
  * Creates a trigger object of the given depth with the given initial value. Triggers fire events
- * when their value changes. They also work in conjunction with watchers (see [[createWatcher]])
+ * when their value changes. They also work in conjunction with watchers (see {@link createWatcher})
  * and notify watchers when the trigger's value is read.
  *
  * The `depth` parameter determines how many levels of nested properties of arrays, maps, sets and
@@ -19,7 +19,7 @@ import { ComputedTrigger, startMutations, stopMutations, Trigger, triggerDecorat
  * @param v Optional initial value
  * @param depth Depth of the trigger, which determines how many levels of nested properties of
  * arrays, maps, sets and objects should trigger changes. Ignored for primitive types.
- * @returns [[ITrigger]] through which the value can be set and retrieved.
+ * @returns `ITrigger` interface through which the value can be set and retrieved.
  */
 export const createTrigger = <T = any>(v?: T, depth?: number): ITrigger<T> =>
     new Trigger( v, depth);
@@ -64,7 +64,7 @@ export const trigger = (targetOrDepth: any, name?: string): any =>
  * @param funcThis Optional value of "this" that will be used to call the original function.
  * @param responderThis Optional value of "this" that will be used to call the responder function.
  * If this value is undefined, the "this" value for the original function will be used.
- * @returns The callable [[IWatcher]] interface, which represent a function with the same sigature
+ * @returns The callable `IWatcher` interface, which represent a function with the same sigature
  * as the original function. In addition, the returned function has the `dispose` method, which
  * must be called when the watcher is not needed anymore.
  */

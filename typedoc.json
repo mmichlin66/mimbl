@@ -7,10 +7,15 @@
     "disableSources": true,
     "hideGenerator": true,
     "includeVersion": true,
-	"includes": "./src/typedoc",
 	"out": "./src/web/reference",
     "entryPointStrategy": "expand",
 	"entryPoints": [
 		"./src/api/"
-	]
+	],
+    "externalSymbolLinkMappings": {
+        "mimcss": {
+            "WritingMode_StyleType": "https://www.mimcss.com/reference/modules/StyleTypes.html#WritingMode_StyleType",
+            "*": "https://www.mimcss.com/typedoc.html"
+        }
+    }
 }

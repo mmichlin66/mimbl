@@ -8,8 +8,8 @@
 	"module": "./lib/mimbl.js",
 	"types": "./lib/index.d.ts",
 	"scripts": {
-		"build": "tsc -b && webpack",
-		"typedoc": "typedoc"
+		"build": "npx tsc -b && webpack",
+		"typedoc": "npx typedoc"
 	},
 	"author": {
 		"name": "Michael Michlin",
@@ -19,7 +19,7 @@
 	"keywords": [
 		"Mimbl",
 		"Component",
-        "Web Elements",
+		"Web Elements",
 		"Virtual DOM",
 		"Web UI"
 	],
@@ -28,6 +28,7 @@
 		"ifdef-loader": "^2.3.2",
 		"mimcss": "^0.12.1",
 		"source-map-loader": "^4.0.1",
+		"typedoc": "^0.23.24",
 		"typescript": "^4.9.4",
 		"webpack": "^5.75.0",
 		"webpack-cli": "^5.0.1"
@@ -36,21 +37,6 @@
 		"lib/mimbl.js",
 		"lib/mimbl.dev.js",
 		"lib/index.d.ts",
-		"lib/api/UtilAPI.d.ts",
-		"lib/api/EventSlotTypes.d.ts",
-		"lib/api/EventSlotAPI.d.ts",
-		"lib/api/TriggerTypes.d.ts",
-		"lib/api/TriggerAPI.d.ts",
-		"lib/api/CompTypes.d.ts",
-		"lib/api/CompAPI.d.ts",
-		"lib/api/WebElmTypes.d.ts",
-		"lib/api/WebElmAPI.d.ts",
-		"lib/api/ElementTypes.d.ts",
-		"lib/api/HtmlTypes.d.ts",
-		"lib/api/SvgTypes.d.ts",
-		"lib/api/MathmlTypes.d.ts",
-		"lib/api/jsx.d.ts"
-	],
-	"dependencies": {
-	}
+		"lib/api/**/*.d.ts"
+	]
 }

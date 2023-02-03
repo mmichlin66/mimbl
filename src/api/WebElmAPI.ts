@@ -71,7 +71,7 @@ const symWebElmDef = Symbol("webElmDef");
 /**
  * Creates and returns a new class from which custom Web elements should derive.
  * The class returned from this function inherits from the HTMLElement-derived class specified
- * as the parameter and implements the [[IComponent]] and [[IComponentEx]] interfaces.
+ * as the parameter and implements the {@link CompTypes!IComponent} and {@link CompTypes!IComponentEx} interfaces.
  *
  * **Usage:**
  *
