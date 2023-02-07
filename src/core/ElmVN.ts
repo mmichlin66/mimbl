@@ -323,17 +323,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     // element properties that can be updated without re-rendering its children.
     public performPartialUpdate(): void
     {
-        if (this.propsForPartialUpdate)
-        {
-            this.updatePropsOnly( this.propsForPartialUpdate)
-            this.propsForPartialUpdate = undefined;
-        }
-
-        if (this.attrsForPartialUpdate)
-        {
-            this.updateAttrsFromTrigger( this.attrsForPartialUpdate)
-            this.attrsForPartialUpdate = undefined;
-        }
+        this.updatePropsOnly(this.propsForPartialUpdate)
+        this.propsForPartialUpdate = undefined;
     }
 
 
@@ -413,23 +404,17 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
     // Updates attribute values of this element from the given object containing new values. This
     // method is invoked only when one or more attributes with triggers have their values changed.
-	private updateAttrsFromTrigger( newAttrValues: any): void
+	public updateAttrValue(name: string, newVal: any): void
 	{
-        // loop over all properties
-        for( let name in newAttrValues)
-		{
-            // get information about the attribute.
-            let rtd = this.attrs?.[name]
-            if (rtd)
-            {
-                let newVal = newAttrValues[name];
-
-                if (newVal != null)
-                    rtd.valS = updateElmProp( this.ownDN!, name, rtd.valS, newVal, rtd.info);
-                else
-                    removeElmProp( this.ownDN!, name, rtd.valS, rtd.info), rtd.valS = null;
-            }
-		}
+        // get information about the attribute.
+        let rtd = this.attrs?.[name]
+        if (rtd)
+        {
+            if (newVal != null)
+                rtd.valS = updateElmProp( this.ownDN!, name, rtd.valS, newVal, rtd.info);
+            else
+                removeElmProp( this.ownDN!, name, rtd.valS, rtd.info), rtd.valS = null;
+        }
 	}
 
 
@@ -517,21 +502,27 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         // remember the new value. We will reuse newVal and oldVal with values from triggers (if any)
         oldRTD.val = newVal;
 
-        // check whether the new value is a trigger and get the actual value from it for comparison.
-        if (isTrigger(newVal))
+        // if the old value was a trigger get the actual value from it for comparison. We also
+        // detach the old value from the onChange callback but still keep the callback itself as
+        // it might be needed if the new value is also a trigger.
+        let onChange = oldRTD.onChange;
+        if (onChange)
         {
-            newVal.attach(oldRTD.onChange ?? onAttrTriggerChanged.bind(this, name));
-            this.hasTriggers = true;
-            newVal = newVal.get();
+            oldVal = oldVal.get();
+            oldVal.detach(onChange);
         }
 
-        // if the old value was a trigger get the actual value from it for comparison
-        if (oldRTD.onChange)
+        // check whether the new value is a trigger and get the actual value from it for comparison.
+        // If it is a trigger either reuse the onChange callback or create and remember a new one.
+        // If it is not a trigger, "forget" the onChange callback.
+        if (isTrigger(newVal))
         {
-            oldVal.detach(oldRTD.onChange);
-            oldRTD.onChange = undefined;
-            oldVal = oldVal.get();
+            newVal = newVal.get();
+            newVal.attach(oldRTD.onChange ??= onAttrTriggerChanged.bind(this, name));
+            this.hasTriggers = true;
         }
+        else if (onChange)
+            oldRTD.onChange = undefined;
 
         // check again as we could have taken the values from the triggers
         if (oldVal === newVal && (newVal == null || typeof newVal !== "object") && !isNewCreator)
@@ -813,13 +804,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     // Properties that were specified in the setProps call. This allows updating the
     // element's properties without re-rendering its children.
     private propsForPartialUpdate: any;
-
-    // Attributes with trigger values that were changed. This allows updating the
-    // element's properties without re-rendering its children. This is different from the
-    // propsForPartialUpdate property because the latter allows changing trigger values to
-    // non-trigger values and vice versa, while the attrsForPartialUpdate property only
-    // indicates change in the triggers' values.
-    public attrsForPartialUpdate: Record<string,any> | undefined;
 }
 
 
@@ -849,14 +833,7 @@ function getPropTypeFromPropVal(propVal: any): PropType
  */
 function onAttrTriggerChanged( this: ElmVN, name: string, val: any): void
 {
-    if (!this.attrsForPartialUpdate)
-        this.attrsForPartialUpdate = { [name]: val };
-    else
-        this.attrsForPartialUpdate[name] = val;
-
-    // this.performPartialUpdate();
-    // this.attrsForPartialUpdate = null;
-    this.requestPartialUpdate();
+    this.updateAttrValue(name, val);
 }
 
 

@@ -52,14 +52,8 @@ export class TextVN extends VN implements ITextVN
         if (text === this.text)
             return;
 
-        let val = this.updateText(text);
-        if (schedulingType === TickSchedulingType.Sync)
-            this.ownDN!.nodeValue = val;
-        else
-        {
-            this.textForPartialUpdate = val;
-            super.requestPartialUpdate( schedulingType);
-        }
+        this.textForPartialUpdate = this.updateText(text);
+        super.requestPartialUpdate(schedulingType);
     }
 
 
@@ -118,6 +112,8 @@ export class TextVN extends VN implements ITextVN
 	// not implemented the update is considered possible - e.g. for text nodes.
 	isUpdatePossible?( newVN: VN): boolean;
 
+
+
 	// Updates this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node.
@@ -139,15 +135,16 @@ export class TextVN extends VN implements ITextVN
         // the onChange is non-null only if this.text is a trigger
         let onChange = this.onChange;
         if (onChange)
-            (this.text as ITrigger).detach( onChange);
+            (this.text as ITrigger).detach(onChange);
 
         this.text = text;
 
         if (typeof text === "object")
         {
             if (!onChange)
-                this.onChange = onTriggerChanged.bind(this);
-            text.attach( onChange!);
+                this.onChange = onChange = onTriggerChanged.bind(this);
+
+            text.attach(onChange!);
             return text.get();
         }
         else
@@ -199,8 +196,7 @@ TextVN.prototype.isUpdatePossible = undefined; // this means that update is alwa
  */
 function onTriggerChanged( this: TextVN, s: string): void
 {
-    this.textForPartialUpdate = s;
-    this.requestPartialUpdate();
+    this.ownDN!.nodeValue = s;
 }
 
 

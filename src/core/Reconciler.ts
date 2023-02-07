@@ -419,7 +419,7 @@ const callScheduledFunctions = (funcs: Map<ScheduledFuncType,ScheduledFuncType>,
 
 
 // Performs the specified operation on the sub-nodes of the given node.
-const performChildrenOperation = (vn: IVN, req?: ChildrenUpdateRequest): void =>
+export const performChildrenOperation = (vn: IVN, req?: ChildrenUpdateRequest): void =>
 {
     s_currentClassComp = vn.comp ?? vn.creator;
 

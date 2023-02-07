@@ -10,7 +10,7 @@ import { ChildrenUpdateRequest, IVN } from "./VNTypes";
     import {StatsCategory} from "../utils/Stats"
 /// #endif
 
-import { getCurrentClassComp, requestNodeUpdate, unmountSubNodes } from "./Reconciler";
+import { getCurrentClassComp, performChildrenOperation, requestNodeUpdate, unmountSubNodes } from "./Reconciler";
 
 
 
@@ -258,7 +258,9 @@ export abstract class VN implements IVN
     /** Schedules an update for this node. */
 	public requestUpdate( req?: ChildrenUpdateRequest, schedulingType?: TickSchedulingType): void
 	{
-		if (!this.updateRequested)
+        if (schedulingType === TickSchedulingType.Sync)
+            performChildrenOperation( this, req);
+		else if (!this.updateRequested)
 		{
 			requestNodeUpdate( this, req, schedulingType);
 			this.updateRequested = true;
@@ -270,7 +272,9 @@ export abstract class VN implements IVN
 	/** Schedules an update for this node. */
 	public requestPartialUpdate( schedulingType?: TickSchedulingType): void
 	{
-		if (!this.partialUpdateRequested)
+		if (schedulingType === TickSchedulingType.Sync)
+            (this as IVN).performPartialUpdate!();
+		else if (!this.partialUpdateRequested)
 		{
 			requestNodeUpdate( this, undefined, schedulingType);
 			this.partialUpdateRequested = true;
