@@ -508,8 +508,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         let onChange = oldRTD.onChange;
         if (onChange)
         {
-            oldVal = oldVal.get();
             oldVal.detach(onChange);
+            oldVal = oldVal.get();
         }
 
         // check whether the new value is a trigger and get the actual value from it for comparison.
@@ -517,9 +517,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         // If it is not a trigger, "forget" the onChange callback.
         if (isTrigger(newVal))
         {
-            newVal = newVal.get();
             newVal.attach(oldRTD.onChange ??= onAttrTriggerChanged.bind(this, name));
             this.hasTriggers = true;
+            newVal = newVal.get();
         }
         else if (onChange)
             oldRTD.onChange = undefined;
