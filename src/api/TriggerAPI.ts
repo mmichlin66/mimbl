@@ -1,5 +1,5 @@
 ﻿import { AnyAnyFunc, ITrigger, IWatcher, NoneTypeFunc, NoneVoidFunc } from "./TriggerTypes";
-import { ComputedTrigger, startMutations, stopMutations, Trigger, triggerDecoratorHelper, Watcher } from "../core/TriggerImpl";
+import { ComputedTrigger, startMutations, stopMutations, Trigger, triggerDecorator, Watcher } from "../core/TriggerImpl";
 
 
 
@@ -39,13 +39,13 @@ export const trigger = (targetOrDepth: any, name?: string): any =>
     {
         // If the first parameter is a number, then it is an explicitly specified depth using
         // decorator factory.
-        return triggerDecoratorHelper.bind( undefined, targetOrDepth);
+        return triggerDecorator.bind( undefined, targetOrDepth);
     }
     else
     {
         // undefined depth means that that the actual depth will be assigned dependig on the
         // value of the trigger: Shallow for maps, sets and arrays and Deep for objects.
-        return triggerDecoratorHelper( undefined, targetOrDepth, name!);
+        return triggerDecorator( undefined, targetOrDepth, name!);
     }
 }
 

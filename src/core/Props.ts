@@ -174,10 +174,18 @@ export function setElmProp(elm: Element, name: string, val: any, info?: AttrProp
         s = valToString( val);
         if (s != null)
         {
-            elm.setAttribute( name, s);
+            elm.setAttribute(name, s);
 
             /// #if USE_STATS
                 DetailedStats.log( StatsCategory.Attr, StatsAction.Added);
+            /// #endif
+        }
+        else
+        {
+            elm.removeAttribute(name);
+
+            /// #if USE_STATS
+                DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
             /// #endif
         }
     }
@@ -201,6 +209,14 @@ export function setElmProp(elm: Element, name: string, val: any, info?: AttrProp
 
                 /// #if USE_STATS
                     DetailedStats.log( StatsCategory.Attr, StatsAction.Added);
+                /// #endif
+            }
+            else
+            {
+                removeAttrFromElement(elm, name, info);
+
+                /// #if USE_STATS
+                    DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
                 /// #endif
             }
         }
@@ -411,7 +427,7 @@ type ObjectPropValueType = { [K: string]: any };
 type ObjectPropToAttrNameFunc = (propName: string) => string;
 
 /** Type for function that converts object property value to string */
-type ObjectPropValToStringFunc = (val: any) => string;
+type ObjectPropValToStringFunc = (val: any) => string | null;
 
 
 
@@ -446,7 +462,10 @@ function setObjectProp(elm: HTMLInputElement, val: ObjectPropValueType,
     nameFunc: ObjectPropToAttrNameFunc, valFunc: ObjectPropValToStringFunc): string | null
 {
     for( let key in val)
-        elm.setAttribute(nameFunc(key), valFunc(val[key]));
+    {
+        let v = valFunc(val[key]);
+        v != null && elm.setAttribute(nameFunc(key), v);
+    }
 
     return stringifyObjectProp(val, nameFunc, valFunc);
 }
@@ -485,7 +504,10 @@ function updateObjectProp(elm: HTMLInputElement, oldS: string | null, newVal: Ob
             let newPropString = valFunc(newVal[propName]);
             if (valFunc(oldVal[propName]) !== newPropString)
             {
-                elm.setAttribute(nameFunc(propName), newPropString);
+                if (newPropString != null)
+                    elm.setAttribute(nameFunc(propName), newPropString);
+                else
+                    elm.removeAttribute(nameFunc(propName));
 
                 /// #if USE_STATS
                 DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
@@ -501,7 +523,8 @@ function updateObjectProp(elm: HTMLInputElement, oldS: string | null, newVal: Ob
     {
         if (!(propName in oldVal))
         {
-            elm.setAttribute(nameFunc(propName), valFunc(newVal[propName]));
+            let v = valFunc(newVal[propName]);
+            v != null && elm.setAttribute(nameFunc(propName), v);
 
             /// #if USE_STATS
             DetailedStats.log( StatsCategory.Attr, StatsAction.Added);
@@ -680,8 +703,8 @@ const mediaToString = (val: MediaStatement): string | null =>
 const dataPropToAttrName = (propName: any): string => `data-${camelToDash(propName)}`
 
 /** Converts property of the data set to string */
-const dataPropToString = (val: any): string =>
-    Array.isArray(val) ? val.map( item => dataPropToString(item)).join(" ") : "" + val;
+const dataPropToString = (val: any): string | null =>
+    val == null ? null : Array.isArray(val) ? val.map( item => dataPropToString(item)).join(" ") : "" + val;
 
 /** Sets `data-* attributes */
 const setDataProp = (elm: HTMLInputElement, val: DatasetPropType) =>
@@ -697,11 +720,11 @@ const removeDataProp = (elm: HTMLInputElement, oldS: string | null) =>
 
 
 
-/** Converts property of the aria set to a `aria-*` name */
-const ariaPropToAttrName = (propName: any): string => `aria-${propName}`
+/** Converts property of the aria set to a `aria-*` name unless it is `"role"` */
+export const ariaPropToAttrName = (propName: any): string => propName === "role" ? propName : `aria-${propName}`
 
 /** Converts property of the aria set to string - same as for dataset */
-const ariaPropToString = (val: any): string => dataPropToString(val);
+export const ariaPropToString = (val: any): string | null => dataPropToString(val);
 
 /** Sets `aria-* attributes */
 const setAriaProp = (elm: HTMLInputElement, val: IAriaset) =>
@@ -713,7 +736,7 @@ const updateAriaProp = (elm: HTMLInputElement, oldS: string | null, newVal: IAri
 
 /** Removes `aria-* attributes */
 const removeAriaProp = (elm: HTMLInputElement, oldS: string | null) =>
-    removeObjectProp(elm, oldS, ariaPropToString);
+    removeObjectProp(elm, oldS, ariaPropToAttrName);
 
 
 

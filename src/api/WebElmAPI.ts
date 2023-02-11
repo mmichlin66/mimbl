@@ -3,15 +3,16 @@
 } from "./WebElmTypes";
 import { IVN } from "../core/VNTypes";
 import { IComponent, PropType } from "./CompTypes";
+import { ITrigger } from "./TriggerTypes";
 import { mimcss } from "../core/StyleScheduler";
-import { trigger } from "./TriggerAPI";
 import { mount, unmount } from "./CompAPI";
 import { ComponentMixin } from "../core/CompImpl";
 import { applyMixins } from "../utils/UtilFunc";
-import { registerElmProp, setAttrValue } from "../core/Props";
+import { ariaPropToAttrName, ariaPropToString, registerElmProp, setAttrValue } from "../core/Props";
 import { symToVNs } from "../core/Reconciler";
 import { IndependentCompVN } from "../core/IndependentCompVN";
 import { ClassCompVN } from "../core/ClassCompVN";
+import { Trigger } from "../core/TriggerImpl";
 
 
 
@@ -32,7 +33,7 @@ export type WebElmAttrDefinition =
      */
     propName?: string;
 
-    /** Optional converter function and some other options controlling the attribute's behavior */
+    /** Converter function and some other parameters controlling the attribute's behavior */
     options?: WebElmAttrOptions;
 }
 
@@ -47,8 +48,14 @@ type WebElmDefinition =
     /** Custom Web Element name - the name for which the WebElm class is registered. */
     name: string;
 
+    /**
+     * If defined, determines the tag name of a built-in HTML element that the custom element
+     * extends.
+     */
+    extends?: string;
+
     /** Shadow DOM and form association options */
-    options: WebElmOptions;
+    options?: WebElmOptions;
 
     /** Attribute/Property definitions by attribute names; that is, names used in HTML. */
     attrs: { [attrName: string]: WebElmAttrDefinition}
@@ -60,16 +67,32 @@ type WebElmDefinition =
 
 
 /**
- * Symbol on the Web Element class constructor under which we keep Web Element definition
- * parameters. These parameters include the custom Web Element name, shadow DOM options, form
- * association options and attribute options.
+ * Function that returns a class from which autonomous custom elements (which don't need to
+ * customize existing built-in elements) should inherit. The return class derives directly from
+ * HTMLElement.
+ *
+ * **Usage:**
+ *
+ * ```typescript
+ * @mim.webElm("my-element")
+ * class MyCustomElement extends mim.WebElm()
+ * {
+ *    render(): any { return ... }
+ * }
+ * ```
+ *
+ * @typeparam TAttrs Type that maps attribute names to attribute types.
+ * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
+ * `detail` property of a CustomEvent.
  */
-const symWebElmDef = Symbol("webElmDef");
+export const WebElm = <TAttrs extends {} = {}, TEvents extends {} = {}>() =>
+    WebElmInternal("", HTMLElement) as WebElmConstructor<HTMLElement,TAttrs,TEvents>
 
 
 
 /**
- * Creates and returns a new class from which custom Web elements should derive.
+ * Creates and returns a new class from which customized built-in Web elements should derive.
  * The class returned from this function inherits from the HTMLElement-derived class specified
  * as the parameter and implements the {@link CompTypes!IComponent} and {@link CompTypes!IComponentEx} interfaces.
  *
@@ -93,8 +116,24 @@ const symWebElmDef = Symbol("webElmDef");
  * @returns Class that inherits from the given HTMLElement-derived class that imlements all
  * the internal logic of custom Web elements.
  */
-export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends {} = {}, TEvents extends {} = {}>(
-    elmClass: new() => TElm): WebElmConstructor<TElm,TAttrs,TEvents>
+export const WebElmEx = <TTag extends keyof HTMLElementTagNameMap, TAttrs extends {} = {}, TEvents extends {} = {}>(
+        tag: TTag, elmClass: new() => HTMLElementTagNameMap[TTag]): WebElmConstructor<HTMLElementTagNameMap[TTag],TAttrs,TEvents> =>
+    WebElmInternal(tag, elmClass) as WebElmConstructor<HTMLElementTagNameMap[TTag],TAttrs,TEvents>;
+
+
+
+/**
+ * Symbol on the Web Element class constructor under which we keep Web Element definition
+ * parameters. These parameters include the custom Web Element name, shadow DOM options, form
+ * association options and attribute options.
+ */
+const symWebElmDef = Symbol("webElmDef");
+
+
+
+// Implementation
+function WebElmInternal<TAttrs extends {}, TEvents extends {}>(tagToExtend: string,
+    elmClass: new() => HTMLElement): WebElmConstructor<HTMLElement,TAttrs,TEvents>
 {
     // dynamically build the actual element class and implement the necessary interfaces
     abstract class ActualClass extends (elmClass as (new() => HTMLElement))
@@ -106,9 +145,9 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
             return Object.keys((this[symWebElmDef] as WebElmDefinition).attrs);
         }
 
-        static get formAssociated(): boolean
+        static get formAssociated(): boolean | undefined
         {
-            return false;
+            return (this[symWebElmDef] as WebElmDefinition).options?.formAssociated;
         }
 
         /** WebElm definition taken from the class constructor */
@@ -116,6 +155,20 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
 
         /** Shadow DOM root node - can be undefined if "noShadow" was specified in the options */
         #shadowRoot?: ShadowRoot;
+
+        /**
+         * "Internals" object helping implement form associated elements. This can be undefined if
+         * neither `formAssociated` nor `ariaRole` was specified in the options.
+         */
+        #internals?: ElementInternals;
+
+        /**
+         * Flag indicating that we don't need to call setAttribute() in a property's set() accessor
+         * when a property is set as a result of the attribute change. This same flag is used to
+         * indicate that attribute change notification is called as a result from setting the
+         * property.
+         */
+        isAttrSync: boolean = false;
 
         constructor()
         {
@@ -125,8 +178,24 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
             // @webElm and @attr decorators
             this.#definition = this.constructor[symWebElmDef];
             let options = this.#definition.options;
-            if (!options?.noShadow)
-                this.#shadowRoot = this.attachShadow({mode: options?.mode ?? "open"});
+            if (options)
+            {
+                if (!options.noShadow)
+                    this.#shadowRoot = this.attachShadow({mode: options.mode ?? "open"});
+
+                if (options.formAssociated || options.aria)
+                {
+                    this.#internals = this.attachInternals();
+
+                    // if specified, set default ARIA role and other ARIA attributes to the
+                    // `internals` object
+                    if (options.aria)
+                    {
+                        for (let [name, value] of Object.entries(options.aria))
+                            this.#internals[ariaPropToAttrName(name)] = ariaPropToString(value);
+                    }
+                }
+            }
         }
 
         connectedCallback(): void
@@ -141,9 +210,12 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
 
         attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void
         {
-            // get property name corresponding to the attribute. If no such attribute is defined
-            // for our class, do nothing (this shouldn't happen because the callback is only called
-            // for defined attributes).
+            // ignore this call if the attribute has been changed as a result of setting property vaue
+            if (this.isAttrSync)
+                return;
+
+                // if no such attribute is defined in our class, do nothing (this shouldn't happen because
+            // the callback is only called for defined attributes).
             let attrDef = this.#definition.attrs[name];
             if (!attrDef)
                 return;
@@ -164,7 +236,14 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
             // decorators are reactive, this will trigger re-rendering. Note that property may not
             // be specified if the attribute was only declared for notification or writing purpose.
             if (propName)
+            {
+                // since we are setting the property because the attribute has been changed,
+                // indicate that we don't need to call setAttribute from the property's set
+                // accessor.
+                this.isAttrSync = true;
                 this[propName] = actNewValue;
+                this.isAttrSync = false;
+            }
 
             // call the `onchanged` method if defined. Note that it is called bound to the instance
             // of our custom element.
@@ -229,33 +308,13 @@ export function WebElmEx<TElm extends HTMLElement = HTMLElement, TAttrs extends 
         return this.vn as ClassCompVN ?? new IndependentCompVN( this);
     }
 
-    return ActualClass as unknown as WebElmConstructor<TElm,TAttrs,TEvents>;
+    // if we are customizing a built-in element, set its tag name into the definition
+    if (tagToExtend)
+        getOrCreateWebElmDefinition(ActualClass).extends = tagToExtend;
+
+
+    return ActualClass as unknown as WebElmConstructor<HTMLElement,TAttrs,TEvents>;
 }
-
-
-
-/**
- * Function that returns a class from which regular custom Web elements (which don't need to
- * customize existing built-in elements) should inherit. The return class derives directly from
- * HTMLElement.
- *
- * **Usage:**
- *
- * ```typescript
- * @mim.webElm("my-elelemnt")
- * class MyCustomElement extends mim.WebElm()
- * {
- *    render(): any { return ... }
- * }
- * ```
- *
- * @typeparam TAttrs Type that maps attribute names to attribute types.
- * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
- * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
- * `detail` property of a CustomEvent.
- */
-export const WebElm = <TAttrs extends {} = {}, TEvents extends {} = {}>() =>
-    WebElmEx<HTMLElement,TAttrs,TEvents>(HTMLElement);
 
 
 
@@ -337,9 +396,29 @@ function attrDecorator(attrName: string | undefined, options: WebElmAttrOptions 
 
     addWebElmAttr(definition, {attrName: attrName ?? propName, propName, options})
 
-    // make it a trigger unless the "noTrigger" flag was set to true
-    if (propName && !options?.noTrigger)
-        trigger(target, propName);
+    // make it a trigger unless the "triggerDepth" flag was set to a negative value
+    let depth = options?.triggerDepth ?? 0;
+    if (propName && depth >= 0)
+    {
+        let sym = Symbol( propName + "_attr");
+
+        const getTriggerObj = (obj: any, depth: number | undefined): ITrigger =>
+            obj[sym] ??= new Trigger(undefined, depth) as ITrigger;
+
+        Object.defineProperty( target, propName, {
+            get() { return getTriggerObj(this, depth).get(); },
+            set(val)
+            {
+                getTriggerObj(this, depth).set(val);
+                if (!this.isAttrSync)
+                {
+                    this.isAttrSync = true;
+                    this.setAttr(attrName ?? propName, val);
+                    this.isAttrSync = false;
+                }
+            },
+        });
+    }
 }
 
 
@@ -389,8 +468,8 @@ export function registerWebElm(webElmClass: WebElmConstructor, name?: string,
     }
     // by now the definition has been adjusted, so we can register the custom element according
     // to the definition values.
-    const tag = definition.options?.extends;
-    customElements.define( definition.name!, webElmClass, tag ? {extends: tag} : undefined);
+    const tagToExtend = definition.extends;
+    customElements.define( definition.name, webElmClass, tagToExtend ? {extends: tagToExtend} : undefined);
 }
 
 
@@ -436,7 +515,7 @@ function mergeWebElmDefinition(webElmClass: WebElmConstructor, name?: string,
  * @param webElmClass Custom Web Element class
  * @returns Web Element definition object associated with the given class.
  */
-function getOrCreateWebElmDefinition(webElmClass: WebElmConstructor): WebElmDefinition
+function getOrCreateWebElmDefinition(webElmClass: any): WebElmDefinition
 {
     return webElmClass[symWebElmDef] ??= { name: "", attrs: {}, props: {} }
 }
@@ -484,7 +563,7 @@ export const attrToInt: WebElmFromHtmlConverter = (stringValue: string | null | 
  * Built-in attribute converter that converts string value to a Boolean value.
  */
 export const attrToBool: WebElmFromHtmlConverter = (stringValue: string | null | undefined): boolean =>
-    !!stringValue;
+    stringValue != null;
 
 
 

@@ -670,7 +670,7 @@ class SetHandler extends SlotContainerHandler
 /**
  * Helper function for defining `@trigger` decorators.
  */
-export const triggerDecoratorHelper = (depth: number | undefined, target: any, name: string): void =>
+export const triggerDecorator = (depth: number | undefined, target: any, name: string): void =>
 {
     let sym = Symbol( name + "_trigger");
 

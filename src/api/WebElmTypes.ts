@@ -1,4 +1,5 @@
 ﻿import { IComponent, IComponentEx } from "./CompTypes";
+import { IAriaset } from "./ElementTypes";
 
 
 
@@ -43,7 +44,7 @@ export type WebElmAttrOptions =
      * Flag indicating that no trigger should be created for the property reflecting the
      * attribute's value.
      */
-    noTrigger?: boolean;
+    triggerDepth?: number;
 
     /** Converter function that converts the string attribute value to a property native type */
     fromHtml?: WebElmFromHtmlConverter;
@@ -71,10 +72,14 @@ export type WebElmOptions = Partial<ShadowRootInit> &
     deferred?: boolean;
 
     /**
-     * If defined, determines the tag name of a built-in HTML element that the custom element
-     * extends.
+     * Flag indicating whether the element should be associated with a form.
      */
-    extends?: string;
+    formAssociated?: boolean;
+
+    /**
+     * Provides default values for ARIA (`aria-*`) attributes.
+     */
+    aria?: IAriaset;
 
     /**
      * Determines whether or not shadow DOM root node should be created under the element. If
@@ -162,7 +167,8 @@ export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}>
 
 
 /**
- * Represents a constructor for the HTMLElement-derived classes.
+ * Represents a constructor for the HTMLElement-derived classes. This constructor is returned from
+ * the {@link WebElmAPI!WebElm} and {@link WebElmAPI!WebElmEx} functions.
  *
  * @typeparam TElm Class deriving from HTMLElement, from which the resulting class will inherit.
  * @typeparam TAttrs Type that maps attribute names to attribute types.

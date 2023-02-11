@@ -10,3 +10,4 @@ unit,title,file
 8,Callbacks and this,callbacks-and-this.html
 9,Component Life Cycle,component-lifecycle.html
 10,Component Lazy-Loading,component-lazy-loading.html
+11,Custom Web Elements,custom-web-elements.html

@@ -59,10 +59,13 @@ export type AriaBoolean =  boolean | "true" |"false";
 
 
 /**
- * Defines a set of aria properties
+ * Defines a set of aria properties. All properties in this interface except `role` are serialized
+ * by appending `"aria-"` to the property name. The `role` attribute is added here for convenience
+ * to keep all ARIA-related attributes in one place.
  */
 export interface IAriaset
 {
+    role?: string;
     activedescendant?: IDPropType;
     atomic?: AriaBoolean;
     autocomplete?: "none" | "inline" | "list" | "both";
