@@ -1,5 +1,5 @@
 ﻿import {CssColor, MediaStatement} from "mimcss"
-import {ICustomWebElements, ExtendedElement} from "./CompTypes"
+import {ExtendedElement} from "./CompTypes"
 import {
     ReferrerPolicyPropType, FormtargetPropType, CrossoriginPropType, FormenctypePropType,
     FormmethodPropType, IElementAttrs, IElementEvents, FetchpriorityPropType, IDPropType
@@ -31,7 +31,7 @@ export interface IHtmlElementAttrs extends IElementAttrs
 	hidden?: boolean | "" | "hidden" | "until-found";
     inert?: boolean;
 	inputmode?: "none" | "text" | "decimal" | "numeric" | "tel" | "search" | "email" | "url";
-	is?: keyof ICustomWebElements;
+	is?: string;
 	itemid?: string;
 	itemprop?: string;
 	itemref?: string | string[];

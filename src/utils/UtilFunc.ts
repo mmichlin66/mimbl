@@ -169,25 +169,29 @@ export const s_isSvgSvg = (elm: Element): boolean =>
 /**
  * Copies all members from the prototypes of the given source constructor functions to the
  * prototype of the given source constructor function.
- * @param target Constructor function to which to copy source members.
- * @param sources Constructor functions from which to copy members to the target.
+ * @param target Class to which to copy source members.
+ * @param sources Mixin classes from which to copy members to the target.
  */
 export function applyMixins(target: any, ...sources: any[]): void
 {
     let targetPrototype = target.prototype;
-    sources.forEach(source =>
+    for (let source of sources)
     {
         let sourcePrototype = source.prototype;
-        Object.getOwnPropertyNames(sourcePrototype).forEach(name =>
-        {
-            if (name !== "constructor")
-            {
-                Object.defineProperty(targetPrototype, name,
-                    Object.getOwnPropertyDescriptor(sourcePrototype, name)!);
-            }
-        });
-    });
+        copyMixinProp(targetPrototype, sourcePrototype, Object.getOwnPropertyNames(sourcePrototype)
+            .filter(name => name !== "constructor"));
+        copyMixinProp(targetPrototype, sourcePrototype, Object.getOwnPropertySymbols(sourcePrototype));
+    }
 }
+
+/**
+ * Copies the definitions of the given properties from the source object to the target object. This
+ * can be used for copying instace methods and accessors from prototype to prototype; or for
+ * copying static methods and accessors from class to class.
+ */
+export const copyMixinProp = (target: object, source: object, props: PropertyKey[]) =>
+    props.forEach(prop =>
+        Object.defineProperty(target, prop, Object.getOwnPropertyDescriptor(source, prop)!));
 
 
 

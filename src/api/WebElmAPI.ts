@@ -7,7 +7,7 @@ import { ITrigger } from "./TriggerTypes";
 import { mimcss } from "../core/StyleScheduler";
 import { mount, unmount } from "./CompAPI";
 import { ComponentMixin } from "../core/CompImpl";
-import { applyMixins } from "../utils/UtilFunc";
+import { applyMixins, copyMixinProp } from "../utils/UtilFunc";
 import { ariaPropToAttrName, ariaPropToString, registerElmProp, setAttrValue } from "../core/Props";
 import { symToVNs } from "../core/Reconciler";
 import { IndependentCompVN } from "../core/IndependentCompVN";
@@ -67,6 +67,15 @@ type WebElmDefinition =
 
 
 /**
+ * Symbol on the Web Element class constructor under which we keep Web Element definition
+ * parameters. These parameters include the custom Web Element name, shadow DOM options, form
+ * association options and attribute options.
+ */
+const symWebElmDef = Symbol("webElmDef");
+
+
+
+/**
  * Function that returns a class from which autonomous custom elements (which don't need to
  * customize existing built-in elements) should inherit. The return class derives directly from
  * HTMLElement.
@@ -85,9 +94,10 @@ type WebElmDefinition =
  * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
+ * @returns Class that inherits from the HTMLElement class that imlements all the internal logic
+ * of custom Web elements.
  */
-export const WebElm = <TAttrs extends {} = {}, TEvents extends {} = {}>() =>
-    WebElmInternal("", HTMLElement) as WebElmConstructor<HTMLElement,TAttrs,TEvents>
+export function WebElm<TAttrs extends {} = {}, TEvents extends {} = {}>(): WebElmConstructor<HTMLElement,TAttrs,TEvents>;
 
 
 
@@ -100,7 +110,7 @@ export const WebElm = <TAttrs extends {} = {}, TEvents extends {} = {}>() =>
  *
  * ```typescript
  * @mim.webElm("custom-button")
- * class MyCustomButton extends mim.WebElmEx(HTMLButtonElement)
+ * class MyCustomButton extends mim.WebElm("button", HTMLButtonElement)
  * {
  *    render(): any { return ... }
  * }
@@ -112,208 +122,235 @@ export const WebElm = <TAttrs extends {} = {}, TEvents extends {} = {}>() =>
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
  *
- * @param elmClass HTMLElement-derived class from which the returned class will derive.
+ * @param tag Name of the HTML element that is customized by the Web element.
+ * @param elmClass HTMLElement-derived class from which the returned class will derive. This class
+ * must correspond to the HTML element specified by the `tag` parameter.
  * @returns Class that inherits from the given HTMLElement-derived class that imlements all
  * the internal logic of custom Web elements.
  */
-export const WebElmEx = <TTag extends keyof HTMLElementTagNameMap, TAttrs extends {} = {}, TEvents extends {} = {}>(
-        tag: TTag, elmClass: new() => HTMLElementTagNameMap[TTag]): WebElmConstructor<HTMLElementTagNameMap[TTag],TAttrs,TEvents> =>
-    WebElmInternal(tag, elmClass) as WebElmConstructor<HTMLElementTagNameMap[TTag],TAttrs,TEvents>;
-
-
-
-/**
- * Symbol on the Web Element class constructor under which we keep Web Element definition
- * parameters. These parameters include the custom Web Element name, shadow DOM options, form
- * association options and attribute options.
- */
-const symWebElmDef = Symbol("webElmDef");
+export function WebElm<TTag extends keyof HTMLElementTagNameMap, TAttrs extends {} = {}, TEvents extends {} = {}>(
+        tag: TTag, elmClass: new() => HTMLElementTagNameMap[TTag]): WebElmConstructor<HTMLElementTagNameMap[TTag],TAttrs,TEvents>;
 
 
 
 // Implementation
-function WebElmInternal<TAttrs extends {}, TEvents extends {}>(tagToExtend: string,
-    elmClass: new() => HTMLElement): WebElmConstructor<HTMLElement,TAttrs,TEvents>
+export function WebElm<TAttrs extends {}, TEvents extends {}>(tagToExtend?: string,
+    elmClass?: new() => HTMLElement): WebElmConstructor<HTMLElement,TAttrs,TEvents>
 {
-    // dynamically build the actual element class and implement the necessary interfaces
-    abstract class ActualClass extends (elmClass as (new() => HTMLElement))
+    // tagToExtend is undefined for autonomous Web Elements that derive directly from HTMLElement
+    if (!tagToExtend)
+        elmClass = HTMLElement;
+
+    // dynamically build the actual element class, to which component and Web Element mixins
+    // will be applied
+    abstract class ActualClass extends elmClass!
     {
-        static get observedAttributes(): string[]
-        {
-            // return the array of attribute names. Note that since the method is static "this" is
-            // the class (that is, the costructor function) itself.
-            return Object.keys((this[symWebElmDef] as WebElmDefinition).attrs);
-        }
-
-        static get formAssociated(): boolean | undefined
-        {
-            return (this[symWebElmDef] as WebElmDefinition).options?.formAssociated;
-        }
-
-        /** WebElm definition taken from the class constructor */
-        #definition: WebElmDefinition;
-
-        /** Shadow DOM root node - can be undefined if "noShadow" was specified in the options */
-        #shadowRoot?: ShadowRoot;
-
-        /**
-         * "Internals" object helping implement form associated elements. This can be undefined if
-         * neither `formAssociated` nor `ariaRole` was specified in the options.
-         */
-        #internals?: ElementInternals;
-
-        /**
-         * Flag indicating that we don't need to call setAttribute() in a property's set() accessor
-         * when a property is set as a result of the attribute change. This same flag is used to
-         * indicate that attribute change notification is called as a result from setting the
-         * property.
-         */
-        isAttrSync: boolean = false;
-
         constructor()
         {
             super();
-
-            // by the time the constructor is called, we have all the information setup via the
-            // @webElm and @attr decorators
-            this.#definition = this.constructor[symWebElmDef];
-            let options = this.#definition.options;
-            if (options)
-            {
-                if (!options.noShadow)
-                    this.#shadowRoot = this.attachShadow({mode: options.mode ?? "open"});
-
-                if (options.formAssociated || options.aria)
-                {
-                    this.#internals = this.attachInternals();
-
-                    // if specified, set default ARIA role and other ARIA attributes to the
-                    // `internals` object
-                    if (options.aria)
-                    {
-                        for (let [name, value] of Object.entries(options.aria))
-                            this.#internals[ariaPropToAttrName(name)] = ariaPropToString(value);
-                    }
-                }
-            }
+            this.init();
         }
 
-        connectedCallback(): void
-        {
-            mount(this, this.#shadowRoot ?? this);
-        }
-
-        disconnectedCallback(): void
-        {
-            unmount(this.#shadowRoot ?? this);
-        }
-
-        attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void
-        {
-            // ignore this call if the attribute has been changed as a result of setting property vaue
-            if (this.isAttrSync)
-                return;
-
-                // if no such attribute is defined in our class, do nothing (this shouldn't happen because
-            // the callback is only called for defined attributes).
-            let attrDef = this.#definition.attrs[name];
-            if (!attrDef)
-                return;
-
-            // get attributes parameters and check whether we actually need to do anything with
-            // the new attribute value
-            let {propName, options} = attrDef;
-            let onchanged = options?.onchanged;
-            if (!propName && !onchanged)
-                return;
-
-            // determine the actual new value that should be set to the property and convert it to
-            // the proper type if necessary
-            let fromHtml = options?.fromHtml;
-            let actNewValue = fromHtml ? fromHtml(newValue, attrDef.attrName) : newValue;
-
-            // set the new value to the property. Since by default properties with the @attr
-            // decorators are reactive, this will trigger re-rendering. Note that property may not
-            // be specified if the attribute was only declared for notification or writing purpose.
-            if (propName)
-            {
-                // since we are setting the property because the attribute has been changed,
-                // indicate that we don't need to call setAttribute from the property's set
-                // accessor.
-                this.isAttrSync = true;
-                this[propName] = actNewValue;
-                this.isAttrSync = false;
-            }
-
-            // call the `onchanged` method if defined. Note that it is called bound to the instance
-            // of our custom element.
-            onchanged?.call(this, actNewValue, attrDef.attrName, propName);
-        }
-
-        // /** The render() function should be overridden in the derived class */
-        // abstract render(): any;
-
-        // Necessary IWebElm members
-        processStyles(func: () => void, useAdoption: boolean = true)
-        {
-            // no matter what useAdoption says, if we don't have Mimcss library or if the element
-            // doesn't have a shadow DOM root, we call the function with the current context (which,
-            // normally, will create/remove style elements in the document's head).
-            if (!mimcss || !this.#shadowRoot)
-                func();
-            else
-            {
-                mimcss.pushRootContext(this.#shadowRoot, useAdoption);
-                try
-                {
-                    func();
-                }
-                finally
-                {
-                    mimcss.popRootContext(this.#shadowRoot, useAdoption)
-                }
-            }
-        }
-
-        setAttr<K extends string & keyof TAttrs>(attrName: K, value: TAttrs[K] | null | undefined): void
-        {
-            let toHtml = this.#definition.attrs[attrName]?.options?.toHtml;
-            let actualValue = toHtml ? toHtml(value, attrName) : value;
-            if (actualValue == null)
-                this.removeAttribute(attrName);
-            else
-                setAttrValue( this, attrName, actualValue);
-        }
-
-        getAttr<K extends string & keyof TAttrs>(attrName: K): string | null
-        {
-            return this.getAttribute(attrName);
-        }
-
-        hasAttr<K extends string & keyof TAttrs>(attrName: K): boolean
-        {
-            return this.hasAttribute(attrName);
-        }
+        // This is only needed to satisfy the call from the constructor. Actual implementation is
+        // provided by WebElmMixin
+        abstract init(): void;
     }
 
-    // apply the ComponentMixin, which makes the actual class to implement all IComponentEx methods
-    applyMixins(ActualClass, ComponentMixin);
-
-    // Add toVNs method to the actual class. This method is invoked to convert rendered content to
-    // virtual node or nodes.
-    ActualClass.prototype[symToVNs] = function(this: IComponent): IVN | IVN[] | null | undefined
-    {
-        // if the component (this can only be an Instance component) is already attached to VN,
-        // return this existing VN; otherwise create a new one.
-        return this.vn as ClassCompVN ?? new IndependentCompVN( this);
-    }
+    applyMixins(ActualClass, ComponentMixin, WebElmMixin);
+    copyMixinProp(ActualClass, WebElmMixin, ["observedAttributes", "formAssociated"]);
 
     // if we are customizing a built-in element, set its tag name into the definition
     if (tagToExtend)
         getOrCreateWebElmDefinition(ActualClass).extends = tagToExtend;
 
-
     return ActualClass as unknown as WebElmConstructor<HTMLElement,TAttrs,TEvents>;
+}
+
+
+
+/**
+ * Class whose methods are copied to every implementation of custom Web elements
+ */
+abstract class WebElmMixin extends HTMLElement
+{
+    static get observedAttributes(): string[]
+    {
+        // return the array of attribute names. Note that since the method is static "this" is
+        // the class (that is, the costructor function) itself.
+        return Object.keys((this[symWebElmDef] as WebElmDefinition).attrs);
+    }
+
+    static get formAssociated(): boolean | undefined
+    {
+        return (this[symWebElmDef] as WebElmDefinition).options?.formAssociated;
+    }
+
+    /** WebElm definition taken from the class constructor */
+    _def: WebElmDefinition;
+
+    /** Shadow DOM root node - can be undefined if "noShadow" was specified in the options */
+    _shadowRoot?: ShadowRoot;
+
+    /**
+     * "Internals" object helping implement form associated elements. This can be undefined if
+     * neither `formAssociated` nor `ariaRole` was specified in the options.
+     */
+    _internals?: ElementInternals;
+
+    /**
+     * Flag indicating that we don't need to call setAttribute() in a property's set() accessor
+     * when a property is set as a result of the attribute change. This same flag is used to
+     * indicate that attribute change notification is called as a result from setting the
+     * property.
+     */
+    _isAttrSync: boolean = false;
+
+
+
+    /** This method is invoked from the actual class constructor */
+    init()
+    {
+        // by the time the constructor is called, we have all the information setup via the
+        // @webElm and @attr decorators
+        let def: WebElmDefinition = this._def = this.constructor[symWebElmDef];
+        let options = def.options;
+        if (options && !def.extends)
+        {
+            if (!options.noShadow)
+                this._shadowRoot = this.attachShadow({mode: options.mode ?? "open"});
+
+            if (options.formAssociated || options.aria)
+            {
+                this._internals = this.attachInternals();
+
+                // if specified, set default ARIA role and other ARIA attributes to the
+                // `internals` object
+                if (options.aria)
+                {
+                    for (let [name, value] of Object.entries(options.aria))
+                        this._internals[ariaPropToAttrName(name)] = ariaPropToString(value);
+                }
+            }
+        }
+    }
+
+    /** Gets the shadow DOM root node. It is created if it doesn' exist yet */
+    get shadowRoot(): ShadowRoot
+    {
+        return this._shadowRoot ??= this.attachShadow({mode: this._def?.options?.mode ?? "open"})
+    }
+
+    /** Gets the "internals" object. It is created if it doesn' exist yet */
+    get internals(): ElementInternals
+    {
+        return this._internals ??= this.attachInternals();
+    }
+
+    connectedCallback(): void
+    {
+        mount(this, this._shadowRoot ?? this);
+    }
+
+    disconnectedCallback(): void
+    {
+        unmount(this._shadowRoot ?? this);
+    }
+
+    attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void
+    {
+        // ignore this call if the attribute has been changed as a result of setting property vaue
+        if (this._isAttrSync)
+            return;
+
+            // if no such attribute is defined in our class, do nothing (this shouldn't happen because
+        // the callback is only called for defined attributes).
+        let attrDef = this._def.attrs[name];
+        if (!attrDef)
+            return;
+
+        // get attributes parameters and check whether we actually need to do anything with
+        // the new attribute value
+        let {propName, options} = attrDef;
+        let onchanged = options?.onchanged;
+        if (!propName && !onchanged)
+            return;
+
+        // determine the actual new value that should be set to the property and convert it to
+        // the proper type if necessary
+        let fromHtml = options?.fromHtml;
+        let actNewValue = fromHtml ? fromHtml(newValue, attrDef.attrName) : newValue;
+
+        // set the new value to the property. Since by default properties with the @attr
+        // decorators are reactive, this will trigger re-rendering. Note that property may not
+        // be specified if the attribute was only declared for notification or writing purpose.
+        if (propName)
+        {
+            // since we are setting the property because the attribute has been changed,
+            // indicate that we don't need to call setAttribute from the property's set
+            // accessor.
+            this._isAttrSync = true;
+            this[propName] = actNewValue;
+            this._isAttrSync = false;
+        }
+
+        // call the `onchanged` method if defined. Note that it is called bound to the instance
+        // of our custom element.
+        onchanged?.call(this, actNewValue, attrDef.attrName, propName);
+    }
+
+    /** The render() function should be overridden in the derived class */
+    render(): any {}
+
+    // Necessary IWebElm members
+    processStyles(func: () => void, useAdoption: boolean = true)
+    {
+        // no matter what useAdoption says, if we don't have Mimcss library or if the element
+        // doesn't have a shadow DOM root, we call the function with the current context (which,
+        // normally, will create/remove style elements in the document's head).
+        if (!mimcss || !this._shadowRoot)
+            func();
+        else
+        {
+            mimcss.pushRootContext(this._shadowRoot, useAdoption);
+            try
+            {
+                func();
+            }
+            finally
+            {
+                mimcss.popRootContext(this._shadowRoot, useAdoption)
+            }
+        }
+    }
+
+    setAttr(attrName: string, value: any): void
+    {
+        let toHtml = this._def.attrs[attrName]?.options?.toHtml;
+        let stringValue = toHtml ? toHtml(value, attrName) : value;
+        if (stringValue == null)
+            this.removeAttribute(attrName);
+        else
+            this.setAttribute(attrName, stringValue);
+    }
+
+    getAttr(attrName: string): string | null
+    {
+        return this.getAttribute(attrName);
+    }
+
+    hasAttr(attrName: string): boolean
+    {
+        return this.hasAttribute(attrName);
+    }
+
+    // Add toVNs method to the actual class. This method is invoked to convert rendered content to
+    // virtual node or nodes.
+    [symToVNs](this: IComponent): IVN | IVN[] | null | undefined
+    {
+        // if the component (this can only be an Instance component) is already attached to VN,
+        // return this existing VN; otherwise create a new one.
+        return this.vn as ClassCompVN ?? new IndependentCompVN( this);
+    }
 }
 
 
@@ -410,11 +447,17 @@ function attrDecorator(attrName: string | undefined, options: WebElmAttrOptions 
             set(val)
             {
                 getTriggerObj(this, depth).set(val);
-                if (!this.isAttrSync)
+                if (!this._isAttrSync)
                 {
-                    this.isAttrSync = true;
-                    this.setAttr(attrName ?? propName, val);
-                    this.isAttrSync = false;
+                    this._isAttrSync = true;
+                    try
+                    {
+                        this.setAttr(attrName ?? propName, val);
+                    }
+                    finally
+                    {
+                        this._isAttrSync = false;
+                    }
                 }
             },
         });
