@@ -516,7 +516,7 @@ export type EventPropType<T extends Event = Event> =
  * Internal type containing names of attributes that are not "triggerized" when applying
  * the {@link ExtendedAttrs} type to the element attributes interface.
  */
-export type NoTriggerAttrNames = "xmlns";
+export type NoTriggerAttrNames = "xmlns" | "is";
 
 
 

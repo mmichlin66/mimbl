@@ -258,11 +258,7 @@ abstract class WebElmMixin extends HTMLElement
 
     attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void
     {
-        // ignore this call if the attribute has been changed as a result of setting property vaue
-        if (this._isAttrSync)
-            return;
-
-            // if no such attribute is defined in our class, do nothing (this shouldn't happen because
+        // if no such attribute is defined in our class, do nothing (this shouldn't happen because
         // the callback is only called for defined attributes).
         let attrDef = this._def.attrs[name];
         if (!attrDef)
@@ -283,7 +279,8 @@ abstract class WebElmMixin extends HTMLElement
         // set the new value to the property. Since by default properties with the @attr
         // decorators are reactive, this will trigger re-rendering. Note that property may not
         // be specified if the attribute was only declared for notification or writing purpose.
-        if (propName)
+        // Ignore this call if the attribute has been changed as a result of setting property vaue
+        if (propName && !this._isAttrSync)
         {
             // since we are setting the property because the attribute has been changed,
             // indicate that we don't need to call setAttribute from the property's set

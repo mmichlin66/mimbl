@@ -155,41 +155,30 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount( parent: VN, index: number, anchorDN: DN, beforeDN: DN): void
+	public mount(parent: VN, index: number, anchorDN: DN, beforeDN: DN): void
 	{
-        super.mount( parent, index, anchorDN);
+        super.mount(parent, index, anchorDN);
 
         // create the element; if the element is in the list, use the provided namespace;
-        let elm: T;
+        // if namespace is provided use it; otherwise, use the namespace of the anchor element.
+        let props = this.props as Record<string,any>;
         let info = elmInfos[this.elmName];
-        if (typeof info === "number")
-        {
-            elm = info === ElementNamespace.HTML
-                ? document.createElement( this.elmName) as any as T
-                : document.createElementNS( ElementNamespaceNames[info], this.elmName) as T;
-        }
-        else if (!info)
-        {
-            // if namespace is provided use it; otherwise, use the namespace of the anchor element.
-            let ns = this.props?.xmlns;
-            if (ns)
-                elm = document.createElementNS( ns, this.elmName) as any as T;
-            else
-                elm = document.createElementNS( (this.anchorDN as Element).namespaceURI, this.elmName) as T;
-        }
-        else
-            elm = document.createElementNS( ElementNamespaceNames[info.ns], info.name) as any as T;
+        let ns = typeof info === "number" ? ElementNamespaceNames[info] :
+            info ? ElementNamespaceNames[info.ns] :
+            props?.xmlns ?? (this.anchorDN as Element).namespaceURI;
+        let elm = document.createElementNS(ns ?? HtmlNamespace, this.elmName,
+            props?.is != null ? {is: props.is} : undefined) as T;
 
         /// #if DEBUG
-            elm.setAttribute("mim-debugID", "" + this.debugID);
+            elm.setAttribute("mim-debug-id", "" + this.debugID);
         /// #endif
 
         this.ownDN = elm;
 
         // translate properties into attributes, events and custom attributes
-        if (this.props)
+        if (props)
         {
-            this.parseProps( this.props);
+            this.parseProps(props);
 
             if (this.attrs)
                 this.mountAttrs();
@@ -200,18 +189,18 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 this.mountCustomAttrs();
 
             if (this.ref)
-                setRef( this.ref, elm);
+                setRef(this.ref, elm);
 
             if (this.vnref)
-                setRef( this.vnref, this);
+                setRef(this.vnref, this);
         }
 
         // add sub-nodes
         if (this.subNodes)
-            mountSubNodes( this, this.subNodes, elm, null);
+            mountSubNodes(this, this.subNodes, elm, null);
 
         // add element to DOM
-        anchorDN!.insertBefore( elm, beforeDN);
+        anchorDN!.insertBefore(elm, beforeDN);
 
         /// #if USE_STATS
 			DetailedStats.log( StatsCategory.Elm, StatsAction.Added);
@@ -918,6 +907,7 @@ const elmInfos: {[elmName:string]: ElmInfo} =
     div: ElementNamespace.HTML,
     dt: ElementNamespace.HTML,
     i: ElementNamespace.HTML,
+    input: ElementNamespace.HTML,
     img: ElementNamespace.HTML,
     label: ElementNamespace.HTML,
     li: ElementNamespace.HTML,
