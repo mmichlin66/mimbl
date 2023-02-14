@@ -217,8 +217,8 @@ export interface IHtmlButtonElementAttrs extends IHtmlFormFieldElementAttrs
 // <canvas>
 export interface IHtmlCanvasElementAttrs extends IHtmlElementAttrs
 {
-	height?: number;
-	width?: number;
+	height?: number | `${number}`;
+	width?: number | `${number}`;
 }
 
 
@@ -247,7 +247,7 @@ export interface IHtmlCodeElementAttrs extends IHtmlElementAttrs
 // <col>
 export interface IHtmlColElementAttrs extends IHtmlElementAttrs
 {
-	span?: number;
+	span?: number | `${number}`;
 }
 
 
@@ -262,7 +262,7 @@ export interface IHtmlColgroupElementAttrs extends IHtmlElementAttrs
 // <data>
 export interface IHtmlDataElementAttrs extends IHtmlElementAttrs
 {
-	value?: string | number;
+	value?: any;
 }
 
 
@@ -345,10 +345,10 @@ export interface IHtmlEmElementAttrs extends IHtmlElementAttrs
 // <embed>
 export interface IHtmlEmbedElementAttrs extends IHtmlElementAttrs
 {
-	height?: number;
+	height?: number | `${number}`;
 	src?: string;
 	type?: string;
-	width?: number;
+	width?: number | `${number}`;
 }
 
 
@@ -473,8 +473,8 @@ export interface IHtmlHrElementAttrs extends IHtmlElementAttrs
 	align?: string;
 	color?: CssColor;
 	noshade?: boolean;
-	size?: number;
-	width?: number;
+	size?: number | `${number}`;
+	width?: number | `${number}`;
 }
 
 
@@ -500,14 +500,14 @@ export interface IHtmlIframeElementAttrs extends IHtmlElementAttrs
 	allowfullscreen?: boolean;
 	allowpaymentrequest?: boolean;
 	csp?: string;
-	height?: number;
+	height?: number | `${number}`;
 	loading?: "eager" | "lazy";
 	name?: string;
 	referrerpolicy?: ReferrerPolicyPropType;
 	sandbox?: SandboxPropType | SandboxPropType[];
 	src?: string | "about:blank";
 	srcdoc?: string;
-	width?: number;
+	width?: number | `${number}`;
 }
 
 
@@ -519,7 +519,7 @@ export interface IHtmlImgElementAttrs extends IHtmlElementAttrs
 	crossorigin?: CrossoriginPropType;
 	decoding?: "auto" | "sync" | "async";
     fetchpriority?: FetchpriorityPropType;
-	height?: number;
+	height?: number | `${number}`;
 	intrinsicsize?: boolean;
 	ismap?: boolean;
 	loading?: "eager" | "lazy";
@@ -527,7 +527,7 @@ export interface IHtmlImgElementAttrs extends IHtmlElementAttrs
 	sizes?: string | string[];
 	src?: string;
 	srcset?: string | string[];
-	width?: number;
+	width?: number | `${number}`;
 	usemap?: string;
 }
 
@@ -548,16 +548,16 @@ export interface IHtmlInputElementAttrs extends IHtmlFormFieldElementAttrs
 	autocomplete?: string;
 	max?: string | number | Date;
 	list?: IDPropType;
-	maxlength?: number;
-	min?: string | number | Date;
-	minlength?: number;
+	maxlength?: number | `${number}`;
+	min?: string | number | `${number}` | Date;
+	minlength?: number | `${number}`;
 	multiple?: boolean;
 	pattern?: string | RegExp;
 	placeholder?: string;
 	readonly?: boolean;
 	required?: boolean;
-	step?: number | "any";
-	size?: number;
+	step?: number | `${number}` | "any";
+	size?: number | `${number}`;
 	type?: "button" | "checkbox" | "color" | "date" | "datetime" | "datetime-local" |
         "email" | "file" | "hidden" | "image" | "month" | "number" | "password" | "radio" |
         "range" | "reset" | "search" | "submit" | "tel" | "text" | "time" | "url" | "week";
@@ -584,9 +584,9 @@ export interface IHtmlInputElementAttrs extends IHtmlFormFieldElementAttrs
 
 	// image
 	alt?: string;
-	height?: number;
+	height?: number | `${number}`;
 	src?: string;
-	width?: number;
+	width?: number | `${number}`;
 }
 
 
@@ -626,7 +626,7 @@ export interface IHtmlLegendElementAttrs extends IHtmlElementAttrs
 // <li>
 export interface IHtmlLiElementAttrs extends IHtmlElementAttrs
 {
-	value?: number;
+	value?: number | `${number}`;
 	type?: "a" | "A" | "i" | "vsides" | "I" | "1";
 }
 
@@ -700,12 +700,12 @@ export interface IHtmlMetaElementAttrs extends IHtmlElementAttrs
 // <meter>
 export interface IHtmlMeterElementAttrs extends IHtmlElementAttrs
 {
-	high?: number;
-	low?: number;
-	min?: number;
-	max?: number;
-	optimum?: number;
-	value?: number;
+	high?: number | `${number}`;
+	low?: number | `${number}`;
+	min?: number | `${number}`;
+	max?: number | `${number}`;
+	optimum?: number | `${number}`;
+	value?: number | `${number}`;
 }
 
 
@@ -729,11 +729,11 @@ export interface IHtmlObjectElementAttrs extends IHtmlElementAttrs
 {
 	data?: string;
 	form?: IDPropType;
-    height?: number;
+    height?: number | `${number}`;
 	name?: string;
 	type?: string;
     usemap?: string;
-    width?: number;
+    width?: number | `${number}`;
 }
 
 
@@ -742,7 +742,7 @@ export interface IHtmlObjectElementAttrs extends IHtmlElementAttrs
 export interface IHtmlOlElementAttrs extends IHtmlElementAttrs
 {
 	reversed?: boolean;
-	start?: number;
+	start?: number | `${number}`;
 	type?: "a" | "A" | "i" | "I" | "1";
 }
 
@@ -810,8 +810,8 @@ export interface IHtmlPreElementAttrs extends IHtmlElementAttrs
 // <progress>
 export interface IHtmlProgressElementAttrs extends IHtmlElementAttrs
 {
-	max?: number;
-	value?: number;
+	max?: number | `${number}`;
+	value?: number | `${number}`;
 }
 
 
@@ -890,7 +890,7 @@ export interface IHtmlSelectElementAttrs extends IHtmlFormFieldElementAttrs
 	autocomplete?: string;
 	multiple?: boolean;
 	required?: boolean;
-	size?: number;
+	size?: number | `${number}`;
 }
 
 
@@ -913,13 +913,13 @@ export interface IHtmlSmallElementAttrs extends IHtmlElementAttrs
 // <source>
 export interface IHtmlSourceElementAttrs extends IHtmlElementAttrs
 {
-    height?: number;
+    height?: number | `${number}`;
 	media?: MediaStatement;
 	sizes?: string;
 	src?: string;
 	srcset?: string | string[];
 	type?: string;
-    width?: number;
+    width?: number | `${number}`;
 }
 
 
@@ -987,9 +987,9 @@ export interface IHtmlTbodyElementAttrs extends IHtmlElementAttrs
 // <td>
 export interface IHtmlTdElementAttrs extends IHtmlElementAttrs
 {
-	colspan?: number;
+	colspan?: number | `${number}`;
 	headers?: IDPropType | IDPropType[];
-	rowspan?: number;
+	rowspan?: number | `${number}`;
 }
 
 
@@ -1007,13 +1007,13 @@ export interface IHtmlTextareaElementAttrs extends IHtmlFormFieldElementAttrs
 {
 	autocomplete?: string;
     autocorrect?: "on" | "off";
-	cols?: number;
-	maxlength?: number;
-	minlength?: number;
+	cols?: number | `${number}`;
+	maxlength?: number | `${number}`;
+	minlength?: number | `${number}`;
 	placeholder?: string;
 	readonly?: boolean;
 	required?: boolean;
-	rows?: number;
+	rows?: number | `${number}`;
 	wrap?: "hard" | "soft" | "off";
 }
 
@@ -1030,9 +1030,9 @@ export interface IHtmlTfootElementAttrs extends IHtmlElementAttrs
 export interface IHtmlThElementAttrs extends IHtmlElementAttrs
 {
 	abbr?: string;
-	colspan?: number;
+	colspan?: number | `${number}`;
 	headers?: IDPropType | IDPropType[];
-	rowspan?: number;
+	rowspan?: number | `${number}`;
 	scope?: "row" | "col" | "rowgroup" | "colgroup";
 	wrap?: "hard" | "soft" | "off";
 }
@@ -1108,14 +1108,14 @@ export interface IHtmlVideoElementAttrs extends IHtmlElementAttrs
 	buffered?: boolean;
 	controls?: boolean;
 	crossorigin?: CrossoriginPropType;
-	height?: number;
+	height?: number | `${number}`;
 	loop?: boolean;
 	muted?: boolean;
 	playsinline?: boolean;
     poster?: string;
 	preload?: "none" | "metadata" | "auto" | "";
 	src?: string;
-	width?: number;
+	width?: number | `${number}`;
 }
 
 

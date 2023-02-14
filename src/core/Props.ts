@@ -90,12 +90,6 @@ export interface AttrPropInfo extends PropInfoBase
      * e.g. from camelCase to dash-case
      */
 	name?: string | ((name: string) => string);
-
-    /**
-     * Flag indicating that the attribute's value can be set to the element via property assignment
-     * instead of the setAttribute() method.
-     */
-    isProp?: boolean;
 }
 
 
@@ -201,11 +195,10 @@ export function setElmProp(elm: Element, name: string, val: any, info?: AttrProp
             s = set( elm, val, name);
         else
         {
-            let v2s = info.v2s;
-            s = v2s ? v2s(val, name, elm) : valToString( val);
+            s = info.v2s ? info.v2s(val, name, elm) : valToString( val);
             if (s != null)
             {
-                setAttrValueToElement(elm, name, s, info);
+                elm.setAttribute(name, s);
 
                 /// #if USE_STATS
                     DetailedStats.log( StatsCategory.Attr, StatsAction.Added);
@@ -213,7 +206,7 @@ export function setElmProp(elm: Element, name: string, val: any, info?: AttrProp
             }
             else
             {
-                removeAttrFromElement(elm, name, info);
+                elm.removeAttribute(name);
 
                 /// #if USE_STATS
                     DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
@@ -296,10 +289,7 @@ export function removeElmProp(elm: Element, name: string, oldS: string | null, i
         if (nameOrFunc)
             name = typeof nameOrFunc === "string" ? nameOrFunc : nameOrFunc(name);
 
-        if (remove)
-            remove( elm, oldS, name);
-        else
-            removeAttrFromElement(elm, name, info);
+        remove ? remove( elm, oldS, name) : elm.removeAttribute(name);
     }
 
     /// #if USE_STATS
@@ -319,61 +309,28 @@ export function removeElmProp(elm: Element, name: string, oldS: string | null, i
 function convertCompareAndUpdateOrRemoveAttr(elm: Element, name: string, oldS: string | null,
     newVal: any, info?: AttrPropInfo): string | null
 {
-    let v2s = info?.v2s;
-    let newS = v2s ? v2s(newVal, name, elm) : valToString( newVal);
+    let newS = info?.v2s ? info.v2s(newVal, name, elm) : valToString( newVal);
     if (oldS !== newS)
     {
         if (newS != null)
         {
-            setAttrValueToElement(elm, name, newS, info);
+            elm.setAttribute(name, newS);
 
             /// #if USE_STATS
                 DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
             /// #endif
-
-            return newS;
         }
         else
         {
-            removeAttrFromElement(elm, name, info);
+            elm.removeAttribute(name);
 
             /// #if USE_STATS
                 DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
             /// #endif
-
-            return null;
         }
     }
-    else
-        return oldS;
-}
 
-
-
-/**
- * Helper function that depending on the info.isProp flag either uses the element's setAttribute()
- * method or sets the value to the element's property.
- */
-function setAttrValueToElement(elm: Element, name: string, val: string, info?: AttrPropInfo | null): void
-{
-    if (info?.isProp)
-        elm[name] = val;
-    else
-        elm.setAttribute( name, val);
-}
-
-
-
-/**
- * Helper function that depending on the info.isProp flag either uses the element's removeAttribute()
- * method or sets null to the element's property.
- */
-function removeAttrFromElement(elm: Element, name: string, info?: AttrPropInfo): void
-{
-    if (info?.isProp)
-        elm[name] = null;
-    else
-        elm.removeAttribute(name);
+    return newS;
 }
 
 
@@ -576,6 +533,29 @@ const doNothing = () => {}
 
 
 
+/** Sets the given value to the element's `value` property */
+const setValueProp = (elm: HTMLElement, val: any): string | null =>
+    (elm as any).value = valToString(val);
+
+
+
+/** Removes the `value` attribtue */
+const removeValueProp = (elm: HTMLElement) =>
+{
+    // for some elements like `<input type="text">` elm.removeAttribute("value") is not enough
+    (elm as any).value = null;
+    // for some elements like `<progress>` elm.value = null is not enough
+    elm.removeAttribute("value");
+}
+
+
+
+/** Sets both `defaultValue` and `value` element properties */
+const setDefaultValueProp = (elm: HTMLElement, val: any): string | null =>
+    (elm as any).value = (elm as any).defaultValue = valToString(val);
+
+
+
 /** This variant is needed to use as the "set" function in AttrPropInfo */
 function setCheckedProp(elm: HTMLInputElement, val: CheckedPropType): string | null;
 
@@ -597,7 +577,7 @@ function setCheckedProp(elm: HTMLInputElement, val: CheckedPropType, setDefault?
 }
 
 
-
+/** Unchecks checkbox or radio button */
 function removeCheckedProp(elm: HTMLInputElement): void
 {
     elm.checked = false;
@@ -605,13 +585,9 @@ function removeCheckedProp(elm: HTMLInputElement): void
 
 
 
+/** Sets both `defaultChecked` and `checked` element properties */
 const setDefaultCheckedProp = (elm: HTMLInputElement, val: CheckedPropType): string | null =>
     setCheckedProp(elm, val, true);
-
-
-
-const setDefaultValueProp = (elm: HTMLInputElement, val: string): string | null =>
-    elm.value = elm.defaultValue = val;
 
 
 
@@ -784,11 +760,10 @@ const SvgAttrAsStyleWithNameConversionPropInfo: AttrPropInfo = { type: PropType.
  * For exampe, the `fill` attribute means shape-filling color when applied to such elements as
  * circle, rect or path, while it means the final state of animation when applied to such
  * elements as animate or animateMotion. To distinguish between different meaning (and,
- * therefore different treatment) of the attributes, the attribute name can be set to a
- * function, which will return the actual AttrPropInfo given the attribute and element names.
+ * therefore different treatment) of the attributes, the value can be set to a function, which
+ * will return the actual AttrPropInfo given the attribute and element names.
  */
 const propInfos: { [P:string]: PropInfo | ((elmName: string, attrName: string) => PropInfo) } =
-// const propInfos: { [P:string]: PropInfo } =
 {
     // framework attributes.
     key: StdFrameworkPropInfo,
@@ -798,12 +773,9 @@ const propInfos: { [P:string]: PropInfo | ((elmName: string, attrName: string) =
 
     // attributes - only those attributes are listed that have non-trivial treatment or whose value
     // type is object or function.
-    class: { type: PropType.Attr, name: "className", isProp: true },
-    for: { type: PropType.Attr, name: "htmlFor", isProp: true },
-    tabindex: { type: PropType.Attr, name: "tabIndex", isProp: true },
     checked: { type: PropType.Attr, set: setCheckedProp, remove: removeCheckedProp },
     defaultChecked: { type: PropType.Attr, set: setDefaultCheckedProp, update: doNothing, remove: doNothing },
-    value: { type: PropType.Attr, isProp: true },
+    value: { type: PropType.Attr, set: setValueProp, remove: removeValueProp },
     defaultValue: { type: PropType.Attr, set: setDefaultValueProp, update: doNothing, remove: doNothing },
     style: { type: PropType.Attr, v2s: styleToString },
     media: { type: PropType.Attr, v2s: mediaToString },

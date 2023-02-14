@@ -119,11 +119,11 @@ export interface ISvgPresentationAttrs
 	floodOpacity?: SvgPercent;
 	fontFamily?: string;
 	fontSize?: FontSizeKeyword | SvgLength | "inherit";
-	fontSizeAdjust?: number | "none" | "inherit";
+	fontSizeAdjust?: number | `${number}` | "none" | "inherit";
 	fontStretch?: FontStretchKeyword | SvgPercent | "inherit";
 	fontStyle?: "normal" | "italic" | "oblique";
 	fontVariant?: string;
-	fontWeight?: number | "normal" | "bold" | "bolder" | "lighter" | "inherit";
+	fontWeight?: number | `${number}` | "normal" | "bold" | "bolder" | "lighter" | "inherit";
 	imageRendering?: ImageRendering_StyleType | "inherit";
 	letterSpacing?: "normal" | SvgLength | "inherit";
 	lightingColor?: CssColor;
@@ -131,18 +131,18 @@ export interface ISvgPresentationAttrs
 	markerMid?: Marker_StyleType | "inherit";
 	markerStart?: Marker_StyleType | "inherit";
 	mask?: string;
-	opacity?: number;
+	opacity?: number | `${number}`;
 	overflow?: "visible" | "hidden" | "scroll" | "auto" | "inherit";
 	pointerEvents?: PointerEvents_StyleType;
 	shapeRendering?: ShapeRendering_StyleType | "inherit";
 	stopColor?: CssColor;
-	stopOpacity?: number;
+	stopOpacity?: number | `${number}`;
 	stroke?: SvgPaint;
 	strokeDasharray?: "none" | OneOrMany<SvgLength>;
 	strokeDashoffset?: SvgLength;
 	strokeLinecap?: StrokeLinecap_StyleType;
 	strokeLinejoin?: StrokeLinejoin_StyleType;
-	strokeMiterlimit?: number;
+	strokeMiterlimit?: number | `${number}`;
 	strokeOpacity?: SvgPercent;
 	strokeWidth?: SvgLength;
 	textAnchor?: TextAnchor_StyleType | "inherit";
@@ -211,7 +211,7 @@ export interface ISvgAnimationTimingAttrs
 	min?: SvgClock;
 	max?: SvgClock;
 	restart?: "always" | "whenNotActive" | "never";
-	repeatCount?: number | "indefinite";
+	repeatCount?: number | `${number}` | "indefinite";
 	repeatDur?: SvgClock;
 	fill?: "freeze" | "remove";
 }
@@ -223,8 +223,8 @@ export interface ISvgAnimationValueAttrs
 {
 	calcMode?: "discrete" | "linear" | "paced" | "spline";
 	values?: string[];
-	keyTimes?: number[];
-	keySplines?: [number,number,number,number][];
+	keyTimes?: (number | `${number}`)[];
+	keySplines?: [number | `${number}`, number | `${number}`, number | `${number}`, number | `${number}`][];
 	from?: string | number;
 	to?: string | number;
 	by?: string | number;
@@ -442,8 +442,8 @@ export interface ISvgAnimateMotionElementProps extends
     ISvgAnimationAdditionAttrs
 {
 	path?: string | IPathBuilder;
-	keyPoints?: number[];
-	rotate?: number| "auto" | "auto-reverse";
+	keyPoints?: (number | `${number}`)[];
+	rotate?: number | `${number}` | "auto" | "auto-reverse";
 }
 
 
@@ -471,7 +471,7 @@ export interface ISvgCircleElementProps extends
 	cx?: SvgLength;
 	cy?: SvgLength;
 	r?: SvgLength;
-	pathLength?: number;
+	pathLength?: number | `${number}`;
 }
 
 
@@ -527,7 +527,7 @@ export interface ISvgEllipseElementProps extends
 	cy?: SvgLength;
 	rx?: SvgLength | "auto";
 	ry?: SvgLength | "auto";
-	pathLength?: number;
+	pathLength?: number | `${number}`;
 }
 
 
@@ -549,12 +549,12 @@ export interface ISvgFeColorMatrixElementProps extends
 {
 	in?: SvgInPropType;
 	type: "matrix" | "saturate" | "hueRotate" | "luminanceToAlpha";
-	values?: number |
+	values?: number | `${number}` |
         [
-            number,number,number,number,number,
-            number,number,number,number,number,
-            number,number,number,number,number,
-            number,number,number,number,number,
+            number | `${number}`, number | `${number}`, number | `${number}`, number | `${number}`, number | `${number}`,
+            number | `${number}`, number | `${number}`, number | `${number}`, number | `${number}`, number | `${number}`,
+            number | `${number}`, number | `${number}`, number | `${number}`, number | `${number}`, number | `${number}`,
+            number | `${number}`, number | `${number}`, number | `${number}`, number | `${number}`, number | `${number}`,
         ];
 }
 
@@ -576,10 +576,10 @@ export interface ISvgFeCompositeElementProps extends
 	in?: SvgInPropType;
 	in2?: SvgInPropType;
 	opertor?: "over" | "in" | "out" | "atop" | "xor" | "lighter" | "arithmetic";
-	k1?: number;
-	k2?: number;
-	k3?: number;
-	k4?: number;
+	k1?: number | `${number}`;
+	k2?: number | `${number}`;
+	k3?: number | `${number}`;
+	k4?: number | `${number}`;
 }
 
 
@@ -588,15 +588,15 @@ export interface ISvgFeCompositeElementProps extends
 export interface ISvgFeConvolveMatrixElementProps extends
     ISvgFilterPrimitiveCategoryAttrs
 {
-	bias?: number;
-	divisor?: number;
+	bias?: number | `${number}`;
+	divisor?: number | `${number}`;
 	edgeMode?: "duplicate" | "wrap" | "none";
 	in?: SvgInPropType;
-	kernelMatrix?: number[];
-	order?: number | [number, number?];
+	kernelMatrix?: (number | `${number}`)[];
+	order?: number | `${number}` | [number | `${number}`, (number | `${number}`)?];
 	preserveAlpha?: "true" | "false";
-	targetX?: number;
-	targetY?: number;
+	targetX?: number | `${number}`;
+	targetY?: number | `${number}`;
 }
 
 
@@ -607,8 +607,8 @@ export interface ISvgFeDiffuseLightingElementProps extends
     Pick<ISvgPresentationAttrs, "lightingColor">
 {
 	in?: SvgInPropType;
-	surfaceScale?: number;
-	diffuseConstant?: number;
+	surfaceScale?: number | `${number}`;
+	diffuseConstant?: number | `${number}`;
 }
 
 
@@ -619,7 +619,7 @@ export interface ISvgFeDisplacementMapElementProps extends
 {
 	in?: SvgInPropType;
 	in2?: SvgInPropType;
-	scale?: number;
+	scale?: number | `${number}`;
 	xChannelSelector?: "R" | "G" | "B" | "A";
 	yChannelSelector?: "R" | "G" | "B" | "A";
 }
@@ -630,8 +630,8 @@ export interface ISvgFeDisplacementMapElementProps extends
 export interface ISvgFeDistantLightElementProps extends
     ISvgLightSourceCategoryAttrs
 {
-	azimuth?: number;
-	elevation?: number;
+	azimuth?: number | `${number}`;
+	elevation?: number | `${number}`;
 }
 
 
@@ -642,9 +642,9 @@ export interface ISvgFeDropShadowElementProps extends
     Pick<ISvgPresentationAttrs, "floodColor" | "floodOpacity">
 {
 	in?: SvgInPropType;
-	stdDeviation?: number;
-	dx?: number;
-	dy?: number;
+	stdDeviation?: number | `${number}`;
+	dx?: number | `${number}`;
+	dy?: number | `${number}`;
 }
 
 
@@ -695,7 +695,7 @@ export interface ISvgFeGaussianBlurElementProps extends
     ISvgFilterPrimitiveCategoryAttrs
 {
 	in?: SvgInPropType;
-	stdDeviation?: number | [number, number?];
+	stdDeviation?: number | `${number}` | [number | `${number}`, (number | `${number}`)?];
 	edgeMode?: "duplicate" | "wrap" | "none";
 }
 
@@ -734,7 +734,7 @@ export interface ISvgFeMorphologyElementProps extends
 {
 	in?: SvgInPropType;
 	operator?: "erode" | "dilate";
-	radius?: number | [number, number?];
+	radius?: number | `${number}` | [number | `${number}`, (number | `${number}`)?];
 }
 
 
@@ -744,8 +744,8 @@ export interface ISvgFeOffsetElementProps extends
     ISvgFilterPrimitiveCategoryAttrs
 {
 	in?: SvgInPropType;
-	dx?: number;
-	dy?: number;
+	dx?: number | `${number}`;
+	dy?: number | `${number}`;
 }
 
 
@@ -754,9 +754,9 @@ export interface ISvgFeOffsetElementProps extends
 export interface ISvgFePointLightElementProps extends
     ISvgLightSourceCategoryAttrs
 {
-	x?: number;
-	y?: number;
-	z?: number;
+	x?: number | `${number}`;
+	y?: number | `${number}`;
+	z?: number | `${number}`;
 }
 
 
@@ -767,9 +767,9 @@ export interface ISvgFeSpecularLightingElementProps extends
     Pick<ISvgPresentationAttrs, "lightingColor">
 {
 	in?: SvgInPropType;
-	surfaceScale?: number;
-	specularConstant?: number;
-	specularExponent?: number;
+	surfaceScale?: number | `${number}`;
+	specularConstant?: number | `${number}`;
+	specularExponent?: number | `${number}`;
 }
 
 
@@ -778,14 +778,14 @@ export interface ISvgFeSpecularLightingElementProps extends
 export interface ISvgFeSpotLightElementProps extends
     ISvgLightSourceCategoryAttrs
 {
-	x?: number;
-	y?: number;
-	z?: number;
-	pointsAtX?: number;
-	pointsAtY?: number;
-	pointsAtZ?: number;
-	specularExponent?: number;
-	limitingConeAngle?: number;
+	x?: number | `${number}`;
+	y?: number | `${number}`;
+	z?: number | `${number}`;
+	pointsAtX?: number | `${number}`;
+	pointsAtY?: number | `${number}`;
+	pointsAtZ?: number | `${number}`;
+	specularExponent?: number | `${number}`;
+	limitingConeAngle?: number | `${number}`;
 }
 
 
@@ -803,9 +803,9 @@ export interface ISvgFeTileElementProps extends
 export interface ISvgFeTurbulenceElementProps extends
     ISvgFilterPrimitiveCategoryAttrs
 {
-	baseFrequency?: number | [number, number?];
-	numOctaves?: number;
-	seed?: number;
+	baseFrequency?: number | `${number}` | [number | `${number}`, (number | `${number}`)?];
+	numOctaves?: number | `${number}`;
+	seed?: number | `${number}`;
 	stitchTiles?: "noStitch" | "stitch";
 	type: "fractalNoise" | "turbulence";
 }
@@ -904,7 +904,7 @@ export interface ISvgLineElementProps extends
 	x2?: CrossoriginPropType;
 	y1?: CrossoriginPropType;
 	y2?: CrossoriginPropType;
-	pathLength?: number;
+	pathLength?: number | `${number}`;
 }
 
 
@@ -984,7 +984,7 @@ export interface ISvgPathElementProps extends
     ISvgRenderableCategoryAttrs,
     Pick<ISvgPresentationAttrs, "d" | "fillRule">
 {
-	pathLength?: number;
+	pathLength?: number | `${number}`;
 }
 
 
@@ -1017,8 +1017,8 @@ export interface ISvgPolygonElementProps extends
     ISvgRenderableCategoryAttrs,
     Pick<ISvgPresentationAttrs, "fillRule">
 {
-	points: number[];
-	pathLength?: number;
+	points: (number | `${number}`)[];
+	pathLength?: number | `${number}`;
 }
 
 
@@ -1030,8 +1030,8 @@ export interface ISvgPolylineElementProps extends
     ISvgRenderableCategoryAttrs,
     Pick<ISvgPresentationAttrs, "fillRule">
 {
-	points?: number[];
-	pathLength?: number;
+	points?: (number | `${number}`)[];
+	pathLength?: number | `${number}`;
 }
 
 
@@ -1066,7 +1066,7 @@ export interface ISvgRectElementProps extends
 	height?: SvgLength | "auto";
 	rx?: SvgLength | "auto";
 	ry?: SvgLength | "auto";
-	pathLength?: number;
+	pathLength?: number | `${number}`;
 }
 
 
@@ -1173,7 +1173,7 @@ export interface ISvgTextElementProps extends
 	y?: SvgLength;
 	dx?: SvgLength;
 	dy?: SvgLength;
-	rotate?: number | number[];
+	rotate?: number | `${number}` | (number | `${number}`)[];
 	lengthAdjust?: LengthAdjustPropType;
 	textLength?: SvgLength;
 }
@@ -1218,7 +1218,7 @@ export interface ISvgTspanElementProps extends
 	y?: SvgLength;
 	dx?: SvgLength;
 	dy?: SvgLength;
-	rotate?: number | number[];
+	rotate?: number | `${number}` | (number | `${number}`)[];
 	lengthAdjust?: LengthAdjustPropType;
 	textLength?: SvgLength;
 }

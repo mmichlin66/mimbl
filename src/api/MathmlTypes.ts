@@ -24,7 +24,7 @@ export interface IMathmlElementAttrs extends IElementAttrs
     mathvariant?: "normal" | "bold" | "italic" | "bold-italic" | "double-struck" | "bold-fraktur" |
         "script" | "bold-script" | "fraktur" | "sans-serif" | "bold-sans-serif" | "sans-serif-italic" |
         "sans-serif-bold-italic" | "monospace" | "initial" | "tailed" | "looped" | "stretched";
-    scriptlevel?: number | `+${number}` | `-${number}`;
+    scriptlevel?: number | `${number}` | `+${number}` | `-${number}`;
 }
 
 
@@ -188,7 +188,7 @@ export interface IMathmlMsubElementAttrs extends IMathmlElementAttrs
 // <msubsup>
 export interface IMathmlMsubsupElementAttrs extends IMathmlElementAttrs
 {
-	span?: number;
+	span?: number | `${number}`;
 }
 
 
@@ -210,8 +210,8 @@ export interface IMathmlMtableElementAttrs extends IMathmlElementAttrs
 // <mtd>
 export interface IMathmlMtdElementAttrs extends IMathmlElementAttrs
 {
-    columnspan?: number;
-    rowspan?: number;
+    columnspan?: number | `${number}`;
+    rowspan?: number | `${number}`;
 }
 
 
