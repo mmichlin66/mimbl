@@ -279,27 +279,30 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             cleanElmProps(this.elmName, this.ownDN!)
         }
 
-        if (newVN.props)
-            newVN.parseProps( newVN.props);
+        if (this.props || newVN.props)
+        {
+            if (newVN.props)
+                newVN.parseProps( newVN.props);
 
-        // if reference specifications changed then set or unset them as necessary
-        if (this.ref != newVN.ref)
-            this.ref = updateRef(this.ref, newVN.ref, this.ownDN!);
-        if (this.vnref != newVN.vnref)
-            updateRef(this.vnref, newVN.vnref, this);
+            // if reference specifications changed then set or unset them as necessary
+            if (this.ref != newVN.ref)
+                this.ref = updateRef(this.ref, newVN.ref, this.ownDN!);
+            if (this.vnref != newVN.vnref)
+                updateRef(this.vnref, newVN.vnref, this);
 
-        // remember the new value of the key and updateStartegy properties (even if the
-        // values are the same)
-        this.key = newVN.key;
-        this.updateStrategy = newVN.updateStrategy;
+            // remember the new value of the key and updateStartegy properties (even if the
+            // values are the same)
+            this.key = newVN.key;
+            this.updateStrategy = newVN.updateStrategy;
 
-        // update attributes and events
-        this.updateAttrs( newVN.attrs, isNewCreator);
-        this.updateEvents( newVN.events);
-        this.updateCustomAttrs( newVN.customAttrs);
+            // update attributes and events
+            this.updateAttrs( newVN.attrs, isNewCreator);
+            this.updateEvents( newVN.events);
+            this.updateCustomAttrs( newVN.customAttrs);
 
-        // remember new props
-        this.props = newVN.props;
+            // remember new props
+            this.props = newVN.props;
+        }
 
         // update children if they exist either on our or on the new element
         if (this.subNodes || newVN.subNodes)

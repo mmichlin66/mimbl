@@ -355,9 +355,9 @@ const camelToDash = (s: string): string => s.replace( /([a-zA-Z])(?=[A-Z])/g, '$
  * not be called with these values as the proper action is to remove attributes with such values.
  */
 const valToString = (val: any): string | null =>
+	typeof val === "string" ? val :
     val == null || val === false ? null :
     val === true ? "" :
-	typeof val === "string" ? val :
     Array.isArray(val) ? array2s(val, " ") :
     val.toString();
 
