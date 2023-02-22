@@ -1,3 +1,10 @@
+# 0.10.4
+
+1. Support for internals and ARIA in Web Elements.
+2. Bug fixes and performance optimizations.
+3. Use Mimcss@0.12.2.
+
+
 # 0.10.3
 
 1. `lazy()` function returns a Promise-like object with `then`, `catch` and `finally` methods.
