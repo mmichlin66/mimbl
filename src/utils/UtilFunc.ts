@@ -10,6 +10,54 @@ export const MathmlNamespace = "http://www.w3.org/1998/Math/MathML";
 
 
 
+/** Comma-separated list of all SVG element names */
+const SvgTagNamesAsString =
+    "svgA,animate,animateMotion,animateTransform,circle,clipPath,defs,desc,ellipse,feBlend,feColorMatrix,feComponentTransfer,feComposite,feConvolveMatrix,feDiffuseLighting,feDisplacementMap,feDistantLight,feDropShadow,feFlood,feFuncA,feFuncB,feFuncG,feFuncR,feGaussianBlur,feImage,feMerge,feMergeNode,feMorphology,feOffset,fePointLight,feSpecularLighting,feSpotLight,feTile,feTurbulence,filter,foreignObject,g,image,line,linearGradient,marker,mask,metadata,mpath,path,pattern,polygon,polyline,radialGradient,rect,svgScript,set,stop,svgStyle,svg,switch,symbol,text,textPath,svgTitle,tspan,use,view";
+
+/** Array of all SVG element names */
+const SvgTagNames = SvgTagNamesAsString.split(",");
+
+/** Comma-separated list of all MathML element names */
+const MathmlTagNamesAsString =
+    "math,merror,mfrac,mi,mmultiscripts,mn,mo,mover,mpadded,mphantom,mprescripts,mroot,mrow,ms,mspace,msqrt,mstyle,msub,msubsup,msup,mtable,mtd,mtext,mtr,munder,munderover,semantics,annotation,annotation-xml";
+
+/** Array of all MathML element names */
+const MathmlTagNames = MathmlTagNamesAsString.split(",");
+
+/**
+ * Returns namespace string for the given element name (SVG or MathML) and null if the name is a
+ * regular HTML element.
+ */
+export const getElmNS = (elmName: string): string | null =>
+    SvgTagNames.includes(elmName) ? SvgNamespace :
+    MathmlTagNames.includes(elmName) ? MathmlNamespace :
+    null;
+
+
+
+/**
+ * Some SVG elements have the same names as HTML. To distinguish them we are using special names,
+ * and this object maps the special names to the names that should be used in DOM.
+ */
+const RealElementNames: { [elmName:string]: string } =
+{
+    svgA: "a",
+    svgTitle: "title",
+    svgScript: "script",
+    svgStyle: "style",
+}
+
+export const getElmRealName = (elmName: string): string =>
+    RealElementNames[elmName] ?? elmName;
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Utility functions.
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 /**
  * Compares the two given values going only one level down to their properties (if objects or arrays)
  * @param o1

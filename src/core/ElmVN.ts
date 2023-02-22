@@ -16,7 +16,7 @@ import {
     setElmProp, updateElmProp
 } from "./Props";
 import { isTrigger } from "./TriggerImpl";
-import { HtmlNamespace, MathmlNamespace, SvgNamespace, s_deepCompare } from "../utils/UtilFunc";
+import { getElmNS, getElmRealName } from "../utils/UtilFunc";
 
 
 
@@ -162,12 +162,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         // create the element; if the element is in the list, use the provided namespace;
         // if namespace is provided use it; otherwise, use the namespace of the anchor element.
         let props = this.props as Record<string,any>;
-        let info = elmInfos[this.elmName];
-        let ns = typeof info === "number" ? ElementNamespaceNames[info] :
-            info ? ElementNamespaceNames[info.ns] :
-            props?.xmlns ?? (this.anchorDN as Element).namespaceURI;
-        let elm = document.createElementNS(ns ?? HtmlNamespace, this.elmName,
-            props?.is != null ? {is: props.is} : undefined) as T;
+        let ns = getElmNS(this.elmName);
+        let elm = ns
+            ? document.createElementNS(ns, getElmRealName(this.elmName)) as T
+            : document.createElement(this.elmName, props?.is != null ? {is: props.is} : undefined) as unknown as T;
 
         /// #if DEBUG
             elm.setAttribute("mim-debug-id", "" + this.debugID);
@@ -348,7 +346,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             else // if (propType === PropType.CustomAttr)
             {
                 // remember custom attributes value. Handler will be created later.
-                (this.customAttrs ??= {})[propName] = { info: propInfo as CustomAttrPropInfo, val: propVal, handler: undefined};
+                (this.customAttrs ??= {})[propName] = { info: propInfo as CustomAttrPropInfo, val: propVal};
             }
 		}
 	}
@@ -432,7 +430,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 val = val.get();
             }
 
-            rtd.valS = setElmProp( this.ownDN!, name, val, rtd.info);
+            if (val != null)
+                rtd.valS = setElmProp( this.ownDN!, name, val, rtd.info);
         }
 
         // `add` means that a new attribute is mounted as a result of updating already existing
@@ -869,64 +868,6 @@ interface CustomAttrRunTimeData
 	// Handler object that knows to deal with the property values
 	handler?: ICustomAttributeHandler;
 };
-
-
-
-/**
- * Numeric indicators of namespaces that can be mapped to element names for speeding up the
- *  decision on how to create elements
- */
-const enum ElementNamespace
-{
-    HTML = 1,
-    SVG = 2,
-    MATHML = 3,
-}
-
-/** Object containing namespace URIs of known namespaces */
-const ElementNamespaceNames = {
-    [ElementNamespace.HTML]: HtmlNamespace,
-    [ElementNamespace.SVG]: SvgNamespace,
-    [ElementNamespace.MATHML]: MathmlNamespace,
-}
-
-// The ElmInfo type defines information that helps creating an element. This information can be
-// of the following types:
-//  - number - numeric indicator of the element namespce
-//  - object that contains namespace and optionally element's real name. Some non-HTML elements
-//    have names that cannot be used in JSX directly (e.g. because of hyphen like in
-//    "color-profile"). In this case, the string value will be the actual element name to put into
-//    the HTML document, while JSX will be using a camel-formatted name (e.g. "colorProfile").
-type ElmInfo = ElementNamespace | { ns: number, name: string};
-
-/** Object that maps element names to ElmInfo. Elements that are not in this map are created using
- * the anchor's namespace URI with the document.createElementNS() call.
- */
-const elmInfos: {[elmName:string]: ElmInfo} =
-{
-    a: ElementNamespace.HTML,
-    button: ElementNamespace.HTML,
-    dd: ElementNamespace.HTML,
-    div: ElementNamespace.HTML,
-    dt: ElementNamespace.HTML,
-    i: ElementNamespace.HTML,
-    input: ElementNamespace.HTML,
-    img: ElementNamespace.HTML,
-    label: ElementNamespace.HTML,
-    li: ElementNamespace.HTML,
-    p: ElementNamespace.HTML,
-    span: ElementNamespace.HTML,
-    tr: ElementNamespace.HTML,
-    td: ElementNamespace.HTML,
-
-    svg: ElementNamespace.SVG,
-    svgA: { ns: ElementNamespace.SVG, name: "a" },
-    svgTitle: { ns: ElementNamespace.SVG, name: "title" },
-    svgScript: { ns: ElementNamespace.SVG, name: "script" },
-    svgStyle: { ns: ElementNamespace.SVG, name: "style" },
-
-    math: ElementNamespace.MATHML,
-}
 
 
 
