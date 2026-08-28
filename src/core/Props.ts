@@ -33,7 +33,7 @@ export interface PropInfoBase
  * Information about attributes that contains functions for setting, diffing, updating and removing
  * attribute(s) corresponding to the property.
  */
-export interface AttrPropInfo extends PropInfoBase
+export interface AttrPropInfo<T extends Element = Element> extends PropInfoBase
 {
 	/**
      * Function that converts attribute value to string. If this function is not defined, a
@@ -58,7 +58,7 @@ export interface AttrPropInfo extends PropInfoBase
      * value is converted to string and is set either via the element's setAttribute() function
      * or (if `isProp` property is true) by assigning the string value to the element's property.
      */
-	set?: (elm: Element, val: any, name: string) => string | null;
+	set?: (elm: T, val: any, name: string) => string | null;
 
 	/**
      * Function that updates the value of the attribute based on the object that was returned from
@@ -69,13 +69,13 @@ export interface AttrPropInfo extends PropInfoBase
      * assigning the string value to the element's property.
      * @returns New string value if updated; null if removed; undefined if no change.
      */
-	update?: (elm: Element, oldS: string | null, newVal: any, name: string) => string | null | void;
+	update?: (elm: T, oldS: string | null, newVal: any, name: string) => string | null | void;
 
 	/**
      * Function that removes the attribute. If this function is not defined, then the DOM
      * elm.removeAttribute is called with propName as attribute name.
      */
-	remove?: (elm: Element, oldS: string | null, name: string) => void;
+	remove?: (elm: T, oldS: string | null, name: string) => void;
 
 	/**
      * The actual name of the attribute/property. This is sometimes needed if the attribute name
@@ -415,7 +415,7 @@ function unstringifyObjectProp(s: string): ObjectPropValueType
 
 
 /** Sets object attributes like `data-*` or `aria-*` */
-function setObjectProp(elm: HTMLInputElement, val: ObjectPropValueType,
+function setObjectProp(elm: Element, val: ObjectPropValueType,
     nameFunc: ObjectPropToAttrNameFunc, valFunc: ObjectPropValToStringFunc): string | null
 {
     for( let key in val)
@@ -430,7 +430,7 @@ function setObjectProp(elm: HTMLInputElement, val: ObjectPropValueType,
 
 
 /** Updates object attributes like `data-*` or `aria-*` */
-function updateObjectProp(elm: HTMLInputElement, oldS: string | null, newVal: ObjectPropValueType,
+function updateObjectProp(elm: Element, oldS: string | null, newVal: ObjectPropValueType,
     nameFunc: ObjectPropToAttrNameFunc, valFunc: ObjectPropValToStringFunc): string | null | void
 {
     // if we don't have old string value (which shouldn't happen), just use the set function
@@ -497,7 +497,7 @@ function updateObjectProp(elm: HTMLInputElement, oldS: string | null, newVal: Ob
 
 
 /** Removes object attributes like `data-*` or `aria-*` */
-function removeObjectProp(elm: HTMLInputElement, oldS: string | null,
+function removeObjectProp(elm: Element, oldS: string | null,
     nameFunc: ObjectPropToAttrNameFunc): void
 {
     // if we don't have old string value (which shouldn't happen), just use the set function
@@ -534,13 +534,13 @@ const doNothing = () => {}
 
 
 /** Sets the given value to the element's `value` property */
-const setValueProp = (elm: HTMLElement, val: any): string | null =>
+const setValueProp = (elm: Element, val: any): string | null =>
     (elm as any).value = valToString(val);
 
 
 
 /** Removes the `value` attribtue */
-const removeValueProp = (elm: HTMLElement) =>
+const removeValueProp = (elm: Element) =>
 {
     // for some elements like `<input type="text">` elm.removeAttribute("value") is not enough
     (elm as any).value = null;
@@ -551,42 +551,43 @@ const removeValueProp = (elm: HTMLElement) =>
 
 
 /** Sets both `defaultValue` and `value` element properties */
-const setDefaultValueProp = (elm: HTMLElement, val: any): string | null =>
+const setDefaultValueProp = (elm: Element, val: any): string | null =>
     (elm as any).value = (elm as any).defaultValue = valToString(val);
 
 
 
 /** This variant is needed to use as the "set" function in AttrPropInfo */
-function setCheckedProp(elm: HTMLInputElement, val: CheckedPropType): string | null;
+function setCheckedProp(elm: Element, val: CheckedPropType): string | null;
 
 /** This variant is needed to provide the "true" value for the "defaultCheck" property */
-function setCheckedProp(elm: HTMLInputElement, val: CheckedPropType, setDefault?: boolean): string | null;
+function setCheckedProp(elm: Element, val: CheckedPropType, setDefault?: boolean): string | null;
 
 // Implementation used by both "checked" and "defaultChecked" attributes
-function setCheckedProp(elm: HTMLInputElement, val: CheckedPropType, setDefault?: boolean): string | null
+function setCheckedProp(elm: Element, val: CheckedPropType, setDefault?: boolean): string | null
 {
+    let inputElm = elm as HTMLInputElement;
     if (typeof val == "boolean")
-        elm.checked = val, elm.indeterminate = false;
+        inputElm.checked = val, inputElm.indeterminate = false;
     else
-        elm.checked = false, elm.indeterminate = true;
+        inputElm.checked = false, inputElm.indeterminate = true;
 
     if (setDefault)
-        elm.defaultChecked = elm.checked;
+        inputElm.defaultChecked = inputElm.checked;
 
     return "" + val;
 }
 
 
 /** Unchecks checkbox or radio button */
-function removeCheckedProp(elm: HTMLInputElement): void
+function removeCheckedProp(elm: Element): void
 {
-    elm.checked = false;
+    (elm as HTMLInputElement).checked = false;
 }
 
 
 
 /** Sets both `defaultChecked` and `checked` element properties */
-const setDefaultCheckedProp = (elm: HTMLInputElement, val: CheckedPropType): string | null =>
+const setDefaultCheckedProp = (elm: Element, val: CheckedPropType): string | null =>
     setCheckedProp(elm, val, true);
 
 
@@ -683,15 +684,15 @@ const dataPropToString = (val: any): string | null =>
     val == null ? null : Array.isArray(val) ? val.map( item => dataPropToString(item)).join(" ") : "" + val;
 
 /** Sets `data-* attributes */
-const setDataProp = (elm: HTMLInputElement, val: DatasetPropType) =>
+const setDataProp = (elm: Element, val: DatasetPropType) =>
     setObjectProp(elm, val, dataPropToAttrName, dataPropToString);
 
 /** Updates `data-* attributes */
-const updateDataProp = (elm: HTMLInputElement, oldS: string | null, newVal: DatasetPropType) =>
+const updateDataProp = (elm: Element, oldS: string | null, newVal: DatasetPropType) =>
     updateObjectProp(elm, oldS, newVal, dataPropToAttrName, dataPropToString);
 
 /** Removes `data-* attributes */
-const removeDataProp = (elm: HTMLInputElement, oldS: string | null) =>
+const removeDataProp = (elm: Element, oldS: string | null) =>
     removeObjectProp(elm, oldS, dataPropToAttrName);
 
 
@@ -703,15 +704,15 @@ export const ariaPropToAttrName = (propName: any): string => propName === "role"
 export const ariaPropToString = (val: any): string | null => dataPropToString(val);
 
 /** Sets `aria-* attributes */
-const setAriaProp = (elm: HTMLInputElement, val: IAriaset) =>
+const setAriaProp = (elm: Element, val: IAriaset) =>
     setObjectProp(elm, val, ariaPropToAttrName, ariaPropToString);
 
 /** Updates `aria-* attributes */
-const updateAriaProp = (elm: HTMLInputElement, oldS: string | null, newVal: IAriaset) =>
+const updateAriaProp = (elm: Element, oldS: string | null, newVal: IAriaset) =>
     updateObjectProp(elm, oldS, newVal, ariaPropToAttrName, ariaPropToString);
 
 /** Removes `aria-* attributes */
-const removeAriaProp = (elm: HTMLInputElement, oldS: string | null) =>
+const removeAriaProp = (elm: Element, oldS: string | null) =>
     removeObjectProp(elm, oldS, ariaPropToAttrName);
 
 

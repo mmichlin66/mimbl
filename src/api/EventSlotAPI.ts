@@ -163,7 +163,7 @@ class EventSlotPretender implements IEventSlotOwner
 {
     private handler: MultiEventSlotHandler;
     private prop: PropertyKey;
-    private slot: EventSlot;
+    private slot?: EventSlot;
 
     constructor( handler: MultiEventSlotHandler, prop: PropertyKey)
     {
@@ -207,7 +207,7 @@ class EventSlotPretender implements IEventSlotOwner
 	/** Determines whether this event slot has any listeners. */
 	public has(): boolean
     {
-        return this.slot.has();
+        return this.slot?.has() ?? false;
     }
 }
 

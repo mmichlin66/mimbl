@@ -57,7 +57,7 @@ export async function s_initStyleScheduler(): Promise<number>
 class StyleScheduler implements IScheduler
 {
     // Callback to call to write changes to the DOM.
-	private doDOMUpdate: () => void;
+	private doDOMUpdate?: () => void;
 
     /**
      * Initializes the scheduler object and provides the callback that should be invoked when the
@@ -89,7 +89,7 @@ class StyleScheduler implements IScheduler
 	 */
 	private onUpdate(): void
 	{
-		this.doDOMUpdate();
+		this.doDOMUpdate?.();
 	}
 }
 

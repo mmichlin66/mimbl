@@ -18,7 +18,7 @@
         "noEmitOnError": true,
         "useDefineForClassFields": false,
         "module": "esnext",
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "esModuleInterop": true,
 		"target": "esnext",
 		"lib": [ "esnext", "dom" ],
@@ -28,9 +28,8 @@
 		"jsxFactory": "mim.jsx",
         "jsxFragmentFactory": "mim.Fragment",
         "types": [],
-        "baseUrl": ".",
         "paths": {
-            "mimbl": ["src/index.ts"]
+            "mimbl": ["./src/index.ts"]
         }
 	},
 

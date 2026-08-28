@@ -43,7 +43,7 @@ export abstract class VN implements IVN
      * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the
      * root nodes that don't have parents.
      */
-	public index: number;
+	public index!: number;
 
 	// DOM node under which all content of this virtual node is rendered.
 	public anchorDN?: DN;
@@ -372,7 +372,7 @@ function collectImmediateDNs(vn: IVN, arr: DN[]): void
  * @param onlyIf An optional value to which to compare the current (old) value of the reference.
  * The new value will be set only if the old value equals the `onlyIf` value.
  */
-export function setRef<T>( ref: RefType<T>, val: T, onlyIf?: T): void
+export function setRef<T>( ref: RefType<T>, val: T | undefined, onlyIf?: T | null): void
 {
 	if (typeof ref === "function")
 		ref(val);

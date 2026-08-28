@@ -1,4 +1,4 @@
-﻿import {DN, EventPropType, IComponentClass, RefPropType} from "../api/CompTypes"
+﻿import {ComponentProps, DN, EventPropType, IComponentClass, RefPropType} from "../api/CompTypes"
 import { IVN, VNDisp } from "./VNTypes";
 import { ClassCompVN } from "./ClassCompVN";
 import { VN, setRef, updateRef } from "./VN";
@@ -11,21 +11,20 @@ import { EventsMixin } from "./Events";
 // Represents a managed component implementing the IComponent<> interface.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-export class ManagedCompVN extends ClassCompVN
+export class ManagedCompVN<TProps extends {} = {}, TEvents extends {} = {}> extends ClassCompVN<TProps, TEvents>
 {
 	// Properties that were passed to the component. For managed components this is always defined.
     // Even if no properties were passed to the component, props would include an array of
     // children (which might be null or empty).
-	public props: Record<string,any>;
+	public props: ComponentProps<TProps, TEvents>;
 
 
 
-    constructor( compClass: IComponentClass, props: Record<string,any> | undefined, children: IVN[] | null = null)
+    constructor(compClass: IComponentClass<TProps, TEvents>, props: ComponentProps<TProps, TEvents> | undefined, children: IVN[] | null = null)
 	{
-		super();
+		super(compClass);
 
-		this.compClass = compClass;
-        this.props = props as Record<string,any>;
+        this.props = props ?? {} as ComponentProps<TProps, TEvents>;
         this.children = children;
 
         // get the key (if exists) because we will need it during update even before the
@@ -101,7 +100,7 @@ export class ManagedCompVN extends ClassCompVN
 	// Updated this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node.
-	public update( newVN: ManagedCompVN, disp: VNDisp): void
+	public update( newVN: ManagedCompVN<TProps, TEvents>, disp: VNDisp): void
 	{
         // if the new VN was created by a different creator, remember it.
         let isNewCreator = this.creator !== newVN.creator;
@@ -139,7 +138,7 @@ export class ManagedCompVN extends ClassCompVN
      * Goes over the original properties and parses them into build-in (ref), events and regular.
      * Replaces this.props with an object that contains children and regular props only.
      */
-	private parseProps( props: Record<string,any> | undefined): void
+	private parseProps( props: ComponentProps<TProps, TEvents> | undefined): void
 	{
         let actualProps: Record<string,any> = {children: this.children};
 
@@ -161,7 +160,7 @@ export class ManagedCompVN extends ClassCompVN
             }
         }
 
-        this.props = actualProps;
+        this.props = actualProps as ComponentProps<TProps, TEvents>;
 	}
 
 

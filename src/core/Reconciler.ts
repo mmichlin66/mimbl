@@ -119,7 +119,7 @@ export function wrapFunc<T extends Function>(funcOrParams: T | CallbackWrapperPa
             comp: options?.comp ?? s_currentClassComp,
             tickType: options?.tickType
           }
-    );
+    ) as unknown as T;
 }
 
 

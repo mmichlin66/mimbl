@@ -25,7 +25,7 @@ class MyStyles extends css.StyleDefinition
 // Define component that displays "Hello World!"
 class HelloWorld extends mim.Component
 {
-    styles: MyStyles;
+    styles!: MyStyles;
 
     // Activate styles when the component mounts
     willMount()

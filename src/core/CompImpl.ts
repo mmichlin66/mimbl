@@ -65,7 +65,7 @@ export abstract class ComponentMixin<TProps extends {} = {}, TEvents extends {} 
     // which the mixin is applied. Instead, these classes implement these properties and methods
     // on their own.
     vn?: ClassCompVN;
-	props: ComponentProps<TProps,TEvents>;
+	props!: ComponentProps<TProps,TEvents>;
     abstract render(): any;
     abstract addEventListener(type: string, callback: EventListenerOrEventListenerObject | null, options?: AddEventListenerOptions | boolean): void;
     abstract dispatchEvent(event: Event): boolean;

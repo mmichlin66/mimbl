@@ -38,7 +38,7 @@ class ResizeObserverHandler implements mim.ICustomAttributeHandler<ResizeObserve
 	private observer: ResizeObserver;
 
     // Constructor is called when the element is mounted
-	constructor(elmVN: mim.IElmVN, attrVal: ResizeObserverAttrType, attrName: string)
+	constructor(elmVN: mim.IElmVN<any>, attrVal: ResizeObserverAttrType, attrName?: string)
 	{
 		this.elm = elmVN.elm as HTMLElement;
 

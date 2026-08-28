@@ -1,4 +1,4 @@
-﻿import { DN, IClassCompVN, IComponent, IComponentClass, ComponentShadowOptions } from "../api/CompTypes"
+﻿import { DN, IClassCompVN, IComponent, IComponentClass, ComponentShadowOptions, ComponentProps } from "../api/CompTypes"
 import { VNDisp } from "./VNTypes";
 import { IWatcher } from "../api/TriggerTypes";
 
@@ -34,19 +34,19 @@ export const shadowDecorator = (options: ComponentShadowOptions, cls: Function):
  * Base class for IndependentCompVN and ManagedCompVN classes. It provides common functionality
  * in terms of update requests and lifecycle management.
  */
-export abstract class ClassCompVN extends VN implements IClassCompVN
+export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {}> extends VN implements IClassCompVN
 {
 	/** Type of the class-based component. */
-	public compClass: IComponentClass;
+	public compClass!: IComponentClass<TProps, TEvents>;
 
 	/** Component instance. */
-	public comp?: IComponent;
+	public comp?: IComponent<TProps, TEvents>;
 
 	/**
      * Properties that were passed to the component. This might be undefined for independent
      * components.
      */
-	public props: Record<string,any> | undefined;
+	public props: ComponentProps<TProps, TEvents> | undefined;
 
     /**
      * Optional element serving as a host for shadow root if the component specifies the `shadow`
@@ -73,6 +73,12 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 	/// #endif
 
 
+
+    constructor(compClass: IComponentClass<TProps, TEvents>)
+    {
+        super();
+        this.compClass = compClass;
+    }
 
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
@@ -169,7 +175,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
 
 	// Determines whether the update of this node from the given node is possible. The newVN
 	// parameter is guaranteed to point to a VN of the same type as this node.
-	public isUpdatePossible( newVN: ClassCompVN): boolean
+	public isUpdatePossible( newVN: ClassCompVN<TProps, TEvents>): boolean
 	{
 		// update is possible if the component class is the same
 		return this.compClass === newVN.compClass;
@@ -181,7 +187,7 @@ export abstract class ClassCompVN extends VN implements IClassCompVN
      * Performs part of the update functionality, which is common for managed and independent
      * coponents.
      */
-	public update( newVN: ClassCompVN, disp: VNDisp): void
+	public update( newVN: ClassCompVN<TProps, TEvents>, disp: VNDisp): void
 	{
         let comp = this.comp!;
         this.updateStrategy = comp.updateStrategy;

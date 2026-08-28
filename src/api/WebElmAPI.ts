@@ -186,7 +186,7 @@ abstract class WebElmMixin extends HTMLElement
     }
 
     /** WebElm definition taken from the class constructor */
-    _def: WebElmDefinition;
+    _def!: WebElmDefinition;
 
     /** Shadow DOM root node - can be undefined if "noShadow" was specified in the options */
     _shadowRoot?: ShadowRoot;
@@ -292,7 +292,7 @@ abstract class WebElmMixin extends HTMLElement
 
         // call the `onchanged` method if defined. Note that it is called bound to the instance
         // of our custom element.
-        onchanged?.call(this, actNewValue, attrDef.attrName, propName);
+        onchanged?.call(this, actNewValue, attrDef.attrName);
     }
 
     /** The render() function should be overridden in the derived class */

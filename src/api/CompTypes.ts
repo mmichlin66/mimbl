@@ -49,7 +49,7 @@ export type DN = Node | null;
  *
  * @typeparam TProps Type defining properties that can be passed to the class-based component
  * of this type. Note that if the component is expected to accept children then the *TProps*
- * object must have the `cildren` property (usually of the `any` type). Default type is an empty
+ * object must have the `children` property (usually of the `any` type). Default type is an empty
  * object (no properties and no children).
  * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
@@ -57,9 +57,9 @@ export type DN = Node | null;
  */
 export type ComponentProps<TProps extends {} = {}, TEvents extends {} = {}> =
     Readonly<TProps> &
+    {key?: any} &
     { readonly [K in keyof TEvents & string as `$on_${K}`]?:
         EventPropType<TEvents[K] extends Event ? TEvents[K] : CustomEvent<TEvents[K]>> }
-
 
 
 /**
@@ -73,7 +73,11 @@ export type ComponentProps<TProps extends {} = {}, TEvents extends {} = {}> =
  */
 export interface IComponentClass<TProps extends {} = {}, TEvents extends {} = {}>
 {
-	new( props?: ComponentProps<TProps,TEvents>): IComponent<TProps,TEvents>;
+    new (
+        ...args: {} extends TProps
+            ? [props?: ComponentProps<TProps, TEvents>]
+            : [props: ComponentProps<TProps, TEvents>]
+    ): IComponent<TProps, TEvents>;
 }
 
 
@@ -428,7 +432,7 @@ export type CallbackPropType<T extends Function = Function> =
 /**
  * Defines event handler that is invoked when reference value changes.
  */
-export type RefFunc<T = any> = (newRef: T) => void;
+export type RefFunc<T = any> = (newRef: T | undefined) => void;
 
 /**
  * Defines event handler that is invoked when reference value changes.
@@ -810,17 +814,17 @@ export interface IRootVN extends IVNode
 /**
  * The IClassCompVN interface represents a virtual node for a JSX-based component.
  */
-export interface IClassCompVN extends IVNode
+export interface IClassCompVN<TProps extends {} = {}, TEvents extends {} = {}> extends IVNode
 {
 	/** Gets the component instance. */
-    readonly comp?: IComponent;
+    readonly comp?: IComponent<TProps, TEvents>;
 
     /**
      * Object that is used mainly by the managed components. It keeps the properties first passed
      * to the componet's constructor and then changed when the component is updated through its
      * parent updates.
      */
-	readonly props: any;
+	readonly props: ComponentProps<TProps, TEvents> | undefined;
 
     /**
      * If the component specifies the {@link CompAPI!withShadow} decorator, the `shadowRoot`
@@ -993,7 +997,7 @@ export interface ITextVN extends IVNode
  *   the same handler to serve different attributes).
  * 2. Implement the ICustomAttributeHandler interface
  */
-export interface ICustomAttributeHandlerClass<T>
+export interface ICustomAttributeHandlerClass<T = any>
 {
 	/**
 	 * Constructs a new custom attribute handler that will act on the given element and provides
@@ -1005,7 +1009,7 @@ export interface ICustomAttributeHandlerClass<T>
 	 * @param attrVal Initial value of the custom attribute
 	 * @param attrName Name of the custom attribute
 	 */
-	new( elmVN: IElmVN, attrVal: T, attrName?: string): ICustomAttributeHandler<T>;
+	new( elmVN: IElmVN<any>, attrVal: T, attrName?: string): ICustomAttributeHandler<T>;
 }
 
 

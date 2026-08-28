@@ -163,7 +163,7 @@ export interface IElementAttrs
 /**
  * Represents standard element events that can be fired by all elements.
  */
-export interface IElementEvents extends GlobalEventHandlersEventMap, ElementEventMap, DocumentAndElementEventHandlersEventMap
+export interface IElementEvents extends GlobalEventHandlersEventMap, ElementEventMap
 {
 }
 

@@ -99,6 +99,8 @@ export class DetailedStats
 	private constructor( name: string)
 	{
 		this.name = name;
+        this.startTime = 0;
+        this.duration = 0;
 	}
 
 

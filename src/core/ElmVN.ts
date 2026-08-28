@@ -637,7 +637,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         catch( err)
         {
             /// #if DEBUG
-            console.error( `Error creating handler for custom attribute '${name}': ${err.message}`);
+            console.error( `Error creating handler for custom attribute '${name}': ${(err as Error).message}`);
             /// #endif
 
             return false;
@@ -665,7 +665,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         catch( err)
         {
             /// #if DEBUG
-            console.error( `Error terminating handler for custom attribute '${name}': ${err.message}`);
+            console.error( `Error terminating handler for custom attribute '${name}': ${(err as Error).message}`);
             /// #endif
         }
 	}
@@ -726,7 +726,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         catch( err)
         {
             /// #if DEBUG
-            console.error( `Error updating handler for custom attribute '${name}': ${err.message}`);
+            console.error( `Error updating handler for custom attribute '${name}': ${(err as Error).message}`);
             /// #endif
         }
 	}
@@ -770,7 +770,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	private props: ExtendedElement<T> | undefined;
 
     // Redefine the ownDN property from VN to be of the Element type
-	public ownDN: T | null;
+	public ownDN: T | null = null;
 
     // Reference to the element that is specified as a "ref" property.
 	private ref?: RefType<T>;
@@ -779,7 +779,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	private vnref?: ElmRefType<T>;
 
 	// Object that serves as a map between attribute names and their current values.
-	private attrs: { [name: string]: AttrRunTimeData };
+	private attrs!: { [name: string]: AttrRunTimeData };
 
 	// Flag indicating whether at least one of the attributes has triggers. If not then
     // we can avoid calling unmountAttrs upon element unmounting.
@@ -790,7 +790,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 	// Object that serves as a map between names of custom element properties and their respective
 	// handler objects and values.
-    private customAttrs: { [name: string]: CustomAttrRunTimeData };
+    private customAttrs!: { [name: string]: CustomAttrRunTimeData };
 
     // Properties that were specified in the setProps call. This allows updating the
     // element's properties without re-rendering its children.
@@ -822,7 +822,7 @@ function getPropTypeFromPropVal(propVal: any): PropType
  * Function reacting on the value change in an attribute's trigger. This function gets bounded to
  * the instance of the ElmVN class and attribute RTD object; therefore, it can use "this".
  */
-function onAttrTriggerChanged( this: ElmVN, name: string, val: any): void
+function onAttrTriggerChanged( this: ElmVN<any>, name: string, val: any): void
 {
     this.updateAttrValue(name, val);
 }

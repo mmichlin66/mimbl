@@ -19,9 +19,8 @@ export class IndependentCompVN extends ClassCompVN
 
 	constructor( comp: IComponent)
 	{
-		super();
+		super(comp.constructor as IComponentClass);
 
-        this.compClass = comp.constructor as IComponentClass;
         this.comp = this.key = comp;
 	};
 
