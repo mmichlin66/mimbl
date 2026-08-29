@@ -90,8 +90,8 @@ const symWebElmDef = Symbol("webElmDef");
  * }
  * ```
  *
- * @typeparam TAttrs Type that maps attribute names to attribute types.
- * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * @typeParam TAttrs Type that maps attribute names to attribute types.
+ * @typeParam TEvents Type that maps event names (a.k.a event types) to either Event-derived
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
  * @returns Class that inherits from the HTMLElement class that imlements all the internal logic
@@ -116,9 +116,9 @@ export function WebElm<TAttrs extends {} = {}, TEvents extends {} = {}>(): WebEl
  * }
  * ```
  *
- * @typeparam TElm Class deriving from HTMLElement, from which the resulting class will inherit.
- * @typeparam TAttrs Type that maps attribute names to attribute types.
- * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * @typeParam TElm Class deriving from HTMLElement, from which the resulting class will inherit.
+ * @typeParam TAttrs Type that maps attribute names to attribute types.
+ * @typeParam TEvents Type that maps event names (a.k.a event types) to either Event-derived
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
  *

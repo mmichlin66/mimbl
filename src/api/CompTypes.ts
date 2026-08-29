@@ -47,11 +47,11 @@ export type DN = Node | null;
  * <MyComp title="Hello" $on_titleChanged={e => console.log(`Title changed to ${e.detail}`)}
  * ```
  *
- * @typeparam TProps Type defining properties that can be passed to the class-based component
+ * @typeParam TProps Type defining properties that can be passed to the class-based component
  * of this type. Note that if the component is expected to accept children then the *TProps*
  * object must have the `children` property (usually of the `any` type). Default type is an empty
  * object (no properties and no children).
- * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * @typeParam TEvents Type that maps event names (a.k.a event types) to either Event-derived
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent. Default type is an empty object (no events).
  */
@@ -65,9 +65,9 @@ export type ComponentProps<TProps extends {} = {}, TEvents extends {} = {}> =
 /**
  * Interface that defines constructor signature for components.
  *
- * @typeparam TProps Type defining properties that can be passed to the class-based component
+ * @typeParam TProps Type defining properties that can be passed to the class-based component
  *		of this type. Default type is an empty object (no properties).
- * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * @typeParam TEvents Type that maps event names (a.k.a event types) to either Event-derived
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
  */
@@ -91,9 +91,9 @@ export interface IComponentClass<TProps extends {} = {}, TEvents extends {} = {}
  * Note that you normally don't need to implement this interface because your components will
  * usually derive from the {@link CompAPI!Component} class that implements it.
  *
- * @typeparam TProps Type defining properties that can be passed to this class-based component.
+ * @typeParam TProps Type defining properties that can be passed to this class-based component.
  *		Default type is an empty object (no properties).
- * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * @typeParam TEvents Type that maps event names (a.k.a event types) to either Event-derived
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
  */
@@ -229,7 +229,7 @@ export type ComponentShadowOptions = boolean | string | ShadowRootInit |
  * Represents component functionality that is implemented by the Mimbl base classes for
  * regular components and custom Web element.
  *
- * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * @typeParam TEvents Type that maps event names (a.k.a event types) to either Event-derived
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
  */
@@ -339,7 +339,7 @@ export interface IComponentEx<TEvents extends {} = {}>
      * built-in and custom events. For built-in events (that is, events whose type derives from
      * Event), this is the event object itself. For custom events, it becomes the value of the
      * `detail` property of the CustomEvent object.
-     * @typeparam K Defines a range of possible values for the `eventType` parameter. K is a key
+     * @typeParam K Defines a range of possible values for the `eventType` parameter. K is a key
      * from the `TEvent` type.
      * @param eventType Event type name, which is a key from the `TEvents` type
      * @param detail Event data, whose type is defined by the type mapped to the key
@@ -476,7 +476,7 @@ export type ElmRefPropType<T extends Element = Element> = RefPropType<IElmVN<T>>
 
 /**
  * Type of event handler function for DOM events of type T.
- * @typeparam T DOM event type, e.g. MouseEvent
+ * @typeParam T DOM event type, e.g. MouseEvent
  * @param e Event object
  * @param arg Optional parameter, which is defined only if it was passed when the callback was
  * wrapped - that is, in the `arg` property of the EventObjectType object or in the 2nd item of the
@@ -486,14 +486,14 @@ export type EventFuncType<T extends Event = Event> = (e: T, arg?: any) => void;
 
 /**
  * Type defining a tuple that can be supplied for an event listener.
- * @typeparam T DOM event type, e.g. MouseEvent
+ * @typeParam T DOM event type, e.g. MouseEvent
  */
 export type EventTupleType<T extends Event = Event> =
     [func: EventFuncType<T>, arg?: any, thisArg?: any]
 
 /**
  * Type defining an object that can be supplied for an event listener.
- * @typeparam T DOM event type, e.g. MouseEvent
+ * @typeParam T DOM event type, e.g. MouseEvent
  */
 export interface EventObjectType<T extends Event> extends CallbackWrappingOptions
 {
@@ -509,7 +509,7 @@ export interface EventObjectType<T extends Event> extends CallbackWrappingOption
 
 /**
  * Union type that can be passed to an Element's event.
- * @typeparam T DOM event type, e.g. MouseEvent
+ * @typeParam T DOM event type, e.g. MouseEvent
  */
 export type EventPropType<T extends Event = Event> =
     EventFuncType<T> | EventTupleType<T> | EventObjectType<T>;
@@ -591,14 +591,14 @@ export type ExtendedEvents<T> = {
  * built-in or custom element is defined as a JSX intrinsic element using the `ExtendedElement`
  * type by passing the correct attribute, event and children types.
  *
- * @typeparam TRef - Type that can be passed to the `ref` attribute to get a reference to the
+ * @typeParam TRef - Type that can be passed to the `ref` attribute to get a reference to the
  * element.
- * @typeparam TAttr Type listing element's attribute names mapped to attribute types.
- * @typeparam TEvents Type listing element's event names mapped to event types. Most elements
+ * @typeParam TAttr Type listing element's attribute names mapped to attribute types.
+ * @typeParam TEvents Type listing element's event names mapped to event types. Most elements
  * don't need to specify this type parameter as they only implement standard events; however,
  * there are some elements - e.g. <video> - that define additional events. Custom Web elements
  * can also define their own events - in this case, they must be specified here.
- * @typeparam TChildren Type that determines what children are allowed under the element. It
+ * @typeParam TChildren Type that determines what children are allowed under the element. It
  * defaults to `any` and usually doesn't need to be specified.
  */
 export type ExtendedElement<TRef extends Element = Element,

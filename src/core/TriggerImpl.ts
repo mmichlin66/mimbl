@@ -91,7 +91,7 @@ export class Watcher<T extends AnyAnyFunc = any>
      * that were read during its execution. When any of these trigger objects have their values
      * changed, the responder function will be called.
      *
-     * @typeparam T Type (signature) of the function to be watched.
+     * @typeParam T Type (signature) of the function to be watched.
      * @param func Function to be watched
      * @param responder Function to be invoked when values of the trigger objects encountered during
      * the original function's last execution change.

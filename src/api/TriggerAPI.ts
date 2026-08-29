@@ -15,7 +15,7 @@ import { ComputedTrigger, startMutations, stopMutations, Trigger, triggerDecorat
  * that add or remove items will trigger events, but modifications to the items will not.
  * The `depth` parameter is ignored for primitive types.
  *
- * @typeparam T Type of the trigger value.
+ * @typeParam T Type of the trigger value.
  * @param v Optional initial value
  * @param depth Depth of the trigger, which determines how many levels of nested properties of
  * arrays, maps, sets and objects should trigger changes. Ignored for primitive types.
@@ -57,7 +57,7 @@ export const trigger = (targetOrDepth: any, name?: string): any =>
  * that were read during its execution. When any of these trigger objects have their values
  * changed, the responder function will be called.
  *
- * @typeparam T Type (signature) of the function to be watched.
+ * @typeParam T Type (signature) of the function to be watched.
  * @param func Function to be watched
  * @param responder Function to be invoked when values of the trigger objects encountered during
  * the original function's last execution change.
@@ -78,7 +78,7 @@ export const createWatcher = <T extends AnyAnyFunc>( func: T, responder: NoneVoi
  * Creates a computed trigger object whose value is calculated by the given function or get
  * accessor.
  *
- * @typeparam T Type of the computed value.
+ * @typeParam T Type of the computed value.
  * @param func Function, method or get accessor that produces the computed value.
  * @param thisArg Optional `this` value to use when invoking the computing function.
  * @returns Trigger object that will trigger changes only when the computed value changes.

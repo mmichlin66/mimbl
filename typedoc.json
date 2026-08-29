@@ -12,6 +12,9 @@
 	"entryPoints": [
 		"./src/api/"
 	],
+    "exclude": [
+        "src/web/**/*"
+    ],
     "externalSymbolLinkMappings": {
         "mimcss": {
             "WritingMode_StyleType": "https://www.mimcss.com/reference/modules/StyleTypes.html#WritingMode_StyleType",

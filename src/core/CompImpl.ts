@@ -11,7 +11,7 @@ import { scheduleFunc, wrapFunc } from "./Reconciler";
  * Component mixin that contains functionality that is shared between regular components and
  * custom Web elements.
  *
- * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * @typeParam TEvents Type that maps event names (a.k.a event types) to either Event-derived
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
  */

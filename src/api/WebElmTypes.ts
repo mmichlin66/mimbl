@@ -103,8 +103,8 @@ export type OnPropChangeHandlers<TEvents> =
 
 /**
  * Represents the Mimbl component side of the custom element implementation.
- * @typeparam TAttrs Type that maps attribute names to attribute types.
- * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * @typeParam TAttrs Type that maps attribute names to attribute types.
+ * @typeParam TEvents Type that maps event names (a.k.a event types) to either Event-derived
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
  */
@@ -125,7 +125,7 @@ export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}>
 
     /**
      * Sets the value of the given attribute converting it to string if necessary.
-     * @typeparam K Defines a range of possible values for the `attrName` parameter. K is a key
+     * @typeParam K Defines a range of possible values for the `attrName` parameter. K is a key
      * from the `TAttr` type.
      * @param attrName Attribute name, which is a key from the `TAttrs` type
      * @param value Value to set to the attribute. It is converted to string if necessary.
@@ -134,7 +134,7 @@ export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}>
 
     /**
      * Gets the current string value of the given attribute.
-     * @typeparam K Defines a range of possible values for the `attrName` parameter. K is a key
+     * @typeParam K Defines a range of possible values for the `attrName` parameter. K is a key
      * from the `TAttr` type.
      * @param attrName Attribute name, which is a key from the `TAttrs` type
      * @returns The current value of the attribute.
@@ -143,7 +143,7 @@ export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}>
 
     /**
      * Determines whether the element has the attribute with the given name.
-     * @typeparam K Defines a range of possible values for the `attrName` parameter. K is a key
+     * @typeParam K Defines a range of possible values for the `attrName` parameter. K is a key
      * from the `TAttr` type.
      * @param attrName Attribute name, which is a key from the `TAttrs` type
      * @returns True if the attribute with the given name exists on the element.
@@ -155,7 +155,7 @@ export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}>
      * built-in and custom events. For built-in events (that is, events whose type derives from
      * Event), this is the event object itself. For custom events, it becomes the value of the
      * `detail` property of the CustomEvent object.
-     * @typeparam K Defines a range of possible values for the `eventType` parameter. K is a key
+     * @typeParam K Defines a range of possible values for the `eventType` parameter. K is a key
      * from the `TEvent` type.
      * @param eventType Event type name, which is a key from the `TEvents` type
      * @param detail Event data, whose type is defined by the type mapped to the key
@@ -168,11 +168,11 @@ export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}>
 
 /**
  * Represents a constructor for the HTMLElement-derived classes. This constructor is returned from
- * the {@link WebElmAPI!WebElm} and {@link WebElmAPI!WebElmEx} functions.
+ * the {@link WebElmAPI!WebElm} function.
  *
- * @typeparam TElm Class deriving from HTMLElement, from which the resulting class will inherit.
- * @typeparam TAttrs Type that maps attribute names to attribute types.
- * @typeparam TEvents Type that maps event names (a.k.a event types) to either Event-derived
+ * @typeParam TElm Class deriving from HTMLElement, from which the resulting class will inherit.
+ * @typeParam TAttrs Type that maps attribute names to attribute types.
+ * @typeParam TEvents Type that maps event names (a.k.a event types) to either Event-derived
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
  */

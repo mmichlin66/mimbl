@@ -198,13 +198,13 @@ export function registerCustomAttribute<T>( attrName: string, handlerClass: ICus
  * Base class for components. Components must derive from this class and must implement the render
  * method.
  *
- * @typeparam TProps Type of the components properties object. By default, it contains an optional
+ * @typeParam TProps Type of the components properties object. By default, it contains an optional
  * `children` property of type `any`. This allows components that don't explicitly specify any
  * type, to accept children. Note that if a component provides its own type for the properties
  * object and wants to accept children, this type must have the `children` property of the desired
  * type. If not, the component will not be able to accept children (which, oftentimes, might be a
  * desired behavior).
- * @typeparam TEvents Interface defining the component's event. This interface should map event
+ * @typeParam TEvents Interface defining the component's event. This interface should map event
  * names (e.g. "change") to the types of event objects. The event object types could be either
  * types derived from the built-in Event type, in which case this will be the type passed to the
  * event handler function. If the event object type doesn't derive from the built-in Event type,
@@ -494,7 +494,7 @@ s_initStyleScheduler().then( n => mimblStyleSchedulerType = n);
  *     Component Lazy-Loading
  * </a>
  *
- * @typeparam T Type to which the promise resolves. Since this function is intended to be called
+ * @typeParam T Type to which the promise resolves. Since this function is intended to be called
  * with dynamic `import()` statement, this type will normally be `typeof import(...)`; that is,
  * it will be an object containing all exported module members.
  * @param funcOrPromise Either a promise returned from the dynamic import statement or a function

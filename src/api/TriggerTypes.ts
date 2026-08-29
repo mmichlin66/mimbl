@@ -19,7 +19,7 @@ export type TypeVoidFunc<T> = (v: T) => void;
 /**
  * The ITrigger interface represents an object that keeps a value and notifies all attached wathers
  * when this value changes.
- * @typeparam T Type of the trigger value.
+ * @typeParam T Type of the trigger value.
  */
 export interface ITrigger<T = any> extends IEventSlot<TypeVoidFunc<T>>
 {
@@ -38,7 +38,7 @@ export interface ITrigger<T = any> extends IEventSlot<TypeVoidFunc<T>>
  * to all triggers whose values were read during the course of the call. When values of these
  * triggers change, a responder function is called. The responder function is provided when the
  * watcher is created, but it can be changed later.
- * @typeparam T Type (signature) of the function to be watched.
+ * @typeParam T Type (signature) of the function to be watched.
  */
 export interface IWatcher<T extends AnyAnyFunc = any>
 {
