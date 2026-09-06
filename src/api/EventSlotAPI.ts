@@ -15,18 +15,16 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
 	 */
     public fire( ...args: Parameters<TFunc>): void
     {
-        this.listener?.( ...args);
-        this.listeners?.forEach( (rc, listener) => listener( ...args));
+        this.listener?.(...args);
+        this.listeners?.forEach((rc, listener) => listener(...args));
     }
 
 	/**
 	 * Adds the given function as a listener to the event.
 	 */
-	public attach( listener: TFunc): void
+	public attach(listener: TFunc): void
 	{
-        if (!listener)
-            return;
-        else if (listener === this.listener)
+        if (listener === this.listener)
             this.rc++;
         else if (!this.listener)
         {
@@ -35,33 +33,29 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
         }
         else
         {
-            if (!this.listeners)
-                this.listeners = new Map();
-
+            this.listeners ??= new Map();
             let rc = this.listeners.get(listener) ?? 0;
-            this.listeners.set( listener, rc + 1);
+            this.listeners.set(listener, rc + 1);
         }
 	}
 
 	/** Removes the given function as a listener to the event. */
-	public detach( listener: TFunc): void
+	public detach(listener: TFunc): void
 	{
-        if (!listener)
-            return;
-        else if (this.listener === listener)
+        if (this.listener === listener)
         {
             if (--this.rc === 0)
-                this.listener = null;
+                this.listener = undefined;
         }
         else
         {
-			let rc = this.listeners?.get( listener);
-            if (rc != null)
+			let rc = this.listeners?.get(listener);
+            if (rc)
             {
-                if (--rc === 0)
+                if (rc === 1)
                     this.listeners!.delete(listener);
                 else
-                    this.listeners!.set( listener, rc);
+                    this.listeners!.set(listener, rc - 1);
             }
         }
 	}
@@ -75,9 +69,9 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
 	/** Removes all listeners to the event. */
 	public clear(): void
 	{
-		this.listener = null;
+		this.listener = undefined;
         this.rc = 0;
-		this.listeners = null;
+		this.listeners = undefined;
 	}
 
 
@@ -86,7 +80,7 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
      * The first listener function. Since many times there is only one listener to an event, we
      * optimize by not creating a set of listeners.
      */
-	private listener?: TFunc | null;
+	private listener?: TFunc = undefined;
 
 	/**
      * Reference counter of the listener function.
@@ -95,7 +89,7 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
 
 	// Map of listener functions to their respective reference counts. When there are no listeners,
     // this field is set to null to preserve space.
-	private listeners?: Map<TFunc,number> | null;
+	private listeners?: Map<TFunc,number> = undefined;
 }
 
 

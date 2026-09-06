@@ -1,6 +1,8 @@
 ﻿import { AnyAnyFunc, ITrigger, IWatcher, NoneTypeFunc, NoneVoidFunc } from "./TriggerTypes";
 import { ComputedTrigger, startMutations, stopMutations, Trigger, triggerDecorator, Watcher } from "../core/TriggerImpl";
 
+export {triggerize} from "../core/TriggerImpl";
+
 
 
 /**
