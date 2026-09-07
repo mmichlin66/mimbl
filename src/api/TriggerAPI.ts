@@ -1,5 +1,5 @@
 ﻿import { AnyAnyFunc, ITrigger, IWatcher, NoneTypeFunc, NoneVoidFunc } from "./TriggerTypes";
-import { ComputedTrigger, startMutations, stopMutations, Trigger, triggerDecorator, Watcher } from "../core/TriggerImpl";
+import { ComputedTrigger, startMutations, stopMutations, Trigger, Watcher } from "../core/TriggerImpl";
 
 export {triggerize} from "../core/TriggerImpl";
 
@@ -49,6 +49,24 @@ export const trigger = (targetOrDepth: any, name?: string): any =>
         // value of the trigger: Shallow for maps, sets and arrays and Deep for objects.
         return triggerDecorator( undefined, targetOrDepth, name!);
     }
+}
+
+
+
+/**
+ * Helper function for defining `@trigger` decorators.
+ */
+const triggerDecorator = (depth: number | undefined, target: any, name: string): void =>
+{
+    let sym = Symbol( name + "_trigger");
+
+    const getTriggerObj = (obj: any, depth: number | undefined): ITrigger =>
+        obj[sym] ??= new Trigger( undefined, depth) as ITrigger;
+
+    Object.defineProperty( target, name, {
+        get() { return getTriggerObj(this, depth).get(); },
+        set(val) { getTriggerObj(this, depth).set(val); },
+	});
 }
 
 
