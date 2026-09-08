@@ -451,19 +451,27 @@ export const stopMutations = (): void =>
 // the trigger for that item is created and it is this trigger that will notify of reads and changes
 // in the item's value.
 //
-// The Proxy object returned by the `triggerize` function is marked with a special symbol to indicate
-// that it is a trigger proxy. This is used to avoid triggerizing the same object multiple times.
+// The Proxy object returned by the `triggerize` function is marked with a special symbol pointing
+// to the target object, while the target object is marked with another symbol pointing to the
+// proxy. This is used to avoid triggerizing the same object multiple times.
 //
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
 /**
- * A symbol to mark objects that are proxies for triggerized values. This is used to avoid triggerizing
- * the same object multiple times. The value of this symbol is the original object that was triggerized
- * to create the proxy.
+ * A symbol to mark proxy objects for triggerized values. The value of this symbol is the original
+ * object that was triggerized to create the proxy. This is used to avoid triggerizing
+ * the same object multiple times.
  */
-const symTriggerProxyTarget = Symbol("symTriggerProxyTarget");
+const symTarget = Symbol("symTarget");
+
+/**
+ * A symbol to mark objects that have been alredy triggerized. The value of this symbol is the Proxy
+ * object created when the object was triggerized for the first time. This is used to avoid triggerizing
+ * the same object multiple times.
+ */
+const symProxy = Symbol("symProxy");
 
 
 
@@ -474,20 +482,35 @@ const symTriggerProxyTarget = Symbol("symTriggerProxyTarget");
  *   - the depth is 0, meaning that we don't actually want to triggerize the value
  *   - the value is not an object (that is, it is a primitive type)
  *   - the value is already a trigger proxy
+ * If triggerization is possible, it might happen that the object has alreay been triggerized. In
+ * this case, the original proxy object createed during the prior triggerization is also returned.
  * @param v Value to check whether it can be triggerized
  * @param depth Optional depth of the level that called this function. If this parameter is 0, no
  * triggerization occurs and the value is returned as is. If undefined or negative, no restriction
  * on depth is applied. If positive, only that number of levels is subject to triggerization.
- * @returns Tuple with two elements:
- *   - The first element is a flag indicating whether the input value can be triggerized.
- *   - Thesecond element is a flag indicaing whether it is an already triggerized object.
+ * @returns Tuple with three elements:
+ *   - The first element is a flag indicating whether the input value can be triggerized (this is
+ *     also true if the value is already triggerized).
+ *   - The second element is either undefined if the value has not been triggerized yet, or is the
+ *     proxy object created on the previous triggerization of the value.
+ *   - The third element is the target object of the proxy if the value is a proxy; otherwise, it
+ *     is the value itself. In other words, the third element is always the untriggerized object
+ *     including null, undefined and values of primitive types.
  */
-export function canTriggerize(v: any, depth?: number): [boolean, boolean]
+export function canTriggerize<T>(v: T, depth?: number): [boolean, T | undefined, T]
 {
-    if (v == null || depth === 0 || typeof v !== "object")
-        return [false, false];
-    else
-        return [true, symTriggerProxyTarget in v];
+    if (!v || typeof v !== "object" || depth === 0)
+        return [false, undefined, v];
+
+    // if symTarget is in v, it means v is a proxy; if symProxy is in v, it means v is already
+    // triggerized and v[symProxy] returns the proxy; otherwse, there is no proxy (undefined).
+    let proxy = symTarget in v ? v : v[symProxy];
+
+    // if symProxy is in v, it means v is the untriggerized object; if symTarget is in v, it means
+    // v is a proxy and v[symTarget] returns the object; otherwise, v is not yet triggerized.
+    let obj = symProxy in v ? v : proxy?.[symTarget] ?? v;
+
+    return [true, proxy, obj];
 }
 
 
@@ -501,7 +524,7 @@ export function canTriggerize(v: any, depth?: number): [boolean, boolean]
  * @param depth Optional depth of the level that called this function. If this parameter is 0, no
  * triggerization occurs and the value is returned as is. If undefined or negative, no restriction
  * on depth is applied. If positive, only that number of levels is subject to triggerization.
- * @returns A proxy to the triggerized object or the input value if it cannot be triggerized.
+ * @returns A proxy to the triggerized input value or the value itself if it cannot be triggerized.
  */
 export function triggerize<T>(v: T, depth?: number): T
 {
@@ -510,14 +533,17 @@ export function triggerize<T>(v: T, depth?: number): T
     depth = depth ?? -1;
 
     // check whether the value can be triggerized at the given level and whether it is already
-    // a proxy of the triggerized object. If it cannot be triggerized or it is already a proxy,
-    // return the value as is.
-    let [canBeTriggerized, isTriggerProxy] = canTriggerize(v, depth);
-    if (!canBeTriggerized || isTriggerProxy)
+    // a proxy of the triggerized object or an already triggerized object itself. If it cannot be
+    // triggerized or it is already/has a proxy, return the value as is.
+    let [canBeTriggerized, proxy] = canTriggerize(v, depth);
+    if (!canBeTriggerized)
         return v;
+    else if (proxy)
+        return proxy;
 
-    // for arrays, plain objects, maps and sets we will create a trigger proxy. For other types of
-    // objects we don't create a proxy and return the original value.
+    // We are here only if v is an untriggerized-yet object. For arrays, plain objects, maps and
+    // sets we will create a trigger proxy. For other types of objects we don't create a proxy and
+    // return the original value.
     let handlerClass: new (depth: number, target: any) => ProxyHandler<any>;
     if (Array.isArray(v) || (v as any).constructor === Object)
         handlerClass = ArrayObjectHandler;
@@ -528,7 +554,7 @@ export function triggerize<T>(v: T, depth?: number): T
     else
         return v;
 
-    return new Proxy( v as any as object, new handlerClass(depth - 1, v)) as any as T;
+    return v[symProxy] = new Proxy( v as any as object, new handlerClass(depth - 1, v)) as any as T;
 }
 
 
@@ -542,7 +568,7 @@ export function triggerize<T>(v: T, depth?: number): T
 export function untriggerize(v: any): any
 {
     // proxy's target is kept under the symTriggerProxyTarget returned by the proxy's handler.
-    return v && typeof v === "object" && symTriggerProxyTarget in v ? v[symTriggerProxyTarget] : v;
+    return v && typeof v === "object" && symTarget in v ? v[symTarget] : v;
 }
 
 
@@ -586,21 +612,6 @@ abstract class BaseContainerHandler<T extends object> implements ProxyHandler<T>
     // Abstract declaration - neded only to satisfy the compiler that we indeed implement
     // the ProxyHandler interface.
     abstract get(target: T, prop: PropertyKey, receiver: any): any;
-
-
-    // /** Returns the trigger for a specific item, creating it if it doesn't exist. */
-    // protected obtainItemTrigger(item: any, value?: any): Trigger
-    // {
-    //     let itemTrigger = this.itemTriggers.get(item);
-    //     if (!itemTrigger)
-    //     {
-    //         // create a trigger for the property and add it to our internal map
-    //         itemTrigger = new Trigger(value, this.depth - 1);
-    //         this.itemTriggers.set(item, itemTrigger);
-    //     }
-
-    //     return itemTrigger;
-    // }
 }
 
 
@@ -632,7 +643,7 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
     {
         // handle our artificial symbol that marks trigger proxies. We don't call the target
         // and we always return the target itself - this is the way to expose it through the proxy.
-        if (prop === symTriggerProxyTarget)
+        if (prop === symTarget)
             return this.target;
 
         // check whether we already have a trigger. If no, get the value from the target and
@@ -665,35 +676,38 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
 
     set(target: T, prop: PropertyKey, value: any, receiver: any): boolean
     {
-        // check whether the property exists on the target. If it doesn't, we will notify the
-        // container trigger of a change.
-        if (!Reflect.has(target, prop))
-            this.containerTrigger.notifyWrite();
-
         // we use untriggerized values in the target object, so get it now
-        let realValue = untriggerize(value);
+        let untriggerizedValue = untriggerize(value);
 
         // if the property is a symbol, we don't need to do anything else. We also don't need to do
         // anything if the depth is 0, because we don't want to triggerize the value.
         if (typeof prop === "symbol" || this.depth === 0)
-            return Reflect.set(target, prop, realValue, receiver);
+            return Reflect.set(target, prop, untriggerizedValue, receiver);
+
+        // change the value in the target
+        let result = Reflect.set(target, prop, untriggerizedValue, receiver);
 
         // check if we already have a trigger for this property. If we don't, we will create one
-        // with the value read from the target.
+        // with the new value. If trigger already exists, we set the new value to it, which should
+        // invoke the listeners if there are any.
         let itemTrigger = this.itemTriggers.get(prop);
         if (!itemTrigger)
         {
-            // get the current value from the target.
-            let orgVal = Reflect.get(target, prop, receiver);
+            // check whether the property exists on the target. If it doesn't, we will notify the
+            // container trigger of a change.
+            if (!Reflect.has(target, prop))
+                this.containerTrigger.notifyWrite();
 
             // create a trigger for the property and add it to our internal map
-            itemTrigger = new Trigger(orgVal, this.depth - 1);
+            itemTrigger = new Trigger(value, this.depth - 1);
             this.itemTriggers.set(prop, itemTrigger);
         }
+        else
+        {
+            // this notifies the trigger of a change if the new value is different from the old one
+            itemTrigger.set(untriggerizedValue);
+        }
 
-        // change the value in the target and in the trigger.
-        let result = Reflect.set(target, prop, realValue, receiver);
-        itemTrigger.set(value);
         return result;
     }
 
@@ -721,7 +735,7 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
     has(target: T, prop: PropertyKey): boolean
     {
         // handle our artificial symbol that marks trigger proxies.
-        if (prop === symTriggerProxyTarget)
+        if (prop === symTarget)
             return true;
 
         this.containerTrigger.notifyRead();
@@ -784,7 +798,7 @@ abstract class MapSetBaseHandler<T extends Map<any,any> | Set<any>> extends Base
 
     get(target: T, prop: PropertyKey, receiver: any): any
     {
-        if (prop === symTriggerProxyTarget)
+        if (prop === symTarget)
             return this.target;
 
         // if we have a wrapper for the requested property, return it. Otherwise, return the
@@ -808,7 +822,7 @@ abstract class MapSetBaseHandler<T extends Map<any,any> | Set<any>> extends Base
     has(target: T, prop: PropertyKey): boolean
     {
         // handle our artificial symbol that marks trigger proxies.
-        if (prop === symTriggerProxyTarget)
+        if (prop === symTarget)
             return true;
 
         return Reflect.has(target, prop);
@@ -852,23 +866,23 @@ class SetHandler extends MapSetBaseHandler<Set<any>>
     add_wrapper(orgMethod: Function, v: any): Set<any>
     {
         // if the value cannot be triggerized, we don't need to create triggers for items.
-        let [canBeTriggerized, _] = canTriggerize(v, this.depth - 1);
+        let [canBeTriggerized, , untriggerizedValue] = canTriggerize(v, this.depth - 1);
         if (canBeTriggerized)
         {
             // check whether we already have a trigger for this value. If we do, we don't need
             // to do anything; otherwise, we will create a trigger for the value.
-            if (this.itemTriggers.get(v))
+            if (this.itemTriggers.get(untriggerizedValue))
                 return this.target;
             else
-                this.itemTriggers.set(v, new Trigger(v, this.depth - 1));
+                this.itemTriggers.set(untriggerizedValue, new Trigger(untriggerizedValue, this.depth - 1));
         }
 
         // check whether the target already has the value. If it does, we don't need to do anything;
         // otherwise, we notify the container trigger of a change and call the original method.
-        if (!this.target.has(v))
+        if (!this.target.has(untriggerizedValue))
         {
             this.containerTrigger.notifyWrite();
-            orgMethod(v);
+            orgMethod(untriggerizedValue);
         }
 
         // the add() method always returns the Set object itself
@@ -879,22 +893,22 @@ class SetHandler extends MapSetBaseHandler<Set<any>>
     delete_wrapper(orgMethod: Function, v: any): boolean
     {
         // since value can be a proxy to a real value, we need to get the real value
-        v = untriggerize(v);
+        let untriggerizedValue = untriggerize(v);
 
         // delete the item from the target - it will tell whether the value was in the set. If it
         // was not, we don't need to do anything; otherwise, we notify the container trigger of a
         // change and remove a trigger if we had one.
-        if (!orgMethod(v))
+        if (!orgMethod(untriggerizedValue))
             return false;
 
         this.containerTrigger.notifyWrite();
 
         // check whether we have a trigger for this value and remove it.
-        let itemTrigger = this.itemTriggers.get(v);
+        let itemTrigger = this.itemTriggers.get(untriggerizedValue);
         if (itemTrigger)
         {
             itemTrigger.clear();
-            this.itemTriggers.delete(v);
+            this.itemTriggers.delete(untriggerizedValue);
         }
 
         return true;
@@ -916,28 +930,27 @@ class SetHandler extends MapSetBaseHandler<Set<any>>
     }
 
     /** Processes items during iteration over the container */
-    iteratorProxyCallback = (item: any): void =>
+    iteratorProxyCallback = (item: any): any =>
     {
         // for "entries" iterator, item is a tuple of [key, value]; for other iterators, it is just value
         let v = Array.isArray(item) ? item[1] : item;
 
         // if the value cannot be triggerized, we don't need to create triggers for items.
-        let [canBeTriggerized] = canTriggerize(v, this.depth - 1);
+        let [canBeTriggerized, proxy, untriggerizedValue] = canTriggerize(v, this.depth - 1);
         if (canBeTriggerized)
         {
-            // we keep our triggers in a map with untriggerized keys, so get it now
-            let realValue = untriggerize(v);
-
             // check whether we already have a trigger for this value and create it if needed.
-            let itemTrigger = this.itemTriggers.get(realValue);
+            let itemTrigger = this.itemTriggers.get(untriggerizedValue);
             if (!itemTrigger)
             {
-                itemTrigger = new Trigger(v, this.depth - 1);
-                this.itemTriggers.set(realValue, itemTrigger);
+                itemTrigger = new Trigger(untriggerizedValue, this.depth - 1);
+                this.itemTriggers.set(untriggerizedValue, itemTrigger);
             }
 
             itemTrigger.notifyRead();
         }
+
+        return proxy ?? untriggerizedValue;
     }
 }
 
@@ -983,7 +996,7 @@ class IteratorHandler implements ProxyHandler<any>
     {
         const result = this.orgNext();
         if (!result.done)
-            this.itemCallback(result.value);
+            result.value = this.itemCallback(result.value);
 
         return result;
     }
