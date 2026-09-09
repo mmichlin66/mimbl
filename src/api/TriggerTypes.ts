@@ -27,7 +27,7 @@ export interface ITrigger<T = any> extends IEventSlot<TypeVoidFunc<T>>
     get(): T;
 
     /** Sets a new value */
-    set( v: T): void;
+    set(v: T): void;
 }
 
 

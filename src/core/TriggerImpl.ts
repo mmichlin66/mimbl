@@ -22,6 +22,16 @@ let nextWatcherDebugId = 1;
  */
 export class Trigger<T = any> extends EventSlot<NoneVoidFunc> implements ITrigger<T>
 {
+    /// #if DEBUG
+    debugId: number = nextTriggerDebugId++;
+    /// #endif
+
+    // Number indicating to what level the items of container types should be triggerrized.
+    private depth?: number;
+
+    // Value being get and set
+    private v: T;
+
     constructor(v?: T, depth?: number)
     {
         super();
@@ -41,7 +51,7 @@ export class Trigger<T = any> extends EventSlot<NoneVoidFunc> implements ITrigge
     public set(v: T): void
     {
         // nothing to do if the value is the same
-        if (v !== this.v)
+        if (untriggerize(v) !== untriggerize(this.v))
         {
             this.v = triggerize(v, this.depth);
             this.fire();
@@ -59,18 +69,6 @@ export class Trigger<T = any> extends EventSlot<NoneVoidFunc> implements ITrigge
     {
         this.fire();
     }
-
-
-
-    /// #if DEBUG
-    debugId: number = nextTriggerDebugId++;
-    /// #endif
-
-    // Number indicating to what level the items of container types should be triggerrized.
-    private depth?: number;
-
-    // Value being get and set
-    private v: T;
 }
 
 
@@ -588,7 +586,7 @@ abstract class BaseContainerHandler<T extends object> implements ProxyHandler<T>
      * container. This trigger doesn't hold any particular value (that is, it is undefined); it is
      * triggerred only through its notifyRead and notifyWrite methods.
      */
-    protected containerTrigger: Trigger;
+    protected trigger: Trigger;
 
     /**
      * Triggers for individual items - object fields or array elements.
@@ -606,7 +604,7 @@ abstract class BaseContainerHandler<T extends object> implements ProxyHandler<T>
     {
         this.depth = depth;
         this.target = target;
-        this.containerTrigger = new Trigger();
+        this.trigger = new Trigger();
     }
 
     // Abstract declaration - neded only to satisfy the compiler that we indeed implement
@@ -670,7 +668,7 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
             }
         }
 
-        this.containerTrigger.notifyRead();
+        this.trigger.notifyRead();
         return itemTrigger ? itemTrigger.get() : orgVal;
     }
 
@@ -696,7 +694,7 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
             // check whether the property exists on the target. If it doesn't, we will notify the
             // container trigger of a change.
             if (!Reflect.has(target, prop))
-                this.containerTrigger.notifyWrite();
+                this.trigger.notifyWrite();
 
             // create a trigger for the property and add it to our internal map
             itemTrigger = new Trigger(value, this.depth - 1);
@@ -719,7 +717,7 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
             return false;
 
         // since the property was deleted, we notify the container trigger of a change
-        this.containerTrigger?.notifyWrite();
+        this.trigger?.notifyWrite();
 
         // remove the trigger for this property from our internal map.
         let itemTrigger = this.itemTriggers.get(prop);
@@ -738,13 +736,13 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
         if (prop === symTarget)
             return true;
 
-        this.containerTrigger.notifyRead();
+        this.trigger.notifyRead();
         return Reflect.has(target, prop);
     }
 
     ownKeys(target: T): ArrayLike<string | symbol>
     {
-        this.containerTrigger.notifyRead();
+        this.trigger.notifyRead();
         return Reflect.ownKeys(target);
     }
 }
@@ -777,8 +775,8 @@ abstract class MapSetBaseHandler<T extends Map<any,any> | Set<any>> extends Base
         super(depth, target);
 
         this.registerMethodWrapper("clear", this.clear_wrapper);
+        this.registerMethodWrapper("forEach", this.forEach_wrapper);
     }
-
 
     /**
      * Registers a wrapper for the given method name using the given function. The wrapper will be
@@ -794,31 +792,29 @@ abstract class MapSetBaseHandler<T extends Map<any,any> | Set<any>> extends Base
         this.wrappers.set(prop, wrappingMethod.bind(this, this.target[prop].bind(this.target)));
     }
 
-
-
+    /** get() trap */
     get(target: T, prop: PropertyKey, receiver: any): any
     {
         if (prop === symTarget)
             return this.target;
 
         // if we have a wrapper for the requested property, return it. Otherwise, return the
-        // original value from the target. Note that we use the target as the receiver, because we
-        // want to have the original method's "this" bound to the target, not to the proxy.
+        // original value from the target. Each wrapper decides whether to notify read or write.
         let wrapper = this.wrappers.get(prop);
         if (wrapper)
-        {
-            // each wrapper decides whether to notify read or write
             return wrapper;
-        }
         else
         {
-            // for all unwrapped methods (and the size property) we notify read
-            this.containerTrigger.notifyRead();
+            // for all unwrapped methods (and the size property) we notify read. Note that we use
+            // the target as the receiver, because we want to have the original method's "this"
+            // bound to the target, not to the proxy.
+            this.trigger.notifyRead();
             let result = Reflect.get(target, prop, target);
             return typeof result === "function" ? result.bind(target) : result;
         }
     }
 
+    /** has() trap */
     has(target: T, prop: PropertyKey): boolean
     {
         // handle our artificial symbol that marks trigger proxies.
@@ -828,15 +824,37 @@ abstract class MapSetBaseHandler<T extends Map<any,any> | Set<any>> extends Base
         return Reflect.has(target, prop);
     }
 
-
-
+    /** Wrapper for the clear() method. */
     clear_wrapper(orgMethod: Function): void
     {
         if (this.target.size)
         {
-            this.containerTrigger.notifyWrite();
+            this.trigger.notifyWrite();
             orgMethod();
         }
+    }
+
+    /** Wrapper for the forEach() method */
+    forEach_wrapper(orgMethod: Function, callback: (v: any, k: any, c: T) => void, thisArg: any): any
+    {
+        this.trigger.notifyRead();
+
+        // if depth is 0, just invoke the original method because we don't need to triggerize the items.
+        if (this.depth === 0)
+            return orgMethod(callback, thisArg);
+        else
+            return orgMethod(this.forEachCallback.bind(this, callback, thisArg));
+    }
+
+    /**
+     * Callback passed to the original forEach invocation. This method is bound to this, original
+     * callback and original callback's thisArg.
+     */
+    forEachCallback(orgCallback: (v: any, k: any, c: T) => void, orgThisArg: any,
+        v: any, k: any, c: T): void
+    {
+        // triggerize value and key and pass them to the original callback alone with the proxy of the map/set
+        orgCallback.call(orgThisArg, triggerize(v, this.depth - 1), triggerize(k, this.depth - 1), this.target[symProxy]);
     }
 }
 
@@ -865,23 +883,14 @@ class SetHandler extends MapSetBaseHandler<Set<any>>
     /** Wrapper for the `Set.add` method */
     add_wrapper(orgMethod: Function, v: any): Set<any>
     {
-        // if the value cannot be triggerized, we don't need to create triggers for items.
-        let [canBeTriggerized, , untriggerizedValue] = canTriggerize(v, this.depth - 1);
-        if (canBeTriggerized)
-        {
-            // check whether we already have a trigger for this value. If we do, we don't need
-            // to do anything; otherwise, we will create a trigger for the value.
-            if (this.itemTriggers.get(untriggerizedValue))
-                return this.target;
-            else
-                this.itemTriggers.set(untriggerizedValue, new Trigger(untriggerizedValue, this.depth - 1));
-        }
+        // call original method passing untriggerized value
+        let untriggerizedValue = untriggerize(v);
 
         // check whether the target already has the value. If it does, we don't need to do anything;
         // otherwise, we notify the container trigger of a change and call the original method.
         if (!this.target.has(untriggerizedValue))
         {
-            this.containerTrigger.notifyWrite();
+            this.trigger.notifyWrite();
             orgMethod(untriggerizedValue);
         }
 
@@ -901,23 +910,14 @@ class SetHandler extends MapSetBaseHandler<Set<any>>
         if (!orgMethod(untriggerizedValue))
             return false;
 
-        this.containerTrigger.notifyWrite();
-
-        // check whether we have a trigger for this value and remove it.
-        let itemTrigger = this.itemTriggers.get(untriggerizedValue);
-        if (itemTrigger)
-        {
-            itemTrigger.clear();
-            this.itemTriggers.delete(untriggerizedValue);
-        }
-
+        this.trigger.notifyWrite();
         return true;
     }
 
     /** Wrapper for methods that return an iterator */
     iter_wrapper(orgMethod: Function): any
     {
-        this.containerTrigger.notifyRead();
+        this.trigger.notifyRead();
 
         let orgIter = orgMethod();
 
@@ -934,23 +934,7 @@ class SetHandler extends MapSetBaseHandler<Set<any>>
     {
         // for "entries" iterator, item is a tuple of [key, value]; for other iterators, it is just value
         let v = Array.isArray(item) ? item[1] : item;
-
-        // if the value cannot be triggerized, we don't need to create triggers for items.
-        let [canBeTriggerized, proxy, untriggerizedValue] = canTriggerize(v, this.depth - 1);
-        if (canBeTriggerized)
-        {
-            // check whether we already have a trigger for this value and create it if needed.
-            let itemTrigger = this.itemTriggers.get(untriggerizedValue);
-            if (!itemTrigger)
-            {
-                itemTrigger = new Trigger(untriggerizedValue, this.depth - 1);
-                this.itemTriggers.set(untriggerizedValue, itemTrigger);
-            }
-
-            itemTrigger.notifyRead();
-        }
-
-        return proxy ?? untriggerizedValue;
+        return triggerize(v, this.depth - 1);
     }
 }
 
