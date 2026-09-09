@@ -1,4 +1,4 @@
-﻿import { AnyAnyFunc, ITrigger, IWatcher, NoneTypeFunc, NoneVoidFunc } from "./TriggerTypes";
+﻿import { ITrigger, IWatcher } from "./TriggerTypes";
 import { ComputedTrigger, startMutations, stopMutations, Trigger, Watcher } from "../core/TriggerImpl";
 
 export {triggerize} from "../core/TriggerImpl";
@@ -18,38 +18,29 @@ export {triggerize} from "../core/TriggerImpl";
  * The `depth` parameter is ignored for primitive types.
  *
  * @typeParam T Type of the trigger value.
- * @param v Optional initial value
+ * @param v Initial value
  * @param depth Depth of the trigger, which determines how many levels of nested properties of
  * arrays, maps, sets and objects should trigger changes. Ignored for primitive types.
  * @returns `ITrigger` interface through which the value can be set and retrieved.
  */
-export const createTrigger = <T = any>(v?: T, depth?: number): ITrigger<T> =>
-    new Trigger( v, depth);
+export const createTrigger = <T = any>(v: T, depth?: number): ITrigger<T> =>
+    new Trigger(v, depth);
 
 
 
 /**
- * Decorator function for defining properties so that changing their value will any watcher
+ * Decorator function for defining properties so that changing their value will cause any watcher
  * objects attached to them to respond.
  * The form `@trigger` designates a default trigger decorator, whose depth will be assigned
  * depending on the value type: Shallow for arrays, maps and sets and Deep for objects.
  * The form `@trigger(n)` designates a trigger decorator factory with the specified depth.
  */
 export const trigger = (targetOrDepth: any, name?: string): any =>
-{
-    if (typeof targetOrDepth === "number")
-    {
-        // If the first parameter is a number, then it is an explicitly specified depth using
-        // decorator factory.
-        return triggerDecorator.bind( undefined, targetOrDepth);
-    }
-    else
-    {
-        // undefined depth means that that the actual depth will be assigned dependig on the
-        // value of the trigger: Shallow for maps, sets and arrays and Deep for objects.
-        return triggerDecorator( undefined, targetOrDepth, name!);
-    }
-}
+    // If the first parameter is a number, then it is an explicitly specified depth using
+    // decorator factory.
+    typeof targetOrDepth === "number"
+        ? triggerDecorator.bind(undefined, targetOrDepth)
+        : triggerDecorator(undefined, targetOrDepth, name!);
 
 
 
@@ -88,7 +79,7 @@ const triggerDecorator = (depth: number | undefined, target: any, name: string):
  * as the original function. In addition, the returned function has the `dispose` method, which
  * must be called when the watcher is not needed anymore.
  */
-export const createWatcher = <T extends AnyAnyFunc>( func: T, responder: NoneVoidFunc,
+export const createWatcher = <T extends (...args: any[]) => any>( func: T, responder: () => void,
         funcThis?: any, responderThis?: any): IWatcher<T> =>
     Watcher.create(func, responder, funcThis, responderThis);
 
@@ -103,8 +94,8 @@ export const createWatcher = <T extends AnyAnyFunc>( func: T, responder: NoneVoi
  * @param thisArg Optional `this` value to use when invoking the computing function.
  * @returns Trigger object that will trigger changes only when the computed value changes.
  */
-export const createComputedTrigger = <T = any>(func: NoneTypeFunc<T>, thisArg?: any): ITrigger<T> =>
-    new ComputedTrigger( func, thisArg);
+export const createComputedTrigger = <T = any>(func: () => T, thisArg?: any): ITrigger<T> =>
+    new ComputedTrigger(func, thisArg);
 
 
 

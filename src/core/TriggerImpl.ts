@@ -1,5 +1,6 @@
-﻿import { AnyAnyFunc, ITrigger, IWatcher, NoneTypeFunc, NoneVoidFunc } from "../api/TriggerTypes";
+﻿import { IContainerTrigger, ITrigger, IWatcher } from "../api/TriggerTypes";
 import {EventSlot} from "../api/EventSlotAPI";
+import { IEventSlot } from "../api/EventSlotTypes";
 
 
 
@@ -17,22 +18,53 @@ let nextWatcherDebugId = 1;
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
- * The Trigger class represents an object that keeps a value and notifies the current watcher (if
- * any) when this value changes.
+ * The ContainerTrigger class represents a container object that keeps an arbitrary number of
+ * elements that can added to and removed from it. When this happens, the `notifyRead()` or
+ * `notifyWrite()` methods should be called so that watchers attached to this container trigger
+ * can respond.
  */
-export class Trigger<T = any> extends EventSlot<NoneVoidFunc> implements ITrigger<T>
+export class ContainerTrigger extends EventSlot<() => void> implements IContainerTrigger
+{
+    /// #if DEBUG
+    debugId: number = nextTriggerDebugId++;
+    /// #endif
+
+    /** Notifies that the container has been read from */
+    public notifyRead(): void
+    {
+        currentWatcher?.notifyTriggerRead(this);
+    }
+
+    /**
+     * Notifies that the container's content has been changed - that is, elements have been added
+     * to or deleted from it.
+     */
+    public notifyWrite(): void
+    {
+        this.fire();
+    }
+}
+
+
+
+/**
+ * The Trigger class represents an object that keeps a value and notifies the current watcher (if
+ * any) when this value is read so that the watchers can attach to it. When the value changes, the
+ * watchers will respond.
+ */
+export class Trigger<T = any> extends EventSlot<(v: T) => void> implements ITrigger<T>
 {
     /// #if DEBUG
     debugId: number = nextTriggerDebugId++;
     /// #endif
 
     // Number indicating to what level the items of container types should be triggerrized.
-    private depth?: number;
+    protected depth?: number;
 
     // Value being get and set
-    private v: T;
+    protected v: T;
 
-    constructor(v?: T, depth?: number)
+    constructor(v: T, depth?: number)
     {
         super();
 
@@ -52,22 +84,7 @@ export class Trigger<T = any> extends EventSlot<NoneVoidFunc> implements ITrigge
     {
         // nothing to do if the value is the same
         if (untriggerize(v) !== untriggerize(this.v))
-        {
-            this.v = triggerize(v, this.depth);
-            this.fire();
-        }
-    }
-
-    /** Notifies the current watcher (if exists) that trigger value has been read */
-    public notifyRead()
-    {
-        currentWatcher?.notifyTriggerRead(this);
-    }
-
-    /** Fires the "change" event */
-    public notifyWrite()
-    {
-        this.fire();
+            this.fire(this.v = triggerize(v, this.depth));
     }
 }
 
@@ -95,7 +112,7 @@ export const isTrigger = (obj: object): obj is ITrigger =>
  * Watcher object. Whenever a value is changed in any of these triggers, the watcher object is
  * notified and calls the responder function.
  */
-export class Watcher<T extends AnyAnyFunc = any>
+export class Watcher<T extends (...args: any[]) => any = any>
 {
     /**
      * Creates a watcher function with the same signature as the given regular function. When the
@@ -111,11 +128,11 @@ export class Watcher<T extends AnyAnyFunc = any>
      * @param responderThis Optional value of "this" that will be used to call the responder function.
      * If this value is undefined, the "this" value for the original function will be used.
      */
-    static create<T extends AnyAnyFunc>( func: T, responder: NoneVoidFunc,
+    static create<T extends (...args: any[]) => any>( func: T, responder: () => void,
         funcThis?: any, responderThis?: any): IWatcher<T>
     {
         // create a new watcher object and bind the watcher function to this object.
-        let watcherObj = new Watcher( func, responder, funcThis, responderThis);
+        let watcherObj = new Watcher(func, responder, funcThis, responderThis);
         let watcherFunc = watcherObj.execute.bind( watcherObj) as IWatcher<T>;
 
         // bind the watcher dispose function to the watcher object and set it as the property on
@@ -126,7 +143,7 @@ export class Watcher<T extends AnyAnyFunc = any>
 
 
 
-    constructor( func: T, responder: NoneVoidFunc, funcThis?: any, responderThis?: any)
+    constructor(func: T, responder: () => void, funcThis?: any, responderThis?: any)
     {
         this.func = func;
         this.responder = responder;
@@ -201,14 +218,13 @@ export class Watcher<T extends AnyAnyFunc = any>
         deferredWatchers.delete( this);
 
         // indicate that the watcher has been disposed
-        this.func = null;
-        this.responder = null;
+        this.func = this.responder = undefined;
     }
 
     /**
      * Notifies that the value of the given trigger object has been read.
      */
-    public notifyTriggerRead(trigger: Trigger): void
+    public notifyTriggerRead(trigger: IEventSlot): void
     {
         // if we have already seen this trigger, we don't need to attach to it again. That means
         // that during a watch function run we will be attaching to each encountered trigger only
@@ -216,7 +232,7 @@ export class Watcher<T extends AnyAnyFunc = any>
         // we will detach from it only once.
         if (!this.triggers.has(trigger))
         {
-            this.triggers.add( trigger);
+            this.triggers.add(trigger);
             trigger.attach(this.onTriggerChanged);
         }
     }
@@ -247,23 +263,28 @@ export class Watcher<T extends AnyAnyFunc = any>
     /**
      * Function being watched; that is, during which we should listen to triggers being read, so
      * that we can remember them and later respond when they notify that their values have been
-     * changed.
+     * changed. Optional only because it becomes undefined after dispose().
      **/
-    private func: T | null;
+    private func?: T;
 
-    // Function to be invoked when the the value of one of the triggers changes
-    private responder: NoneVoidFunc | null;
+    /**
+     * Function to be invoked when the the value of one of the triggers changes. Optional only
+     * because it becomes undefined after dispose().
+     */
+    private responder?: () => void
 
-    // "this" value to apply to the watched function when calling it.
+    /** "this" value to apply to the watched function when calling it. */
     private funcThis: any;
 
-    // "this" value to apply to responder function when calling it.
+    /** "this" value to apply to responder function when calling it. */
     private responderThis: any;
 
-    // Set of triggers currently being watched by this watcher. The purpose of knowing what
-    // triggers are used by what watcher is to remove the watcher from all these triggers when
-    // the watcher is disposed.
-    public triggers = new Set<Trigger>();
+    /**
+     * Set of triggers currently being watched by this watcher. The purpose of knowing what
+     * triggers are used by what watcher is to remove the watcher from all these triggers when
+     * the watcher is disposed.
+     */
+    public triggers = new Set<IEventSlot>();
 }
 
 
@@ -285,9 +306,11 @@ export class Watcher<T extends AnyAnyFunc = any>
  */
 export class ComputedTrigger<T = any> extends Trigger<T>
 {
-    constructor(func: NoneTypeFunc<T>, thisArg?: any)
+    constructor(func: () => T, thisArg?: any)
     {
-        super();
+        // need to cast to T because, in general, undefined is not necessarily in T; however,
+        // the actual value will be always obtained from the watcher function.
+        super(undefined as T);
 
         this.func = func;
         this.thisArg = thisArg;
@@ -302,17 +325,16 @@ export class ComputedTrigger<T = any> extends Trigger<T>
         if (this.isStale)
         {
             // we need to create the watcher if this is the first time the get method is called.
-            if (!this.watcher)
-                this.watcher = Watcher.create(this.func, this.responder, this.thisArg, this);
+            this.watcher ??= Watcher.create(this.func, this.responder, this.thisArg, this);
 
-            super.set(this.watcher());
+            this.v = triggerize(this.watcher(), this.depth);
             this.isStale = false;
         }
 
         return super.get();
     }
 
-    public detach(listener: NoneVoidFunc): void
+    public detach(listener: () => void): void
     {
         super.detach(listener);
 
@@ -320,7 +342,7 @@ export class ComputedTrigger<T = any> extends Trigger<T>
         if (this.watcher && !this.has())
         {
             this.watcher.dispose();
-            this.watcher = null;
+            this.watcher = undefined;
             this.isStale = true;
         }
     }
@@ -342,13 +364,13 @@ export class ComputedTrigger<T = any> extends Trigger<T>
 
 
     // Function we will be watching
-    private func: NoneTypeFunc<T>;
+    private func: () => T;
 
     // "this" value to apply to the watched function when calling it.
     private thisArg: any;
 
     // Watcher over our function
-    private watcher: IWatcher<NoneTypeFunc<T>> | null | undefined;
+    private watcher?: IWatcher<() => T> = undefined;
 
     // Flag indicating that the value  kept by the trigger might not reflect the actual computed
     // value. This flag is true under the following circumstances:
@@ -565,7 +587,7 @@ export function triggerize<T>(v: T, depth?: number): T
  */
 export function untriggerize(v: any): any
 {
-    // proxy's target is kept under the symTriggerProxyTarget returned by the proxy's handler.
+    // proxy's target is kept under the symTarget returned by the proxy's handler.
     return v && typeof v === "object" && symTarget in v ? v[symTarget] : v;
 }
 
@@ -586,7 +608,7 @@ abstract class BaseContainerHandler<T extends object> implements ProxyHandler<T>
      * container. This trigger doesn't hold any particular value (that is, it is undefined); it is
      * triggerred only through its notifyRead and notifyWrite methods.
      */
-    protected trigger: Trigger;
+    protected trigger: ContainerTrigger;
 
     /**
      * Triggers for individual items - object fields or array elements.
@@ -604,7 +626,7 @@ abstract class BaseContainerHandler<T extends object> implements ProxyHandler<T>
     {
         this.depth = depth;
         this.target = target;
-        this.trigger = new Trigger();
+        this.trigger = new ContainerTrigger();
     }
 
     // Abstract declaration - neded only to satisfy the compiler that we indeed implement
@@ -659,7 +681,7 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
             if (this.isArray && ArrayMutatingMethods.includes(prop))
                 return orgVal;
 
-            // if it is a symbol or if the depth is 0, we don't triggerizing the value; otherwise,
+            // if it is a symbol or if the depth is 0, we don't triggerize the value; otherwise,
             // create a trigger for the property and add it to our internal map.
             if (typeof prop !== "symbol" && this.depth !== 0)
             {
@@ -682,9 +704,6 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
         if (typeof prop === "symbol" || this.depth === 0)
             return Reflect.set(target, prop, untriggerizedValue, receiver);
 
-        // change the value in the target
-        let result = Reflect.set(target, prop, untriggerizedValue, receiver);
-
         // check if we already have a trigger for this property. If we don't, we will create one
         // with the new value. If trigger already exists, we set the new value to it, which should
         // invoke the listeners if there are any.
@@ -695,10 +714,6 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
             // container trigger of a change.
             if (!Reflect.has(target, prop))
                 this.trigger.notifyWrite();
-
-            // create a trigger for the property and add it to our internal map
-            itemTrigger = new Trigger(value, this.depth - 1);
-            this.itemTriggers.set(prop, itemTrigger);
         }
         else
         {
@@ -706,7 +721,8 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
             itemTrigger.set(untriggerizedValue);
         }
 
-        return result;
+        // change the value in the target
+        return Reflect.set(target, prop, untriggerizedValue, receiver);
     }
 
     deleteProperty(target: T, prop: PropertyKey): boolean
@@ -719,7 +735,7 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
         // since the property was deleted, we notify the container trigger of a change
         this.trigger?.notifyWrite();
 
-        // remove the trigger for this property from our internal map.
+        // if we have a trigger for this property, remove it from our internal map.
         let itemTrigger = this.itemTriggers.get(prop);
         if (itemTrigger)
         {
@@ -727,7 +743,7 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
             this.itemTriggers.delete(prop);
         }
 
-        return result;
+        return true;
     }
 
     has(target: T, prop: PropertyKey): boolean

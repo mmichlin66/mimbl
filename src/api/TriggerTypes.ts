@@ -2,26 +2,33 @@
 
 
 
-/** Type for functions that accept any number of parameters and return any type */
-export type AnyAnyFunc = (...args: any[]) => any;
+/**
+ * The IContainerTrigger interface represents a container object that keeps an arbitrary number of
+ * elements that can added to and removed from it. When this happens, the `notifyRead()` or
+ * `notifyWrite()` methods should be called so that watchers attached to this container trigger
+ * can respond.
+ */
+export interface IContainerTrigger extends IEventSlot<() => void>
+{
+    /** Notifies that the container has been read from */
+    notifyRead(): void;
 
-/** Type for functions that accept no parameters and return values of any type */
-export type NoneTypeFunc<T> = () => T;
-
-/** Type for functions that accept no parameters and don't return any value */
-export type NoneVoidFunc = () => void;
-
-/** Type for functions that accept one parameter of the given type and don't return any value */
-export type TypeVoidFunc<T> = (v: T) => void;
+    /**
+     * Notifies that the container's content has been changed - that is, elements have been added
+     * to or deleted from it.
+     */
+    notifyWrite(): void
+}
 
 
 
 /**
- * The ITrigger interface represents an object that keeps a value and notifies all attached wathers
- * when this value changes.
+ * The ITrigger interface represents an object that keeps a value and notifies the current watcher
+ * (if any) when this value is read so that the watchers can attach to it. When the value changes,
+ * the watchers will respond.
  * @typeParam T Type of the trigger value.
  */
-export interface ITrigger<T = any> extends IEventSlot<TypeVoidFunc<T>>
+export interface ITrigger<T = any> extends IEventSlot<(v: T) => void>
 {
     /** Retrieves the current value */
     get(): T;
@@ -40,7 +47,7 @@ export interface ITrigger<T = any> extends IEventSlot<TypeVoidFunc<T>>
  * watcher is created, but it can be changed later.
  * @typeParam T Type (signature) of the function to be watched.
  */
-export interface IWatcher<T extends AnyAnyFunc = any>
+export interface IWatcher<T extends (...args: any[]) => any = any>
 {
     /** This is a callable interface, which is implement as a function. */
     (...args: Parameters<T>): ReturnType<T>;
