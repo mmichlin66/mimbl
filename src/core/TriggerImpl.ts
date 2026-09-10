@@ -602,18 +602,13 @@ abstract class BaseContainerHandler<T extends object> implements ProxyHandler<T>
     protected target: T;
 
     /**
-     * Trigger object which notifies of reads or changes in the container as a whole. For example,
+     * Trigger object which notifies of reads or changes in the container as a whole, for example,
      * when the number of items in the container changes. This trigger is notified of reads anytime
      * an item is accessed and it is notified of changes when an item is added or removed from the
-     * container. This trigger doesn't hold any particular value (that is, it is undefined); it is
-     * triggerred only through its notifyRead and notifyWrite methods.
+     * container. This trigger doesn't hold any value; it is triggerred only through its notifyRead
+     * and notifyWrite methods.
      */
     protected trigger: ContainerTrigger;
-
-    /**
-     * Triggers for individual items - object fields or array elements.
-     */
-    protected itemTriggers = new Map<any, Trigger>();
 
     /**
      * Number indicating to what level the items of this container should be triggerized.
@@ -666,32 +661,19 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
         if (prop === symTarget)
             return this.target;
 
-        // check whether we already have a trigger. If no, get the value from the target and
-        // create a trigger for it if needed.
-        let itemTrigger = this.itemTriggers.get(prop);
-        let orgVal: any = undefined;
-        if (!itemTrigger)
+        // get the value from the target.
+        let orgVal = Reflect.get(target, prop, receiver);
+
+        // if the target is an array, check the property against the names of array methods. If
+        // it is one of them, we don't need to notify read on the container trigger, because the
+        // function will notify write on the container trigger when called.
+        if (this.isArray && ArrayMutatingMethods.includes(prop))
+            return orgVal;
+        else
         {
-            // get the value from the target.
-            orgVal = Reflect.get(target, prop, receiver);
-
-            // if the target is an array, check the property against the names of array methods. If
-            // it is one of them, we don't need to notify read on the container trigger, because the
-            // function will notify write on the container trigger when called.
-            if (this.isArray && ArrayMutatingMethods.includes(prop))
-                return orgVal;
-
-            // if it is a symbol or if the depth is 0, we don't triggerize the value; otherwise,
-            // create a trigger for the property and add it to our internal map.
-            if (typeof prop !== "symbol" && this.depth !== 0)
-            {
-                itemTrigger = new Trigger(orgVal, this.depth - 1);
-                this.itemTriggers.set(prop, itemTrigger);
-            }
+            this.trigger.notifyRead();
+            return typeof prop !== "symbol" && this.depth !== 0 ? triggerize(orgVal) : orgVal;
         }
-
-        this.trigger.notifyRead();
-        return itemTrigger ? itemTrigger.get() : orgVal;
     }
 
     set(target: T, prop: PropertyKey, value: any, receiver: any): boolean
@@ -699,30 +681,18 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
         // we use untriggerized values in the target object, so get it now
         let untriggerizedValue = untriggerize(value);
 
-        // if the property is a symbol, we don't need to do anything else. We also don't need to do
-        // anything if the depth is 0, because we don't want to triggerize the value.
-        if (typeof prop === "symbol" || this.depth === 0)
-            return Reflect.set(target, prop, untriggerizedValue, receiver);
+        // in order to determine whether we need to notify about changes, we first check whether
+        // the requested property exists in the target. If yes, we compare the current value of the
+        // property in the target with the untriggerized input one.
+        let needNotifyWrite = !Reflect.has(target, prop) || Reflect.get(target, prop, receiver) !== untriggerizedValue;
 
-        // check if we already have a trigger for this property. If we don't, we will create one
-        // with the new value. If trigger already exists, we set the new value to it, which should
-        // invoke the listeners if there are any.
-        let itemTrigger = this.itemTriggers.get(prop);
-        if (!itemTrigger)
-        {
-            // check whether the property exists on the target. If it doesn't, we will notify the
-            // container trigger of a change.
-            if (!Reflect.has(target, prop))
-                this.trigger.notifyWrite();
-        }
-        else
-        {
-            // this notifies the trigger of a change if the new value is different from the old one
-            itemTrigger.set(untriggerizedValue);
-        }
+        // we write to the target even if the values are the same - to let it process it anyway
+        let result =  Reflect.set(target, prop, untriggerizedValue, receiver);
 
-        // change the value in the target
-        return Reflect.set(target, prop, untriggerizedValue, receiver);
+        if (needNotifyWrite)
+            this.trigger.notifyWrite();
+
+        return result;
     }
 
     deleteProperty(target: T, prop: PropertyKey): boolean
@@ -733,16 +703,7 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
             return false;
 
         // since the property was deleted, we notify the container trigger of a change
-        this.trigger?.notifyWrite();
-
-        // if we have a trigger for this property, remove it from our internal map.
-        let itemTrigger = this.itemTriggers.get(prop);
-        if (itemTrigger)
-        {
-            itemTrigger.clear();
-            this.itemTriggers.delete(prop);
-        }
-
+        this.trigger.notifyWrite();
         return true;
     }
 

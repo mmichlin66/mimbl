@@ -66,7 +66,7 @@ const triggerDecorator = (depth: number | undefined, target: any, name: string):
     let sym = Symbol( name + "_trigger");
 
     const getTriggerObj = (obj: any, depth: number | undefined): ITrigger =>
-        obj[sym] ??= new Trigger( undefined, depth) as ITrigger;
+        obj[sym] ??= new Trigger(undefined, depth);
 
     Object.defineProperty( target, name, {
         get() { return getTriggerObj(this, depth).get(); },
