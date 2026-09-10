@@ -567,14 +567,14 @@ export function triggerize<T>(v: T, depth?: number): T
     let handlerClass: new (depth: number, target: any) => ProxyHandler<any>;
     if (Array.isArray(v) || (v as any).constructor === Object)
         handlerClass = ArrayObjectHandler;
-    // else if (v instanceof Map)
-    //     handlerClass = MapHandler;
+    else if (v instanceof Map)
+        handlerClass = MapHandler;
     else if (v instanceof Set)
         handlerClass = SetHandler;
     else
         return v;
 
-    return v[symProxy] = new Proxy( v as any as object, new handlerClass(depth - 1, v)) as any as T;
+    return v[symProxy] = new Proxy(v as any as object, new handlerClass(depth - 1, v)) as any as T;
 }
 
 
@@ -766,14 +766,15 @@ class ArrayObjectHandler<T extends object> extends BaseContainerHandler<T>
 
 
 /**
- * Base class for Map/Set handlers. Methods whose names were supplied in the constructor,
- * notify change; all other methods notify read.
+ * Base class for Map/Set handlers.
  *
  * For Map and Set in order to be proxied, the methods returned from get() must be
  * bound to the target. See https://javascript.info/proxy#built-in-objects-internal-slots.
  */
 abstract class MapSetBaseHandler<T extends Map<any,any> | Set<any>> extends BaseContainerHandler<T>
 {
+    private readonly isMap: boolean;
+
     /**
      * Map of method names to their corresponding functions that will be returned from the get()
      * method. This base class takes care of certain methods like `clear` and `delete`, but the
@@ -784,14 +785,19 @@ abstract class MapSetBaseHandler<T extends Map<any,any> | Set<any>> extends Base
      */
     protected wrappers = new Map<PropertyKey, Function>();
 
-
-
-    constructor(depth: number, target: T)
+    constructor(isMap: boolean, depth: number, target: T)
     {
         super(depth, target);
 
+        this.isMap = isMap;
+
         this.registerMethodWrapper("clear", this.clear_wrapper);
+        this.registerMethodWrapper("delete", this.delete_wrapper);
         this.registerMethodWrapper("forEach", this.forEach_wrapper);
+        this.registerMethodWrapper("keys", this.keysValues_wrapper);
+        this.registerMethodWrapper("values", this.keysValues_wrapper);
+        this.registerMethodWrapper("entries", this.entries_wrapper);
+        this.registerMethodWrapper(Symbol.iterator, isMap ? this.entries_wrapper : this.keysValues_wrapper);
     }
 
     /**
@@ -840,6 +846,22 @@ abstract class MapSetBaseHandler<T extends Map<any,any> | Set<any>> extends Base
         return Reflect.has(target, prop);
     }
 
+    /** Wrapper for the `Set.delete` method */
+    delete_wrapper(orgMethod: Function, v: any): boolean
+    {
+        // since value can be a proxy to a real value, we need to get the real value
+        let untriggerizedValue = untriggerize(v);
+
+        // delete the item from the target - it will tell whether the value was in the set. If it
+        // was not, we don't need to do anything; otherwise, we notify the container trigger of a
+        // change.
+        if (!orgMethod(untriggerizedValue))
+            return false;
+
+        this.trigger.notifyWrite();
+        return true;
+    }
+
     /** Wrapper for the clear() method. */
     clear_wrapper(orgMethod: Function): void
     {
@@ -869,88 +891,48 @@ abstract class MapSetBaseHandler<T extends Map<any,any> | Set<any>> extends Base
     forEachCallback(orgCallback: (v: any, k: any, c: T) => void, orgThisArg: any,
         v: any, k: any, c: T): void
     {
-        // triggerize value and key and pass them to the original callback alone with the proxy of the map/set
-        orgCallback.call(orgThisArg, triggerize(v, this.depth - 1), triggerize(k, this.depth - 1), this.target[symProxy]);
+        // triggerize value and key (only for maps) and pass them to the original callback alone
+        // with the proxy of the map/set
+        v = triggerize(v, this.depth - 1);
+        k = this.isMap ? triggerize(k, this.depth - 1) : k;
+        orgCallback.call(orgThisArg, v, k, this.target[symProxy]);
     }
-}
 
-
-
-/**
- * Handler for the Set class providing wrapping methods for all Set's methods. It notifies the
- * container trigger of reads and changes and it creates triggers for the items in the set (if
- * depth is not 0).
- */
-class SetHandler extends MapSetBaseHandler<Set<any>>
-{
-    constructor(depth: number, target: Set<any>)
+    /** Wrapper for `keys()` and `values()` methods that return an iterator */
+    keysValues_wrapper(orgMethod: Function): any
     {
-        super(depth, target);
-
-        this.registerMethodWrapper("add", this.add_wrapper);
-        this.registerMethodWrapper("delete", this.delete_wrapper);
-
-        this.registerMethodWrapper(Symbol.iterator, this.iter_wrapper);
-        this.registerMethodWrapper("keys", this.iter_wrapper);
-        this.registerMethodWrapper("values", this.iter_wrapper);
-        this.registerMethodWrapper("entries", this.iter_wrapper);
+        return this.iterWrapper(orgMethod, this.keysValuesIteratorProxyCallback);
     }
 
-    /** Wrapper for the `Set.add` method */
-    add_wrapper(orgMethod: Function, v: any): Set<any>
+    /** Wrapper for `entries()` method that returns an iterator */
+    entries_wrapper(orgMethod: Function): any
     {
-        // call original method passing untriggerized value
-        let untriggerizedValue = untriggerize(v);
-
-        // check whether the target already has the value. If it does, we don't need to do anything;
-        // otherwise, we notify the container trigger of a change and call the original method.
-        if (!this.target.has(untriggerizedValue))
-        {
-            this.trigger.notifyWrite();
-            orgMethod(untriggerizedValue);
-        }
-
-        // the add() method always returns the Set object itself
-        return this.target;
+        return this.iterWrapper(orgMethod, this.entriesIteratorProxyCallback);
     }
 
-    /** Wrapper for the `Set.delete` method */
-    delete_wrapper(orgMethod: Function, v: any): boolean
-    {
-        // since value can be a proxy to a real value, we need to get the real value
-        let untriggerizedValue = untriggerize(v);
-
-        // delete the item from the target - it will tell whether the value was in the set. If it
-        // was not, we don't need to do anything; otherwise, we notify the container trigger of a
-        // change and remove a trigger if we had one.
-        if (!orgMethod(untriggerizedValue))
-            return false;
-
-        this.trigger.notifyWrite();
-        return true;
-    }
-
-    /** Wrapper for methods that return an iterator */
-    iter_wrapper(orgMethod: Function): any
+    /** Wrapper for iterator methods using the given callback function */
+    iterWrapper(orgMethod: Function, callback: IteratorProxyCallback): any
     {
         this.trigger.notifyRead();
 
-        let orgIter = orgMethod();
-
         // if depth is not 0, wrap original iterator in our proxy, which will call the
         // iteratorProxyCallback method for each item so that we can triggerize them.
-        if (this.depth === 0)
-            return orgIter;
-        else
-            return new Proxy(orgIter, new IteratorHandler(orgIter, this.iteratorProxyCallback))
+        let orgIter = orgMethod();
+        return this.depth === 0 ? orgIter : new Proxy(orgIter, new IteratorHandler(orgIter, callback));
     }
 
-    /** Processes items during iteration over the container */
-    iteratorProxyCallback = (item: any): any =>
+    /** Processes items during iteration over the container via keys() or values() methods */
+    keysValuesIteratorProxyCallback = (item: any): any =>
+        triggerize(item, this.depth - 1);
+
+    /** Processes items during iteration over the container via entries() method */
+    entriesIteratorProxyCallback = (item: [any, any]): any =>
     {
-        // for "entries" iterator, item is a tuple of [key, value]; for other iterators, it is just value
-        let v = Array.isArray(item) ? item[1] : item;
-        return triggerize(v, this.depth - 1);
+        // value is triggerized; key is triggerrized for maps but is the same as values for sets.
+        let [k, v] = item;
+        v = triggerize(v, this.depth - 1);
+        k = this.isMap ? triggerize(k, this.depth - 1) : v;
+        return [k, v];
     }
 }
 
@@ -987,6 +969,8 @@ class IteratorHandler implements ProxyHandler<any>
     {
         if (prop === "next")
             return this.next_wrapper
+        else if (prop === Symbol.iterator)
+            return () => receiver;
 
         const value = Reflect.get(target, prop, target);
         return (typeof value === 'function') ? value.bind(target) : value;
@@ -999,6 +983,87 @@ class IteratorHandler implements ProxyHandler<any>
             result.value = this.itemCallback(result.value);
 
         return result;
+    }
+}
+
+
+
+/**
+ * Handler for the Set class providing wrapping methods for Set's methods. It notifies the
+ * container trigger of reads and changes and it creates triggers for the items in the set (if
+ * depth is not 0).
+ */
+class SetHandler extends MapSetBaseHandler<Set<any>>
+{
+    constructor(depth: number, target: Set<any>)
+    {
+        super(false, depth, target);
+
+        this.registerMethodWrapper("add", this.add_wrapper);
+    }
+
+    /** Wrapper for the `Set.add` method */
+    add_wrapper(orgMethod: Function, v: any): Set<any>
+    {
+        // call original method passing untriggerized value
+        let untriggerizedValue = untriggerize(v);
+
+        // check whether the target already has the value. If it does, we don't need to do anything;
+        // otherwise, we notify the container trigger of a change and call the original method.
+        if (!this.target.has(untriggerizedValue))
+        {
+            this.trigger.notifyWrite();
+            orgMethod(untriggerizedValue);
+        }
+
+        // the add() method always returns the Set object itself
+        return this.target;
+    }
+}
+
+
+
+/**
+ * Handler for the Set class providing wrapping methods for Set's methods. It notifies the
+ * container trigger of reads and changes and it creates triggers for the items in the set (if
+ * depth is not 0).
+ */
+class MapHandler extends MapSetBaseHandler<Map<any,any>>
+{
+    constructor(depth: number, target: Map<any,any>)
+    {
+        super(true, depth, target);
+
+        this.registerMethodWrapper("get", this.get_wrapper);
+        this.registerMethodWrapper("set", this.set_wrapper);
+    }
+
+    /** Wrapper for the `Map.get` method */
+    get_wrapper(orgMethod: Function, k: any): any
+    {
+        this.trigger.notifyRead();
+
+        // call original method passing untriggerized key
+        return triggerize(orgMethod(untriggerize(k)));
+    }
+
+    /** Wrapper for the `Map.set` method */
+    set_wrapper(orgMethod: Function, k: any, v: any): Map<any,any>
+    {
+        let untriggerizedKey = untriggerize(k);
+
+        // check whether the target already has the value. If it does, we don't need to do anything;
+        // otherwise, we notify the container trigger of a change and call the original method.
+        if (!this.target.has(untriggerizedKey))
+        {
+            this.trigger.notifyWrite();
+
+            // call original method passing untriggerized key and value
+            orgMethod(untriggerizedKey, untriggerize(v));
+        }
+
+        // the set() method always returns the Map object itself
+        return this.target;
     }
 }
 

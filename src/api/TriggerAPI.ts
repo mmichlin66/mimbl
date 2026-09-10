@@ -11,9 +11,9 @@ export {triggerize} from "../core/TriggerImpl";
  * and notify watchers when the trigger's value is read.
  *
  * The `depth` parameter determines how many levels of nested properties of arrays, maps, sets and
- * objects should trigger read and write events. If the depth is 0, changing nested
- * properties doesn't cause the trigger to fire - only changing the property itself does. If the
- * depth is undefined, arrays, objects, maps and sets get the depth of 1, meaning that operations
+ * objects should trigger read and write events. If the depth is 0, changing nested properties
+ * doesn't cause the trigger to fire - only changing the property itself does. If the depth is
+ * undefined ornegative, arrays, objects, maps and sets get the depth of 1, meaning that operations
  * that add or remove items will trigger events, but modifications to the items will not.
  * The `depth` parameter is ignored for primitive types.
  *
@@ -33,14 +33,28 @@ export const createTrigger = <T = any>(v: T, depth?: number): ITrigger<T> =>
  * objects attached to them to respond.
  * The form `@trigger` designates a default trigger decorator, whose depth will be assigned
  * depending on the value type: Shallow for arrays, maps and sets and Deep for objects.
+ */
+export function trigger(target: any, name: string): any;
+
+/**
+ * Decorator function for defining properties so that changing their value will cause any watcher
+ * objects attached to them to respond.
  * The form `@trigger(n)` designates a trigger decorator factory with the specified depth.
  */
-export const trigger = (targetOrDepth: any, name?: string): any =>
+export function trigger(depth: number): any;
+
+/**
+ * Implementation
+ * @ignore
+ */
+export function trigger(targetOrDepth: any, name?: string): any
+{
     // If the first parameter is a number, then it is an explicitly specified depth using
     // decorator factory.
-    typeof targetOrDepth === "number"
+    return typeof targetOrDepth === "number"
         ? triggerDecorator.bind(undefined, targetOrDepth)
         : triggerDecorator(undefined, targetOrDepth, name!);
+}
 
 
 
@@ -133,13 +147,14 @@ export const computed = (target: any, name: string, propDescr: PropertyDescripto
             propDescr.set = function(v: any): void
             {
                 startMutations();
-                try { orgSet.call( this, v); }
+                try { orgSet.call(this, v); }
                 finally { stopMutations(); }
             }
         }
     }
     else
     {
+        // handle function case
         let orgFunc = propDescr.value;
         propDescr.value = function(): any { return getTriggerValue(orgFunc, this); }
     }
