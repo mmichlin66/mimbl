@@ -1,7 +1,7 @@
 ﻿import { ITrigger, IWatcher } from "./TriggerTypes";
 import { ComputedTrigger, startMutations, stopMutations, Trigger, Watcher } from "../core/TriggerImpl";
 
-export {triggerize} from "../core/TriggerImpl";
+export {trig} from "../core/TriggerImpl";
 
 
 
