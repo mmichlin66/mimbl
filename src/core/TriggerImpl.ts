@@ -728,15 +728,15 @@ class RegularHandler<T extends object> extends BaseContainerHandler<T>
     set(target: T, prop: PropertyKey, value: any, receiver: any): boolean
     {
         // we use untriggerized values in the target object, so get it now
-        let untriggerizedValue = untrig(value);
+        let untrigValue = untrig(value);
 
         // in order to determine whether we need to notify about changes, we first check whether
         // the requested property exists in the target. If yes, we compare the current value of the
         // property in the target with the untriggerized input one.
-        let needNotifyWrite = !Reflect.has(target, prop) || Reflect.get(target, prop, receiver) !== untriggerizedValue;
+        let needNotifyWrite = !Reflect.has(target, prop) || Reflect.get(target, prop, receiver) !== untrigValue;
 
         // we write to the target even if the values are the same - to let it process it anyway
-        let result =  Reflect.set(target, prop, untriggerizedValue, receiver);
+        let result =  Reflect.set(target, prop, untrigValue, receiver);
 
         if (needNotifyWrite)
             this.trigger.notifyWrite();
@@ -760,6 +760,65 @@ class RegularHandler<T extends object> extends BaseContainerHandler<T>
 // register triggerization proxy handler for Array and Object classes
 registerTrigProxyHandler(Array, RegularHandler);
 registerTrigProxyHandler(Object, RegularHandler);
+
+
+
+/**
+ * Handler class for "exotic" mutable JavaScript classes - such as Date.
+ */
+abstract class ExoticHandler<T extends object> extends BaseContainerHandler<T>
+{
+    /** Array of methods names that mutate the object */
+    private mutationMethods: PropertyKey[];
+
+    constructor(mutationMethods: PropertyKey[], target: T,depth?: number)
+    {
+        super(target, depth);
+        this.mutationMethods = mutationMethods;
+    }
+
+    get_trap(target: T, prop: PropertyKey, receiver: any): any
+    {
+        // get the value from the target.
+        let orgVal = Reflect.get(target, prop, target);
+
+        if (this.mutationMethods.includes(prop))
+            this.trigger.notifyWrite();
+        else
+            this.trigger.notifyRead();
+
+        // if the value is a function, bind it to the target; otherwise, return it as is.
+        return typeof orgVal === "function" ? orgVal.bind(target) : orgVal;
+    }
+}
+
+
+
+/**
+ * Names of array mutating methods. If a get() trap is invoked for one of them, we don't need to
+ * notify read on the container trigger, because the function will notify write on the container
+ * trigger when called.
+ */
+const DateMutatingMethods: PropertyKey[] = [
+    "setDate", "setFullYear", "setHours", "setMilliseconds", "setMinutes", "setMonth", "setSeconds", "setTime",
+    "setUTCDate", "setUTCFullYear", "setUTCHours", "setUTCMilliseconds", "setUTCMinutes", "setUTCMonth", "setUTCSeconds",
+  ];
+
+
+
+/**
+ * Handler class for the Date class.
+ */
+class DateHandler<T extends object> extends ExoticHandler<T>
+{
+    constructor(target: T, depth?: number)
+    {
+        super(DateMutatingMethods, target, depth);
+    }
+}
+
+// register triggerization proxy handler for Date class
+registerTrigProxyHandler(Date, DateHandler);
 
 
 
@@ -835,12 +894,12 @@ abstract class MapSetBaseHandler<T extends Map<any,any> | Set<any>> extends Base
     delete_wrapper(orgMethod: Function, v: any): boolean
     {
         // since value can be a proxy to a real value, we need to get the real value
-        let untriggerizedValue = untrig(v);
+        let untrigValue = untrig(v);
 
         // delete the item from the target - it will tell whether the value was in the set. If it
         // was not, we don't need to do anything; otherwise, we notify the container trigger of a
         // change.
-        if (!orgMethod(untriggerizedValue))
+        if (!orgMethod(untrigValue))
             return false;
 
         this.trigger.notifyWrite();
@@ -991,14 +1050,14 @@ class SetHandler extends MapSetBaseHandler<Set<any>>
     add_wrapper(orgMethod: Function, v: any): Set<any>
     {
         // call original method passing untriggerized value
-        let untriggerizedValue = untrig(v);
+        let untrigValue = untrig(v);
 
         // check whether the target already has the value. If it does, we don't need to do anything;
         // otherwise, we notify the container trigger of a change and call the original method.
-        if (!this.target.has(untriggerizedValue))
+        if (!this.target.has(untrigValue))
         {
             this.trigger.notifyWrite();
-            orgMethod(untriggerizedValue);
+            orgMethod(untrigValue);
         }
 
         // the add() method always returns the Set object itself

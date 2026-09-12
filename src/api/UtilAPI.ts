@@ -1,13 +1,10 @@
-import { s_isSvg, s_isSvgSvg } from "../utils/UtilFunc";
-
-
-
 /**
  * Determines whether the given element is one of the elements from the SVG spec; that is, <svg>
  * or any other from SVG.
  * @param elm Element to test
  */
-export const isSvg = (elm: Element): boolean => s_isSvg( elm);
+export const isSvg = (elm: Element): boolean =>
+	"ownerSVGElement" in (elm as any);
 
 
 
@@ -15,7 +12,9 @@ export const isSvg = (elm: Element): boolean => s_isSvg( elm);
  * Determines whether the given element is the <svg> element.
  * @param elm  Element to test
  */
-export const isSvgSvg = (elm: Element): boolean => s_isSvgSvg( elm);
+export const isSvgSvg = (elm: Element): boolean =>
+	elm.tagName === "svg";
+	// (elm as any).ownerSVGElement === null;
 
 
 

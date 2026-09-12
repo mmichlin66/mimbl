@@ -14,24 +14,40 @@ export const MathmlNamespace = "http://www.w3.org/1998/Math/MathML";
 const SvgTagNamesAsString =
     "svgA,animate,animateMotion,animateTransform,circle,clipPath,defs,desc,ellipse,feBlend,feColorMatrix,feComponentTransfer,feComposite,feConvolveMatrix,feDiffuseLighting,feDisplacementMap,feDistantLight,feDropShadow,feFlood,feFuncA,feFuncB,feFuncG,feFuncR,feGaussianBlur,feImage,feMerge,feMergeNode,feMorphology,feOffset,fePointLight,feSpecularLighting,feSpotLight,feTile,feTurbulence,filter,foreignObject,g,image,line,linearGradient,marker,mask,metadata,mpath,path,pattern,polygon,polyline,radialGradient,rect,svgScript,set,stop,svgStyle,svg,switch,symbol,text,textPath,svgTitle,tspan,use,view";
 
-/** Array of all SVG element names */
-const SvgTagNames = SvgTagNamesAsString.split(",");
+// /** Array of all SVG element names */
+// const SvgTagNames = SvgTagNamesAsString.split(",");
 
 /** Comma-separated list of all MathML element names */
 const MathmlTagNamesAsString =
     "math,merror,mfrac,mi,mmultiscripts,mn,mo,mover,mpadded,mphantom,mprescripts,mroot,mrow,ms,mspace,msqrt,mstyle,msub,msubsup,msup,mtable,mtd,mtext,mtr,munder,munderover,semantics,annotation,annotation-xml";
 
-/** Array of all MathML element names */
-const MathmlTagNames = MathmlTagNamesAsString.split(",");
+// /** Array of all MathML element names */
+// const MathmlTagNames = MathmlTagNamesAsString.split(",");
 
 /**
- * Returns namespace string for the given element name (SVG or MathML) and null if the name is a
+ * Map of SVG and MathML element names to their respective namespaces - an efficient name to know
+ * the namespace required to create an element (see {@link getElmNS}). HTML elements are nt in this
+ * map because they don't need to indicate namespace to be created.
+ */
+const ElementNamespaces = new Map<string, string>([
+    ...SvgTagNamesAsString.split(",").map((tag): [string, string] => [tag, SvgNamespace]),
+    ...MathmlTagNamesAsString.split(",").map((tag): [string, string] => [tag,MathmlNamespace])
+]);
+
+// /**
+//  * Returns namespace string for the given element name (SVG or MathML) and null if the name is a
+//  * regular HTML element.
+//  */
+// export const getElmNS = (elmName: string): string | null =>
+//     SvgTagNames.includes(elmName) ? SvgNamespace :
+//     MathmlTagNames.includes(elmName) ? MathmlNamespace :
+//     null;
+
+/**
+ * Returns namespace string for the given element name (SVG or MathML) and undefined if the name is a
  * regular HTML element.
  */
-export const getElmNS = (elmName: string): string | null =>
-    SvgTagNames.includes(elmName) ? SvgNamespace :
-    MathmlTagNames.includes(elmName) ? MathmlNamespace :
-    null;
+export const getElmNS = (elmName: string): string | undefined => ElementNamespaces.get(elmName)
 
 
 
@@ -47,8 +63,12 @@ const RealElementNames: { [elmName:string]: string } =
     svgStyle: "style",
 }
 
-export const getElmRealName = (elmName: string): string =>
-    RealElementNames[elmName] ?? elmName;
+/**
+ * Returns a "real" element name to use in HTML for certain SVG elements that have names identical
+ * to HTML elements. In JSX, these SVG elements must be specified by differen names; for example,
+ * to use SVG's `<a>` element, JSX must use `<svgA>`.
+ */
+export const getElmRealName = (elmName: string): string => RealElementNames[elmName] ?? elmName;
 
 
 
@@ -76,135 +96,114 @@ export const s_shallowCompare = (o1: any, o2: any): boolean =>
  */
 export const s_deepCompare = (o1: any, o2: any, level: number = -1): boolean =>
 {
+    // check by identity - regardess of type
 	if (o1 === o2)
 		return true;
-	else if (o1 == null && o2 == null)
+
+    // treat null and undefined as equal
+	if (o1 == null && o2 == null)
         return true;
-    else if (level === 0)
+
+    // treat two NaN as equal
+	if (isNaN(o1) && isNaN(o2))
+        return true;
+
+    // if this is the last level of comparizon, parameters are not equal because only identity or
+    // null/undefined equality would do and it was already checked.
+    if (level === 0)
         return false;
-	else if (o1 == null || o2 == null)
+
+    // if only one is null/undefined - not equal.
+	if (o1 == null || o2 == null)
 		return false;
-	else if (typeof o1 !== typeof o2)
+
+    // from here on, both parameters are defined and not null
+	if (typeof o1 !== typeof o2)
 		return false;
-	else if (Array.isArray(o1) !== Array.isArray(o2))
+
+    // from here on, the types of the two parameters are the same
+	if (Array.isArray(o1) !== Array.isArray(o2))
 		return false;
-	else if (Array.isArray(o1))
+
+    // arrays must be of the same length and elements should be deeply comparable.
+	if (Array.isArray(o1))
 	{
 		if (o1.length !== o2.length)
 			return false;
-		else
-		{
-			for( let i = 0, len = o1.length; i < len; i++)
-			{
-				if (!s_deepCompare( o1[i], o2[i], level - 1))
-					return false;
-			}
 
-            return true;
-		}
+        for (let i = 0, len = o1.length; i < len; i++)
+        {
+            if (!s_deepCompare(o1[i], o2[i], level - 1))
+                return false;
+        }
+
+        return true;
 	}
-	else if (typeof o1 === "object")
+
+    // check Date
+    if (o1 instanceof Date && o2 instanceof Date)
+        return o1.valueOf() == o2.valueOf();
+
+    // check Date
+    if (o1 instanceof RegExp && o2 instanceof RegExp)
+        return o1.source == o2.source && o1.flags === o2.flags;
+
+    // check Set; since there is no efficient way to perform deep comparizon of the elements in
+    // the sets we rely on key identities.
+    if (o1 instanceof Set && o2 instanceof Set)
 	{
-		for( let p in o1)
+        if (o1.size !== o2.size)
+            return false;
+
+		for (let v of o1)
 		{
-			if (!s_deepCompare( o1[p], o2[p], level - 1))
+			if (!o2.has(v))
 				return false;
 		}
+	}
 
-		for( let p in o2)
+    // check Map; since there is no efficient way to perform deep comparizon of the keys in
+    // the maps we rely on key identities; however, we deeply compare the values of the same
+    // keys. Note that we treat an absence of a key and the existence of the key with the
+    // undefined value as a difference.
+    if (o1 instanceof Map && o2 instanceof Map)
+	{
+        if (o1.size !== o2.size)
+            return false;
+
+		for (let k of o1)
 		{
-			if (!(p in o1))
+			if (!o2.has(k))
+				return false;
+
+            if (!s_deepCompare(o1.get(k), o2.get(k), level - 1))
+				return false;
+		}
+	}
+
+    // check general objects by comparing their enumerable properties' values. Note that we treat
+    // an absence of a property and the existence of the property with the undefined value as a
+    // difference.
+	if (typeof o1 === "object")
+	{
+        if (Object.keys(o1).length !== Object.keys(o2).length)
+            return false;
+
+		for (let p in o1)
+		{
+			if (!(p in o2))
+				return false;
+
+			if (!s_deepCompare(o1[p], o2[p], level - 1))
 				return false;
 		}
 
         return true;
 	}
-	else
-	{
-		// we are here if these are strings, numbers, booleans or functions and they are different
-		return false;
-	}
+
+    // we are here if these are strings, numbers, booleans or functions and they are different
+    return false;
 }
-
-
-
-// export function hashObject( o: any): number
-// {
-// 	if (o === undefined)
-// 		return 0;
-// 	else if (o === null)
-// 		return 1;
-// 	else if (isNaN(0))
-// 		return 2;
-// 	else if (o === true)
-// 		return 3;
-// 	else if (o === false)
-// 		return 4;
-
-// 	let h = 10;
-
-// 	if (typeof o === "number")
-// 		return 10 + o;
-// 	else if (typeof o === "string")
-// 		return hashString( o);
-// 	else if (typeof o === "function")
-// 		return hashString( o.name);
-// 	else if (Array.isArray(o))
-// 	{
-// 		let len = o.length;
-// 		let h = 10 + len;
-// 		for( let i = 0; i < len; i++)
-// 			 h += i + hashObject( o[i]);
-// 		return h;
-// 	}
-// 	else
-// 	{
-// 		let h = 10;
-// 		for( let p in o)
-// 			h += hashString(p) + hashObject(o[p]);
-// 		return h;
-// 	}
-// }
-
-
-
-// export function hashString( s: string): number
-// {
-// 	if (!s)
-// 		return 5;
-
-// 	let len = s.length;
-// 	let h = 10 + len;
-// 	for( let i = 0; i < len; i++)
-// 		h += s.charCodeAt(i);
-// 	return h;
-// }
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Utility functions for determining whether an element is an SVG.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-/**
- * Determines whether the given element is one of the elements from the SVG spec; that is, <svg>
- * or any other from SVG.
- * @param elm Element to test
- */
-export const s_isSvg = (elm: Element): boolean =>
-	"ownerSVGElement" in (elm as any);
-
-
-
-/**
- * Determines whether the given element is the <svg> element.
- * @param elm  Element to test
- */
-export const s_isSvgSvg = (elm: Element): boolean =>
-	elm.tagName === "svg";
-	// (elm as any).ownerSVGElement === null;
 
 
 
