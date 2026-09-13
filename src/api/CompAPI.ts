@@ -5,6 +5,7 @@
 } from "./CompTypes";
 import { IVN } from "../core/VNTypes";
 import {EventSlot} from "./EventSlotAPI"
+import { Trigger } from "./TriggerAPI";
 import { ClassCompVN, shadowDecorator } from "../core/ClassCompVN";
 import { TextVN } from "../core/TextVN";
 import { ElmVN } from "../core/ElmVN";
@@ -13,13 +14,10 @@ import { ManagedCompVN } from "../core/ManagedCompVN";
 import { mountRoot, unmountRoot } from "../core/RootVN";
 import { content2VNs, setCurrentClassComp, symJsxToVNs, symToVNs, wrapFunc } from "../core/Reconciler";
 import { s_initStyleScheduler } from "../core/StyleScheduler";
-import { createWatcher } from "./TriggerAPI";
 import { symRenderNoWatcher, VN } from "../core/VN";
 import { ComponentMixin } from "../core/CompImpl";
 import { applyMixins } from "../utils/UtilFunc";
 import { registerElmProp } from "../core/Props";
-import { IWatcher } from "./TriggerTypes";
-import { Trigger } from "../core/TriggerImpl";
 import { Fragment } from "./jsx";
 
 

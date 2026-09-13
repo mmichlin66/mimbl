@@ -15,8 +15,8 @@ import {
     AttrPropInfo, cleanElmProps, CustomAttrPropInfo, EventPropInfo, getPropInfo, removeElmProp,
     setElmProp, updateElmProp
 } from "./Props";
-import { isTrigger } from "./TriggerImpl";
 import { getElmNS, getElmRealName } from "../utils/UtilFunc";
+import { Trigger } from "../api/TriggerAPI";
 
 
 
@@ -423,7 +423,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         // the value can actually be a trigger and we need to listen to its changes then
         if (val != null)
         {
-            if (isTrigger(val))
+            if (val instanceof Trigger)
             {
                 val.attach(rtd.onChange = onAttrTriggerChanged.bind( this, name));
                 this.hasTriggers = true;
@@ -506,7 +506,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         // check whether the new value is a trigger and get the actual value from it for comparison.
         // If it is a trigger either reuse the onChange callback or create and remember a new one.
         // If it is not a trigger, "forget" the onChange callback.
-        if (isTrigger(newVal))
+        if (newVal instanceof Trigger)
         {
             newVal.attach(oldRTD.onChange ??= onAttrTriggerChanged.bind(this, name));
             this.hasTriggers = true;

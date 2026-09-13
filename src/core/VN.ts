@@ -2,8 +2,8 @@
     DN, IComponent, UpdateStrategy, TickSchedulingType, RefType, ISubscription, IPublication
 } from "../api/CompTypes";
 import { IEventSlot, IEventSlotOwner } from "../api/EventSlotTypes";
-import { createTrigger } from "../api/TriggerAPI";
 import { ITrigger } from "../api/TriggerTypes";
+import { Trigger } from "../api/TriggerAPI";
 import { ChildrenUpdateRequest, IVN } from "./VNTypes";
 
 /// #if USE_STATS
@@ -429,7 +429,7 @@ class Publication implements IPublication<any>
     {
         this.id = id;
         this.vn = vn;
-        this.trigger = createTrigger( value, depth);
+        this.trigger = new Trigger( value, depth);
         notifyServicePublished( this);
     }
 

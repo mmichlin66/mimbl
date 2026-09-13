@@ -1,14 +1,15 @@
 ﻿import { DN, IClassCompVN, IComponent, IComponentClass, ComponentShadowOptions, ComponentProps } from "../api/CompTypes"
 import { VNDisp } from "./VNTypes";
 import { IWatcher } from "../api/TriggerTypes";
+import { Watcher } from "../api/TriggerAPI";
+import { setCurrentClassComp, mountContent, reconcile } from "./Reconciler";
+import { symRenderNoWatcher, VN } from "./VN";
+
+
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
-
-import { createWatcher } from "../api/TriggerAPI";
-import { setCurrentClassComp, mountContent, reconcile } from "./Reconciler";
-import { symRenderNoWatcher, VN } from "./VN";
 
 
 
@@ -276,7 +277,7 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
         // establish watcher if not disabled using the @noWatcher decorator
         this.watcher = comp.render[symRenderNoWatcher]
             ? undefined
-            : createWatcher( comp.render, this.requestUpdate, comp, this);
+            : Watcher.create(comp.render, this.requestUpdate, comp, this);
 
         this.updateStrategy = comp.updateStrategy;
     }

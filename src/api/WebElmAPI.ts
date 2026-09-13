@@ -4,6 +4,7 @@
 import { IVN } from "../core/VNTypes";
 import { IComponent, PropType } from "./CompTypes";
 import { ITrigger } from "./TriggerTypes";
+import { Trigger } from "./TriggerAPI";
 import { mimcss } from "../core/StyleScheduler";
 import { mount, unmount } from "./CompAPI";
 import { ComponentMixin } from "../core/CompImpl";
@@ -12,7 +13,6 @@ import { ariaPropToAttrName, ariaPropToString, registerElmProp, setAttrValue } f
 import { symToVNs } from "../core/Reconciler";
 import { IndependentCompVN } from "../core/IndependentCompVN";
 import { ClassCompVN } from "../core/ClassCompVN";
-import { Trigger } from "../core/TriggerImpl";
 
 
 
