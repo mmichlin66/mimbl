@@ -31,7 +31,7 @@ export class ContainerTrigger extends EventSlot<() => void> implements IContaine
     /** Notifies that the container has been read from */
     public notifyRead(): void
     {
-        currentWatcher?.notifyTriggerRead(this);
+        notifyTriggerRead(this);
     }
 
     /**
@@ -74,7 +74,7 @@ export class Trigger<T = any> extends EventSlot<(v: T) => void> implements ITrig
     // Retrieves the current value
     public get(): T
     {
-        currentWatcher?.notifyTriggerRead(this);
+        notifyTriggerRead(this);
         return this.v;
     }
 
@@ -217,8 +217,7 @@ export class Watcher<T extends (...args: any[]) => any = any> implements IWatche
         this.triggers = new Set();
 
         // install our watcher at the top of the watchers stack
-        let prevWatcher = currentWatcher;
-        currentWatcher = this;
+        attachWatcher(this);
 
         // call the function
         try
@@ -228,12 +227,28 @@ export class Watcher<T extends (...args: any[]) => any = any> implements IWatche
         finally
         {
             // remove our watcher from the top of the watchers stack
-            currentWatcher = prevWatcher;
+            detachWatcher(this);
 
             // remove our watcher from old triggers. This when we forget about the triggers that
             // were read during the previous execution of the function and that are not read during
             // this execution.
             oldTriggers.forEach(trigger => trigger.detach(this.onTriggerChanged));
+        }
+    }
+
+    /**
+     * Notifies that the value of the given trigger object has been read.
+     */
+    public onTriggerRead(trigger: IEventSlot): void
+    {
+        // if we have already seen this trigger, we don't need to attach to it again. That means
+        // that during a watch function run we will be attaching to each encountered trigger only
+        // once. This is necessary because when the trigger is not encountered on a subsequent run,
+        // we will detach from it only once.
+        if (!this.triggers.has(trigger))
+        {
+            this.triggers.add(trigger);
+            trigger.attach(this.onTriggerChanged);
         }
     }
 
@@ -252,29 +267,98 @@ export class Watcher<T extends (...args: any[]) => any = any> implements IWatche
     }
 
     /**
-     * Notifies that the value of the given trigger object has been read.
-     * @ignore
-     */
-    public notifyTriggerRead(trigger: IEventSlot): void
-    {
-        // if we have already seen this trigger, we don't need to attach to it again. That means
-        // that during a watch function run we will be attaching to each encountered trigger only
-        // once. This is necessary because when the trigger is not encountered on a subsequent run,
-        // we will detach from it only once.
-        if (!this.triggers.has(trigger))
-        {
-            this.triggers.add(trigger);
-            trigger.attach(this.onTriggerChanged);
-        }
-    }
-
-    /**
      * Handler for change events fired by all triggers this watcher is listening to. We don't need
      * to distinguish between triggers and we also don't need the trigger's value.
      * @ignore
      */
     private onTriggerChanged = () =>
         mutationScopesRefCount ? deferredWatchers.add(this) : this.respond();
+}
+
+
+
+/**
+ * Stack of Watcher objects. Whenever a watcher's `run()` method is called, it calls the
+ * `attachWatcher()` function before calling the watched function and `detachWatcher()` function
+ * after calling the watched function. The `attachWatcher()` function places the watcher's callback
+ * on the top of the stack while the `detachWatcher()` function removes it. When a trigger is read,
+ * it notifies the global WatcherStack instance, which invokes the callback from the top of the
+ * stack only. Thus, the currently running watcher is notified of trigger reads.
+ */
+const watcherStack: IWatcher[] = []
+
+/** Places the given watcher at the top of the stack */
+const attachWatcher = (watcher: IWatcher) => watcherStack.push(watcher);
+
+/** Removes the given watcher from the top of the stack */
+const detachWatcher = (watcher: IWatcher) =>
+{
+    /// #if DEBUG
+    if (watcherStack.length === 0)
+        console.error( "Unpaired call to WatcherStack.detach()");
+    else if (watcherStack[watcherStack.length - 1] !== watcher)
+        console.error( "Wrong watcher in the call to WatcherStack.detach()");
+    /// #endif
+
+    watcherStack.pop();
+}
+
+/** Notifies the watcher at the top of the stack (if any) that the given trigger has been read */
+const notifyTriggerRead = (trigger: IEventSlot) =>
+{
+    let len = watcherStack.length;
+    if (len > 0)
+        watcherStack[len - 1].onTriggerRead(trigger);
+}
+
+
+
+// Number of currently active mutation scopes. When a trigger notifies that its value has been
+// changed while this number is not 0, the trigger will be remembered in the internal set.
+// After all mutation scopes are finished, the watchers attached to all triggers in the set
+// will be notified. When a trigger notifies that its value has been changed while there are
+// no mutation scopes present, the watchers attached to the trigger are notified immediately.
+let mutationScopesRefCount = 0;
+
+// Set of watchers that should be notified when the last mutation scope exits. Using Set
+// ensures that no matter how many triggers reference a watcher, the watcher will be present
+// only once.
+const deferredWatchers = new Set<Watcher>();
+
+
+
+/**
+ * Increments mutation scope reference count
+ */
+export const enterMutationScope = (): void =>
+{
+    mutationScopesRefCount++;
+}
+
+/**
+ * Decrements mutation scope reference count. If it reaches zero, notifies all deferred watchers.
+ */
+export const exitMutationScope = (): void =>
+{
+    if (mutationScopesRefCount === 0)
+    {
+        /// #if DEBUG
+        console.error( "Unpaired call to exitMutationScope()");
+        /// #endif
+
+        return;
+    }
+
+    if (--mutationScopesRefCount === 0 && deferredWatchers.size)
+    {
+        // since when watchers respond, they can execute their watcher functions and that could
+        // mess with the same set of watchers we are iterating over. Therefore, we make a copy
+        // of this set first.
+        let watchers = Array.from(deferredWatchers);
+        deferredWatchers.clear();
+        for(let watcher of watchers)
+            watcher.respond();
+    }
 }
 
 
@@ -417,73 +501,6 @@ export const computed = (target: any, name: string, propDescr: PropertyDescripto
         // handle function case
         let orgFunc = propDescr.value;
         propDescr.value = function(): any { return getTriggerValue(orgFunc, this); }
-    }
-}
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Global functionality of the trigger-watcher mechanism. It includes a stack of watcher objects
-// currently executing their functions and watching for trigger objects to be read. When a trigger
-// object is being read (that is its get() method is called), all the watchers in the stack are
-// notified, because they all depend on the trigger object's value for their functionality.
-//
-// It also maintains a reference count of mutation scopes and handles notifying watchers of
-// mutations only when the last mutation scope has exited. The triggers don't notify the watchers
-// directly; instead, they notify the manager, which accumulates the information and notifies all
-// the watchers once out of the last mutation scope.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-// Current watcher objects that will receive notification when trigger values are read.
-let currentWatcher: Watcher;
-
-// Number of currently active mutation scopes. When a trigger notifies that its value has been
-// changed while this number is not 0, the trigger will be remembered in the internal set.
-// After all mutation scopes are finished, the watchers attached to all triggers in the set
-// will be notified. When a trigger notifies that its value has been changed while there are
-// no mutation scopes present, the watchers attached to the trigger are notified immediately.
-let mutationScopesRefCount = 0;
-
-// Set of watchers that should be notified when the last mutation scope exits. Using Set
-// ensures that no matter how many triggers reference a watcher, the watcher will be present
-// only once.
-const deferredWatchers = new Set<Watcher>();
-
-
-
-/**
- * Increments mutation scope reference count
- */
-export const enterMutationScope = (): void =>
-{
-    mutationScopesRefCount++;
-}
-
-/**
- * Decrements mutation scope reference count. If it reaches zero, notifies all deferred watchers.
- */
-export const exitMutationScope = (): void =>
-{
-    if (mutationScopesRefCount === 0)
-    {
-        /// #if DEBUG
-        console.error( "Unpaired call to exitMutationScope");
-        /// #endif
-
-        return;
-    }
-
-    if (--mutationScopesRefCount === 0 && deferredWatchers.size)
-    {
-        // since when watchers respond, they can execute their watcher functions and that could
-        // mess with the same set of watchers we are iterating over. Therefore, we make a copy
-        // of this set first.
-        let watchers = Array.from(deferredWatchers);
-        deferredWatchers.clear();
-        for(let watcher of watchers)
-            watcher.respond();
     }
 }
 

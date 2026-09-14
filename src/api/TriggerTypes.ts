@@ -51,6 +51,9 @@ export interface IWatcher<T extends (...args: any[]) => any = any>
     /** This is a callable interface, which is implement as a function. */
     run(...args: Parameters<T>): ReturnType<T>;
 
+    /** Notifies that the given trigger object has been read while the watched function was running */
+    onTriggerRead(trigger: IEventSlot): void;
+
     /**
      * Invokes the responder function independent of the trigger changes.
      */
