@@ -123,23 +123,6 @@ export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
 
 
 
-/** Registers information about the given property. */
-export function registerElmProp( propName: string, info: AttrPropInfo | EventPropInfo | CustomAttrPropInfo): void
-{
-    if (propName in propInfos)
-    {
-        /// #if DEBUG
-        console.error( `Element property ${propName} is already registered.`);
-        /// #endif
-
-        return;
-    }
-
-    propInfos[propName] = info;
-}
-
-
-
 /**
  * Sets the value of the given attribute on the given element. This method handles special cases
  * of properties with non-trivial values.
@@ -363,7 +346,7 @@ const valToString = (val: any): string | null =>
 
 
 
-/** Joins array elements with comma */
+/** Joins array elements with the given separator */
 const array2s = (val: any[], sep: string): string =>
     val == null ? "" : val.map( item => valToString(item)).filter( item => !!item).join(sep);
 
@@ -594,7 +577,7 @@ const setDefaultCheckedProp = (elm: Element, val: CheckedPropType): string | nul
 
 /**
  * Converts the given value to string using the Mimcss conversion rules for the given syntax,
- * whcih is either a property name or a syntax like "<length>".
+ * which is either a property name or a syntax like "<length>".
  */
 const mimcssPropToString = (val: any, syntax: string): string =>
     mimcss ? mimcss.getStylePropValue(syntax, val) : typeof val === "string" ? val : "";
@@ -726,36 +709,47 @@ const removeAriaProp = (elm: Element, oldS: string | null) =>
 
 const StdFrameworkPropInfo: AttrPropInfo = { type: PropType.Framework };
 
-// Produces comma-separated list from array of values
+/** Produces comma-separated list from array of values */
 const ArrayWithCommaPropInfo: AttrPropInfo = { type: PropType.Attr, v2s: (val: any[]): string => array2s(val, ",") };
 
-// Produces semicolon-separated list from array of values
+/** Produces semicolon-separated list from array of values */
 const ArrayWithSemicolonPropInfo: AttrPropInfo = { type: PropType.Attr, v2s: (val: any[]): string => array2s(val, ";") };
 
-// Handles conversion of CssLength-typed attributes to strings
+/** Handles conversion of CssLength-typed attributes to strings */
 const CssLengthPropInfo: AttrPropInfo = { type: PropType.Attr, v2s: (val: any) => mimcssPropToString(val, "<length>") };
 
-// Handles conversion of CssColor-typed attributes to strings
+/** Handles conversion of CssColor-typed attributes to strings */
 const CssColorPropInfo: AttrPropInfo = { type: PropType.Attr, v2s: (val: any) => mimcssPropToString(val, "color") };
 
-// Handles conversion of SVG presentation attributes as Mimcss style properties to strings
+/** Handles conversion of SVG presentation attributes as Mimcss style properties to strings */
 const SvgAttrAsStylePropInfo: AttrPropInfo = { type: PropType.Attr, v2s: svgAttrToStylePropString };
 
-// Handles conversion of numeric attributes to strings depending on whether the element that uses
-// them is an SVG element. For SVG elements, units are not added, for others (in particular,
-// MathML), they are added.
+/**
+ * Handles conversion of numeric attributes to strings depending on whether the element that uses
+ * them is an SVG element. For SVG elements, units are not added, for others (in particular,
+ * MathML), they are added.
+ */
 const NumericAttrAsStylePropInfo: AttrPropInfo = { type: PropType.Attr, v2s: numAttrToStylePropString };
 
-// Handles conversion of SVG presentation attributes' names from camelCase to dash case
+/** Handles conversion of SVG presentation attributes' names from camelCase to dash case */
 const SvgAttrNameConversionPropInfo: AttrPropInfo = { type: PropType.Attr, name: camelToDash };
 
-// Handles conversion of SVG presentation attributes as Mimcss style properties to strings and
-// conversion of camelCase propery names to dash case.
+/**
+ * Handles conversion of SVG presentation attributes as Mimcss style properties to strings and
+ * conversion of camelCase propery names to dash case.
+ */
 const SvgAttrAsStyleWithNameConversionPropInfo: AttrPropInfo = { type: PropType.Attr, v2s: svgAttrToStylePropString, name: camelToDash };
+
+
+
+/** Type combining PropInfo or function that returns PropEinfo for the given eement and property names */
+type PropInfoOrFunc = PropInfo | ((elmName: string, attrName: string) => PropInfo);
+
+
 
 /**
  * Object that maps property names to PropInfo-derived objects. Information about custom
- * attributes is added to this object when the registerProperty method is called.
+ * attributes is added to this object when the registerElmProp method is called.
  *
  * There are a few attributes that have different meaning when applied to different elements.
  * For exampe, the `fill` attribute means shape-filling color when applied to such elements as
@@ -764,7 +758,7 @@ const SvgAttrAsStyleWithNameConversionPropInfo: AttrPropInfo = { type: PropType.
  * therefore different treatment) of the attributes, the value can be set to a function, which
  * will return the actual AttrPropInfo given the attribute and element names.
  */
-const propInfos: { [P:string]: PropInfo | ((elmName: string, attrName: string) => PropInfo) } =
+const globalPropRegistry: { [P: string]: PropInfoOrFunc } =
 {
     // framework attributes.
     key: StdFrameworkPropInfo,
@@ -884,12 +878,66 @@ const propInfos: { [P:string]: PropInfo | ((elmName: string, attrName: string) =
 
 
 /**
+ * Object containing property registries per element name. The keys are element names (including
+ * custom Web Element names); values map property names to PropInfoOrFunc type - same stucture as
+ * in the global registry.
+ */
+const elementPropRegistries: { [E: string]: { [P: string]: PropInfoOrFunc} } =
+{
+}
+
+
+
+/**
+ * Registers information about the given property either for all elements or for the specific
+ * element.
+ * @param propName Name of the property
+ * @param info Information about the property
+ * @param elmName Optional element name. If this is undefined, the property information is
+ * registered for all elements; otherwise, only for the specified element
+ */
+export function registerElmProp(propName: string, info: PropInfoOrFunc, elmName?: string): void
+{
+    // use element-secific registry if element name was specified and global registry otherwise
+    let registry: { [P: string]: PropInfoOrFunc };
+    if (elmName)
+    {
+        registry = elementPropRegistries[elmName];
+        if (!registry)
+            elementPropRegistries[elmName] = registry = {}
+    }
+    else
+        registry = globalPropRegistry;
+
+    if (propName in registry)
+    {
+        /// #if DEBUG
+        console.error( `Element property '${propName}' for element '${elmName ?? "global"}' is already registered.`);
+        /// #endif
+
+        return;
+    }
+
+    registry[propName] = info;
+}
+
+
+
+/**
  * Retrieves info about a registered property
  */
-// export const getPropInfo = (name: string): PropInfo | undefined => propInfos[name];
 export function getPropInfo(elmName: string, attrName: string): PropInfo | undefined
 {
-    let info = propInfos[attrName];
+    let info: PropInfoOrFunc | undefined;
+
+    // first try element-specific registry; then global registry
+    if (elmName && elmName in elementPropRegistries)
+        info = elementPropRegistries[elmName][attrName];
+
+    // if no element-specific registry or attribute name not found there, try global registry
+    if (!info)
+        info = globalPropRegistry[attrName];
+
     return typeof info === "function" ? info(elmName, attrName) : info;
 }
 

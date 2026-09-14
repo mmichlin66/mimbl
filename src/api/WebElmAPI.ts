@@ -322,12 +322,7 @@ abstract class WebElmMixin extends HTMLElement
 
     setAttr(attrName: string, value: any): void
     {
-        let toHtml = this._def.attrs[attrName]?.options?.toHtml;
-        let stringValue = toHtml ? toHtml(value, attrName) : value;
-        if (stringValue == null)
-            this.removeAttribute(attrName);
-        else
-            this.setAttribute(attrName, stringValue);
+        setAttrValue(this, attrName, value);
     }
 
     getAttr(attrName: string): string | null
@@ -504,7 +499,7 @@ export function registerWebElm(webElmClass: WebElmConstructor, name?: string,
         // the v2s method set to toHtml
         let toHtml = options?.toHtml;
         if (toHtml)
-            registerElmProp( attrDef.attrName, {type: PropType.Attr, v2s: toHtml})
+            registerElmProp(attrDef.attrName, {type: PropType.Attr, v2s: toHtml}, definition.name);
     }
     // by now the definition has been adjusted, so we can register the custom element according
     // to the definition values.
