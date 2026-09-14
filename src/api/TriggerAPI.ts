@@ -121,6 +121,7 @@ export function trigger(targetOrDepth: any, name?: string): any
 
 /**
  * Helper function for defining `@trigger` decorators.
+ * @ignore
  */
 const triggerDecorator = (depth: number | undefined, target: any, name: string): void =>
 {
@@ -154,16 +155,41 @@ let nextWatcherDebugId = 1;
  * during a function execution. When the trigger objects are read, they are remembered by the
  * Watcher object. Whenever a value is changed in any of these triggers, the watcher object is
  * notified and calls the responder function.
+ * @typeParam T Type (signature) of the function to be watched.
  */
-export class Watcher<T extends (...args: any[]) => any = any>
+export class Watcher<T extends (...args: any[]) => any = any> implements IWatcher<T>
 {
+    /// #if DEBUG
+    debugId: number = nextWatcherDebugId++;
+    /// #endif
+
     /**
-     * Creates a watcher function with the same signature as the given regular function. When the
+     * Function being watched; that is, during which we should listen to triggers being read, so
+     * that we can remember them and later respond when they notify that their values have been
+     * changed.
+     **/
+    private func: T;
+
+    /**
+     * Function to be invoked when the the value of one of the triggers changes. It can also be
+     * called on its own - independent of the trigger changes.
+     * @ignore
+     */
+    public respond: () => void
+
+    /**
+     * Set of triggers currently being watched by this watcher. The purpose of knowing what
+     * triggers are used by what watcher is to remove the watcher from all these triggers when
+     * the watcher is disposed.
+     */
+    private triggers = new Set<IEventSlot>();
+
+    /**
+     * Creates a watcher object with the same signature as the given regular function. When the
      * watcher function is invoked it invokes the original function and it notices all trigger objects
      * that were read during its execution. When any of these trigger objects have their values
      * changed, the responder function will be called.
      *
-     * @typeParam T Type (signature) of the function to be watched.
      * @param func Function to be watched
      * @param responder Function to be invoked when values of the trigger objects encountered during
      * the original function's last execution change.
@@ -171,46 +197,17 @@ export class Watcher<T extends (...args: any[]) => any = any>
      * @param responderThis Optional value of "this" that will be used to call the responder function.
      * If this value is undefined, the "this" value for the original function will be used.
      */
-    static create<T extends (...args: any[]) => any>(func: T, responder: () => void,
-        funcThis?: any, responderThis?: any): IWatcher<T>
-    {
-        // create a new watcher object and bind the watcher function to this object.
-        let watcherObj = new Watcher(func, responder, funcThis, responderThis);
-        let watcherFunc = watcherObj.execute.bind(watcherObj) as IWatcher<T>;
-
-        // bind the watcher dispose function to the watcher object and set it as the property on
-        // the previously bound instance of the watcher function
-        watcherFunc.dispose = watcherObj.dispose.bind(watcherObj);
-        return watcherFunc;
-    }
-
-
-
     constructor(func: T, responder: () => void, funcThis?: any, responderThis?: any)
     {
-        this.func = func;
-        this.responder = responder;
-        this.funcThis = funcThis;
-
-        // if responder "this" is not defined use the one for the function
-        this.responderThis = responderThis ? responderThis : funcThis;
+        this.func = func.bind(funcThis) as T;
+        this.respond = responder.bind(responderThis ?? funcThis);
     }
 
     /**
-     * Executes the original function while noticing read notificaions from triggers.
+     * Executes the original function while noticing read notifications from triggers.
      */
-    public execute(...args: any[]): any
+    public run(...args: Parameters<T>): ReturnType<T>
     {
-        // check whether our watcher has been already disposed
-        if (!this.func)
-        {
-            /// #if DEBUG
-            console.error( "Disposed watcher was called.");
-            /// #endif
-
-            return;
-        }
-
         // move all current triggers to a temporary set. We don't detach our watcher from these
         // triggers yet, because the function might read the same triggers again and we don't want
         // to detach and reattach in this case. Instead, we will be just increasing their reference
@@ -226,7 +223,7 @@ export class Watcher<T extends (...args: any[]) => any = any>
         // call the function
         try
         {
-            return this.func.apply(this.funcThis, args);
+            return this.func(...args);
         }
         finally
         {
@@ -240,32 +237,23 @@ export class Watcher<T extends (...args: any[]) => any = any>
         }
     }
 
-    /** Clears internal resources. */
-    public dispose(): void
+    /**
+     * Detaches the watcher from all its current triggers. The responder function will not be
+     * called until the `run()` method is called again and attaches to new triggers.
+     */
+    public detach(): void
     {
-        // check whether the object is already disposed
-        if (!this.func)
-        {
-            /// #if DEBUG
-            console.error("Disposing already disposed watcher.");
-            /// #endif
-
-            return;
-        }
-
         // detaches this watcher from all the triggers and the triggers from this watcher.
         this.triggers.forEach( trigger => trigger.detach(this.onTriggerChanged));
         this.triggers.clear();
 
         // remove this watcher from the deferred set
-        deferredWatchers.delete( this);
-
-        // indicate that the watcher has been disposed
-        this.func = this.responder = undefined;
+        deferredWatchers.delete(this);
     }
 
     /**
      * Notifies that the value of the given trigger object has been read.
+     * @ignore
      */
     public notifyTriggerRead(trigger: IEventSlot): void
     {
@@ -283,51 +271,10 @@ export class Watcher<T extends (...args: any[]) => any = any>
     /**
      * Handler for change events fired by all triggers this watcher is listening to. We don't need
      * to distinguish between triggers and we also don't need the trigger's value.
+     * @ignore
      */
     private onTriggerChanged = () =>
         mutationScopesRefCount ? deferredWatchers.add(this) : this.respond();
-
-    // Notifies the watcher that it should call the responder function. This occurs when there
-    // are triggers whose values have been changed
-    public respond(): void
-    {
-        // check whether our watcher has been already disposed. It can happen if after all mutation
-        // scopes exited the manager notifies multiple watchers and one of the watchers' responder
-        // disposes of another watcher.
-        this.responder?.apply(this.responderThis);
-    }
-
-
-
-    /// #if DEBUG
-    debugId: number = nextWatcherDebugId++;
-    /// #endif
-
-    /**
-     * Function being watched; that is, during which we should listen to triggers being read, so
-     * that we can remember them and later respond when they notify that their values have been
-     * changed. Optional only because it becomes undefined after dispose().
-     **/
-    private func?: T;
-
-    /**
-     * Function to be invoked when the the value of one of the triggers changes. Optional only
-     * because it becomes undefined after dispose().
-     */
-    private responder?: () => void
-
-    /** "this" value to apply to the watched function when calling it. */
-    private funcThis: any;
-
-    /** "this" value to apply to responder function when calling it. */
-    private responderThis: any;
-
-    /**
-     * Set of triggers currently being watched by this watcher. The purpose of knowing what
-     * triggers are used by what watcher is to remove the watcher from all these triggers when
-     * the watcher is disposed.
-     */
-    public triggers = new Set<IEventSlot>();
 }
 
 
@@ -368,9 +315,9 @@ export class ComputedTrigger<T = any> extends Trigger<T>
         if (this.isStale)
         {
             // we need to create the watcher if this is the first time the get method is called.
-            this.watcher ??= Watcher.create(this.func, this.responder, this.thisArg, this);
+            this.watcher ??= new Watcher(this.func, this.responder, this.thisArg, this);
 
-            this.v = trig(this.watcher(), this.depth);
+            this.v = trig(this.watcher.run(), this.depth);
             this.isStale = false;
         }
 
@@ -384,7 +331,7 @@ export class ComputedTrigger<T = any> extends Trigger<T>
         // we keep our function watcher only if we still have somebody watching us.
         if (this.watcher && !this.has())
         {
-            this.watcher.dispose();
+            this.watcher.detach();
             this.watcher = undefined;
             this.isStale = true;
         }
@@ -399,17 +346,17 @@ export class ComputedTrigger<T = any> extends Trigger<T>
     private responder(): void
     {
         if (this.watcher)
-            super.set(this.watcher());
+            super.set(this.watcher.run());
         else
             this.isStale = true;
     }
 
 
 
-    // Function we will be watching
+    /** Function we will be watching */
     private func: () => T;
 
-    // "this" value to apply to the watched function when calling it.
+    /** "this" value to apply to the watched function when calling it. */
     private thisArg: any;
 
     // Watcher over our function
@@ -419,8 +366,8 @@ export class ComputedTrigger<T = any> extends Trigger<T>
     // value. This flag is true under the following circumstances:
     // 1. Right after the object has been created. We don't even create the watcher because we
     //    wait until the get method is called.
-    // 2. When the responder has been invoked, but our trigger didn't have any watcher. Again, we
-    //    will wait until the get method is called.
+    // 2. After our trigger is detached from all watchers. Again, we will wait until the get
+    //    method is called.
     private isStale: boolean;
 }
 

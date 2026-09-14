@@ -40,20 +40,27 @@ export interface ITrigger<T = any> extends IEventSlot<(v: T) => void>
 
 
 /**
- * The IWatcher interface represents a callable object that wraps a function and has the same
- * signature as this function. When a watcher is called it calls the wrapped function and attaches
- * to all triggers whose values were read during the course of the call. When values of these
- * triggers change, a responder function is called. The responder function is provided when the
- * watcher is created, but it can be changed later.
+ * The IWatcher interface represents an object that wraps a function. When the watcher's `run()`
+ * method is called, it calls the wrapped function and attaches to all triggers whose values were
+ * read during the course of the call. When a value of any of these triggers changes, a responder
+ * function is called.
  * @typeParam T Type (signature) of the function to be watched.
  */
 export interface IWatcher<T extends (...args: any[]) => any = any>
 {
     /** This is a callable interface, which is implement as a function. */
-    (...args: Parameters<T>): ReturnType<T>;
+    run(...args: Parameters<T>): ReturnType<T>;
 
-    /** Clears internal resources. */
-    dispose(): void;
+    /**
+     * Invokes the responder function independent of the trigger changes.
+     */
+    respond(): void;
+
+    /**
+     * Detaches the watcher from all its current triggers. The responder function will not be
+     * called until the `run()` method is called again and attaches to new triggers.
+     */
+    detach(): void;
 }
 
 

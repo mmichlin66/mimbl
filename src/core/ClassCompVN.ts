@@ -250,7 +250,7 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
 		/// #endif
 
         // return this.actRender();
-        return this.watcher ? this.watcher() : this.comp.render();
+        return this.watcher ? this.watcher.run() : this.comp.render();
 	}
 
 
@@ -277,7 +277,7 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
         // establish watcher if not disabled using the @noWatcher decorator
         this.watcher = comp.render[symRenderNoWatcher]
             ? undefined
-            : Watcher.create(comp.render, this.requestUpdate, comp, this);
+            : new Watcher(comp.render, this.requestUpdate, comp, this);
 
         this.updateStrategy = comp.updateStrategy;
     }
@@ -289,7 +289,7 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
     {
         // release the watcher; we don't need to set it to undefined because it will be done
         // in the next mount (which is only possible in independent components)
-        this.watcher?.dispose();
+        this.watcher?.detach();
 
         let willUnmount = comp.willUnmount;
         if (willUnmount)
