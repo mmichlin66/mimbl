@@ -60,10 +60,10 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
         }
 	}
 
-	/** Determines whether this event slot has any listeners. */
-	public has(): boolean
+	/** Determines whether this event slot has any attached listeners. */
+	public isEmpty(): boolean
     {
-        return !!this.listener || !!this.listeners?.size;
+        return !this.listeners?.size;
     }
 
 	/** Removes all listeners to the event. */
@@ -198,10 +198,10 @@ class EventSlotPretender implements IEventSlotOwner
         this.slot?.detach( listener);
 	}
 
-	/** Determines whether this event slot has any listeners. */
-	public has(): boolean
+	/** Determines whether this event slot has any attached listeners. */
+	public isEmpty(): boolean
     {
-        return this.slot?.has() ?? false;
+        return this.slot?.isEmpty() ?? true;
     }
 }
 

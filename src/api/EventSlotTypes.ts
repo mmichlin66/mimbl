@@ -8,13 +8,13 @@ export interface IEventSlot<TFunc extends Function = Function>
 	 * Adds the given function as a listener to the event. Note that this cannot be a lambda
 	 * function because there will be no way to remove a lambda function listener later.
 	 */
-	attach( listener: TFunc): void;
+	attach(listener: TFunc): void;
 
 	/** Removes the given function as a listener to the event. */
-	detach( listener: TFunc): void;
+	detach(listener: TFunc): void;
 
-	/** Determines whether this event slot has any listeners. */
-	has(): boolean;
+	/** Determines whether this event slot has any attached listeners. */
+	isEmpty(): boolean;
 }
 
 
@@ -32,7 +32,7 @@ export interface IEventSlotOwner<TFunc extends EventSlotFunc = any> extends IEve
 	 * Method that raises the event and calls all the listeners (if any). It has the signature
 	 * of the template function so only proper-types parameters can be passed to it.
 	 */
-    fire( ...a: Parameters<TFunc>): void;
+    fire(...a: Parameters<TFunc>): void;
 
 	/** Removes all listeners to the event. */
 	clear(): void;

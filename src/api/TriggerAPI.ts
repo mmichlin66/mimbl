@@ -413,7 +413,7 @@ export class ComputedTrigger<T = any> extends Trigger<T>
         super.detach(listener);
 
         // we keep our function watcher only if we still have somebody watching us.
-        if (this.watcher && !this.has())
+        if (this.watcher && this.isEmpty())
         {
             this.watcher.detach();
             this.watcher = undefined;
