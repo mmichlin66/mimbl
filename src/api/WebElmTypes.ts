@@ -46,6 +46,14 @@ export type WebElmAttrOptions =
      */
     triggerDepth?: number;
 
+    /**
+     * Type of the property behind the attribute. This allows having non-string properties in the
+     * Web Element class while converting them to/from strings or null as HTML requires. Specifying
+     * type engages type-spcific conversion functions, so fromHtml and toHtml are not needed (unless
+     * some non-standard conversion is required).
+     */
+    type?: String | Boolean | Number | BigInt | Object;
+
     /** Converter function that converts the string attribute value to a property native type */
     fromHtml?: WebElmFromHtmlConverter;
 

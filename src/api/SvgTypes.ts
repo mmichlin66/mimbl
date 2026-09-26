@@ -207,7 +207,7 @@ export interface ISvgAnimationTimingAttrs
 {
 	begin?: string | string[];
 	dur?: SvgClock;
-	end?: string[];
+	end?: string | string[];
 	min?: SvgClock;
 	max?: SvgClock;
 	restart?: "always" | "whenNotActive" | "never";
@@ -222,9 +222,9 @@ export interface ISvgAnimationTimingAttrs
 export interface ISvgAnimationValueAttrs
 {
 	calcMode?: "discrete" | "linear" | "paced" | "spline";
-	values?: string[];
-	keyTimes?: (number | `${number}`)[];
-	keySplines?: [number | `${number}`, number | `${number}`, number | `${number}`, number | `${number}`][];
+	values?: string | string[];
+	keyTimes?: string | (number | `${number}`)[];
+	keySplines?: string | [number | `${number}`, number | `${number}`, number | `${number}`, number | `${number}`][];
 	from?: string | number;
 	to?: string | number;
 	by?: string | number;

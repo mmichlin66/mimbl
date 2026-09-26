@@ -8,24 +8,20 @@ export const HtmlNamespace = "http://www.w3.org/1999/xhtml";
 export const SvgNamespace = "http://www.w3.org/2000/svg";
 export const MathmlNamespace = "http://www.w3.org/1998/Math/MathML";
 
+/** Not a real namespace, but used for Custom Html Elements (Web Components) */
+export const CustomNamespace = "CustomNamespace";
 
 
 /** Comma-separated list of all SVG element names */
 const SvgTagNamesAsString =
     "svgA,animate,animateMotion,animateTransform,circle,clipPath,defs,desc,ellipse,feBlend,feColorMatrix,feComponentTransfer,feComposite,feConvolveMatrix,feDiffuseLighting,feDisplacementMap,feDistantLight,feDropShadow,feFlood,feFuncA,feFuncB,feFuncG,feFuncR,feGaussianBlur,feImage,feMerge,feMergeNode,feMorphology,feOffset,fePointLight,feSpecularLighting,feSpotLight,feTile,feTurbulence,filter,foreignObject,g,image,line,linearGradient,marker,mask,metadata,mpath,path,pattern,polygon,polyline,radialGradient,rect,svgScript,set,stop,svgStyle,svg,switch,symbol,text,textPath,svgTitle,tspan,use,view";
 
-// /** Array of all SVG element names */
-// const SvgTagNames = SvgTagNamesAsString.split(",");
-
 /** Comma-separated list of all MathML element names */
 const MathmlTagNamesAsString =
     "math,merror,mfrac,mi,mmultiscripts,mn,mo,mover,mpadded,mphantom,mprescripts,mroot,mrow,ms,mspace,msqrt,mstyle,msub,msubsup,msup,mtable,mtd,mtext,mtr,munder,munderover,semantics,annotation,annotation-xml";
 
-// /** Array of all MathML element names */
-// const MathmlTagNames = MathmlTagNamesAsString.split(",");
-
 /**
- * Map of SVG and MathML element names to their respective namespaces - an efficient name to know
+ * Map of SVG and MathML element names to their respective namespaces - an efficient way to know
  * the namespace required to create an element (see {@link getElmNS}). HTML elements are nt in this
  * map because they don't need to indicate namespace to be created.
  */
@@ -34,20 +30,12 @@ const ElementNamespaces = new Map<string, string>([
     ...MathmlTagNamesAsString.split(",").map((tag): [string, string] => [tag,MathmlNamespace])
 ]);
 
-// /**
-//  * Returns namespace string for the given element name (SVG or MathML) and null if the name is a
-//  * regular HTML element.
-//  */
-// export const getElmNS = (elmName: string): string | null =>
-//     SvgTagNames.includes(elmName) ? SvgNamespace :
-//     MathmlTagNames.includes(elmName) ? MathmlNamespace :
-//     null;
-
 /**
  * Returns namespace string for the given element name (SVG or MathML) and undefined if the name is a
  * regular HTML element.
  */
-export const getElmNS = (elmName: string): string | undefined => ElementNamespaces.get(elmName)
+export const getElmNS = (elmName: string): string =>
+    ElementNamespaces.get(elmName) ?? (elmName.includes("-") ? CustomNamespace : HtmlNamespace);
 
 
 
@@ -203,6 +191,66 @@ export const s_deepCompare = (o1: any, o2: any, level: number = -1): boolean =>
 
     // we are here if these are strings, numbers, booleans or functions and they are different
     return false;
+}
+
+
+
+function hashReplacer(this: Set<any>, key: string, value: any) {
+    // 'this' refers to the tracking Set object we passed in
+    const seen = this;
+
+    // Handle undefined and null first
+    if (value === null)
+        return value;
+
+    // handle primitive types
+    if (typeof value !== 'object')
+    {
+        // if (typeof value === 'function') return undefined; // Erases custom fn properties
+        if (typeof value === 'symbol') return value.toString();
+        return value;
+    }
+
+    // from here on we are dealing with objects or arrays
+    if (seen.has(value)) return '[Circular]';
+    seen.add(value);
+
+    // handle arrays
+    if (Array.isArray(value))
+        return value;
+
+    // Sets are converted to arrays
+    if (value instanceof Set)
+        return Array.from(value);
+
+    // Maps are converted to objects with sorted keys
+    if (value instanceof Map)
+    {
+        const mapObj = {};
+        const sortedKeys = Array.from(value.keys()).sort();
+        for (const k of sortedKeys)
+            mapObj[k] = value.get(k);
+        return mapObj;
+    }
+
+    // if an object knows to convert itself to a primitivem use this
+    if (Symbol.toPrimitive in value)
+        return String(value);
+
+    // if the object overrides the standard toString(), use it
+    if (typeof value.toString === 'function' && value.toString !== Object.prototype.toString)
+        return value.toString();
+
+    // return a new object with the same but sorted keys as the input one
+    return Object.keys(value).sort().reduce((sorted, k) => {
+        sorted[k] = value[k];
+        return sorted;
+    }, {});
+}
+
+export function objectToHashKey(obj: any, trackingSet?: Set<any>) {
+    // Bind the context to 'this' inside the replacer function
+    return JSON.stringify(obj, hashReplacer.bind(trackingSet ?? new Set()));
 }
 
 

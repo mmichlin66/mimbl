@@ -1044,12 +1044,6 @@ export interface ICustomAttributeHandler<T = any>
 /** Type of properties that can be specified for an element. */
 export const enum PropType
 {
-    /**
-     * Built-in attribute that is used internally by the Mimbl infrastructure and is not set
-     * to the element.
-     */
-	Framework = 0,
-
 	/** Regular attributes set using Element.setAttribute */
 	Attr = 1,
 
@@ -1058,6 +1052,12 @@ export const enum PropType
 
 	/**  Custom attributes for which handler factories are registered*/
 	CustomAttr = 3,
+
+    /**
+     * Built-in attribute that is used internally by the Mimbl infrastructure and is not set
+     * to the element.
+     */
+	Framework = 4,
 }
 
 

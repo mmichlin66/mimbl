@@ -77,6 +77,7 @@ export interface IHtmlLinkLikeElementAttrs extends IHtmlElementAttrs
 	download?: string;
 	href?: string;
 	hreflang?: string;
+   	imageSrcset?: string | string[];
 	ping?: string | string[];
 	referrerpolicy?: ReferrerPolicyPropType;
 	rel?: string;
@@ -562,7 +563,7 @@ export interface IHtmlInputElementAttrs extends IHtmlFormFieldElementAttrs
         "email" | "file" | "hidden" | "image" | "month" | "number" | "password" | "radio" |
         "range" | "reset" | "search" | "submit" | "tel" | "text" | "time" | "url" | "week";
 	value?: string | number | Date;
-    defaultValue?: string;
+    defaultValue?: string | number | Date;
 
     // text and search
     dirname?: string;
@@ -644,7 +645,7 @@ export interface IHtmlLinkElementAttrs extends IHtmlLinkLikeElementAttrs
 	integrity?: string;
 	media?: MediaStatement;
 	prefetch?: string;
-	sizes?: string;
+	sizes?: string | string[];
 	type?: string;
 }
 
@@ -915,7 +916,7 @@ export interface IHtmlSourceElementAttrs extends IHtmlElementAttrs
 {
     height?: number | `${number}`;
 	media?: MediaStatement;
-	sizes?: string;
+	sizes?: string | string[];
 	src?: string;
 	srcset?: string | string[];
 	type?: string;

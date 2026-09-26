@@ -2,14 +2,14 @@
     WebElmAttrChangeHandler, WebElmAttrOptions, WebElmConstructor, WebElmFromHtmlConverter, WebElmOptions, WebElmToHtmlConverter
 } from "./WebElmTypes";
 import { IVN } from "../core/VNTypes";
-import { IComponent, PropType } from "./CompTypes";
+import { IComponent } from "./CompTypes";
 import { ITrigger } from "./TriggerTypes";
 import { Trigger } from "./TriggerAPI";
 import { mimcss } from "../core/StyleScheduler";
 import { mount, unmount } from "./CompAPI";
 import { ComponentMixin } from "../core/CompImpl";
 import { applyMixins, copyMixinProp } from "../utils/UtilFunc";
-import { ariaPropToAttrName, ariaPropToString, registerElmProp, setAttrValue } from "../core/Props";
+import { ariaPropToAttrName, ariaPropToString } from "../core/Props";
 import { symToVNs } from "../core/Reconciler";
 import { IndependentCompVN } from "../core/IndependentCompVN";
 import { ClassCompVN } from "../core/ClassCompVN";
@@ -240,7 +240,7 @@ abstract class WebElmMixin extends HTMLElement
         return this._shadowRoot ??= this.attachShadow({mode: this._def?.options?.mode ?? "open"})
     }
 
-    /** Gets the "internals" object. It is created if it doesn' exist yet */
+    /** Gets the "internals" object. It is created if it doesn't exist yet */
     get internals(): ElementInternals
     {
         return this._internals ??= this.attachInternals();
@@ -258,11 +258,21 @@ abstract class WebElmMixin extends HTMLElement
 
     attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void
     {
+        // Ignore this call if the attribute has been changed as a result of setting property value.
+        if (this._isAttrSync)
+            return;
+
         // if no such attribute is defined in our class, do nothing (this shouldn't happen because
         // the callback is only called for defined attributes).
         let attrDef = this._def.attrs[name];
+
+        /// #if DEBUG
         if (!attrDef)
+        {
+            console.error(`Attribute definition not found for attribute '${name}'`)
             return;
+        }
+        /// #endif
 
         // get attributes parameters and check whether we actually need to do anything with
         // the new attribute value
@@ -274,25 +284,25 @@ abstract class WebElmMixin extends HTMLElement
         // determine the actual new value that should be set to the property and convert it to
         // the proper type if necessary
         let fromHtml = options?.fromHtml;
-        let actNewValue = fromHtml ? fromHtml(newValue, attrDef.attrName) : newValue;
+        if (fromHtml)
+            newValue = fromHtml(newValue, attrDef.attrName);
 
         // set the new value to the property. Since by default properties with the @attr
-        // decorators are reactive, this will trigger re-rendering. Note that property may not
-        // be specified if the attribute was only declared for notification or writing purpose.
-        // Ignore this call if the attribute has been changed as a result of setting property vaue
-        if (propName && !this._isAttrSync)
+        // decorators are reactive, this will trigger re-rendering. Note that property may not be
+        // specified if the attribute was only declared for notification or writing purpose.
+        if (propName)
         {
             // since we are setting the property because the attribute has been changed,
             // indicate that we don't need to call setAttribute from the property's set
             // accessor.
             this._isAttrSync = true;
-            this[propName] = actNewValue;
-            this._isAttrSync = false;
+            try { this[propName] = newValue; }
+            finally { this._isAttrSync = false; }
         }
 
         // call the `onchanged` method if defined. Note that it is called bound to the instance
         // of our custom element.
-        onchanged?.call(this, actNewValue, attrDef.attrName);
+        onchanged?.call(this, newValue, attrDef.attrName);
     }
 
     /** The render() function should be overridden in the derived class */
@@ -320,9 +330,21 @@ abstract class WebElmMixin extends HTMLElement
         }
     }
 
-    setAttr(attrName: string, value: any): void
+    setAttr(attrName: string, val: any): void
     {
-        setAttrValue(this, attrName, value);
+        // if no such attribute is defined in our class, do nothing.
+        let attrDef = this._def.attrs[attrName];
+        if (!attrDef)
+            return;
+
+        // determine the actual new value that should be set to the attribute and
+        // convert it to the proper type if necessary.
+        let toHtml = attrDef.options?.toHtml;
+        let attrVal = toHtml ? toHtml(val, attrName) : String(val);
+        if (attrVal == null)
+            this.removeAttribute(attrName);
+        else
+            this.setAttribute(attrName, attrVal);
     }
 
     getAttr(attrName: string): string | null
@@ -425,9 +447,9 @@ function attrDecorator(attrName: string | undefined, options: WebElmAttrOptions 
 
     addWebElmAttr(definition, {attrName: attrName ?? propName, propName, options})
 
-    // make it a trigger unless the "triggerDepth" flag was set to a negative value
-    let depth = options?.triggerDepth ?? 0;
-    if (propName && depth >= 0)
+    // make it a trigger
+    let depth = options?.triggerDepth;
+    if (propName)
     {
         let sym = Symbol( propName + "_attr");
 
@@ -435,21 +457,22 @@ function attrDecorator(attrName: string | undefined, options: WebElmAttrOptions 
             obj[sym] ??= new Trigger(undefined, depth) as ITrigger;
 
         Object.defineProperty( target, propName, {
+            // in this context, "this" is the custom element object
             get() { return getTriggerObj(this, depth).get(); },
-            set(val)
+            set(this: WebElmMixin, val)
             {
-                getTriggerObj(this, depth).set(val);
-                if (!this._isAttrSync)
+                if (this._isAttrSync)
+                    return;
+
+                try
                 {
                     this._isAttrSync = true;
-                    try
-                    {
-                        this.setAttr(attrName ?? propName, val);
-                    }
-                    finally
-                    {
-                        this._isAttrSync = false;
-                    }
+                    getTriggerObj(this, depth).set(val);
+                    this.setAttr(attrName ?? propName, val);
+                }
+                finally
+                {
+                    this._isAttrSync = false;
                 }
             },
         });
@@ -494,13 +517,8 @@ export function registerWebElm(webElmClass: WebElmConstructor, name?: string,
                     attrDef.options = options = {onchanged}
             }
         }
-
-        // if attribute specifies toHtml converter, then register this attribute as JSX property with
-        // the v2s method set to toHtml
-        let toHtml = options?.toHtml;
-        if (toHtml)
-            registerElmProp(attrDef.attrName, {type: PropType.Attr, v2s: toHtml}, definition.name);
     }
+
     // by now the definition has been adjusted, so we can register the custom element according
     // to the definition values.
     const tagToExtend = definition.extends;
@@ -603,18 +621,36 @@ export const attrToBool: WebElmFromHtmlConverter = (stringValue: string | null |
 
 
 /**
- * Built-in attribute converter that converts string value to a Boolean value.
+ * Built-in converter that converts property object value to a unique string mapped to the object
+ * itself in the "transit object registry".
  */
-export const attrToObj: WebElmFromHtmlConverter = (stringValue: string | null | undefined): any =>
-    !stringValue ? null : JSON.parse(stringValue);
+export const objToAttr: WebElmToHtmlConverter = (obj: object | null | undefined): string | null =>
+{
+    if (!obj)
+        return null;
+
+    // generate unique key
+    let key = Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+    transitObjectRegistry[key] = obj;
+    return key;
+}
 
 
 
 /**
- * Built-in converter that converts property object value to a string by using JSON.stringify.
+ * Built-in attribute converter that converts string value to an Object value by looking it up in
+ * the "transit object registry".
  */
-export const objToAttr: WebElmToHtmlConverter = (obj: object | null | undefined): string | null =>
-    !obj ? null : JSON.stringify(obj);
+export const attrToObj: WebElmFromHtmlConverter = (stringValue: string | null | undefined): any =>
+{
+    if (!stringValue)
+        return null;
+
+    let obj = transitObjectRegistry[stringValue];
+    delete transitObjectRegistry[stringValue];
+    return obj;
+}
 
 
 
+const transitObjectRegistry: Record<string, any> = {}

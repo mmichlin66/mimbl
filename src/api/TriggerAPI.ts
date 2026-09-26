@@ -24,10 +24,16 @@ let nextTriggerDebugId = 1;
  */
 export class ContainerTrigger extends EventSlot<() => void> implements IContainerTrigger
 {
-    /// #if DEBUG
-    debugId: number = nextTriggerDebugId++;
-    /// #endif
+    declare debugId: number;
 
+    constructor()
+    {
+        super();
+
+        /// #if DEBUG
+        this.debugId = nextTriggerDebugId++;
+        /// #endif
+    }
     /** Notifies that the container has been read from */
     public notifyRead(): void
     {
@@ -53,9 +59,7 @@ export class ContainerTrigger extends EventSlot<() => void> implements IContaine
  */
 export class Trigger<T = any> extends EventSlot<(v: T) => void> implements ITrigger<T>
 {
-    /// #if DEBUG
-    debugId: number = nextTriggerDebugId++;
-    /// #endif
+    declare debugId: number;
 
     // Number indicating to what level the items of container types should be triggerrized.
     protected depth?: number;
@@ -66,6 +70,10 @@ export class Trigger<T = any> extends EventSlot<(v: T) => void> implements ITrig
     constructor(v: T, depth?: number)
     {
         super();
+
+        /// #if DEBUG
+        this.debugId = nextTriggerDebugId++;
+        /// #endif
 
         this.depth = depth;
         this.v = trig(v, depth) as T;
@@ -159,9 +167,7 @@ let nextWatcherDebugId = 1;
  */
 export class Watcher<T extends (...args: any[]) => any = any> implements IWatcher<T>
 {
-    /// #if DEBUG
-    debugId: number = nextWatcherDebugId++;
-    /// #endif
+    declare debugId: number;
 
     /**
      * Function being watched; that is, during which we should listen to triggers being read, so
@@ -199,6 +205,10 @@ export class Watcher<T extends (...args: any[]) => any = any> implements IWatche
      */
     constructor(func: T, responder: () => void, funcThis?: any, responderThis?: any)
     {
+        /// #if DEBUG
+        this.debugId = nextWatcherDebugId++;
+        /// #endif
+
         this.func = func.bind(funcThis) as T;
         this.respond = responder.bind(responderThis ?? funcThis);
     }

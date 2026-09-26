@@ -15,7 +15,7 @@ import {
     AttrPropInfo, cleanElmProps, CustomAttrPropInfo, EventPropInfo, getPropInfo, removeElmProp,
     setElmProp, updateElmProp
 } from "./Props";
-import { getElmNS, getElmRealName } from "../utils/UtilFunc";
+import { getElmNS, getElmRealName, HtmlNamespace, MathmlNamespace, SvgNamespace } from "../utils/UtilFunc";
 import { Trigger } from "../api/TriggerAPI";
 
 
@@ -30,8 +30,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// Tag name of an Element.
 	public elmName: string;
 
-	// Instance of an Element. The instance is created when the node is rendered for the first
-	// time.
+	// Element's namespace.
+	public ns: string;
+
+	// Instance of an Element. The instance is created when the node is mounted.
 	public get elm(): T | null { return this.ownDN; }
 
 
@@ -43,6 +45,11 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		this.elmName = tagName;
 		this.props = props;
 		this.subNodes = subNodes;
+
+        // set element's namespace to HTML - the real namespace will be obtained on mounting - we
+        // just don't need to spend time on this during the constructions of this virtual node as
+        // we don't use it during update - update only checks element name.
+        this.ns = HtmlNamespace;
 
         // get the key property. If key property was not specified, use id; if id was not
         // specified key will remain undefined.
@@ -159,11 +166,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	{
         super.mount(parent, index, anchorDN);
 
-        // create the element; if the element is in the list, use the provided namespace;
-        // if namespace is provided use it; otherwise, use the namespace of the anchor element.
+        // create the element using proper namespace for SVG and MathML elements.
         let props = this.props as Record<string,any>;
-        let ns = getElmNS(this.elmName);
-        let elm = ns
+        let ns = this.ns = getElmNS(this.elmName);
+        let elm = ns === SvgNamespace || ns === MathmlNamespace
             ? document.createElementNS(ns, getElmRealName(this.elmName)) as T
             : document.createElement(this.elmName, props?.is != null ? {is: props.is} : undefined) as unknown as T;
 
@@ -327,10 +333,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         for( let [propName, propVal] of Object.entries(props))
 		{
             // get information about the property and determine its type.
-            let propInfo = getPropInfo(this.elmName, propName);
-            let propType = propInfo?.type ?? getPropTypeFromPropVal(propVal);
-            if (propType === PropType.Attr)
-                (this.attrs ??= {})[propName] = { info: propInfo, val: propVal, valS: null };
+            let propInfo = getPropInfo(this.ns, this.elmName, propName);
+            let propType = !propInfo ? getPropTypeFromPropVal(propVal) : propInfo.type;
+            if (!propType || propType === PropType.Attr)
+                (this.attrs ??= {})[propName] = { info: propInfo as AttrPropInfo | undefined, val: propVal, valS: null };
             else if (propType === PropType.Event)
                 (this.events ??= new EventsMixin(this.creator)).add(propName,
                     propVal as EventPropType, (propInfo as EventPropInfo)?.schedulingType);
@@ -361,8 +367,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         for( let [propName, propVal] of Object.entries(props))
 		{
             // get information about the property and determine its type.
-            let propInfo = getPropInfo(this.elmName, propName);
-            let propType = propInfo?.type ?? getPropTypeFromPropVal(propVal);
+            let propInfo = getPropInfo(this.ns, this.elmName, propName);
+            let propType = !propInfo ? getPropTypeFromPropVal(propVal) : propInfo.type;
 
             if (propType === PropType.Attr)
                 this.updateAttrOnly( propName, propVal, propInfo as AttrPropInfo);
