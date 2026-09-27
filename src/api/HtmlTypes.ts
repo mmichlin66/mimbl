@@ -24,7 +24,7 @@ export interface IHtmlElementAttrs extends IElementAttrs
 	accesskey?: string | string[];
 	autocapitalize?: "off" | "none" | "on" | "sentences" | "words" | "characters";
 	autofocus?: boolean;
-	contenteditable?: boolean | "true" | "false";
+	contentEditable?: boolean | "true" | "false";
 	dir?: "ltr" | "rtl" | "auto";
     enterkeyhint?: "enter" | "done" | "go" | "next" | "previous" | "search" | "send";
     exportparts?: string | string[];
@@ -391,7 +391,7 @@ export interface IHtmlFormElementAttrs extends IHtmlElementAttrs
 	enctype?: FormenctypePropType;
 	method?: FormmethodPropType;
 	name?: string;
-	novalidate?: boolean;
+	noValidate?: boolean;
     rel?: string;
 	target?: string | FormtargetPropType;
 }
@@ -549,13 +549,13 @@ export interface IHtmlInputElementAttrs extends IHtmlFormFieldElementAttrs
 	autocomplete?: string;
 	max?: string | number | Date;
 	list?: IDPropType;
-	maxlength?: number | `${number}`;
+	maxLength?: number | `${number}`;
 	min?: string | number | `${number}` | Date;
-	minlength?: number | `${number}`;
+	minLength?: number | `${number}`;
 	multiple?: boolean;
 	pattern?: string | RegExp;
 	placeholder?: string;
-	readonly?: boolean;
+	readOnly?: boolean;
 	required?: boolean;
 	step?: number | `${number}` | "any";
 	size?: number | `${number}`;
@@ -868,7 +868,7 @@ export interface IHtmlScriptElementAttrs extends IHtmlElementAttrs
 	defer?: boolean;
     fetchpriority?: FetchpriorityPropType;
 	integrity?: string;
-	nomodule?: boolean;
+	noModule?: boolean;
 	nonce?: string;
     referrerpolicy?: ReferrerPolicyPropType;
 	src?: string;
@@ -1009,10 +1009,10 @@ export interface IHtmlTextareaElementAttrs extends IHtmlFormFieldElementAttrs
 	autocomplete?: string;
     autocorrect?: "on" | "off";
 	cols?: number | `${number}`;
-	maxlength?: number | `${number}`;
-	minlength?: number | `${number}`;
+	maxLength?: number | `${number}`;
+	minLength?: number | `${number}`;
 	placeholder?: string;
-	readonly?: boolean;
+	readOnly?: boolean;
 	required?: boolean;
 	rows?: number | `${number}`;
 	wrap?: "hard" | "soft" | "off";
@@ -1112,7 +1112,7 @@ export interface IHtmlVideoElementAttrs extends IHtmlElementAttrs
 	height?: number | `${number}`;
 	loop?: boolean;
 	muted?: boolean;
-	playsinline?: boolean;
+	playsInline?: boolean;
     poster?: string;
 	preload?: "none" | "metadata" | "auto" | "";
 	src?: string;

@@ -132,7 +132,7 @@ export interface IElementAttrs
 	lang?: string;
 	role?: string;
 	style?: string | Styleset;
-	tabindex?: number;
+	tabIndex?: number;
     xmlns?: string;
 
     /**
