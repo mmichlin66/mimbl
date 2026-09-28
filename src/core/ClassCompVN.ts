@@ -56,7 +56,7 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
     public rootHost?: Element;
 
     /** Optional shadow root if the component specifies the `shadow` property */
-    public declare ownDN?: ShadowRoot;
+    public declare ownDN: ShadowRoot | null;
 
 	/**
      * If the component specifies the {@link shadow} property, the `shadowRoot` property will be set
@@ -65,7 +65,7 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
      * `shadowRoot` property will be undefined. Components can access the shadow root via their
      * `vn.shadowRoot` property.
      */
-    public get shadowRoot(): ShadowRoot | undefined { return this.ownDN; };
+    public get shadowRoot(): ShadowRoot | null { return this.ownDN; };
 
 
 
@@ -162,7 +162,7 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
             this.rootHost.remove();
             removeFromDOM = false;
             this.rootHost = undefined;
-            this.ownDN = undefined;
+            this.ownDN = null;
         }
 
         super.unmount( removeFromDOM);

@@ -833,7 +833,7 @@ export interface IClassCompVN<TProps extends {} = {}, TEvents extends {} = {}> e
      * {@link CompAPI!withShadow} decorator, the `shadowRoot` property will be undefined.
      * Components can access the shadow root via their `vn.shadowRoot` property.
      */
-    readonly shadowRoot?: ShadowRoot;
+    readonly shadowRoot?: ShadowRoot | null;
 
 	/**
 	 * This method is called by the component to request to be updated.

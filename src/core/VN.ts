@@ -34,56 +34,56 @@ export abstract class VN implements IVN
 	public abstract get name(): string;
 
 	// Parent node. This is null for the top-level (root) nodes.
-	public parent?: VN | null;
+	public parent: VN | null = null;
 
     /** Class component that created this node. */
-    public creator?: IComponent | null;
+    public creator: IComponent | undefined | null = null;
 
 	/**
      * Zero-based index of this node in the parent's list of sub-nodes. This is zero for the
      * root nodes that don't have parents.
      */
-	public index!: number;
+	public index: number = 0;
 
 	// DOM node under which all content of this virtual node is rendered.
-	public anchorDN?: DN;
+	public anchorDN: DN = null;
 
 	/**
 	 * Node's key. The derived classes set it based on their respective content. A key can be of
 	 * any type.
 	 */
-	public key?: any;
+	public key: any = null;
 
 	// List of sub-nodes - both keyed and unkeyed - defined only if there are some sub-nodes.
-	public subNodes?: IVN[] | null;
+	public subNodes: IVN[] | null = null;
 
 	/**
 	 * Update strategy object that determines different aspects of node behavior
 	 * during updates.
 	 */
-	public updateStrategy?: UpdateStrategy;
+	public updateStrategy: UpdateStrategy | undefined = undefined;
 
 	// Returns DOM node corresponding to the virtual node itself (if any) and not to any of its
 	// sub-nodes.
-	public ownDN?: DN;
+	public ownDN: DN = null;
 
 	// Flag indicating that update has been requested but not yet performed. This flag is needed
 	// to prevent trying to add the node to the global map every time the requestUpdate method
 	// is called.
-	public updateRequested?: boolean;
+	public updateRequested: boolean = false;
 
     // Flag indicating thata partial update has been requested but not yet performed. This flag is
     // different from the updateRequested since it controls node-type-specific "partial" updates,
     // which are treated by the rconciler by calling the performPartialUpdate method. Different
     // virtual node types can support different kinds of partial updates; for example, the ElmVN
     // allows updating the element properties without re-rendering its children.
-	public partialUpdateRequested?: boolean;
+	public partialUpdateRequested: boolean = false;
 
 	// "Tick number" during which the node was last updated. If this node's tick number equals
 	// the current tick number maintained by the root node, this indicates that this node was
 	// already updated in this update cycle. This helps prevent double-rendering of a
 	// component if both the component and its parent are updated in the same cycle.
-	public lastUpdateTick?: number;
+	public lastUpdateTick: number = -1;
 
 
 
@@ -147,7 +147,7 @@ export abstract class VN implements IVN
         if (this.subNodes)
         {
             unmountSubNodes( this.subNodes, removeFromDOM);
-            this.subNodes = undefined;
+            this.subNodes = null;
         }
     }
 
@@ -340,10 +340,10 @@ export abstract class VN implements IVN
 
 
 	/** Map of service IDs to objects constituting publications made by this node. */
-	public pubs?: Map<string,Publication>;
+	public pubs: Map<string,Publication> | undefined = undefined;
 
 	/** Map of service IDs to objects constituting subscriptions made by this node. */
-	private subs?: Map<string,Subscription>;
+	private subs: Map<string,Subscription> | undefined = undefined;
 }
 
 

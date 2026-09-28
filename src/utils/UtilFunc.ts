@@ -8,8 +8,17 @@ export const HtmlNamespace = "http://www.w3.org/1999/xhtml";
 export const SvgNamespace = "http://www.w3.org/2000/svg";
 export const MathmlNamespace = "http://www.w3.org/1998/Math/MathML";
 
-/** Not a real namespace, but used for Custom Html Elements (Web Components) */
-export const CustomNamespace = "CustomNamespace";
+/**
+ * Numbers used to identify namespaces, whcih also serve as indexes of namespace identifiers in our
+ * static array for fast retrieval.
+ */
+export const HtmlNamespaceCode = 0;
+export const SvgNamespaceCode = 1;
+export const MathmlNamespaceCode = 2;
+export const CustomNamespaceCode = 3;
+
+/** Array of element namespace identifiers, where indexes are the namespace codes */
+const elementNamespaces = [HtmlNamespace, SvgNamespace, MathmlNamespace, HtmlNamespace]
 
 
 /** Comma-separated list of all SVG element names */
@@ -21,21 +30,24 @@ const MathmlTagNamesAsString =
     "math,merror,mfrac,mi,mmultiscripts,mn,mo,mover,mpadded,mphantom,mprescripts,mroot,mrow,ms,mspace,msqrt,mstyle,msub,msubsup,msup,mtable,mtd,mtext,mtr,munder,munderover,semantics,annotation,annotation-xml";
 
 /**
- * Map of SVG and MathML element names to their respective namespaces - an efficient way to know
- * the namespace required to create an element (see {@link getElmNS}). HTML elements are nt in this
- * map because they don't need to indicate namespace to be created.
+ * Map of SVG and MathML element names to their respective namespace codess - an efficient way to
+ * know the namespace required to create an element (see {@link getElmNS}). HTML elements are not in
+ * this map because they don't need to indicate namespace to be created.
  */
-const ElementNamespaces = new Map<string, string>([
-    ...SvgTagNamesAsString.split(",").map((tag): [string, string] => [tag, SvgNamespace]),
-    ...MathmlTagNamesAsString.split(",").map((tag): [string, string] => [tag,MathmlNamespace])
+const ElementNamespaceCodes = new Map<string, number>([
+    ...SvgTagNamesAsString.split(",").map((tag): [string, number] => [tag, SvgNamespaceCode]),
+    ...MathmlTagNamesAsString.split(",").map((tag): [string, number] => [tag,MathmlNamespaceCode])
 ]);
 
 /**
- * Returns namespace string for the given element name (SVG or MathML) and undefined if the name is a
- * regular HTML element.
+ * For a given element name, returns a tuple with two elements, where the first element is the
+ * namespace code and the second element is the namespace string.
  */
-export const getElmNS = (elmName: string): string =>
-    ElementNamespaces.get(elmName) ?? (elmName.includes("-") ? CustomNamespace : HtmlNamespace);
+export function getElmNS(elmName: string): [number, string]
+{
+    let code = ElementNamespaceCodes.get(elmName) ?? (elmName.includes("-") ? CustomNamespaceCode : HtmlNamespaceCode);
+    return [code, elementNamespaces[code]];
+}
 
 
 

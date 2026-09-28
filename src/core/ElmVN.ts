@@ -15,27 +15,63 @@ import {
     AttrPropInfo, cleanElmProps, CustomAttrPropInfo, EventPropInfo, getPropInfo, removeElmProp,
     setElmProp, updateElmProp
 } from "./Props";
-import { getElmNS, getElmRealName, HtmlNamespace, MathmlNamespace, SvgNamespace } from "../utils/UtilFunc";
+import { getElmNS, getElmRealName, HtmlNamespaceCode, MathmlNamespaceCode, SvgNamespaceCode } from "../utils/UtilFunc";
 import { Trigger } from "../api/TriggerAPI";
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Represents a DOM element created using JSX.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
+/** For SVG elements' properties property assignment doesn't work - must go via setAttribute */
+const SvgDefaultPropInfo: AttrPropInfo = { attrOnly: true };
+
+/**
+ * All JSX attributes of Custom HTML Elements (Web Components) use standard set/update/remove
+ * functionality and they always use the JSX attrbute value as is without any type conversion.
+ */
+const CustomElementPropInfo: AttrPropInfo = { v2rv: val => val };
+
+
+
+/** Represents a DOM element created using JSX. */
 export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 {
 	// Tag name of an Element.
 	public elmName: string;
 
-	// Element's namespace.
-	public ns: string;
+	// Element's namespace code.
+	public nscode: number;
 
 	// Instance of an Element. The instance is created when the node is mounted.
 	public get elm(): T | null { return this.ownDN; }
 
+    // Properties that were passed to the element.
+	private props: ExtendedElement<T> | undefined = undefined;
+
+    // Redefine the ownDN property from VN to be of the Element type
+	public ownDN: T | null = null;
+
+    // Reference to the element that is specified as a "ref" property.
+	private ref: RefType<T> | undefined = undefined;
+
+    // Reference to this virtual node that is specified as a "vnref" property.
+	private vnref: ElmRefType<T> | undefined = undefined;
+
+	// Object that serves as a map between attribute names and their current values.
+	private attrs: { [name: string]: AttrRunTimeData } | undefined = undefined;
+
+	// Flag indicating whether at least one of the attributes has triggers. If not then
+    // we can avoid calling unmountAttrs upon element unmounting.
+	private hasTriggers: boolean = false;
+
+	// Object that serves as a container for event information.
+	private events: EventsMixin | undefined = undefined;
+
+	// Object that serves as a map between names of custom element properties and their respective
+	// handler objects and values.
+    private customAttrs: { [name: string]: CustomAttrRunTimeData } | undefined = undefined;
+
+    // Properties that were specified in the setProps call. This allows updating the
+    // element's properties without re-rendering its children.
+    private propsForPartialUpdate: any;
 
 
 	constructor( tagName: string, props: ExtendedElement<T> | undefined, subNodes: IVN[] | null)
@@ -46,10 +82,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		this.props = props;
 		this.subNodes = subNodes;
 
-        // set element's namespace to HTML - the real namespace will be obtained on mounting - we
-        // just don't need to spend time on this during the constructions of this virtual node as
-        // we don't use it during update - update only checks element name.
-        this.ns = HtmlNamespace;
+        // set element's namespace code to HTML - the real namespace will be obtained on mounting -
+        // we just don't need to spend time on this during the constructions.
+        this.nscode = HtmlNamespaceCode;
 
         // get the key property. If key property was not specified, use id; if id was not
         // specified key will remain undefined.
@@ -168,8 +203,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
         // create the element using proper namespace for SVG and MathML elements.
         let props = this.props as Record<string,any>;
-        let ns = this.ns = getElmNS(this.elmName);
-        let elm = ns === SvgNamespace || ns === MathmlNamespace
+        let [nscode, ns] = getElmNS(this.elmName);
+        this.nscode = nscode;
+        let elm = nscode === SvgNamespaceCode || nscode === MathmlNamespaceCode
             ? document.createElementNS(ns, getElmRealName(this.elmName)) as T
             : document.createElement(this.elmName, props?.is != null ? {is: props.is} : undefined) as unknown as T;
 
@@ -183,14 +219,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         if (props)
         {
             this.parseProps(props);
-
-            if (this.attrs)
-                this.mountAttrs();
-
+            this.mountAttrs();
             this.events?.mount(elm);
-
-            if (this.customAttrs)
-                this.mountCustomAttrs();
+            this.mountCustomAttrs();
 
             if (this.ref)
                 setRef(this.ref, elm);
@@ -300,9 +331,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             this.updateStrategy = newVN.updateStrategy;
 
             // update attributes and events
-            this.updateAttrs( newVN.attrs, isNewCreator);
-            this.updateEvents( newVN.events);
-            this.updateCustomAttrs( newVN.customAttrs);
+            this.updateAttrs(newVN.attrs, isNewCreator);
+            this.updateEvents(newVN.events);
+            this.updateCustomAttrs(newVN.customAttrs);
 
             // remember new props
             this.props = newVN.props;
@@ -330,24 +361,38 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	private parseProps( props: Record<string,any>): void
 	{
         // loop over all properties ignoring the built-ins
+        let nscode = this.nscode;
         for( let [propName, propVal] of Object.entries(props))
 		{
             // get information about the property and determine its type.
-            let propInfo = getPropInfo(this.ns, this.elmName, propName);
+            let propInfo = getPropInfo(this.nscode, this.elmName, propName);
             let propType = !propInfo ? getPropTypeFromPropVal(propVal) : propInfo.type;
             if (!propType || propType === PropType.Attr)
-                (this.attrs ??= {})[propName] = { info: propInfo as AttrPropInfo | undefined, val: propVal, valS: null };
+            {
+                // all SVG attributes except style must be set via attributes and not properties
+                if (nscode === SvgNamespaceCode && propName !== "style")
+                {
+                    if (!propInfo)
+                        propInfo = SvgDefaultPropInfo;
+                    else
+                        propInfo = Object.assign({}, propInfo, SvgDefaultPropInfo);
+                }
+
+                (this.attrs ??= {})[propName] = { info: propInfo as AttrPropInfo | undefined, val: propVal, rval: null };
+            }
             else if (propType === PropType.Event)
                 (this.events ??= new EventsMixin(this.creator)).add(propName,
                     propVal as EventPropType, (propInfo as EventPropInfo)?.schedulingType);
             else if (propType === PropType.Framework)
             {
                 if (propName === "ref")
-                    this.ref = propVal as RefType<T>;
+                    this.ref = propVal;
                 else if (propName === "vnref")
-                    this.vnref = propVal as ElmRefType<T>;
+                    this.vnref = propVal;
+                // else if (propName === "children" && !this.subNodes)
+                //     this.subNodes = [propVal];
                 else if (propName === "updateStrategy")
-                    this.updateStrategy = propVal as UpdateStrategy;
+                    this.updateStrategy = propVal;
             }
             else // if (propType === PropType.CustomAttr)
             {
@@ -364,14 +409,25 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	private updatePropsOnly( props: any): void
 	{
         // loop over all properties
+        let nscode = this.nscode;
         for( let [propName, propVal] of Object.entries(props))
 		{
             // get information about the property and determine its type.
-            let propInfo = getPropInfo(this.ns, this.elmName, propName);
+            let propInfo = getPropInfo(this.nscode, this.elmName, propName);
             let propType = !propInfo ? getPropTypeFromPropVal(propVal) : propInfo.type;
-
             if (propType === PropType.Attr)
+            {
+                // all SVG attributes except style must be set via attributes and not properties
+                if (nscode === SvgNamespaceCode && propName !== "style")
+                {
+                    if (!propInfo)
+                        propInfo = SvgDefaultPropInfo;
+                    else
+                        propInfo = Object.assign({}, propInfo, SvgDefaultPropInfo);
+                }
+
                 this.updateAttrOnly( propName, propVal, propInfo as AttrPropInfo);
+            }
             else if (propType === PropType.Event)
                 this.updateEventOnly( propName, propVal as EventPropType, propInfo as EventPropInfo);
             else if (propType === PropType.CustomAttr)
@@ -407,9 +463,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         if (rtd)
         {
             if (newVal != null)
-                rtd.valS = updateElmProp( this.ownDN!, name, rtd.valS, newVal, rtd.info);
+                rtd.rval = updateElmProp( this.ownDN!, name, rtd.rval, newVal, rtd.info);
             else
-                removeElmProp( this.ownDN!, name, rtd.valS, rtd.info), rtd.valS = null;
+                removeElmProp( this.ownDN!, name, rtd.rval, rtd.info), rtd.rval = null;
         }
 	}
 
@@ -418,11 +474,14 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// Adds DOM attributes to the Element.
 	private mountAttrs(): void
 	{
-        for( let [name, rtd] of Object.entries(this.attrs))
-            this.mountAttr( name, rtd, false);
+        if (this.attrs)
+        {
+            for( let [name, rtd] of Object.entries(this.attrs))
+                this.mountAttr( name, rtd, false);
+        }
 	}
 
-	private mountAttr( name: string, rtd: AttrRunTimeData, addToAttrs: boolean): void
+	private mountAttr(name: string, rtd: AttrRunTimeData, addToAttrs: boolean): void
 	{
         let val = rtd.val;
 
@@ -437,7 +496,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             }
 
             if (val != null)
-                rtd.valS = setElmProp( this.ownDN!, name, val, rtd.info);
+                rtd.rval = setElmProp( this.ownDN!, name, val, rtd.info);
         }
 
         // `add` means that a new attribute is mounted as a result of updating already existing
@@ -450,7 +509,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 	// Updates DOM attributes of this Element.
-	private updateAttrs( newAttrs: { [name: string]: AttrRunTimeData }, isNewCreator: boolean): void
+	private updateAttrs(newAttrs: { [name: string]: AttrRunTimeData } | undefined, isNewCreator: boolean): void
 	{
 		let oldAttrs = this.attrs;
 
@@ -484,7 +543,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
      * value is null, remove the old property and remove the attribute from the element. If the
      * new value is different from the old one, set it to the attribute in the element.
      */
-    private updateAttr( name: string, oldRTD: AttrRunTimeData, newRTD: AttrRunTimeData, isNewCreator?: boolean): void
+    private updateAttr(name: string, oldRTD: AttrRunTimeData, newRTD: AttrRunTimeData, isNewCreator?: boolean): void
     {
         let oldVal = oldRTD.val;
         let newVal = newRTD.val;
@@ -529,23 +588,27 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         // if creator has changed, use "set" instead of "update" as some properties should be
         // reset as new (e.g. defaultChecked).
         if (newVal == null)
-            removeElmProp(this.ownDN!, name, oldRTD.valS, oldRTD.info), oldRTD.valS = null;
+            removeElmProp(this.ownDN!, name, oldRTD.rval, oldRTD.info), oldRTD.rval = null;
         else if (isNewCreator)
-            oldRTD.valS = setElmProp(this.ownDN!, name, newVal, oldRTD.info);
+            oldRTD.rval = setElmProp(this.ownDN!, name, newVal, oldRTD.info);
         else
-            oldRTD.valS = updateElmProp(this.ownDN!, name, oldRTD.valS, newVal, oldRTD.info);
+            oldRTD.rval = updateElmProp(this.ownDN!, name, oldRTD.rval, newVal, oldRTD.info);
     }
 
 
 
     private unmountAttrs(): void
     {
-        for( let [name, rtd] of Object.entries(this.attrs))
-            this.unmountAttr( name, rtd, false);
+        if (this.attrs)
+        {
+            for( let [name, rtd] of Object.entries(this.attrs))
+                this.unmountAttr( name, rtd, false);
+        }
     }
 
-    private unmountAttr( name: string, rtd: AttrRunTimeData, removeFromAttrs: boolean): void
+    private unmountAttr(name: string, rtd: AttrRunTimeData, removeFromAttrs: boolean): void
     {
+        // if the attribute value is a trigger, detach from it
         if (rtd.onChange)
             rtd.val.detach(rtd.onChange);
 
@@ -554,8 +617,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         // object and from the DOM element.
         if (removeFromAttrs)
         {
-            removeElmProp(this.ownDN!, name, rtd.valS, rtd.info)
-            delete this.attrs[name];
+            removeElmProp(this.ownDN!, name, rtd.rval, rtd.info)
+            delete this.attrs![name];
         }
     }
 
@@ -565,7 +628,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     // when the properties of the element are updated as a result of setProps call; that
     // is, when only the properties that should be added, updated or removed were specified and
     // there is no need to re-render the element's children
-	private updateAttrOnly( name: string, val: any, info?: AttrPropInfo): void
+	private updateAttrOnly(name: string, val: any, info?: AttrPropInfo): void
 	{
         let oldRTD = this.attrs?.[name];
         if (val == null)
@@ -575,7 +638,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         }
         else
         {
-            let newRTD: AttrRunTimeData = {info, val, valS: null};
+            let newRTD: AttrRunTimeData = {info, val, rval: null};
             if (oldRTD)
                 this.updateAttr( name, oldRTD, newRTD);
             else
@@ -586,7 +649,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 	/** Updates event listeners by comparing the old and the new ones. */
-	private updateEvents( newEvents: EventsMixin | undefined): void
+	private updateEvents(newEvents: EventsMixin | undefined): void
 	{
         if (this.events)
         {
@@ -609,7 +672,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     // when the properties of the element are updated as a result of setProps call; that
     // is when only the properties that should be added, updated or removed were specified and
     // there is no need to re-render the element's children
-	private updateEventOnly( name: string, val: EventPropType, info?: EventPropInfo): void
+	private updateEventOnly(name: string, val: EventPropType, info?: EventPropInfo): void
 	{
         (this.events ??= new EventsMixin(this.creator)).updateSingleEvent(name, val, info?.schedulingType);
 	}
@@ -620,7 +683,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	private mountCustomAttrs(): void
 	{
 		// create and initialize custom property handlers
-		for( let name in this.customAttrs)
+		for (let name in this.customAttrs)
 		{
             // if the custom attribute handler failed to initialize, we remove it from our list
             if (!this.mountCustomAttr( name, this.customAttrs[name]))
@@ -631,7 +694,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 	// Creates custom attribute.
-	private mountCustomAttr( name: string, customAttr: CustomAttrRunTimeData): boolean
+	private mountCustomAttr(name: string, customAttr: CustomAttrRunTimeData): boolean
 	{
         // create custom property handler. If we cannot create the handler, remove the property
         // from our object.
@@ -679,7 +742,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 	// Updates custom attributes of this node.
-	private updateCustomAttrs( newCustomAttrs: { [name: string]: CustomAttrRunTimeData }): void
+	private updateCustomAttrs(newCustomAttrs: { [name: string]: CustomAttrRunTimeData } | undefined): void
 	{
 		let oldCustomAttrs = this.customAttrs;
 
@@ -722,12 +785,12 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 	// Updates custom attributes of this node.
-	private updateCustomAttr( name: string, oldCustomAttr: CustomAttrRunTimeData, newCustomAttr: CustomAttrRunTimeData): void
+	private updateCustomAttr(name: string, oldCustomAttr: CustomAttrRunTimeData, newCustomAttr: CustomAttrRunTimeData): void
 	{
         // update the custom property and remember the new value
         try
         {
-            oldCustomAttr.handler!.update( newCustomAttr.val);
+            oldCustomAttr.handler!.update(newCustomAttr.val);
         }
         catch( err)
         {
@@ -743,7 +806,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     // when the properties of the element are updated as a result of setProps call; that
     // is when only the properties that should be added, updated or removed were specified and
     // there is no need to re-render the element's children
-	private updateCustomAttrOnly( name: string, val: any, info: CustomAttrPropInfo): void
+	private updateCustomAttrOnly(name: string, val: any, info: CustomAttrPropInfo): void
 	{
         let oldCustomAttr = this.customAttrs && this.customAttrs[name];
         let newCustomAttr = val != null && { info, val, handler: undefined};
@@ -751,56 +814,24 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         {
             if (oldCustomAttr)
             {
-                this.unmountCustomAttr( name, oldCustomAttr, false)
-                delete this.customAttrs[name];
+                this.unmountCustomAttr(name, oldCustomAttr, false)
+                delete this.customAttrs![name];
             }
         }
         else
         {
             if (oldCustomAttr)
             {
-                this.updateCustomAttr( name, oldCustomAttr, newCustomAttr)
+                this.updateCustomAttr(name, oldCustomAttr, newCustomAttr)
                 oldCustomAttr.val = val;
             }
             else
             {
-                this.mountCustomAttr( name, newCustomAttr);
+                this.mountCustomAttr(name, newCustomAttr);
                 (this.customAttrs ??= {})[name] = newCustomAttr
             }
         }
 	}
-
-
-
-     // Properties that were passed to the element.
-	private props: ExtendedElement<T> | undefined;
-
-    // Redefine the ownDN property from VN to be of the Element type
-	public ownDN: T | null = null;
-
-    // Reference to the element that is specified as a "ref" property.
-	private ref?: RefType<T>;
-
-    // Reference to this virtual node that is specified as a "vnref" property.
-	private vnref?: ElmRefType<T>;
-
-	// Object that serves as a map between attribute names and their current values.
-	private attrs!: { [name: string]: AttrRunTimeData };
-
-	// Flag indicating whether at least one of the attributes has triggers. If not then
-    // we can avoid calling unmountAttrs upon element unmounting.
-	private hasTriggers?: boolean;
-
-	// Object that serves as a container for event information.
-	private events: EventsMixin | undefined;
-
-	// Object that serves as a map between names of custom element properties and their respective
-	// handler objects and values.
-    private customAttrs!: { [name: string]: CustomAttrRunTimeData };
-
-    // Properties that were specified in the setProps call. This allows updating the
-    // element's properties without re-rendering its children.
-    private propsForPartialUpdate: any;
 }
 
 
@@ -848,11 +879,13 @@ interface AttrRunTimeData
 	val: any;
 
 	/**
-     * Current attribute value converted to string and set in HTML. This can only be null if val
-     * is a trigger because we don't remove attribute with a trigger as its value from our attrs
-     * object even if the trigger's value is null.
+     * "Real value" - this is the value returned from either setElmProp() or updateElmProp(). This
+     * value is retained in order to supply it to the next calls to updateElmProp() or
+     * removeElmProp() so that the real element's attributes/properties can be changed/removed.
+     * This can only be null if val is a trigger because we don't remove attribute with a trigger as its
+     * value from our attrs object even if the trigger's value is null.
      */
-	valS: string | null;
+	rval: any;
 
     /**
      * Bound method reacting on the value change in the trigger. It is created only if the attribute value is a trigger.

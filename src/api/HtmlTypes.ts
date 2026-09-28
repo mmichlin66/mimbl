@@ -988,9 +988,9 @@ export interface IHtmlTbodyElementAttrs extends IHtmlElementAttrs
 // <td>
 export interface IHtmlTdElementAttrs extends IHtmlElementAttrs
 {
-	colspan?: number | `${number}`;
+	colSpan?: number | `${number}`;
 	headers?: IDPropType | IDPropType[];
-	rowspan?: number | `${number}`;
+	rowSpan?: number | `${number}`;
 }
 
 
@@ -1031,9 +1031,9 @@ export interface IHtmlTfootElementAttrs extends IHtmlElementAttrs
 export interface IHtmlThElementAttrs extends IHtmlElementAttrs
 {
 	abbr?: string;
-	colspan?: number | `${number}`;
+	colSpan?: number | `${number}`;
 	headers?: IDPropType | IDPropType[];
-	rowspan?: number | `${number}`;
+	rowSpan?: number | `${number}`;
 	scope?: "row" | "col" | "rowgroup" | "colgroup";
 	wrap?: "hard" | "soft" | "off";
 }
