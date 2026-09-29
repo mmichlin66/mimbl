@@ -21,14 +21,10 @@ export type SandboxPropType = "allow-downloads-without-user-activation" | "allow
  */
 export interface IHtmlElementAttrs extends IElementAttrs
 {
-	accesskey?: string | string[];
 	autocapitalize?: "off" | "none" | "on" | "sentences" | "words" | "characters";
-	autofocus?: boolean;
-	contentEditable?: boolean | "true" | "false";
 	dir?: "ltr" | "rtl" | "auto";
     enterkeyhint?: "enter" | "done" | "go" | "next" | "previous" | "search" | "send";
     exportparts?: string | string[];
-	hidden?: boolean | "" | "hidden" | "until-found";
     inert?: boolean;
 	inputmode?: "none" | "text" | "decimal" | "numeric" | "tel" | "search" | "email" | "url";
 	is?: string;
@@ -41,7 +37,6 @@ export interface IHtmlElementAttrs extends IElementAttrs
     part?: string | string[];
 	slot?: string;
 	spellcheck?: "true" | "false" | "default";
-	title?: string;
 	translate?: boolean | "yes" | "no";
 }
 

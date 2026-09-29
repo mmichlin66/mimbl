@@ -97,6 +97,7 @@ import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 
 import { mimcss } from "./StyleScheduler";
 import { CheckedPropType } from "../api/HtmlTypes";
+import { NamespaceCode } from "../utils/UtilFunc";
 
 
 
@@ -208,7 +209,7 @@ export interface AttrPropInfo<T extends Element = Element>
      * Flag indicating that this property can only be set/removed using setAttribute/removeAttribute
      * methods and not as an element property (that is, elm[prop] = value).
      */
-    attrOnly?: boolean;
+    asAttr?: boolean;
 }
 
 
@@ -263,19 +264,12 @@ export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
 
 
 /**
- * Empty attribute information object to skip object creation if it isn't defined for an JSX attribute
- */
-const emptyAttrInfo: AttrPropInfo = {};
-
-
-
-/**
  * Returns element property name to be used for the given JSX attribute. This returns either the
  * property name specified in the attribute information object or the JSX name itself.
  */
-function getPropNameFromAttrInfo(info: AttrPropInfo, name: string): string
+function getPropNameFromAttrInfo(name: string, info?: AttrPropInfo): string
 {
-    let propName = info.propName ?? name;
+    let propName = info?.propName ?? name;
     return typeof propName === "function" ? propName(name) : propName;
 }
 
@@ -283,9 +277,9 @@ function getPropNameFromAttrInfo(info: AttrPropInfo, name: string): string
  * Returns element attribute name to be used for the given JSX attribute. This returns either the
  * attribute name specified in the attribute information object or the JSX name itself.
  */
-function getAttrNameFromAttrInfo(info: AttrPropInfo, name: string): string
+function getAttrNameFromAttrInfo(name: string, info?: AttrPropInfo): string
 {
-    let attrName = info.attrName ?? name.toLowerCase();
+    let attrName = info?.attrName ?? name.toLowerCase();
     return typeof attrName === "function" ? attrName(name) : attrName;
 }
 
@@ -293,43 +287,83 @@ function getAttrNameFromAttrInfo(info: AttrPropInfo, name: string): string
  * Helper function that returns three things:
  *   - Flag indicating whether to set value as element property (true) or as HTML attribute (false);
  *   - Element property name or HTML attribute name to use when setting property or attribute.
- *   - Value to set.
+ *   - Value to set. For setting as element property, this can be of any type; for HTML attribute,
+ *     it will be either string or null.
  */
-function getPropValueForElm(elm: Element, val: any, name: string, info: AttrPropInfo): [boolean, string, any]
+function getPropValueForElm(nscode: number, elm: Element, val: any, name: string, info?: AttrPropInfo): [boolean, string, any]
 {
-    // if v2rv function is defined in the AttrInfo, use it to convert the value to the needed type
+    // determine whether this property should be set/removed as attribute
+    let propName = getPropNameFromAttrInfo(name, info);
+
+    // we need to determine whether to set value to element's property or as an attribute
+    let asProp: boolean;
+    if (nscode === NamespaceCode.SVG)
+        asProp = false;
+    else
+    {
+        // if the property is in the element and it is a custom HTML element, check whether the
+        // property is defined on the custom class itself or on its prototype (versus on the HTML Element
+        // it derives from). If yes, we know this property is handled by the custom class itself and we
+        // don't need to convert the value to anything and will pass it as is.
+        asProp = propName in elm;
+        if (asProp && nscode === NamespaceCode.Custom &&
+            (Object.hasOwn(elm, propName) || Object.hasOwn(Object.getPrototypeOf(elm), propName)))
+        {
+            return [true, propName, val];
+        }
+    }
+
+    // by now we have the asProp set. If v2rv function is defined in the AttrInfo, use it to convert
+    // the value to the needed type. If it is not defined, the value will be converted differently
+    // for properties (depending on the property type) and attributes (string).
     let v2rv = info?.v2rv;
     let rval: any = v2rv?.(val, name, elm);
-
-    // determine whether we need to go via element property or HTML attribute
-    let propName = getPropNameFromAttrInfo(info, name);
-    if (!info?.attrOnly && propName in elm)
+    let actName: string;
+    if (asProp)
     {
-        // if v2rv function is not defined in the AttrInfo, find out the type from the element itself
+        actName = propName;
+
+        // if value was not converted yet, find out the type from the element itself and convert to it
         if (!v2rv)
         {
             let t = typeof elm[propName];
-            rval =
-                t === "string" ? val2s(val) ?? "":
-                t === "boolean" ? Boolean(val) :
-                t === "number" ? Number(val) :
-                val;
-        }
 
-        return [true, propName, rval];
+            // for many numeric properties negative values cannot be set directly. The val2n function
+            // returns null for such properties. This is an indication that it should be deleted as
+            // an attribute.
+            if (t === "number")
+            {
+                rval === val2n(val, propName);
+                if (rval == null)
+                {
+                    asProp = false;
+                    actName = propName.toLowerCase();
+                }
+            }
+            else
+                rval = t === "string" ? val2s(val) ?? "" : t === "boolean" ? Boolean(val) : val;
+        }
     }
     else
-        return [false, getAttrNameFromAttrInfo(info, name), v2rv ? rval : val2s(val)];
+    {
+        actName = getAttrNameFromAttrInfo(name, info);
+
+        // if value was not converted yet, convert value to string
+        if (!v2rv)
+            rval = val2s(val);
+
+    }
+
+    return [asProp, actName, rval];
 }
 
 
 
 /**
- * Using the given property name and its value set the appropriate attribute(s) on the element.
- * This method handles special cases of properties with non-trivial values. Returns the new
- * string value of the attribute or null if the attribute was removed.
+ * Using the given JSX attribute name and value, set the appropriate property or attribute on the
+ * element.
  */
-export function setElmProp(elm: Element, name: string, val: any, info?: AttrPropInfo): any
+export function setElmProp(nscode: number, elm: Element, name: string, val: any, info?: AttrPropInfo): any
 {
     /// #if USE_STATS
     DetailedStats.log(StatsCategory.Attr, StatsAction.Added);
@@ -340,7 +374,7 @@ export function setElmProp(elm: Element, name: string, val: any, info?: AttrProp
     if (info?.set)
         rval = info.set(elm, val, name, info);
     else
-        rval = setElmPropInternal(elm, val, name, info ?? emptyAttrInfo);
+        rval = setElmPropInternal(nscode, elm, val, name, info);
 
     return rval;
 }
@@ -351,12 +385,22 @@ export function setElmProp(elm: Element, name: string, val: any, info?: AttrProp
  * Creates new value and either sets it as the element's property or sets it as an HTML attribute
  * or removes the HTML attribute.
  */
-function setElmPropInternal(elm: Element, val: any, name: string, info: AttrPropInfo): any
+function setElmPropInternal(nscode: number, elm: Element, val: any, name: string, info?: AttrPropInfo): any
 {
-    let [asProp, actName, rval] = getPropValueForElm(elm, val, name, info)
+    let [asProp, actName, rval] = getPropValueForElm(nscode, elm, val, name, info)
 
     if (asProp)
-        elm[actName] = rval;
+    {
+        // some assignments can lead to exceptions (e.g. negative numeric values for maxLength);
+        // therefore, we do the assignment within try/catch
+        try {
+            elm[actName] = rval;
+        } catch (err) {
+            /// #if DEBUG
+            console.error(`Error assigning value '${rval}' to property '${actName}' of element '${elm.localName}'.`, err);
+            /// #endif
+        }
+    }
     else if (rval != null)
         elm.setAttribute(actName, rval);
     else
@@ -372,7 +416,7 @@ function setElmPropInternal(elm: Element, val: any, name: string, info: AttrProp
  * value to the element's attribute. Returns true if update has been performed and false if no
  * change in property value has been detected.
  */
-export function updateElmProp(elm: Element, name: string, oldRVal: any, newVal: any,
+export function updateElmProp(nscode: number, elm: Element, name: string, oldRVal: any, newVal: any,
     info?: AttrPropInfo): any
 {
     /// #if USE_STATS
@@ -386,7 +430,7 @@ export function updateElmProp(elm: Element, name: string, oldRVal: any, newVal: 
     else if (info?.set)
         newRVal = info?.set(elm, newVal, name, info);
     else
-        newRVal = updateElmPropInternal(elm, oldRVal, newVal, name, info ?? emptyAttrInfo);
+        newRVal = updateElmPropInternal(nscode, elm, oldRVal, newVal, name, info);
 
     return newRVal;
 }
@@ -397,9 +441,9 @@ export function updateElmProp(elm: Element, name: string, oldRVal: any, newVal: 
  * Generates new value, compares it to the old value and, if they are different, either sets it as
  * the element's property or sets it as an HTML attribute or removes the HTML attribute.
  */
-function updateElmPropInternal(elm: Element, oldRVal: any, newVal: any, name: string, info: AttrPropInfo): any
+function updateElmPropInternal(nscode: number, elm: Element, oldRVal: any, newVal: any, name: string, info?: AttrPropInfo): any
 {
-    let [asProp, actName, newRVal] = getPropValueForElm(elm, newVal, name, info)
+    let [asProp, actName, newRVal] = getPropValueForElm(nscode, elm, newVal, name, info)
     if (oldRVal !== newRVal)
     {
         if (asProp)
@@ -416,7 +460,7 @@ function updateElmPropInternal(elm: Element, oldRVal: any, newVal: any, name: st
 
 
 /** Removes the attribute(s) corresponding to the given property. */
-export function removeElmProp(elm: Element, name: string, rval: any, info?: AttrPropInfo): void
+export function removeElmProp(nscode: number, elm: Element, name: string, rval: any, info?: AttrPropInfo): void
 {
     /// #if USE_STATS
     DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
@@ -424,32 +468,34 @@ export function removeElmProp(elm: Element, name: string, rval: any, info?: Attr
 
     // get info object doesn't define
     if (!info?.remove)
-        removeElmPropInternal(elm, name, info ?? emptyAttrInfo);
+        removeElmPropInternal(nscode, elm, name, info);
     else
         info.remove(elm, rval, name, info)
 }
 
 
-/**
- * Array of HTML property names of numeric type that don't accept the default "removal"
- * value of -1. For these we call elm.removeAttrbute().
- */
-const numericPropsToRemoveAsAttr = ["maxLength", "minLength"];
-
 /** Removes the attribute(s) corresponding to the given property. */
-export function removeElmPropInternal(elm: Element, name: string, info: AttrPropInfo): void
+export function removeElmPropInternal(nscode: number, elm: Element, name: string, info?: AttrPropInfo): void
 {
-    let propName = getPropNameFromAttrInfo(info, name);
-    if (!info.attrOnly && propName in elm)
+    // determine whether this property should be set/removed as attribute
+    let propName = getPropNameFromAttrInfo(name, info);
+
+    // we need to determine whether to set value to element's property or as an attribute
+    let asProp = nscode === NamespaceCode.SVG ? false : propName in elm;
+
+    if (asProp)
     {
         let t = typeof elm[propName];
+
+        // since we don't know what value to put as a "removing" for numeric properties, we
+        // revert to using removeAttribute().
         if (t === "number")
-            elm.removeAttribute(propName.toLowerCase());
+            elm.removeAttribute(propName);
         else
             elm[propName] = t === "string" ? "" : t === "boolean" ? false : null;
     }
     else
-        elm.removeAttribute(getAttrNameFromAttrInfo(info, name))
+        elm.removeAttribute(getAttrNameFromAttrInfo(name, info))
 }
 
 
@@ -484,7 +530,7 @@ const camelToDash = (s: string): string => s.replace( /([a-zA-Z])(?=[A-Z])/g, '$
  *   - null and undefined are converted to null.
  *   - arrays are converted by calling this function recursively on the elements and separating
  *     them with spaces.
- *   - for everything else (functions and symbols), the typeof val is returned.
+ *   - for everything else (functions and symbols), the String(val) is returned.
  */
 const val2s = (val: any): string | null =>
 	["string", "number", "bigint"].includes(typeof val) ? val.toString() :
@@ -494,13 +540,26 @@ const val2s = (val: any): string | null =>
     // typeof val === "object" ? obj2s(val) :
     String(val);
 
-// const val2s = (val: any): string | null =>
-// 	["string", "number", "bigint"].includes(typeof val) ? val.toString() :
-//     val == null || val === false ? null :
-//     val === true ? "" :
-//     Array.isArray(val) ? arr2s(val, " ") :
-//     typeof val === "object" ? obj2s(val) :
-//     String(val);
+
+
+/** Names of HTML properties that allow setting their values to negative values */
+const negativeNumericPropNames = ["tabIndex", "selectedIndex", "loop", "start"];
+
+/**
+ * Helper function that converts the given value to number. Returns null as an indication that
+ * the attribute should be removed.
+ */
+function val2n(val: any, propName: string): number | null
+{
+    let rval = val == null ? null : Number(val);
+
+    // negative numbers are only allowed for several properties; for all others we return null so
+    // that the corresponding attribute will be deleted.
+    if (rval && rval < 0 && !negativeNumericPropNames.includes(propName))
+        rval = null;
+
+    return rval;
+}
 
 
 

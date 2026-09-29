@@ -12,10 +12,14 @@ export const MathmlNamespace = "http://www.w3.org/1998/Math/MathML";
  * Numbers used to identify namespaces, whcih also serve as indexes of namespace identifiers in our
  * static array for fast retrieval.
  */
-export const HtmlNamespaceCode = 0;
-export const SvgNamespaceCode = 1;
-export const MathmlNamespaceCode = 2;
-export const CustomNamespaceCode = 3;
+export const enum NamespaceCode
+{
+    HTML = 0,
+    SVG = 1,
+    MathML = 2,
+    Custom = 3,
+
+};
 
 /** Array of element namespace identifiers, where indexes are the namespace codes */
 const elementNamespaces = [HtmlNamespace, SvgNamespace, MathmlNamespace, HtmlNamespace]
@@ -35,8 +39,8 @@ const MathmlTagNamesAsString =
  * this map because they don't need to indicate namespace to be created.
  */
 const ElementNamespaceCodes = new Map<string, number>([
-    ...SvgTagNamesAsString.split(",").map((tag): [string, number] => [tag, SvgNamespaceCode]),
-    ...MathmlTagNamesAsString.split(",").map((tag): [string, number] => [tag,MathmlNamespaceCode])
+    ...SvgTagNamesAsString.split(",").map((tag): [string, number] => [tag, NamespaceCode.SVG]),
+    ...MathmlTagNamesAsString.split(",").map((tag): [string, number] => [tag, NamespaceCode.MathML])
 ]);
 
 /**
@@ -45,7 +49,7 @@ const ElementNamespaceCodes = new Map<string, number>([
  */
 export function getElmNS(elmName: string): [number, string]
 {
-    let code = ElementNamespaceCodes.get(elmName) ?? (elmName.includes("-") ? CustomNamespaceCode : HtmlNamespaceCode);
+    let code = ElementNamespaceCodes.get(elmName) ?? (elmName.includes("-") ? NamespaceCode.Custom : NamespaceCode.HTML);
     return [code, elementNamespaces[code]];
 }
 

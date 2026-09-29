@@ -12,22 +12,11 @@ import { mountSubNodes, reconcileSubNodes } from "./Reconciler";
 import { VN, setRef, updateRef } from "./VN";
 import { EventsMixin } from "./Events";
 import {
-    AttrPropInfo, cleanElmProps, CustomAttrPropInfo, EventPropInfo, getPropInfo, removeElmProp,
-    setElmProp, updateElmProp
+    AttrPropInfo, EventPropInfo, CustomAttrPropInfo,
+    getPropInfo, setElmProp, updateElmProp, removeElmProp, cleanElmProps,
 } from "./Props";
-import { getElmNS, getElmRealName, HtmlNamespaceCode, MathmlNamespaceCode, SvgNamespaceCode } from "../utils/UtilFunc";
+import { getElmNS, getElmRealName, NamespaceCode } from "../utils/UtilFunc";
 import { Trigger } from "../api/TriggerAPI";
-
-
-
-/** For SVG elements' properties property assignment doesn't work - must go via setAttribute */
-const SvgDefaultPropInfo: AttrPropInfo = { attrOnly: true };
-
-/**
- * All JSX attributes of Custom HTML Elements (Web Components) use standard set/update/remove
- * functionality and they always use the JSX attrbute value as is without any type conversion.
- */
-const CustomElementPropInfo: AttrPropInfo = { v2rv: val => val };
 
 
 
@@ -37,8 +26,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	// Tag name of an Element.
 	public elmName: string;
 
-	// Element's namespace code.
-	public nscode: number;
+	// Element's namespace code for fast comparisons.
+	public nscode: NamespaceCode;
 
 	// Instance of an Element. The instance is created when the node is mounted.
 	public get elm(): T | null { return this.ownDN; }
@@ -84,7 +73,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
         // set element's namespace code to HTML - the real namespace will be obtained on mounting -
         // we just don't need to spend time on this during the constructions.
-        this.nscode = HtmlNamespaceCode;
+        this.nscode = NamespaceCode.HTML;
 
         // get the key property. If key property was not specified, use id; if id was not
         // specified key will remain undefined.
@@ -202,15 +191,20 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         super.mount(parent, index, anchorDN);
 
         // create the element using proper namespace for SVG and MathML elements.
-        let props = this.props as Record<string,any>;
+        let props = this.props;
         let [nscode, ns] = getElmNS(this.elmName);
         this.nscode = nscode;
-        let elm = nscode === SvgNamespaceCode || nscode === MathmlNamespaceCode
-            ? document.createElementNS(ns, getElmRealName(this.elmName)) as T
-            : document.createElement(this.elmName, props?.is != null ? {is: props.is} : undefined) as unknown as T;
+        let elm: T;
+        if (nscode === NamespaceCode.SVG || nscode === NamespaceCode.MathML)
+            elm = document.createElementNS(ns, getElmRealName(this.elmName)) as T
+        else
+        {
+            let is = (props as any)?.is
+            elm = document.createElement(this.elmName, is ? {is} : undefined) as unknown as T;
+        }
 
         /// #if DEBUG
-            elm.setAttribute("mim-debug-id", "" + this.debugID);
+        elm.setAttribute("mim-debug-id", "" + this.debugID);
         /// #endif
 
         this.ownDN = elm;
@@ -369,14 +363,14 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             let propType = !propInfo ? getPropTypeFromPropVal(propVal) : propInfo.type;
             if (!propType || propType === PropType.Attr)
             {
-                // all SVG attributes except style must be set via attributes and not properties
-                if (nscode === SvgNamespaceCode && propName !== "style")
-                {
-                    if (!propInfo)
-                        propInfo = SvgDefaultPropInfo;
-                    else
-                        propInfo = Object.assign({}, propInfo, SvgDefaultPropInfo);
-                }
+                // // all SVG attributes except style must be set via attributes and not properties
+                // if (nscode === NamespaceCode.SVG && propName !== "style")
+                // {
+                //     if (!propInfo)
+                //         propInfo = SvgDefaultPropInfo;
+                //     else
+                //         propInfo = Object.assign({}, propInfo, SvgDefaultPropInfo);
+                // }
 
                 (this.attrs ??= {})[propName] = { info: propInfo as AttrPropInfo | undefined, val: propVal, rval: null };
             }
@@ -417,14 +411,14 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             let propType = !propInfo ? getPropTypeFromPropVal(propVal) : propInfo.type;
             if (propType === PropType.Attr)
             {
-                // all SVG attributes except style must be set via attributes and not properties
-                if (nscode === SvgNamespaceCode && propName !== "style")
-                {
-                    if (!propInfo)
-                        propInfo = SvgDefaultPropInfo;
-                    else
-                        propInfo = Object.assign({}, propInfo, SvgDefaultPropInfo);
-                }
+                // // all SVG attributes except style must be set via attributes and not properties
+                // if (nscode === NamespaceCode.SVG && propName !== "style")
+                // {
+                //     if (!propInfo)
+                //         propInfo = SvgDefaultPropInfo;
+                //     else
+                //         propInfo = Object.assign({}, propInfo, SvgDefaultPropInfo);
+                // }
 
                 this.updateAttrOnly( propName, propVal, propInfo as AttrPropInfo);
             }
@@ -463,9 +457,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         if (rtd)
         {
             if (newVal != null)
-                rtd.rval = updateElmProp( this.ownDN!, name, rtd.rval, newVal, rtd.info);
+                rtd.rval = updateElmProp(this.nscode, this.ownDN!, name, rtd.rval, newVal, rtd.info);
             else
-                removeElmProp( this.ownDN!, name, rtd.rval, rtd.info), rtd.rval = null;
+                removeElmProp(this.nscode, this.ownDN!, name, rtd.rval, rtd.info), rtd.rval = null;
         }
 	}
 
@@ -496,7 +490,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             }
 
             if (val != null)
-                rtd.rval = setElmProp( this.ownDN!, name, val, rtd.info);
+                rtd.rval = setElmProp(this.nscode, this.ownDN!, name, val, rtd.info);
         }
 
         // `add` means that a new attribute is mounted as a result of updating already existing
@@ -588,11 +582,11 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         // if creator has changed, use "set" instead of "update" as some properties should be
         // reset as new (e.g. defaultChecked).
         if (newVal == null)
-            removeElmProp(this.ownDN!, name, oldRTD.rval, oldRTD.info), oldRTD.rval = null;
+            removeElmProp(this.nscode, this.ownDN!, name, oldRTD.rval, oldRTD.info), oldRTD.rval = null;
         else if (isNewCreator)
-            oldRTD.rval = setElmProp(this.ownDN!, name, newVal, oldRTD.info);
+            oldRTD.rval = setElmProp(this.nscode, this.ownDN!, name, newVal, oldRTD.info);
         else
-            oldRTD.rval = updateElmProp(this.ownDN!, name, oldRTD.rval, newVal, oldRTD.info);
+            oldRTD.rval = updateElmProp(this.nscode, this.ownDN!, name, oldRTD.rval, newVal, oldRTD.info);
     }
 
 
@@ -617,7 +611,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         // object and from the DOM element.
         if (removeFromAttrs)
         {
-            removeElmProp(this.ownDN!, name, rtd.rval, rtd.info)
+            removeElmProp(this.nscode, this.ownDN!, name, rtd.rval, rtd.info)
             delete this.attrs![name];
         }
     }

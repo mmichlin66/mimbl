@@ -126,13 +126,18 @@ export interface IAriaset
  */
 export interface IElementAttrs
 {
+	accesskey?: string | string[];
+	autofocus?: boolean;
 	class?: ClassMoniker;
+	contentEditable?: boolean | "true" | "false";
 	draggable?: "true" | "false";
 	id?: IDPropType;
+	hidden?: boolean | "" | "hidden" | "until-found";
 	lang?: string;
 	role?: string;
 	style?: string | Styleset;
 	tabIndex?: number;
+	title?: string;
     xmlns?: string;
 
     /**
