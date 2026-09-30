@@ -834,13 +834,35 @@ const svgAttrToStylePropString = (val: any, name: string): string => {
 /**
  * Converts style property value using Mimcss library if available.
  */
-function setStyleProp(elm: Element, val: string | Styleset): string | null
+function setStyleProp(elm: Element, val: string | Styleset): any
 {
-    // if Mimcss library is not included, then style attributes can only be strings. If they are
-    // not, this is an application bug and we cannot handle it.
-    let s = typeof val === "string" ? val : mimcss ? mimcss.stylesetToString(val) : null;
-    (elm as any).style.cssText = s;
-    return s;
+    let styleObj = (elm as any).style as CSSStyleDeclaration;
+
+    if (val == null || typeof val === "string")
+    {
+        styleObj.cssText = val ?? "";
+        return val;
+    }
+
+    // now we know that the value is an object; if Mimcss library is not included, we cannot handle it.
+    if (!mimcss)
+    {
+        styleObj.cssText = "";
+        return "";
+    }
+
+    // convert Styleset to string record and set all its properties to the element's style object
+    let r = mimcss.stylesetToRecord(val);
+    for (let propName in r)
+    {
+        let propVal = r[propName];
+        if (propName.startsWith("--"))
+            styleObj.setProperty(propName, propVal);
+        else
+            styleObj[propName] = propVal;
+    }
+
+    return r;
 }
 
 
