@@ -834,14 +834,15 @@ const svgAttrToStylePropString = (val: any, name: string): string => {
 /**
  * Converts style property value using Mimcss library if available.
  */
-function setStyleProp(elm: Element, val: string | Styleset): any
+function setStyleProp(elm: Element, val: string | Styleset | null | undefined): any
 {
     let styleObj = (elm as any).style as CSSStyleDeclaration;
 
     if (val == null || typeof val === "string")
     {
-        styleObj.cssText = val ?? "";
-        return val;
+        let rval = val ?? "";
+        styleObj.cssText = rval;
+        return rval;
     }
 
     // now we know that the value is an object; if Mimcss library is not included, we cannot handle it.
@@ -852,17 +853,107 @@ function setStyleProp(elm: Element, val: string | Styleset): any
     }
 
     // convert Styleset to string record and set all its properties to the element's style object
-    let r = mimcss.stylesetToRecord(val);
-    for (let propName in r)
+    let rval = mimcss.stylesetToRecord(val);
+    for (let propName in rval)
     {
-        let propVal = r[propName];
+        let propVal = rval[propName];
         if (propName.startsWith("--"))
             styleObj.setProperty(propName, propVal);
         else
             styleObj[propName] = propVal;
     }
 
-    return r;
+    // this is a new object so if the Mimcss style object changes internally and is used for
+    // updates, it wouldn't compare with this returned value.
+    return rval;
+}
+
+
+
+/**
+ * Converts style property value using Mimcss library if available.
+ */
+function updateStyleProp(elm: Element, rval: string | Record<string, string> | null | undefined,
+    newVal: string | Styleset | null | undefined): any
+{
+    let styleObj = (elm as any).style as CSSStyleDeclaration;
+
+    // if the new value is null, undefined or string and new  value is not the same as the
+    // remembered value, update the style's cssText.
+    if (newVal == null || typeof newVal === "string")
+    {
+        let newRVal = newVal ?? "";
+        if (newRVal !== rval)
+        {
+            styleObj.cssText = newRVal;
+            return newRVal;
+        }
+        else
+            return undefined;
+    }
+
+    // now we know that the new value is an object; if Mimcss library is not included, we cannot handle it.
+    if (!mimcss)
+    {
+        styleObj.cssText = "";
+        return "";
+    }
+
+    // if the remembered value is not an object (or is null), first clean the current style and then call
+    // setStyleProp
+    if (rval == null || typeof rval !== "object")
+        return setStyleProp(elm, newVal);
+
+    // no we know that both new value and remembered value are objects, so we can compare and set
+    // the new style property by property.
+
+    // convert Styleset to string record
+    let newRVal = mimcss.stylesetToRecord(newVal);
+
+    // prepare flag indicating whether any changes are made
+    let hasChanges = false;
+
+    // go over old properties and remove those that are not in the new style
+    for (let propName in rval)
+    {
+        if (!(propName in newRVal))
+        {
+            hasChanges = true;
+            if (propName.startsWith("--"))
+                styleObj.removeProperty(propName);
+            else
+                styleObj[propName] = "";
+        }
+    }
+
+    // go over new properties and remove those that are not in the new style
+    for (let propName in newRVal)
+    {
+        let newPropVal = newRVal[propName];
+        if (newPropVal !== rval[propName])
+        {
+            hasChanges = true;
+            if (propName.startsWith("--"))
+                styleObj.setProperty(propName, newPropVal);
+            else
+                styleObj[propName] = newPropVal;
+        }
+    }
+
+    // this is a new object so if the Mimcss style object changes internally and is used for
+    // updates, it wouldn't compare with this returned value.
+    return hasChanges ? newRVal : undefined;
+}
+
+
+
+/**
+ * Converts style property value using Mimcss library if available.
+ */
+function removeStyleProp(elm: Element): any
+{
+    let styleObj = (elm as any).style as CSSStyleDeclaration;
+    styleObj.cssText = "";
 }
 
 
@@ -986,7 +1077,7 @@ const globalPropRegistry: { [P: string]: PropInfoOrFunc } =
     defaultChecked: { set: setCheckedProp, update: doNothing, remove: doNothing },
     value: { set: setValueProp, remove: removeValueProp },
     defaultValue: { set: setValueProp, update: doNothing, remove: doNothing },
-    style: { set: setStyleProp },
+    style: { set: setStyleProp, update: updateStyleProp, remove: removeStyleProp },
     media: { v2rv: mediaToString },
     dataset: { set: setDataProp, update: updateDataProp, remove: removeDataProp },
     aria: { set: setAriaProp, update: updateAriaProp, remove: removeAriaProp },
