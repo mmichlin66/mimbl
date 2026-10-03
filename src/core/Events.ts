@@ -63,8 +63,8 @@ export class EventsMixin
 	mount(eventTarget?: EventTarget): void
 	{
         this.eventTarget = eventTarget;
-        for( let [name, rtd] of Object.entries<EventRunTimeData>(this.events))
-		    this.mountEvent(name, rtd);
+        for (let name in this.events)
+		    this.mountEvent(name, this.events[name]);
 	}
 
 
@@ -74,8 +74,8 @@ export class EventsMixin
      */
     unmount(): void
     {
-        for( let [name, rtd] of Object.entries<EventRunTimeData>(this.events))
-		    this.unmountEvent(name, rtd);
+        for (let name in this.events)
+		    this.unmountEvent(name, this.events[name]);
 
         this.events = {};
     }

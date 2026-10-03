@@ -355,25 +355,15 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	private parseProps( props: Record<string,any>): void
 	{
         // loop over all properties ignoring the built-ins
-        let nscode = this.nscode;
-        for( let [propName, propVal] of Object.entries(props))
+        for (let propName in props)
 		{
+            let propVal = props[propName];
+
             // get information about the property and determine its type.
             let propInfo = getPropInfo(this.nscode, this.elmName, propName);
             let propType = !propInfo ? getPropTypeFromPropVal(propVal) : propInfo.type;
             if (!propType || propType === PropType.Attr)
-            {
-                // // all SVG attributes except style must be set via attributes and not properties
-                // if (nscode === NamespaceCode.SVG && propName !== "style")
-                // {
-                //     if (!propInfo)
-                //         propInfo = SvgDefaultPropInfo;
-                //     else
-                //         propInfo = Object.assign({}, propInfo, SvgDefaultPropInfo);
-                // }
-
                 (this.attrs ??= {})[propName] = { info: propInfo as AttrPropInfo | undefined, val: propVal, rval: null };
-            }
             else if (propType === PropType.Event)
                 (this.events ??= new EventsMixin(this.creator)).add(propName,
                     propVal as EventPropType, (propInfo as EventPropInfo)?.schedulingType);
@@ -404,8 +394,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	{
         // loop over all properties
         let nscode = this.nscode;
-        for( let [propName, propVal] of Object.entries(props))
+        for (let propName in props)
 		{
+            let propVal = props[propName];
+
             // get information about the property and determine its type.
             let propInfo = getPropInfo(this.nscode, this.elmName, propName);
             let propType = !propInfo ? getPropTypeFromPropVal(propVal) : propInfo.type;
@@ -470,8 +462,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	{
         if (this.attrs)
         {
-            for( let [name, rtd] of Object.entries(this.attrs))
-                this.mountAttr( name, rtd, false);
+            for (let name in this.attrs)
+                this.mountAttr( name, this.attrs[name], false);
         }
 	}
 
@@ -511,8 +503,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		// update those whose value has changed
 		if (oldAttrs)
 		{
-            for( let [name, oldRTD] of Object.entries(oldAttrs))
+            for (let name in oldAttrs)
             {
+                let oldRTD = oldAttrs[name];
                 let newRTD = newAttrs?.[name];
                 if (newRTD)
                     this.updateAttr(name, oldRTD, newRTD, isNewCreator);
@@ -524,8 +517,9 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 		// loop over new attributes and mount those that are not found among the old ones
 		if (newAttrs)
 		{
-            for( let [name, newRTD] of Object.entries(newAttrs))
-			{
+            for (let name in newAttrs)
+            {
+                let newRTD = newAttrs[name];
 				if (!oldAttrs?.[name])
                     this.mountAttr( name, newRTD, true)
 			}
@@ -595,8 +589,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
     {
         if (this.attrs)
         {
-            for( let [name, rtd] of Object.entries(this.attrs))
-                this.unmountAttr( name, rtd, false);
+            for (let name in this.attrs)
+                this.unmountAttr( name, this.attrs[name], false);
         }
     }
 

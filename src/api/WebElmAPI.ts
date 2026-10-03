@@ -227,8 +227,9 @@ abstract class WebElmMixin extends HTMLElement
                 // `internals` object
                 if (options.aria)
                 {
-                    for (let [name, value] of Object.entries(options.aria))
-                        this._internals[ariaPropToAttrName(name)] = ariaPropToString(value);
+                    for (let name in options.aria)
+                        this._internals[ariaPropToAttrName(name)] = ariaPropToString(options.aria[name]);
+
                 }
             }
         }
@@ -502,8 +503,10 @@ export function registerWebElm(webElmClass: WebElmConstructor, name?: string,
 
     // loop over attribute definitions and try to find `onchanged_${propName}` methods in the class
     // prototype.
-    for( let [propName, attrDef] of Object.entries(definition.props))
+    for (let propName in definition.props)
     {
+        let attrDef = definition.props[propName];
+
         let options = attrDef.options;
         let onchanged = options?.onchanged;
         if (!onchanged)

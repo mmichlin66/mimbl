@@ -1232,8 +1232,8 @@ export function cleanElmProps(elmName: string, elm: Element): void
     let props = elmPropsToClean[elmName];
     if (props)
     {
-        for( let [propName, propVal] of Object.entries(props))
-            elm[propName] = propVal;
+        for (let propName in props)
+            elm[propName] = props[propName];
     }
 }
 

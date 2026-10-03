@@ -145,8 +145,10 @@ export class ManagedCompVN<TProps extends {} = {}, TEvents extends {} = {}> exte
         // loop over all properties
         if (props)
         {
-            for( let [propName, propVal] of Object.entries(props))
+            for (let propName in props)
             {
+                let propVal = props[propName];
+
                 if (propName === "ref")
                     this.ref = propVal as RefPropType<any>;
                 else if (propName.startsWith("$on_"))
