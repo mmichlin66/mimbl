@@ -333,7 +333,7 @@ function getPropValueForElm(nscode: number, elm: Element, val: any, name: string
             // an attribute.
             if (t === "number")
             {
-                rval === val2n(val, propName);
+                rval = val2n(val, propName);
                 if (rval == null)
                 {
                     asProp = false;
