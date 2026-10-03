@@ -1,11 +1,7 @@
 ﻿import {
     DN, ScheduledFuncType,TickSchedulingType, IComponent, CallbackWrappingOptions,
 } from "../api/CompTypes"
-import {
-    ChildrenUpdateRequest, ChildrenUpdateOperation, SetRequest, SpliceRequest, MoveRequest,
-    SwapRequest, SliceRequest, TrimRequest, GrowRequest, ReverseRequest, VNDisp, VNDispAction,
-    VNDispGroup, IVN
-} from "./VNTypes";
+import { VNDisp, VNDispAction, VNDispGroup, IVN } from "./VNTypes";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -203,7 +199,7 @@ const scheduleTick = (tickType: TickSchedulingType = TickSchedulingType.Animatio
 
 
 // Schedules an update for the given node.
-export const requestNodeUpdate = (vn: IVN, req?: ChildrenUpdateRequest, tickType?: TickSchedulingType): void =>
+export const requestNodeUpdate = (vn: IVN, tickType?: TickSchedulingType): void =>
 {
     if (!vn.anchorDN)
     {
@@ -217,7 +213,7 @@ export const requestNodeUpdate = (vn: IVN, req?: ChildrenUpdateRequest, tickType
 	// add this node to the map of nodes for which either update or replacement or
 	// deletion is scheduled. Note that a node will only be present once in the map no
 	// matter how many times it calls requestUpdate().
-	s_vnsScheduledForUpdate.set( vn, req);
+	s_vnsScheduledForUpdate.set(vn, undefined);
 
     // if the node is for a component check if it has beforeUpdate and/or afterUpdate methods
     // and schedule them for running duering the Mimbl tick.
@@ -339,7 +335,7 @@ const performMimbleTick = (): void =>
 		let vnsScheduledForUpdate = s_vnsScheduledForUpdate;
         s_vnsScheduledForUpdate = new Map<IVN,any>();
 
-        vnsScheduledForUpdate.forEach( (req: ChildrenUpdateRequest, vn: IVN) =>
+        vnsScheduledForUpdate.forEach((req: any, vn: IVN) =>
         {
             // it can happen that we encounter already unmounted virtual nodes - ignore them
             if (!vn.anchorDN)
@@ -364,7 +360,7 @@ const performMimbleTick = (): void =>
                     if (vn.lastUpdateTick === s_currentTick)
                         return;
 
-                    performChildrenOperation( vn, req);
+                    performChildrenOperation(vn, req);
                 }
             }
             catch( err)
@@ -419,7 +415,7 @@ const callScheduledFunctions = (funcs: Map<ScheduledFuncType,ScheduledFuncType>,
 
 
 // Performs the specified operation on the sub-nodes of the given node.
-export const performChildrenOperation = (vn: IVN, req?: ChildrenUpdateRequest): void =>
+export const performChildrenOperation = (vn: IVN, req?: any): void =>
 {
     s_currentClassComp = vn.comp ?? vn.creator;
 
@@ -429,482 +425,8 @@ export const performChildrenOperation = (vn: IVN, req?: ChildrenUpdateRequest): 
         // ancestor node that supports error handling or the Mimbl tick loop (which has try/catch).
         reconcile( vn, {oldVN: vn}, vn.render?.());
     }
-    else
-    {
-        switch( req.op)
-        {
-            case ChildrenUpdateOperation.Set: setNodeChildren( vn, req); break;
-            case ChildrenUpdateOperation.Splice: spliceNodeChildren( vn, req); break;
-            case ChildrenUpdateOperation.Move: moveNodeChildren( vn, req); break;
-            case ChildrenUpdateOperation.Swap: swapNodeChildren( vn, req); break;
-            case ChildrenUpdateOperation.Slice: sliceNodeChildren( vn, req); break;
-            case ChildrenUpdateOperation.Trim: trimNodeChildren( vn, req); break;
-            case ChildrenUpdateOperation.Grow: growNodeChildren( vn, req); break;
-            case ChildrenUpdateOperation.Reverse: reverseNodeChildren( vn, req); break;
-        }
-    }
 
     s_currentClassComp = null;
-}
-
-
-
-// Unmounts existing sub-nodes of the given node and mounts the new ones obtained from the given
-// new content.
-const setNodeChildren = (vn: IVN, req: SetRequest): void =>
-{
-    let oldSubNodes = vn.subNodes;
-    let oldLen = oldSubNodes ? oldSubNodes.length : 0;
-
-    let startIndex = req.startIndex || 0;
-    let endIndex = req.endIndex || oldLen;
-    if (endIndex < 0 || endIndex > oldLen)
-        endIndex = oldLen;
-
-    /// #if DEBUG
-        // validate request parameters
-        if (startIndex < 0 || startIndex > oldLen || endIndex < startIndex)
-        {
-            console.error( `Parameters for SetChildren operation are incorrect`, req);
-        }
-    /// #endif
-
-    if (req.update)
-    {
-        reconcile( vn, {oldVN: vn, oldStartIndex: startIndex, oldEndIndex: endIndex,
-            updateStrategy: req.updateStrategy}, req.content);
-
-        return;
-    }
-
-    // if the range of old sub-nodes is only a portion of all sub-nodes, we call the Splice
-    // operation; otherwise, we need to remove all old sub-nodes and add new
-    let rangeLen = endIndex - startIndex;
-    if (rangeLen < oldLen)
-        spliceNodeChildren( vn, {index: startIndex, countToDelete: rangeLen, contentToInsert: req.content});
-    else
-    {
-        if (oldSubNodes)
-            removeAllSubNodes(vn);
-
-        let newSubNodes = req.content != null ? content2VNs( req.content) : null;
-        if (newSubNodes)
-        {
-            let anchorDN = vn.ownDN ?? vn.anchorDN;
-            let beforeDN = vn.ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN!);
-            mountSubNodes( vn, newSubNodes, anchorDN!, beforeDN);
-        }
-
-        vn.subNodes = newSubNodes;
-    }
-}
-
-
-
-// At the given index, removes a given number of sub-nodes and then inserts the new content.
-const spliceNodeChildren = (vn: IVN, req: SpliceRequest): void =>
-{
-    let oldSubNodes = vn.subNodes;
-    let oldLen = oldSubNodes ? oldSubNodes.length : 0;
-
-    // validate request parameters
-    let index = req.index;
-    let countToDelete = req.countToDelete || 0;
-
-    /// #if DEBUG
-        if (index < 0 || index > oldLen || countToDelete < 0)
-        {
-            console.error( `Parameters for SpliceChildren operation are incorrect`, req);
-        }
-    /// #endif
-
-    // calculate the number of sub-nodes to delete
-    countToDelete = Math.min( countToDelete, oldLen - index);
-
-    let newSubNodes = req.contentToInsert != null ? content2VNs( req.contentToInsert) : null;
-    if (countToDelete === 0 && !newSubNodes)
-        return;
-
-    // unmount nodes if necessary - note that it is OK if req.countToDelete is negative - it is
-    // the same as if it was set to 0 because we only use >0 comparisons.
-    if (countToDelete > 0)
-    {
-        let stopIndex = index + countToDelete;
-        for( let i = index; i < stopIndex; i++)
-            oldSubNodes![i].unmount( true);
-    }
-
-    if (!newSubNodes)
-    {
-        // if we don't have new sub-nodes, we just delete the old ones (if any)
-        if (countToDelete > 0)
-            oldSubNodes!.splice( index, countToDelete);
-    }
-    else
-    {
-        // insert new nodes into the old list at the given index
-        if (oldSubNodes)
-            oldSubNodes.splice( index, countToDelete, ...newSubNodes);
-        else
-            vn.subNodes = oldSubNodes = newSubNodes;
-
-        // determine the node before which the new nodes should be mounted
-        let ownDN = vn.ownDN;
-        let anchorDN = ownDN ?? vn.anchorDN;
-        let beforeDN = index + newSubNodes.length < oldSubNodes.length
-            ? oldSubNodes[index + newSubNodes.length].getFirstDN()
-            : ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN!);
-
-        // mount new nodes
-        let stopIndex = index + newSubNodes.length;
-        for( let i = index; i < stopIndex; i++)
-            oldSubNodes[i].mount( vn, i, anchorDN!, beforeDN);
-    }
-}
-
-// Moves a range of sub-nodes to a new location. Moving a region to a new index is the same as
-// swapping two adjacent regions - the region being moved and the region from either the new index
-// to the beginning of the first region or the end of the first region to the new index.
-const moveNodeChildren = (vn: IVN, req: MoveRequest): void =>
-{
-    if (req.shift  === 0 || req.count === 0)
-        return;
-
-    let oldSubNodes = vn.subNodes;
-    let oldLen = oldSubNodes ? oldSubNodes.length : 0;
-
-    /// #if DEBUG
-        if (oldLen < 2)
-        {
-            console.error( `Parameters for MoveChildren operation are incorrect`, req);
-        }
-    /// #endif
-
-    // we will use 1 for the range residing lower in the list
-    let index1: number, count1: number, index2: number, count2: number;
-    if (req.shift < 0)
-    {
-        index1 = req.index + req.shift;
-        count1 = -req.shift;
-        index2 = req.index;
-        count2 = req.count;
-    }
-    else
-    {
-        index1 = req.index;
-        count1 = req.count;
-        index2 = index1 + count1;
-        count2 = req.shift;
-    }
-
-    swapNodeChildren( vn, { index1, count1, index2, count2 })
-}
-
-
-
-// Swaps two ranges of the element's sub-nodes. The ranges cannot intersect.
-const swapNodeChildren = (vn: IVN, req: SwapRequest): void =>
-{
-    let oldSubNodes = vn.subNodes;
-    let oldLen = oldSubNodes ? oldSubNodes.length : 0;
-
-    // we will use 1 for the range residing lower in the list
-    let index1: number, count1: number, index2: number, count2: number;
-    if (req.index1 < req.index2)
-    {
-        index1 = req.index1;
-        count1 = req.count1;
-        index2 = req.index2;
-        count2 = req.count2;
-    }
-    else
-    {
-        index1 = req.index2;
-        count1 = req.count2;
-        index2 = req.index1;
-        count2 = req.count1;
-    }
-
-    /// #if DEBUG
-        if (oldLen < 2 || index1 < 0 || index2 > oldLen || count1 <= 0 || count2 <= 0 ||
-            index1 + count1 > index2 || index2 + count2 > oldLen)
-        {
-            console.error( `Parameters for SwapChildren operation are incorrect`, req);
-        }
-    /// #endif
-
-    // the third range is the range between the two input ones - it might be empty
-    let index3 = index1 + count1;
-    let count3 = index2 - index3;
-
-    // first stage is to move actual DOM nodes
-    let ownDN = vn.ownDN;
-    let anchorDN = ownDN ?? vn.anchorDN;
-
-    // determine whether both ranges should be moved or just one - the latter can happen if the
-    // ranges are adjacent.
-    if (count3 === 0)
-    {
-        // only one range should be moved - move the smaller one: 1 after 2 or 2 before 1
-        if (count1 < count2)
-            moveDOMRange( vn, oldSubNodes!, index1, count1, index2 + count2, anchorDN!);
-        else
-            moveDOMRange( vn, oldSubNodes!, index2, count2, index1, anchorDN!);
-    }
-    else
-    {
-        // we are here if a non-empty range exists between the two input ranges. Having these
-        // three ranges we will need to move only two of them, so we need to find the two smaller
-        // ones.
-        if (count1 <= count2 && count2 <= count3)
-        {
-            // 3 is the biggest: move 1 before 2 and move 2 before 3
-            moveDOMRange( vn, oldSubNodes!, index1, count1, index2, anchorDN!);
-            moveDOMRange( vn, oldSubNodes!, index2, count2, index3, anchorDN!);
-        }
-        else if (count1 <= count2 && count3 <= count2)
-        {
-            // 2 is the biggest: move 1 after 2 and move 3 before 1
-            moveDOMRange( vn, oldSubNodes!, index1, count1, index2 + count2, anchorDN!);
-            moveDOMRange( vn, oldSubNodes!, index3, count3, index1, anchorDN!);
-        }
-        else
-        {
-            // 1 is the biggest: move 2 before 1 and move 3 before 1
-            moveDOMRange( vn, oldSubNodes!, index2, count2, index1, anchorDN!);
-            moveDOMRange( vn, oldSubNodes!, index3, count3, index1, anchorDN!);
-        }
-    }
-
-    // second stage is to swap nodes in the list of sub-nodes and change their indices. If the
-    // ranges are equal in length, just swap the nodes betwen them; otherwise, go from the smallest
-    // index to the biggest, swap nodes if needed and change all indices.
-    if (count1 === count2)
-    {
-        for( let i = 0; i < count1; i++)
-        {
-            let i1 = index1 + i, i2 = index2 + i;
-            let svn1 = oldSubNodes![i1], svn2 = oldSubNodes![i2];
-            oldSubNodes![i1] = svn2; svn2.index = i1;
-            oldSubNodes![i2] = svn1; svn1.index = i2;
-        }
-    }
-    else
-    {
-        // allocate new array of the length enough to hold all three ranges and copy nodes to it
-        // in the order: 2, 3, 1. Then copy nodes from this array back into the original one.
-        let totalLen = count1 + count2 + count3;
-        let arr = new Array( totalLen);
-        let targetIndex = 0;
-
-        // copy range 2
-        let stopIndex = index2 + count2;
-        for( let i = index2; i < stopIndex; i++)
-            arr[targetIndex++] = oldSubNodes![i];
-
-        // copy range 3 if not empty
-        if (count3 > 0)
-        {
-            stopIndex = index3 + count3;
-            for( let i = index3; i < stopIndex; i++)
-                arr[targetIndex++] = oldSubNodes![i];
-        }
-
-        // copy range 1
-        stopIndex = index1 + count1;
-        for( let i = index1; i < stopIndex; i++)
-            arr[targetIndex++] = oldSubNodes![i];
-
-        // copy everything back and adjust indices
-        let svn: IVN;
-        targetIndex = index1;
-        for( let i = 0; i < totalLen; i++)
-        {
-            svn = arr[i];
-            svn.index = targetIndex;
-            oldSubNodes![targetIndex++] = svn;
-        }
-    }
-}
-
-
-// Moves the DOM nodes corresponding to the given range of sub-nodes. This function doesn't move
-// the virtual node objects themselves within the list - only their corresponding DOM nodes.
-const moveDOMRange = (vn: IVN, subNodes: IVN[], index: number, count: number, indexBefore: number, anchorDN: DN) =>
-{
-    let beforeDN: DN;
-    if (indexBefore == subNodes.length)
-        beforeDN = vn.ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN);
-    else
-        beforeDN = subNodes[indexBefore].getFirstDN();
-
-    for( let i = 0; i < count; i++)
-        moveNode( subNodes[index + i], anchorDN, beforeDN);
-}
-
-
-
-// At the given index, removes a given number of sub-nodes and then inserts the new content.
-const sliceNodeChildren = (vn: IVN, req: SliceRequest): void =>
-{
-    let oldSubNodes = vn.subNodes;
-    if (!oldSubNodes)
-        return;
-
-    let oldLen = oldSubNodes.length;
-    let startIndex = req.startIndex || 0;
-
-    /// #if DEBUG
-        if (startIndex < 0 || startIndex > oldLen)
-        {
-            console.error( `Parameters for SliceChildren operation are incorrect`, req);
-        }
-    /// #endif
-
-    let endIndex = req.endIndex != null ? Math.min( req.endIndex, oldLen) : oldLen;
-    if (endIndex - startIndex === oldLen)
-        return;
-
-    // if the range is empty unmount all sub-nodes
-    if (endIndex <= startIndex)
-    {
-        removeAllSubNodes(vn);
-        vn.subNodes = null;
-        return;
-    }
-
-    // trim at start
-    if (startIndex > 0)
-    {
-        for( let i = 0; i < startIndex; i++)
-            oldSubNodes[i].unmount(true);
-    }
-
-    // trim at end
-    if (endIndex < oldLen)
-    {
-        for( let i = endIndex; i < oldLen; i++)
-            oldSubNodes[i].unmount(true);
-    }
-
-    // extract only remaining nodes and change their indices
-    vn.subNodes = oldSubNodes.slice( startIndex, endIndex);
-    vn.subNodes.forEach( (svn, i) => { svn.index = i });
-}
-
-
-
-// Removes the given number of nodes from the start and/or the end of the list of sub-nodes.
-const trimNodeChildren = (vn: IVN, req: TrimRequest): void =>
-{
-    let oldSubNodes = vn.subNodes;
-    if (oldSubNodes)
-        sliceNodeChildren( vn, { startIndex: req.startCount, endIndex: oldSubNodes.length - req.endCount })
-}
-
-
-
-// Adds new content before and/or after the existing children of the given node
-const growNodeChildren = (vn: IVN, req: GrowRequest): void =>
-{
-    // convert content to arrays of sub-nodes. Note that arrays cannot be empty but can be null.
-    let newStartSubNodes = req.startContent != null ? content2VNs( req.startContent) : null;
-    let newEndSubNodes = req.endContent != null ? content2VNs( req.endContent) : null;
-    if (!newStartSubNodes && !newEndSubNodes)
-        return;
-
-    let oldSubNodes = vn.subNodes;
-    let ownDN = vn.ownDN;
-    let anchorDN = ownDN ?? vn.anchorDN;
-
-    // if the node didn't have any nodes before, we just mount all new nodes
-    if (!oldSubNodes)
-    {
-        vn.subNodes = newStartSubNodes && newEndSubNodes
-            ? newStartSubNodes.concat( newEndSubNodes)
-            : newStartSubNodes ?? newEndSubNodes;
-
-        let beforeDN = ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN!);
-        mountSubNodes( vn, vn.subNodes!, anchorDN!, beforeDN);
-        return;
-    }
-
-    // we are here if the array of old sub-nodes is not empty. Now create new array combining
-    // new and old sub-nodes in the correct order.
-    vn.subNodes = newStartSubNodes && newEndSubNodes
-        ? newStartSubNodes.concat( oldSubNodes, newEndSubNodes)
-        : newStartSubNodes
-            ? newStartSubNodes.concat( oldSubNodes)
-            : oldSubNodes.concat( newEndSubNodes!);
-
-    // mount new sub-nodes at the start
-    if (newStartSubNodes)
-    {
-        let beforeDN = oldSubNodes[0].getFirstDN();
-        mountSubNodes( vn, newStartSubNodes, anchorDN!, beforeDN);
-
-        // change indices of the old nodes
-        let shift = newStartSubNodes.length;
-        oldSubNodes.forEach( svn => svn.index += shift);
-    }
-
-    // mount new sub-nodes at the end
-    if (newEndSubNodes)
-    {
-        mountSubNodes( vn, newEndSubNodes, anchorDN!,
-            ownDN ? null : getNextDNUnderSameAnchorDN(vn, anchorDN!),
-            vn.subNodes.length - newEndSubNodes.length);
-    }
-}
-
-
-
-// Reverses the given range of sub-nodes.
-const reverseNodeChildren = (vn: IVN, req: ReverseRequest): void =>
-{
-    let oldSubNodes = vn.subNodes;
-    if (!oldSubNodes)
-        return;
-
-    let oldLen = oldSubNodes.length;
-    let startIndex = req.startIndex || 0;
-    let endIndex = req.endIndex != null ? Math.min( req.endIndex, oldLen) : oldLen;
-
-    /// #if DEBUG
-        if (oldLen < 2 || startIndex < 0 || startIndex > oldLen || endIndex <= startIndex)
-        {
-            console.error( `Parameters for ReverseChildren operation are incorrect`, req);
-            return;
-        }
-    /// #endif
-
-    // find the DOM node after the last element in the range - this will be the node before which
-    // we will move all our nodes from one before last back to the first
-    let ownDN = vn.ownDN;
-    let anchorDN = ownDN ?? vn.anchorDN;
-    let beforeDN = endIndex === oldLen
-        ? ownDN ? null : getNextDNUnderSameAnchorDN( vn, anchorDN!)
-        : oldSubNodes[endIndex].getFirstDN();
-
-    let svn: IVN;
-    for( let i = endIndex - 2; i >= startIndex; i--)
-    {
-        svn = oldSubNodes[i];
-        moveNode( svn, anchorDN!, beforeDN);
-    }
-
-    // now swap virtual nodes and update their indices
-    let svn2: IVN, tempIndex: number;
-    for( let i1 = startIndex, i2 = endIndex - 1; i1 < i2; i1++, i2--)
-    {
-        svn = oldSubNodes[i1];
-        svn2 = oldSubNodes[i2];
-        oldSubNodes[i1] = svn2;
-        oldSubNodes[i2] = svn;
-        tempIndex = svn.index;
-        svn.index = svn2.index;
-        svn2.index = tempIndex;
-    }
 }
 
 

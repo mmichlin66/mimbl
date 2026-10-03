@@ -2,7 +2,7 @@
     IElmVN, ICustomAttributeHandler, EventPropType, RefType, ExtendedElement,
     ElmRefType, TickSchedulingType, UpdateStrategy, PropType, DN
 } from "../api/CompTypes"
-import { ChildrenUpdateOperation, IVN, VNDisp } from "./VNTypes";
+import { IVN, VNDisp } from "./VNTypes";
 
 /// #if USE_STATS
 	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -104,81 +104,17 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
     // Requests update of the element properties without re-rendering of its children.
-	public setProps( props: ExtendedElement<T>, schedulingType?: TickSchedulingType): void
+	public setProps(props: ExtendedElement<T>, schedulingType?: TickSchedulingType): void
     {
         if (!props)
             return;
 
         if (this.propsForPartialUpdate)
-            Object.assign( this.propsForPartialUpdate, props)
+            Object.assign(this.propsForPartialUpdate, props)
         else
             this.propsForPartialUpdate = props;
 
-        this.requestPartialUpdate( schedulingType);
-    }
-
-
-
-    // Replaces the given range of sub-nodes with the new content
-    public setChildren( content?: any, startIndex?: number, endIndex?: number, update?: boolean,
-        updateStrategy?: UpdateStrategy, schedulingType?: TickSchedulingType): void
-    {
-        this.requestUpdate( {
-            op: ChildrenUpdateOperation.Set, content, startIndex, endIndex,
-            update, updateStrategy
-        }, schedulingType);
-    }
-
-    // At the given index, removes a given number of sub-nodes and then inserts the new content.
-    public spliceChildren( index: number, countToDelete?: number, contentToInsert?: any,
-        schedulingType?: TickSchedulingType): void
-    {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Splice, index, countToDelete, contentToInsert}, schedulingType);
-    }
-
-    // Moves a range of sub-nodes to a new location.
-    public moveChildren( index: number, count: number, shift: number, schedulingType?: TickSchedulingType): void
-    {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Move, index, count, shift}, schedulingType);
-    }
-
-    // Swaps two ranges of the element's sub-nodes. The ranges cannot intersect.
-    public swapChildren( index1: number, count1: number, index2: number, count2: number, schedulingType?: TickSchedulingType): void
-    {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Swap, index1, count1, index2, count2}, schedulingType);
-    }
-
-    // Retains the given range of the sub-nodes unmounting the sub-nodes outside the given range.
-    public sliceChildren( startIndex: number, endIndex?: number, schedulingType?: TickSchedulingType): void
-    {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Slice, startIndex, endIndex}, schedulingType);
-    }
-
-    // Removes the given number of nodes from the start and/or the end of the list of sub-nodes.
-    public trimChildren( startCount: number, endCount: number, schedulingType?: TickSchedulingType): void
-    {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Trim, startCount, endCount}, schedulingType);
-    }
-
-    // Adds the given content at the start and/or at the end of the existing children.
-    public growChildren( startContent?: any, endContent?: any, schedulingType?: TickSchedulingType): void
-    {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Grow, startContent, endContent}, schedulingType);
-    }
-
-    /**
-     * Reverses sub-nodes within the given range.
-     * @param startIndex Index of the first sub-node in the range. If undefined, the array of
-     * sub-nodes starts at index 0.
-     * @param endIndex Index of the sub-node after the last sub-node in the range. If
-     * this parameter is zero or undefined or greater than the length of the sub-nodes array, the
-     * range will include all sub-nodes from the startIndex to the end of the array.
-     * @param schedulingType Type determining whether the operation is performed immediately or
-     * is scheduled to a Mimbl tick.
-     */
-    public reverseChildren( startIndex?: number, endIndex?: number, schedulingType?: TickSchedulingType): void
-    {
-        this.requestUpdate( {op: ChildrenUpdateOperation.Reverse, startIndex, endIndex}, schedulingType);
+        this.requestPartialUpdate(schedulingType);
     }
 
 

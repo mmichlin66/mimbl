@@ -41,26 +41,34 @@ export interface IVN extends IVNode
 	 */
     updateStrategy?: UpdateStrategy;
 
-	// Returns DOM node corresponding to the virtual node itself (if any) and not to any of its
-	// sub-nodes.
+	/**
+     * Returns DOM node corresponding to the virtual node itself (if any) and not to any of its
+     * sub-nodes.
+     */
 	ownDN?: DN;
 
-	// Flag indicating that update has been requested but not yet performed. This flag is needed
-	// to prevent trying to add the node to the global map every time the requestUpdate method
-	// is called.
+	/**
+     * Flag indicating that update has been requested but not yet performed. This flag is needed
+     * to prevent trying to add the node to the global map every time the requestUpdate method
+     * is called.
+     */
 	updateRequested?: boolean;
 
-    // Flag indicating thata partial update has been requested but not yet performed. This flag is
-    // different from the updateRequested since it controls node-type-specific "partial" updates,
-    // which are treated by the rconciler by calling the performPartialUpdate method. Different
-    // virtual node types can support different kinds of partial updates; for example, the ElmVN
-    // allows updating the element properties without re-rendering its children.
+    /**
+     * Flag indicating thata partial update has been requested but not yet performed. This flag is
+     * different from the updateRequested since it controls node-type-specific "partial" updates,
+     * which are treated by the rconciler by calling the performPartialUpdate method. Different
+     * virtual node types can support different kinds of partial updates; for example, the ElmVN
+     * allows updating the element properties without re-rendering its children.
+     */
 	partialUpdateRequested?: boolean;
 
-	// "Tick number" during which the node was last updated. If this node's tick number equals
-	// the current tick number maintained by the root node, this indicates that this node was
-	// already updated in this update cycle. This helps prevent double-rendering of a
-	// component if both the component and its parent are updated in the same cycle.
+	/**
+     * "Tick number" during which the node was last updated. If this node's tick number equals
+     * the current tick number maintained by the root node, this indicates that this node was
+     * already updated in this update cycle. This helps prevent double-rendering of a
+     * component if both the component and its parent are updated in the same cycle.
+     */
 	lastUpdateTick?: number;
 
 
@@ -76,9 +84,11 @@ export interface IVN extends IVNode
      */
 	unmount( removeFromDOM: boolean): void;
 
-	// Determines whether the update of this node from the given node is possible. The newVN
-	// parameter is guaranteed to point to a VN of the same type as this node. If this method is
-	// not implemented the update is considered possible - e.g. for text nodes.
+	/**
+     * Determines whether the update of this node from the given node is possible. The newVN
+     * parameter is guaranteed to point to a VN of the same type as this node. If this method is
+     * not implemented the update is considered possible - e.g. for text nodes.
+     */
 	isUpdatePossible?( newVN: IVN): boolean;
 
 	/**
@@ -88,14 +98,18 @@ export interface IVN extends IVNode
      */
 	update?( newVN: IVN, disp: VNDisp): void;
 
-	// Returns content that comprises the children of the node. If the node doesn't have
-	// sub-nodes, null should be returned. If this method is not implemented that means the node
-	// never has children - for example text nodes.
+	/**
+     * Returns content that comprises the children of the node. If the node doesn't have
+     * sub-nodes, null should be returned. If this method is not implemented that means the node
+     * never has children - for example text nodes.
+     */
 	render?(): any;
 
-    // This method is called if the node requested a "partial" update. Different types of virtual
-    // nodes can keep different data for the partial updates; for example, ElmVN can keep new
-    // element properties that can be updated without re-rendering its children.
+    /**
+     * This method is called if the node requested a "partial" update. Different types of virtual
+     * nodes can keep different data for the partial updates; for example, ElmVN can keep new
+     * element properties that can be updated without re-rendering its children.
+     */
 	performPartialUpdate?(): void;
 
 
@@ -105,28 +119,36 @@ export interface IVN extends IVNode
 
 
 
-    // Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
-    // This method is only called on the mounted nodes.
+    /**
+     * Returns the first DOM node defined by either this virtual node or one of its sub-nodes.
+     * This method is only called on the mounted nodes.
+     */
     getFirstDN(): DN;
 
-    // Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
-    // This method is only called on the mounted nodes.
+    /**
+     * Returns the last DOM node defined by either this virtual node or one of its sub-nodes.
+     * This method is only called on the mounted nodes.
+     */
     getLastDN(): DN;
 
-    // Returns the list of DOM nodes that are immediate children of this virtual node; that is, are
-    // NOT children of sub-nodes that have their own DOM node. May return null but never returns
-    // empty array.
+    /**
+     * Returns the list of DOM nodes that are immediate children of this virtual node; that is, are
+     * NOT children of sub-nodes that have their own DOM node. May return null but never returns
+     * empty array.
+     */
     getImmediateDNs(): DN[] | null;
 
 
 
-    // Schedules an update for this node.
-	requestUpdate( req?: ChildrenUpdateRequest, schedulingType?: TickSchedulingType): void;
+    /**
+     * Schedules an update for this node.
+     */
+	requestUpdate(schedulingType?: TickSchedulingType): void;
 
-
-
-	// Schedules an update for this node.
-	requestPartialUpdate( schedulingType?: TickSchedulingType): void;
+	/**
+	 * Schedules an update for this node.
+	 */
+	requestPartialUpdate(schedulingType?: TickSchedulingType): void;
 
 	/// #if USE_STATS
     statsCategory: StatsCategory;
@@ -247,215 +269,6 @@ export interface VNDispGroup
 	/** First DOM node in the group - will be known after the nodes are physically updated */
 	lastDN?: DN;
 }
-
-
-
-/**
- * The UpdateOperation enumeration lists various operations of how the sub-nodes of a virtual
- * node can be updated. When nodes request update they specify the operation and if needed provide
- * operation specific parameters.
- */
-export const enum ChildrenUpdateOperation
-{
-    /**
-     * The node's existing sub-nodes are reconciled with new content. The parameters contain the
-     * new content.
-     */
-    Update = 0,
-
-    /**
-     * The new content is replacing existing children. No parameters are required. The existing
-     * sub-nodes are unmounted and the new sub-nodes are mounted (no updates are performed).
-     */
-    Set = 1,
-
-    /**
-     * Retains the given range of the sub-nodes unmounting the sub-nodes outside the given range.
-     */
-    Slice = 2,
-
-    /**
-     * A range of existing sub-nodes is removed and the new ones added. The parameters contain the
-     * new content that is used to generate the new list of sub-nodes and, optionally, a range of
-     * indices defining the sub-nodes that are replaced. An additional flag determines whether the
-     * existing nodes are unmounted or updates are allowed.
-     */
-    Splice = 3,
-
-    /**
-     * A range of existing sub-nodes is moved to a new location. The parameters contain the index
-     * and the length of the range and the index of the new location. The new index cannot be
-     * within the range.
-     */
-    Move = 4,
-
-    /**
-     * Two ranges of existing sub-nodes change their locations. The parameters contain the indices
-     * and the lengths of the two ranges. The ranges cannot intersect.
-     */
-    Swap = 5,
-
-    /**
-     * Remove sub-nodes from the start and/or the end of the list. The parameters contain
-     * the number of nodes to remove from the start and the number of nodes to remove from the end.
-     * If only single number is give it is used for both the start and the end.
-     */
-    Trim = 6,
-
-    /**
-     * Add sub-nodes at the start and/or the end of the list. The parameters contain
-     * the content to add at the start and the content to add at the end.
-     */
-    Grow = 7,
-
-    /**
-     * Reverse sub-nodes within the given range. The parameter define the start and end indices
-     * of the range.
-     */
-    Reverse = 8,
-}
-
-
-
-/** Parameters for the Set request */
-export type SetRequest =
-{
-    op?: ChildrenUpdateOperation.Set;
-
-    // Content to replace the given range.
-    content?: any;
-
-    // Index of the first sub-node in the range to be replaced by the new content. If undefined,
-    // the default value is 0.
-    startIndex?: number;
-
-    // Index after the last sub-node in the range to be replaced by the new content. If undefined,
-    // the range includes all sub-nodes from startIndex to the end.
-    endIndex?: number;
-
-    // Flag indicating whether the old sub-nodes are unmounted or are allowed to be updated
-    update?: boolean
-
-    // Update strategy to use when updating nodes. If this parameter is undefined, the update
-    // strategy of the node itself is used.
-    updateStrategy?: UpdateStrategy;
-}
-
-
-
-/** Parameters for the Splice request */
-export type SpliceRequest =
-{
-    op?: ChildrenUpdateOperation.Splice;
-
-    // Index at which splicing starts
-    index: number;
-
-    // Number of sub-nodes to be deleted (or updated)
-    countToDelete?: number;
-
-    // New content to insert (or update the old sub-nodes)
-    contentToInsert?: any;
-}
-
-
-
-/** Parameters for the Move request */
-export type MoveRequest =
-{
-    op?: ChildrenUpdateOperation.Move;
-
-    /** Starting index of the region being moved */
-    index: number;
-
-    /** Number of nodes in the region being moved */
-    count: number;
-
-    /** Positive or negative distance of the move */
-    shift: number;
-}
-
-
-
-/** Parameters for the Swap request */
-export type SwapRequest =
-{
-    op?: ChildrenUpdateOperation.Swap;
-
-    /** Start index of the first range */
-    index1: number;
-
-    /** Number of sub-nodes in the first range */
-    count1: number;
-
-    /** Start index of the second range */
-    index2: number
-
-    /** Number of sub-nodes in the second range */
-    count2: number;
-}
-
-
-
-/** Parameters for the Slice request */
-export type SliceRequest =
-{
-    op?: ChildrenUpdateOperation.Slice;
-
-    // Index of the first sub-node in the range
-    startIndex: number;
-
-    // Index after the last sub-node in the range
-    endIndex?: number;
-}
-
-
-
-/** Parameters for the Trim request */
-export type TrimRequest =
-{
-    op?: ChildrenUpdateOperation.Trim;
-
-    /** Number of sub-nodes to remove at the start */
-    startCount: number;
-
-    /** Number of sub-nodes to remove at the end */
-    endCount: number;
-}
-
-
-
-/** Parameters for the Grow request */
-export type GrowRequest =
-{
-    op?: ChildrenUpdateOperation.Grow;
-
-    /** Content to add at the start */
-    startContent?: any;
-
-    /** Content to add at the end */
-    endContent?: any;
-}
-
-
-
-/** Parameters for the Reverse request */
-export type ReverseRequest =
-{
-    op?: ChildrenUpdateOperation.Reverse;
-
-    // Index of the first sub-node in the range
-    startIndex?: number;
-
-    // Index after the last sub-node in the range
-    endIndex?: number;
-}
-
-
-
-/** Combination of update requests for children */
-export type ChildrenUpdateRequest = SetRequest | SpliceRequest | MoveRequest | SwapRequest |
-    SliceRequest | TrimRequest | GrowRequest | ReverseRequest;
 
 
 

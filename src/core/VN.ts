@@ -4,7 +4,7 @@
 import { IEventSlot, IEventSlotOwner } from "../api/EventSlotTypes";
 import { ITrigger } from "../api/TriggerTypes";
 import { Trigger } from "../api/TriggerAPI";
-import { ChildrenUpdateRequest, IVN } from "./VNTypes";
+import { IVN } from "./VNTypes";
 
 /// #if USE_STATS
     import {StatsCategory} from "../utils/Stats"
@@ -243,26 +243,12 @@ export abstract class VN implements IVN
 
 
 
-	// // Level of nesting at which the node resides relative to the root node.
-	// public get depth(): number
-    // {
-    //     let depth = 0;
-    //     for( let p = this.parent; p; p = p.parent)
-    //         depth++;
-
-    //     return depth;
-    // }
-
-
-
     /** Schedules an update for this node. */
-	public requestUpdate( req?: ChildrenUpdateRequest, schedulingType?: TickSchedulingType): void
+	public requestUpdate(schedulingType?: TickSchedulingType): void
 	{
-        if (schedulingType === TickSchedulingType.Sync)
-            performChildrenOperation( this, req);
-		else if (!this.updateRequested)
+        if (!this.updateRequested)
 		{
-			requestNodeUpdate( this, req, schedulingType);
+			requestNodeUpdate( this, schedulingType);
 			this.updateRequested = true;
 		}
 	}
@@ -276,7 +262,7 @@ export abstract class VN implements IVN
             (this as IVN).performPartialUpdate!();
 		else if (!this.partialUpdateRequested)
 		{
-			requestNodeUpdate( this, undefined, schedulingType);
+			requestNodeUpdate( this, schedulingType);
 			this.partialUpdateRequested = true;
 		}
 	}

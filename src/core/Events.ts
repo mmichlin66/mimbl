@@ -45,19 +45,6 @@ export class EventsMixin
 
 
     /**
-     * Returns event handler function for the given event. This methid is supposed to be call only
-     * after the events are mounted, in which case it returns an already wrapped handler. However,
-     * if this method is called before the events are mounted, it will return the original handler.
-     */
-	getHandler(name: string): EventFuncType
-	{
-        let rtd = this.events[name];
-        return rtd.wrapper ?? rtd.func;
-	}
-
-
-
-    /**
      * Mounts all events
      */
 	mount(eventTarget?: EventTarget): void
