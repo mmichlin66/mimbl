@@ -1,10 +1,10 @@
 ﻿import {DN, IRootVN} from "../api/CompTypes"
+import { VN } from "./VN";
+import { reconcileContent } from "./Reconciler";
 
 /// #if USE_STATS
-	import {StatsCategory} from "../utils/Stats"
+import {StatsCategory} from "../utils/Stats"
 /// #endif
-
-import { VN } from "./VN";
 
 
 
@@ -46,6 +46,18 @@ export class RootVN extends VN implements IRootVN
     {
         this.unmountSubNodes(removeFromDOM);
         super.unmount(removeFromDOM);
+    }
+
+
+
+    /**
+     * This method is called if the node requested an update. Different types of virtual nodes can
+     * keep different data for updates; for example, This implementation re-renders the component
+     * and reconciles the current list of sub-nodes with the new content.
+     */
+    public update(): void
+    {
+        reconcileContent(this, {oldVN: this}, this.render());
     }
 
 

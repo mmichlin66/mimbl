@@ -2,7 +2,7 @@
 import { VNDisp } from "./VNTypes";
 import { IWatcher } from "../api/TriggerTypes";
 import { Watcher } from "../api/TriggerAPI";
-import { setCurrentClassComp, mountContent, reconcile } from "./Reconciler";
+import { setCurrentClassComp, mountContent, reconcileContent } from "./Reconciler";
 import { symRenderNoWatcher, VN } from "./VN";
 
 
@@ -84,15 +84,15 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount( parent: VN | null, index: number, anchorDN: DN, beforeDN: DN): void
+	public mount(parent: VN | null, index: number, anchorDN: DN, beforeDN: DN): void
     {
-        super.mount( parent, index, anchorDN);
+        super.mount(parent, index, anchorDN);
 
         let shadowOptions = this.compClass[symShadowOptions] as ComponentShadowOptions;
         if (shadowOptions)
         {
-            let tag: string = "div";
-            let init: ShadowRootInit = {mode: "open"};
+            let tag: string | undefined = undefined;
+            let init: ShadowRootInit | undefined = undefined;
             if (typeof shadowOptions === "string")
                 tag = shadowOptions;
             else if (Array.isArray(shadowOptions))
@@ -103,30 +103,30 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
             else if (typeof shadowOptions === "object")
                 init = shadowOptions;
 
-            this.rootHost = document.createElement( tag);
-            this.ownDN = this.rootHost.attachShadow( init);
+            this.rootHost = document.createElement(tag ?? "div");
+            this.ownDN = this.rootHost.attachShadow(init ?? {mode: "open"});
         }
 
         let comp = this.comp!;
-        let prevCreator = setCurrentClassComp( comp);
+        let prevCreator = setCurrentClassComp(comp);
 
-        this.prepareMount( comp);
+        this.prepareMount(comp);
 
         let newAnchorDN = this.ownDN ?? anchorDN;
         let newBeforeDN = this.ownDN ? null : beforeDN;
 
         if (!comp.handleError)
-            mountContent( this, this.render(), newAnchorDN, newBeforeDN);
+            mountContent(this, this.render(), newAnchorDN, newBeforeDN);
         else
         {
             try
             {
-                mountContent( this, this.render(), newAnchorDN, newBeforeDN);
+                mountContent(this, this.render(), newAnchorDN, newBeforeDN);
             }
             catch( err)
             {
                 /// #if VERBOSE_NODE
-                    console.debug( `Calling handleError() on node ${this.name}. Error:`, err);
+                    console.debug(`Calling handleError() on node ${this.name}. Error:`, err);
                 /// #endif
 
                 // let the component handle the error and re-render; then we render the new
@@ -134,17 +134,17 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
                 // up in an infinite loop. We also set our component as current again.
                 setCurrentClassComp(comp);
                 comp.handleError(err);
-                mountContent( this, this.render(), newAnchorDN, newBeforeDN);
+                mountContent(this, this.render(), newAnchorDN, newBeforeDN);
             }
         }
 
-        setCurrentClassComp( prevCreator);
+        setCurrentClassComp(prevCreator);
 
         if (this.rootHost)
-            anchorDN!.insertBefore( this.rootHost, beforeDN);
+            anchorDN!.insertBefore(this.rootHost, beforeDN);
 
         /// #if USE_STATS
-            DetailedStats.log( StatsCategory.Comp, StatsAction.Added);
+            DetailedStats.log(StatsCategory.Comp, StatsAction.Added);
         /// #endif
     }
 
@@ -155,7 +155,7 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
     {
         this.unmountSubNodes(removeFromDOM);
 
-        this.prepareUnmount( this.comp!);
+        this.prepareUnmount(this.comp!);
 
         if (this.rootHost)
         {
@@ -165,18 +165,32 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
             this.ownDN = null;
         }
 
-        super.unmount( removeFromDOM);
+        super.unmount(removeFromDOM);
 
         /// #if USE_STATS
-            DetailedStats.log( StatsCategory.Comp, StatsAction.Deleted);
+        DetailedStats.log(StatsCategory.Comp, StatsAction.Deleted);
         /// #endif
     }
 
 
 
+    /**
+     * This method is called if the node requested an update. Different types of virtual nodes can
+     * keep different data for updates; for example, This implementation re-renders the component
+     * and reconciles the current list of sub-nodes with the new content.
+     */
+	public update(): void
+	{
+        let prevCreator = setCurrentClassComp(this.comp!);
+        reconcileContent(this, {oldVN: this}, this.render());
+        setCurrentClassComp(prevCreator);
+	}
+
+
+
 	// Determines whether the update of this node from the given node is possible. The newVN
 	// parameter is guaranteed to point to a VN of the same type as this node.
-	public isUpdatePossible( newVN: ClassCompVN<TProps, TEvents>): boolean
+	public canReconcile(newVN: ClassCompVN<TProps, TEvents>): boolean
 	{
 		// update is possible if the component class is the same
 		return this.compClass === newVN.compClass;
@@ -188,20 +202,20 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
      * Performs part of the update functionality, which is common for managed and independent
      * coponents.
      */
-	public update( newVN: ClassCompVN<TProps, TEvents>, disp: VNDisp): void
+	public reconcile(newVN: ClassCompVN<TProps, TEvents>, disp: VNDisp): void
 	{
         let comp = this.comp!;
         this.updateStrategy = comp.updateStrategy;
 
-        let prevCreator = setCurrentClassComp( comp);
+        let prevCreator = setCurrentClassComp(comp);
 
         if (!comp.handleError)
-            reconcile( this, disp, this.render());
+            reconcileContent(this, disp, this.render());
         else
         {
             try
             {
-                reconcile( this, disp, this.render());
+                reconcileContent(this, disp, this.render());
             }
             catch( err)
             {
@@ -213,11 +227,11 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
                 // without try/catch this time; otherwise, we may end up in an infinite loop.
                 setCurrentClassComp(comp);
                 comp.handleError(err);
-                reconcile( this, {oldVN: disp.oldVN}, this.render());
+                reconcileContent(this, {oldVN: disp.oldVN}, this.render());
             }
         }
 
-        setCurrentClassComp( prevCreator);
+        setCurrentClassComp(prevCreator);
 	}
 
 
@@ -234,19 +248,19 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
 	public render(): any
 	{
 		/// #if DEBUG
-			if (!this.comp)
-			{
-				console.error( "render() was called on unmounted component.");
-				return null;
-			}
+        if (!this.comp)
+        {
+            console.error("render() was called on unmounted component.");
+            return null;
+        }
 		/// #endif
 
 		/// #if VERBOSE_COMP
-			console.debug( `VERBOSE: Calling render() on component ${this.name}`);
+        console.debug(`VERBOSE: Calling render() on component ${this.name}`);
 		/// #endif
 
 		/// #if USE_STATS
-			DetailedStats.log( StatsCategory.Comp, StatsAction.Rendered);
+		DetailedStats.log( StatsCategory.Comp, StatsAction.Rendered);
 		/// #endif
 
         // return this.actRender();
@@ -266,13 +280,13 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
 	/**
      * Prepares component for mounting but doesn't render and mount sub-nodes
      */
-	protected prepareMount( comp: IComponent): void
+	protected prepareMount(comp: IComponent): void
     {
         // connect the component to this virtual node
         comp.vn = this;
 
         // don't need try/catch because it will be caught up the chain
-        comp.willMount?.call( comp);
+        comp.willMount?.call(comp);
 
         // establish watcher if not disabled using the @noWatcher decorator
         this.watcher = comp.render[symRenderNoWatcher]
@@ -285,7 +299,7 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
 
 
     // Releases reference to the DOM node corresponding to this virtual node.
-    protected prepareUnmount( comp: IComponent): void
+    protected prepareUnmount(comp: IComponent): void
     {
         // release the watcher; we don't need to set it to undefined because it will be done
         // in the next mount (which is only possible in independent components)
@@ -295,18 +309,18 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
         if (willUnmount)
         {
             // need try/catch but only to log
-            let prevCreator = setCurrentClassComp( comp);
+            let prevCreator = setCurrentClassComp(comp);
             try
             {
-                willUnmount.call( comp);
+                willUnmount.call(comp);
             }
             catch( err)
             {
                 /// #if DEBUG
-                console.error( `Exception in willUnmount of component '${this.name}'`, err);
+                console.error(`Exception in willUnmount of component '${this.name}'`, err);
                 /// #endif
             }
-            setCurrentClassComp( prevCreator);
+            setCurrentClassComp(prevCreator);
         }
 
         // unpublish and unsubscribe
@@ -320,7 +334,8 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
     /**
      * Watcher function wrapping the component's render function. The watcher will notice any
      * trigger objects being read during the original function execution and will request update
-     * thus triggerring re-rendering. */
+     * thus triggerring re-rendering.
+     */
 	private watcher?: IWatcher;
 }
 

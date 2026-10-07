@@ -63,7 +63,7 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
 	/** Determines whether this event slot has any attached listeners. */
 	public isEmpty(): boolean
     {
-        return !this.listeners?.size;
+        return !this.listener && !this.listeners?.size;
     }
 
 	/** Removes all listeners to the event. */

@@ -17,7 +17,7 @@ export class IndependentCompVN extends ClassCompVN
 	/** Component instance, which is always defined for independent components. */
 	public comp: IComponent;
 
-	constructor( comp: IComponent)
+	constructor(comp: IComponent)
 	{
 		super(comp.constructor as IComponentClass);
 
@@ -39,7 +39,7 @@ export class IndependentCompVN extends ClassCompVN
 	// Initializes internal stuctures of the virtual node. This method is called right after the
     // node has been constructed. For nodes that have their own DOM nodes, creates the DOM node
     // corresponding to this virtual node.
-	public mount( parent: VN, index: number, anchorDN: DN, beforeDN: DN): void
+	public mount(parent: VN, index: number, anchorDN: DN, beforeDN: DN): void
     {
         // if the component is already connected to a node, we don't mount it again; instead, we
         // remember the new parameters and move it to a new location. This can happen when the
@@ -53,23 +53,23 @@ export class IndependentCompVN extends ClassCompVN
             this.index = index;
             this.anchorDN = anchorDN;
             if (this.rootHost)
-                anchorDN!.insertBefore( this.rootHost, beforeDN);
+                anchorDN!.insertBefore(this.rootHost, beforeDN);
             else
-                moveNode( this, anchorDN, beforeDN);
+                moveNode(this, anchorDN, beforeDN);
         }
         else
-            super.mount( parent, index, anchorDN, beforeDN);
+            super.mount(parent, index, anchorDN, beforeDN);
     }
 
 
 
     // Releases reference to the DOM node corresponding to this virtual node.
-    public unmount( removeFromDOM: boolean): void
+    public unmount(removeFromDOM: boolean): void
     {
         if (this.ignoreUnmount)
             this.ignoreUnmount = false;
         else
-            super.unmount( removeFromDOM);
+            super.unmount(removeFromDOM);
     }
 
 
@@ -77,7 +77,7 @@ export class IndependentCompVN extends ClassCompVN
 	// Updated this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node.
-	public update( newVN: IndependentCompVN, disp: VNDisp): void
+	public reconcile(newVN: IndependentCompVN, disp: VNDisp): void
 	{
         // if it is the same component instance, we don't need to do anything
 		if (this.comp === newVN.comp)
@@ -86,14 +86,14 @@ export class IndependentCompVN extends ClassCompVN
         // we are here if the component instances are different; we need to prepare the old
         // instance for unmounting and the new one for mounting.
         let oldComp = this.comp;
-        this.prepareUnmount( oldComp);
+        this.prepareUnmount(oldComp);
         this.comp = this.key = newVN.comp;
-        this.prepareMount( newVN.comp);
+        this.prepareMount(newVN.comp);
 
-        super.update( this, disp);
+        super.reconcile(this, disp);
 
         if (oldComp)
-            this.comp.didReplace?.call( this.comp, oldComp);
+            this.comp.didReplace?.call(this.comp, oldComp);
 	}
 
 

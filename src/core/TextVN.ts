@@ -3,7 +3,7 @@ import { ITrigger } from "../api/TriggerTypes";
 import { VNDisp } from "./VNTypes";
 
 /// #if USE_STATS
-	import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
+import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
 /// #endif
 
 import { VN } from "./VN";
@@ -23,7 +23,7 @@ export class TextVN extends VN implements ITextVN
 
 
 
-	constructor( text: string | ITrigger<string>)
+	constructor(text: string | ITrigger<string>)
 	{
 		super();
 		this.text = text;
@@ -31,9 +31,9 @@ export class TextVN extends VN implements ITextVN
 
 
 
-/// #if USE_STATS
+    /// #if USE_STATS
 	public get statsCategory(): StatsCategory { return StatsCategory.Text; }
-/// #endif
+    /// #endif
 
 
 
@@ -47,13 +47,13 @@ export class TextVN extends VN implements ITextVN
 	/**
      * Requests update of the text.
      */
-    setText( text: string | ITrigger<string>, schedulingType?: TickSchedulingType): void
+    setText(text: string | ITrigger<string>, schedulingType?: TickSchedulingType): void
     {
-        if (text === this.text)
-            return;
-
-        this.textForPartialUpdate = this.updateText(text);
-        super.requestPartialUpdate(schedulingType);
+        if (text !== this.text)
+        {
+            this.newText = this.updateText(text);
+            super.requestUpdate(schedulingType);
+        }
     }
 
 
@@ -62,75 +62,99 @@ export class TextVN extends VN implements ITextVN
      * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
      * and before the given node.
      */
-    public mount( parent: VN, index: number, anchorDN: DN, beforeDN: DN): void
+    public mount(parent: VN, index: number, anchorDN: DN, beforeDN: DN): void
     {
         super.mount( parent, index, anchorDN);
 
         // the text can actually be a trigger and we need to listen to its changes then
-        let val = this.text;
-        if (typeof val === "object")
+        let text = this.text;
+        if (typeof text === "object")
         {
-            this.onChange = onTriggerChanged.bind(this);
-            val.attach( this.onChange!);
-            val = val.get();
+            this.onChange = this.onTriggerChanged.bind(this);
+            text.attach(this.onChange!);
+            text = text.get();
         }
 
-        this.ownDN = document.createTextNode( val);
-        anchorDN!.insertBefore( this.ownDN, beforeDN);
+        this.ownDN = document.createTextNode(text);
+        anchorDN!.insertBefore(this.ownDN, beforeDN);
 
         /// #if USE_STATS
-            DetailedStats.log( StatsCategory.Text, StatsAction.Added);
+        DetailedStats.log(StatsCategory.Text, StatsAction.Added);
         /// #endif
     }
 
 
 
-    // Cleans up the node object before it is released.
-    public unmount( removeFromDOM: boolean): void
+    /**
+     * Cleans up the node object before it is released.
+     */
+    public unmount(removeFromDOM: boolean): void
     {
         if (removeFromDOM)
         {
             this.ownDN?.remove();
 
             /// #if USE_STATS
-            DetailedStats.log( StatsCategory.Text, StatsAction.Deleted);
+            DetailedStats.log(StatsCategory.Text, StatsAction.Deleted);
             /// #endif
         }
 
         // the onChange is non-null only if this.text is a trigger
         if (this.onChange)
-            (this.text as ITrigger).detach( this.onChange);
+            (this.text as ITrigger).detach(this.onChange);
 
 		this.ownDN = null;
-        super.unmount( removeFromDOM);
+        super.unmount(removeFromDOM);
     }
 
 
 
-	// Determines whether the update of this node from the given node is possible. The newVN
-	// parameter is guaranteed to point to a VN of the same type as this node. If this method is
-	// not implemented the update is considered possible - e.g. for text nodes.
-	isUpdatePossible?( newVN: VN): boolean;
+    /**
+     * This method is called if the node requested an update. Text node updates the DOM node value
+     * to the remembered text value.
+     */
+    public update(): void
+    {
+        this.ownDN!.nodeValue = this.newText!;
+        this.newText = undefined;
+
+        /// #if USE_STATS
+        DetailedStats.log(StatsCategory.Text, StatsAction.Updated);
+        /// #endif
+    }
 
 
 
-	// Updates this node from the given node. This method is invoked only if update
-	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node.
-	public update( newVN: TextVN, disp: VNDisp): void
+	/**
+     * Determines whether the update of this node from the given node is possible. The newVN
+     * parameter is guaranteed to point to a VN of the same type as this node. Text nodes don't
+     * implement this method - it is set to undefined in the class prototype below.
+     */
+	canReconcile?(newVN: VN): boolean;
+
+
+
+	/**
+     * Recursively updates this node from the given node. This method is invoked only if update
+     * happens as a result of rendering the parent nodes. Text node updates the DOM node value
+     * from the text value from the new virtual node.
+     */
+	public reconcile(newVN: TextVN, disp: VNDisp): void
 	{
         if (this.text !== newVN.text)
         {
-            this.ownDN!.nodeValue = this.updateText( newVN.text);
+            this.ownDN!.nodeValue = this.updateText(newVN.text);
 
             /// #if USE_STATS
-                DetailedStats.log( StatsCategory.Text, StatsAction.Updated);
+            DetailedStats.log(StatsCategory.Text, StatsAction.Updated);
             /// #endif
         }
     }
 
+
+
 	// Update the text field and returns the new text value to be set as the node's value.
-	private updateText( text: string | ITrigger<string>): string
+	private updateText(text: string | ITrigger<string>): string
 	{
         // the onChange is non-null only if this.text is a trigger
         let onChange = this.onChange;
@@ -142,7 +166,7 @@ export class TextVN extends VN implements ITextVN
         if (typeof text === "object")
         {
             if (!onChange)
-                this.onChange = onChange = onTriggerChanged.bind(this);
+                this.onChange = onChange = this.onTriggerChanged.bind(this);
 
             text.attach(onChange!);
             return text.get();
@@ -157,16 +181,12 @@ export class TextVN extends VN implements ITextVN
 
 
 
-    // This method is called if the node requested a "partial" update. Text virtual node keeps
-    // string value to set as node value.
-    public performPartialUpdate(): void
+    /**
+     * Function reacting on the value change in the trigger.
+     */
+    private onTriggerChanged(s: string): void
     {
-        this.ownDN!.nodeValue = this.textForPartialUpdate!;
-        this.textForPartialUpdate = undefined;
-
-        /// #if USE_STATS
-            DetailedStats.log( StatsCategory.Text, StatsAction.Updated);
-        /// #endif
+        this.ownDN!.nodeValue = s;
     }
 
 
@@ -175,29 +195,18 @@ export class TextVN extends VN implements ITextVN
     public declare ownDN: Text | null;
 
     // Text waiting for the partial update operation
-    public textForPartialUpdate?: string;
+    private newText?: string = undefined;
 
     // Bound method reacting on the value change in the trigger. It is created only if the node
     // value is a trigger and not just text.
-    private onChange?: (s: string) => void;
+    private onChange?: (s: string) => void = undefined;
 }
 
 
 // Define methods/properties that are invoked during mounting/unmounting/updating and which don't
 // have or have trivial implementation so that lookup is faster.
 
-TextVN.prototype.isUpdatePossible = undefined; // this means that update is always possible
-
-
-
-/**
- * Function reacting on the value change in the trigger. This function gets bound to the instance
- * of the TextVN class; therefore, it can use "this".
- */
-function onTriggerChanged( this: TextVN, s: string): void
-{
-    this.ownDN!.nodeValue = s;
-}
+TextVN.prototype.canReconcile = undefined; // this means that update is always possible
 
 
 

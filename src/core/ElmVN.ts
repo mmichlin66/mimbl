@@ -60,7 +60,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
     // Properties that were specified in the setProps call. This allows updating the
     // element's properties without re-rendering its children.
-    private propsForPartialUpdate: any;
+    private newProps: any;
 
 
 	constructor( tagName: string, props: ExtendedElement<T> | undefined, subNodes: IVN[] | null)
@@ -109,12 +109,12 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         if (!props)
             return;
 
-        if (this.propsForPartialUpdate)
-            Object.assign(this.propsForPartialUpdate, props)
+        if (this.newProps)
+            Object.assign(this.newProps, props)
         else
-            this.propsForPartialUpdate = props;
+            this.newProps = props;
 
-        this.requestPartialUpdate(schedulingType);
+        this.requestUpdate(schedulingType);
     }
 
 
@@ -218,9 +218,24 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 
-	// Determines whether the update of this node from the given node is possible. The newVN
-	// parameter is guaranteed to point to a VN of the same type as this node.
-	public isUpdatePossible( newVN: ElmVN<T>): boolean
+    /**
+     * This method is called if the node requested an update. Elm node updates its attributes/
+     * properties to the remembered values.
+     */
+    public update(): void
+    {
+        this.updatePropsOnly(this.newProps)
+        this.newProps = undefined;
+    }
+
+
+
+	/**
+     * Determines whether the update of this node from the given node is possible. The newVN
+     * parameter is guaranteed to point to a VN of the same type as this node. If this method is
+     * not implemented the update is considered possible - e.g. for text nodes.
+     */
+	public canReconcile(newVN: ElmVN<T>): boolean
 	{
 		// update is possible if this is the same type of element; that is, it has the same
 		// name. Also, if we currently have events, the creator must be the same.
@@ -229,10 +244,12 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
 
 
-	// Updates this node from the given node. This method is invoked only if update
-	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
-	// point to a VN of the same type as this node.
-	public update( newVN: ElmVN<T>, disp: VNDisp): void
+	/**
+     * Recursively updates this node from the given node. This method is invoked only if update
+     * happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
+     * point to a VN of the same type as this node.
+     */
+	public reconcile(newVN: ElmVN<T>, disp: VNDisp): void
 	{
         // if the new VN was created by a different creator, we will need to update all
         // attributes and events (even if they are the same). We also need to "clean" some
@@ -247,7 +264,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         if (this.props || newVN.props)
         {
             if (newVN.props)
-                newVN.parseProps( newVN.props);
+                newVN.parseProps(newVN.props);
 
             // if reference specifications changed then set or unset them as necessary
             if (this.ref != newVN.ref)
@@ -271,19 +288,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 
         // update children if they exist either on our or on the new element
         if (this.subNodes || newVN.subNodes)
-            reconcileSubNodes( this, disp, newVN.subNodes);
+            reconcileSubNodes(this, disp, newVN.subNodes);
 	}
-
-
-    // This method is called if the node requested a "partial" update. Different types of virtual
-    // nodes can keep different data for the partial updates; for example, ElmVN can keep new
-    // element properties that can be updated without re-rendering its children.
-    public performPartialUpdate(): void
-    {
-        this.updatePropsOnly(this.propsForPartialUpdate)
-        this.propsForPartialUpdate = undefined;
-    }
-
 
 
 	// Goes over the original properties and puts them into the buckets of attributes, event
@@ -329,7 +335,6 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	private updatePropsOnly( props: any): void
 	{
         // loop over all properties
-        let nscode = this.nscode;
         for (let propName in props)
 		{
             let propVal = props[propName];
@@ -338,18 +343,7 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
             let propInfo = getPropInfo(this.nscode, this.elmName, propName);
             let propType = !propInfo ? getPropTypeFromPropVal(propVal) : propInfo.type;
             if (propType === PropType.Attr)
-            {
-                // // all SVG attributes except style must be set via attributes and not properties
-                // if (nscode === NamespaceCode.SVG && propName !== "style")
-                // {
-                //     if (!propInfo)
-                //         propInfo = SvgDefaultPropInfo;
-                //     else
-                //         propInfo = Object.assign({}, propInfo, SvgDefaultPropInfo);
-                // }
-
                 this.updateAttrOnly( propName, propVal, propInfo as AttrPropInfo);
-            }
             else if (propType === PropType.Event)
                 this.updateEventOnly( propName, propVal as EventPropType, propInfo as EventPropInfo);
             else if (propType === PropType.CustomAttr)
@@ -513,8 +507,8 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
         // reset as new (e.g. defaultChecked).
         if (newVal == null)
             removeElmProp(this.nscode, this.ownDN!, name, oldRTD.rval, oldRTD.info), oldRTD.rval = null;
-        else if (isNewCreator)
-            oldRTD.rval = setElmProp(this.nscode, this.ownDN!, name, newVal, oldRTD.info);
+        // else if (isNewCreator)
+        //     oldRTD.rval = setElmProp(this.nscode, this.ownDN!, name, newVal, oldRTD.info);
         else
             oldRTD.rval = updateElmProp(this.nscode, this.ownDN!, name, oldRTD.rval, newVal, oldRTD.info);
     }

@@ -5,14 +5,11 @@ import { IEventSlot, IEventSlotOwner } from "../api/EventSlotTypes";
 import { ITrigger } from "../api/TriggerTypes";
 import { Trigger } from "../api/TriggerAPI";
 import { IVN } from "./VNTypes";
+import { getCurrentClassComp, requestNodeUpdate, unmountSubNodes } from "./Reconciler";
 
 /// #if USE_STATS
-    import {StatsCategory} from "../utils/Stats"
+import {StatsCategory} from "../utils/Stats"
 /// #endif
-
-import { getCurrentClassComp, performChildrenOperation, requestNodeUpdate, unmountSubNodes } from "./Reconciler";
-
-
 
 
 
@@ -23,7 +20,7 @@ import { getCurrentClassComp, performChildrenOperation, requestNodeUpdate, unmou
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// #if DEBUG
-    let g_nextVNDebugID = 1;
+let g_nextVNDebugID = 1;
 /// #endif
 
 export abstract class VN implements IVN
@@ -72,12 +69,12 @@ export abstract class VN implements IVN
 	// is called.
 	public updateRequested: boolean = false;
 
-    // Flag indicating thata partial update has been requested but not yet performed. This flag is
-    // different from the updateRequested since it controls node-type-specific "partial" updates,
-    // which are treated by the rconciler by calling the performPartialUpdate method. Different
-    // virtual node types can support different kinds of partial updates; for example, the ElmVN
-    // allows updating the element properties without re-rendering its children.
-	public partialUpdateRequested: boolean = false;
+    // // Flag indicating thata partial update has been requested but not yet performed. This flag is
+    // // different from the updateRequested since it controls node-type-specific "partial" updates,
+    // // which are treated by the rconciler by calling the performPartialUpdate method. Different
+    // // virtual node types can support different kinds of partial updates; for example, the ElmVN
+    // // allows updating the element properties without re-rendering its children.
+	// public partialUpdateRequested: boolean = false;
 
 	// "Tick number" during which the node was last updated. If this node's tick number equals
 	// the current tick number maintained by the root node, this indicates that this node was
@@ -94,7 +91,7 @@ export abstract class VN implements IVN
         this.creator = getCurrentClassComp();
 
         /// #if DEBUG
-            this.debugID = g_nextVNDebugID++;
+        this.debugID = g_nextVNDebugID++;
         /// #endif
     }
 
@@ -105,7 +102,7 @@ export abstract class VN implements IVN
 	/// #endif
 
     /// #if DEBUG
-        public debugID: number;
+    public debugID: number;
     /// #endif
 
 
@@ -114,7 +111,7 @@ export abstract class VN implements IVN
      * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
      * and before the given node.
      */
-	public mount( parent: VN | null, index: number, anchorDN: DN, beforeDN: DN = null): void
+	public mount(parent: VN | null, index: number, anchorDN: DN, beforeDN: DN = null): void
     {
         this.parent = parent;
         this.index = index;
@@ -126,7 +123,7 @@ export abstract class VN implements IVN
     /**
      * Recursively removes the content of this virtual node from DOM.
      */
-	public unmount( removeFromDOM: boolean): void
+	public unmount(removeFromDOM: boolean): void
     {
         // this indicates that our node is unmounted
         this.anchorDN = null;
@@ -146,7 +143,7 @@ export abstract class VN implements IVN
     {
         if (this.subNodes)
         {
-            unmountSubNodes( this.subNodes, removeFromDOM);
+            unmountSubNodes(this.subNodes, removeFromDOM);
             this.subNodes = null;
         }
     }
@@ -248,22 +245,8 @@ export abstract class VN implements IVN
 	{
         if (!this.updateRequested)
 		{
-			requestNodeUpdate( this, schedulingType);
+			requestNodeUpdate(this, schedulingType);
 			this.updateRequested = true;
-		}
-	}
-
-
-
-	/** Schedules an update for this node. */
-	public requestPartialUpdate( schedulingType?: TickSchedulingType): void
-	{
-		if (schedulingType === TickSchedulingType.Sync)
-            (this as IVN).performPartialUpdate!();
-		else if (!this.partialUpdateRequested)
-		{
-			requestNodeUpdate( this, schedulingType);
-			this.partialUpdateRequested = true;
 		}
 	}
 
@@ -273,14 +256,14 @@ export abstract class VN implements IVN
 	 * Registers the given value as a service with the given ID that will be available for
      * consumption by descendant components.
      */
-	public publishService( id: string, value: any, depth?: number): Publication
+	public publishService(id: string, value: any, depth?: number): Publication
 	{
-        let publication = this.pubs?.get( id);
+        let publication = this.pubs?.get(id);
         if (publication)
             publication.value = value;
         else
         {
-            publication = new Publication( id, this, value, depth);
+            publication = new Publication(id, this, value, depth);
             (this.pubs ??= new Map()).set(id, publication);
         }
 
@@ -297,9 +280,9 @@ export abstract class VN implements IVN
      * this or a closest ancestor component is changed, the subscription's `value` property will
      * receive the new value.
 	 */
-    public subscribeService( id: string, defaultValue?: any, useSelf?: boolean): ISubscription<any>
+    public subscribeService(id: string, defaultValue?: any, useSelf?: boolean): ISubscription<any>
     {
-        let subscription = this.subs?.get( id);
+        let subscription = this.subs?.get(id);
         if (subscription)
             return subscription;
 
@@ -318,7 +301,7 @@ export abstract class VN implements IVN
      * undefined return value serves as the indication that the service was not found. All other
      * values including null, empty string, zero and false might be valid service values.
      */
-	public getService( id: string, defaultService?: any, useSelf?: boolean): any
+	public getService(id: string, defaultService?: any, useSelf?: boolean): any
 	{
 		return findPublication(this, id, useSelf)?.value ?? defaultService;
 	}
@@ -343,7 +326,7 @@ function collectImmediateDNs(vn: IVN, arr: DN[]): void
     if (vn.ownDN)
         arr.push( vn.ownDN);
     else if (vn.subNodes)
-        vn.subNodes.forEach( svn => collectImmediateDNs(svn, arr));
+        vn.subNodes.forEach(svn => collectImmediateDNs(svn, arr));
 }
 
 
@@ -358,7 +341,7 @@ function collectImmediateDNs(vn: IVN, arr: DN[]): void
  * @param onlyIf An optional value to which to compare the current (old) value of the reference.
  * The new value will be set only if the old value equals the `onlyIf` value.
  */
-export function setRef<T>( ref: RefType<T>, val: T | undefined, onlyIf?: T | null): void
+export function setRef<T>(ref: RefType<T>, val: T | undefined, onlyIf?: T | null): void
 {
 	if (typeof ref === "function")
 		ref(val);
@@ -411,11 +394,11 @@ export let symRenderNoWatcher = Symbol();
  */
 class Publication implements IPublication<any>
 {
-    constructor( id: string, vn: VN, value?: any, depth?: number)
+    constructor(id: string, vn: VN, value?: any, depth?: number)
     {
         this.id = id;
         this.vn = vn;
-        this.trigger = new Trigger( value, depth);
+        this.trigger = new Trigger(value, depth);
         notifyServicePublished( this);
     }
 
@@ -457,7 +440,7 @@ class Publication implements IPublication<any>
  */
 class Subscription implements ISubscription<any>
 {
-    public constructor( id: string, vn: VN,
+    public constructor(id: string, vn: VN,
         publication: Publication | undefined, defaultValue?: any, useSelf?: boolean)
     {
         this.id = id;
@@ -469,7 +452,7 @@ class Subscription implements ISubscription<any>
     }
 
     /** Sets the trigger either from the given publication or creates a new one with the default value */
-    public setPublication( publication: Publication | undefined): void
+    public setPublication(publication: Publication | undefined): void
     {
         if (this.trigger === publication?.trigger)
             return;
@@ -500,7 +483,7 @@ class Subscription implements ISubscription<any>
      * Attaches the given callback to the "change" event.
      * @param callback Function that will be called when the value of the service changes.
      */
-    public attach( callback: (value?: any) => void): void
+    public attach(callback: (value?: any) => void): void
     {
         this.callbacks.add(callback);
         this.trigger?.attach(callback);
@@ -510,7 +493,7 @@ class Subscription implements ISubscription<any>
      * Detaches the given callback from the "change" event.
      * @param callback Function that was attached to the "change" event by the {@link attach} method.
      */
-    public detach( callback: (value?: any) => void): void
+    public detach(callback: (value?: any) => void): void
     {
         this.trigger?.detach(callback);
         this.callbacks.delete(callback);
@@ -565,7 +548,7 @@ class Subscription implements ISubscription<any>
  * Goes up the chain of nodes looking for a published service with the given ID. Returns undefined
  * if the service is not found. Note that null might be a valid value.
  */
-function findPublication( vn: VN, id: string, useSelf?: boolean): Publication | undefined
+function findPublication(vn: VN, id: string, useSelf?: boolean): Publication | undefined
 {
     if (useSelf)
     {
@@ -595,7 +578,7 @@ type ServiceInfo =
 }
 
 /** Map of service IDs to sets of virtual nodes that subscribed to this service. */
-let s_serviceInfos = new Map<string,ServiceInfo>();
+let s_serviceInfos = new Map<string, ServiceInfo>();
 
 
 

@@ -54,15 +54,6 @@ export interface IVN extends IVNode
      */
 	updateRequested?: boolean;
 
-    /**
-     * Flag indicating thata partial update has been requested but not yet performed. This flag is
-     * different from the updateRequested since it controls node-type-specific "partial" updates,
-     * which are treated by the rconciler by calling the performPartialUpdate method. Different
-     * virtual node types can support different kinds of partial updates; for example, the ElmVN
-     * allows updating the element properties without re-rendering its children.
-     */
-	partialUpdateRequested?: boolean;
-
 	/**
      * "Tick number" during which the node was last updated. If this node's tick number equals
      * the current tick number maintained by the root node, this indicates that this node was
@@ -77,26 +68,33 @@ export interface IVN extends IVNode
      * Recursively inserts the content of this virtual node to DOM under the given parent (anchor)
      * and before the given node.
      */
-	mount( parent: IVN | null, index: number, anchorDN: DN, beforeDN: DN): void;
+	mount(parent: IVN | null, index: number, anchorDN: DN, beforeDN: DN): void;
 
     /**
      * Recursively removes the content of this virtual node from DOM.
      */
-	unmount( removeFromDOM: boolean): void;
+	unmount(removeFromDOM: boolean): void;
+
+    /**
+     * This method is called if the node requested an update. Different types of virtual
+     * nodes can keep different data for updates; for example, ElmVN can keep new element
+     * properties that can be updated without re-rendering its children.
+     */
+	update?(): void;
 
 	/**
-     * Determines whether the update of this node from the given node is possible. The newVN
-     * parameter is guaranteed to point to a VN of the same type as this node. If this method is
-     * not implemented the update is considered possible - e.g. for text nodes.
+     * Determines whether the this node can be reconciled with the given node. The newVN parameter
+     * is guaranteed to point to a VN of the same type as this node. If this method is not
+     * implemented the update is considered possible - e.g. for text nodes.
      */
-	isUpdatePossible?( newVN: IVN): boolean;
+	canReconcile?(newVN: IVN): boolean;
 
 	/**
      * Recursively updates this node from the given node. This method is invoked only if update
      * happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
      * point to a VN of the same type as this node.
      */
-	update?( newVN: IVN, disp: VNDisp): void;
+	reconcile?(newVN: IVN, disp: VNDisp): void;
 
 	/**
      * Returns content that comprises the children of the node. If the node doesn't have
@@ -104,13 +102,6 @@ export interface IVN extends IVNode
      * never has children - for example text nodes.
      */
 	render?(): any;
-
-    /**
-     * This method is called if the node requested a "partial" update. Different types of virtual
-     * nodes can keep different data for the partial updates; for example, ElmVN can keep new
-     * element properties that can be updated without re-rendering its children.
-     */
-	performPartialUpdate?(): void;
 
 
 
@@ -145,10 +136,7 @@ export interface IVN extends IVNode
      */
 	requestUpdate(schedulingType?: TickSchedulingType): void;
 
-	/**
-	 * Schedules an update for this node.
-	 */
-	requestPartialUpdate(schedulingType?: TickSchedulingType): void;
+
 
 	/// #if USE_STATS
     statsCategory: StatsCategory;

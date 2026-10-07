@@ -164,8 +164,8 @@ export interface AttrPropInfo<T extends Element = Element>
      * @param val New JSX attribute value
      * @param name JSX attribute name - just in case the conversion depends on an attribute
      * @param info This attribute information object
-     * @returns Value to be remembered and later supplied to updateElmProp() or removeElmProp().
-     * Undefined is returned if no change is done.
+     * @returns Value to be remembered and later supplied to updateElmProp() or removeElmProp(). A
+     * special symbol `symNoChanges` is returned if no change is done.
      */
 	update?: (elm: T, rval: any, newVal: any, name: string, info: AttrPropInfo) => any;
 
@@ -246,6 +246,11 @@ export interface CustomAttrPropInfo
 
 /** Type combining information about regular attributes or events or custom attributes. */
 export type PropInfo = AttrPropInfo | EventPropInfo | CustomAttrPropInfo;
+
+
+
+/** Symbol that can be returned from update functions indicating that there were no changes. */
+const symNoChanges = Symbol("NoChanges");
 
 
 
@@ -365,16 +370,16 @@ function getPropValueForElm(nscode: number, elm: Element, val: any, name: string
  */
 export function setElmProp(nscode: number, elm: Element, name: string, val: any, info?: AttrPropInfo): any
 {
-    /// #if USE_STATS
-    DetailedStats.log(StatsCategory.Attr, StatsAction.Added);
-    /// #endif
-
     // get property info object
     let rval: any;
     if (info?.set)
         rval = info.set(elm, val, name, info);
     else
         rval = setElmPropInternal(nscode, elm, val, name, info);
+
+    /// #if USE_STATS
+    DetailedStats.log(StatsCategory.Attr, StatsAction.Added);
+    /// #endif
 
     return rval;
 }
@@ -419,10 +424,6 @@ function setElmPropInternal(nscode: number, elm: Element, val: any, name: string
 export function updateElmProp(nscode: number, elm: Element, name: string, oldRVal: any, newVal: any,
     info?: AttrPropInfo): any
 {
-    /// #if USE_STATS
-    DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
-    /// #endif
-
     let newRVal: any;
 
     if (info?.update)
@@ -432,7 +433,16 @@ export function updateElmProp(nscode: number, elm: Element, name: string, oldRVa
     else
         newRVal = updateElmPropInternal(nscode, elm, oldRVal, newVal, name, info);
 
-    return newRVal;
+    if (newRVal === symNoChanges)
+        return oldRVal;
+    else
+    {
+        /// #if USE_STATS
+        DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
+        /// #endif
+
+        return newRVal;
+    }
 }
 
 
@@ -462,15 +472,15 @@ function updateElmPropInternal(nscode: number, elm: Element, oldRVal: any, newVa
 /** Removes the attribute(s) corresponding to the given property. */
 export function removeElmProp(nscode: number, elm: Element, name: string, rval: any, info?: AttrPropInfo): void
 {
-    /// #if USE_STATS
-    DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
-    /// #endif
-
     // get info object doesn't define
     if (!info?.remove)
         removeElmPropInternal(nscode, elm, name, info);
     else
         info.remove(elm, rval, name, info)
+
+    /// #if USE_STATS
+    DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
+    /// #endif
 }
 
 
@@ -569,25 +579,25 @@ const arr2s = (val: any | any[], sep: string): string | null =>
 
 
 
-/**
- * One-way function that produces unique string for a given object. Doesn't handle circular
- * references.
- */
-function obj2s(obj: Record<string, any>,
-    keyFunc?: (key: string) => string, valFunc?: (val: any) => string | null): string
-{
-    if (Symbol.toPrimitive in obj || (obj.toString && obj.toString !== Object.prototype.toString))
-        return String(obj);
+// /**
+//  * One-way function that produces unique string for a given object. Doesn't handle circular
+//  * references.
+//  */
+// function obj2s(obj: Record<string, any>,
+//     keyFunc?: (key: string) => string, valFunc?: (val: any) => string | null): string
+// {
+//     if (Symbol.toPrimitive in obj || (obj.toString && obj.toString !== Object.prototype.toString))
+//         return String(obj);
 
-    let s = "";
-    for (let key in obj)
-    {
-        let val = obj[key];
-        s += keyFunc ? keyFunc(key) : key;
-        s += valFunc ? valFunc(val) : val2s(val)
-    }
-    return s;
-}
+//     let s = "";
+//     for (let key in obj)
+//     {
+//         let val = obj[key];
+//         s += keyFunc ? keyFunc(key) : key;
+//         s += valFunc ? valFunc(val) : val2s(val)
+//     }
+//     return s;
+// }
 
 
 
@@ -655,7 +665,7 @@ function setObjectProp(elm: Element, val: ObjectPropValueType,
 
 /** Updates object attributes like `data-*` or `aria-*` */
 function updateObjectProp(elm: Element, oldS: string | null, newVal: ObjectPropValueType,
-    nameFunc: ObjectPropToAttrNameFunc, valFunc: ObjectPropValToStringFunc): string | null | void
+    nameFunc: ObjectPropToAttrNameFunc, valFunc: ObjectPropValToStringFunc): any
 {
     // if we don't have old string value (which shouldn't happen), just use the set function
     if (!oldS)
@@ -715,7 +725,7 @@ function updateObjectProp(elm: Element, oldS: string | null, newVal: ObjectPropV
         }
     }
 
-    return hasChanges ? stringifyObjectProp(newVal, nameFunc, valFunc) : undefined;
+    return hasChanges ? stringifyObjectProp(newVal, nameFunc, valFunc) : symNoChanges;
 }
 
 
@@ -942,7 +952,7 @@ function updateStyleProp(elm: Element, rval: string | Record<string, string> | n
 
     // this is a new object so if the Mimcss style object changes internally and is used for
     // updates, it wouldn't compare with this returned value.
-    return hasChanges ? newRVal : undefined;
+    return hasChanges ? newRVal : symNoChanges;
 }
 
 

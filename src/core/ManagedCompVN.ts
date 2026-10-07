@@ -100,7 +100,7 @@ export class ManagedCompVN<TProps extends {} = {}, TEvents extends {} = {}> exte
 	// Updated this node from the given node. This method is invoked only if update
 	// happens as a result of rendering the parent nodes. The newVN parameter is guaranteed to
 	// point to a VN of the same type as this node.
-	public update( newVN: ManagedCompVN<TProps, TEvents>, disp: VNDisp): void
+	public reconcile( newVN: ManagedCompVN<TProps, TEvents>, disp: VNDisp): void
 	{
         // if the new VN was created by a different creator, remember it.
         let isNewCreator = this.creator !== newVN.creator;
@@ -129,7 +129,7 @@ export class ManagedCompVN<TProps extends {} = {}, TEvents extends {} = {}> exte
         comp.props = this.props = newVN.props;
 
 		if (shouldRender)
-            super.update( newVN, disp);
+            super.reconcile( newVN, disp);
 	}
 
 
