@@ -89,7 +89,6 @@
 
 import {Styleset, MediaStatement} from "mimcss"
 import { TickSchedulingType, ICustomAttributeHandlerClass, PropType } from "../api/CompTypes"
-import { IAriaset, DatasetPropType } from "../api/ElementTypes";
 
 /// #if USE_STATS
 import {DetailedStats, StatsCategory, StatsAction} from "../utils/Stats"
@@ -457,7 +456,17 @@ function updateElmPropInternal(nscode: number, elm: Element, oldRVal: any, newVa
     if (oldRVal !== newRVal)
     {
         if (asProp)
-            elm[actName] = newRVal;
+        {
+            // some assignments can lead to exceptions (e.g. negative numeric values for maxLength);
+            // therefore, we do the assignment within try/catch
+            try {
+                elm[actName] = newRVal;
+            } catch (err) {
+                /// #if DEBUG
+                console.error(`Error assigning value '${newRVal}' to property '${actName}' of element '${elm.localName}'.`, err);
+                /// #endif
+            }
+        }
         else if (newRVal != null)
             elm.setAttribute(actName, newRVal);
         else
@@ -543,9 +552,7 @@ const camelToDash = (s: string): string => s.replace( /([a-zA-Z])(?=[A-Z])/g, '$
  *   - for everything else (functions and symbols), the String(val) is returned.
  */
 const val2s = (val: any): string | null =>
-	["string", "number", "bigint"].includes(typeof val) ? val.toString() :
-    val == null || val === false ? null :
-    val === true ? "" :
+    val == null ? null :
     Array.isArray(val) ? arr2s(val, " ") :
     // typeof val === "object" ? obj2s(val) :
     String(val);
@@ -598,158 +605,6 @@ const arr2s = (val: any | any[], sep: string): string | null =>
 //     }
 //     return s;
 // }
-
-
-
-///////////////////////////////////////////////////////////////////////////////////////////////////
-//
-// Handling of "object" properties - properties whose value is an object and every object's
-// property corresponds to a separate element attribute. For example, dataset and aria are
-// examles of such object properties.
-//
-///////////////////////////////////////////////////////////////////////////////////////////////////
-
-/** Type describing the most generic form of object properties */
-type ObjectPropValueType = { [K: string]: any };
-
-/** Type for function that converts object property name to element attribute name */
-type ObjectPropToAttrNameFunc = (propName: string) => string;
-
-/** Type for function that converts object property value to string */
-type ObjectPropValToStringFunc = (val: any) => string | null;
-
-
-
-/**
- * We cannot use JSON stringify on object properties because some fields could be of complex types.
- * Instead, we just create a string with pipe-separated keys and values (converted to strings)
- */
-function stringifyObjectProp(val: ObjectPropValueType,
-    nameFunc: ObjectPropToAttrNameFunc, valFunc: ObjectPropValToStringFunc): string
-{
-    return Object.entries(val).reduce( (s, [k, v]) => s + `${nameFunc(k)}|${valFunc(v)}|`, "");
-}
-
-
-
-/**
- * Parse the string created by {@link stringifyObjectProp} into object, where each key has a
- * string value.
- */
-function unstringifyObjectProp(s: string): ObjectPropValueType
-{
-    let o: ObjectPropValueType = {};
-    let items = s.split("|");
-    for( let i = 0, count = items.length - 1; i < count; i += 2)
-        o[items[i]] = items[i+1];
-
-    return o;
-}
-
-
-
-/** Sets object attributes like `data-*` or `aria-*` */
-function setObjectProp(elm: Element, val: ObjectPropValueType,
-    nameFunc: ObjectPropToAttrNameFunc, valFunc: ObjectPropValToStringFunc): string | null
-{
-    for( let key in val)
-    {
-        let v = valFunc(val[key]);
-        v != null && elm.setAttribute(nameFunc(key), v);
-    }
-
-    return stringifyObjectProp(val, nameFunc, valFunc);
-}
-
-
-
-/** Updates object attributes like `data-*` or `aria-*` */
-function updateObjectProp(elm: Element, oldS: string | null, newVal: ObjectPropValueType,
-    nameFunc: ObjectPropToAttrNameFunc, valFunc: ObjectPropValToStringFunc): any
-{
-    // if we don't have old string value (which shouldn't happen), just use the set function
-    if (!oldS)
-        return setObjectProp(elm, newVal, nameFunc, valFunc);
-
-    // oldS must be the object's stringified value
-    let oldVal = unstringifyObjectProp(oldS) as ObjectPropValueType;
-
-    let hasChanges = false;
-
-    // loop over old data properties: remove those not found in the new data set and change
-    // those that have different values in the new data set compared to the old data set.
-    for( let propName in oldVal)
-    {
-        if (!(propName in newVal))
-        {
-            elm.removeAttribute(nameFunc(propName));
-
-            /// #if USE_STATS
-            DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
-            /// #endif
-
-            hasChanges = true;
-        }
-        else
-        {
-            let newPropString = valFunc(newVal[propName]);
-            if (valFunc(oldVal[propName]) !== newPropString)
-            {
-                if (newPropString != null)
-                    elm.setAttribute(nameFunc(propName), newPropString);
-                else
-                    elm.removeAttribute(nameFunc(propName));
-
-                /// #if USE_STATS
-                DetailedStats.log( StatsCategory.Attr, StatsAction.Updated);
-                /// #endif
-
-                hasChanges = true;
-            }
-        }
-    }
-
-    // loop over old data properties: set those not found in the old data set.
-    for( let propName in newVal)
-    {
-        if (!(propName in oldVal))
-        {
-            let v = valFunc(newVal[propName]);
-            v != null && elm.setAttribute(nameFunc(propName), v);
-
-            /// #if USE_STATS
-            DetailedStats.log( StatsCategory.Attr, StatsAction.Added);
-            /// #endif
-
-            hasChanges = true;
-        }
-    }
-
-    return hasChanges ? stringifyObjectProp(newVal, nameFunc, valFunc) : symNoChanges;
-}
-
-
-
-/** Removes object attributes like `data-*` or `aria-*` */
-function removeObjectProp(elm: Element, oldS: string | null,
-    nameFunc: ObjectPropToAttrNameFunc): void
-{
-    // if we don't have old string value (which shouldn't happen), just use the set function
-    if (oldS)
-    {
-        // oldS must be the object's stringified value
-        let oldVal = unstringifyObjectProp(oldS) as ObjectPropValueType;
-
-        for( let propName in oldVal)
-        {
-            elm.removeAttribute(nameFunc(propName));
-
-            /// #if USE_STATS
-            DetailedStats.log( StatsCategory.Attr, StatsAction.Deleted);
-            /// #endif
-        }
-    }
-}
 
 
 
@@ -978,44 +833,11 @@ const mediaToString = (val: MediaStatement): string | null =>
 
 
 
-/** Converts property of the data set to a `data-*` name */
-const dataPropToAttrName = (propName: any): string => `data-${camelToDash(propName)}`
-
-/** Converts property of the data set to string */
-const dataPropToString = (val: any): string | null =>
-    val == null ? null : Array.isArray(val) ? val.map( item => dataPropToString(item)).join(" ") : "" + val;
-
-/** Sets `data-* attributes */
-const setDataProp = (elm: Element, val: DatasetPropType) =>
-    setObjectProp(elm, val, dataPropToAttrName, dataPropToString);
-
-/** Updates `data-* attributes */
-const updateDataProp = (elm: Element, oldS: string | null, newVal: DatasetPropType) =>
-    updateObjectProp(elm, oldS, newVal, dataPropToAttrName, dataPropToString);
-
-/** Removes `data-* attributes */
-const removeDataProp = (elm: Element, oldS: string | null) =>
-    removeObjectProp(elm, oldS, dataPropToAttrName);
-
-
-
 /** Converts property of the aria set to a `aria-*` name unless it is `"role"` */
 export const ariaPropToAttrName = (propName: any): string => propName === "role" ? propName : `aria-${propName}`
 
 /** Converts property of the aria set to string - same as for dataset */
-export const ariaPropToString = (val: any): string | null => dataPropToString(val);
-
-/** Sets `aria-* attributes */
-const setAriaProp = (elm: Element, val: IAriaset) =>
-    setObjectProp(elm, val, ariaPropToAttrName, ariaPropToString);
-
-/** Updates `aria-* attributes */
-const updateAriaProp = (elm: Element, oldS: string | null, newVal: IAriaset) =>
-    updateObjectProp(elm, oldS, newVal, ariaPropToAttrName, ariaPropToString);
-
-/** Removes `aria-* attributes */
-const removeAriaProp = (elm: Element, oldS: string | null) =>
-    removeObjectProp(elm, oldS, ariaPropToAttrName);
+export const ariaPropToString = val2s;
 
 
 
@@ -1089,8 +911,6 @@ const globalPropRegistry: { [P: string]: PropInfoOrFunc } =
     defaultValue: { set: setValueProp, update: doNothing, remove: doNothing },
     style: { set: setStyleProp, update: updateStyleProp, remove: removeStyleProp },
     media: { v2rv: mediaToString },
-    dataset: { set: setDataProp, update: updateDataProp, remove: removeDataProp },
-    aria: { set: setAriaProp, update: updateAriaProp, remove: removeAriaProp },
 
     coords: ArrayWithCommaPropInfo,
     sizes: ArrayWithCommaPropInfo,

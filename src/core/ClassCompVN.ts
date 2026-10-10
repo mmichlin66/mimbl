@@ -240,10 +240,10 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
      * Generates list of sub-nodes according to the current state. This method is invoked in two
      * situations:
      * 1. Directly if the component is being updated on its own (that is, not as a result of
-     * parent update). In this case, this component is set as the currently active cmoponent by
+     * parent update). In this case, this component is set as the currently active component by
      * the code in Reconciler.
      * 2. From this class'es mount or update. In this case, this component is set as the currently
-     * active cmoponent by the code in mount and update.
+     * active component by the code in mount and update.
      */
 	public render(): any
 	{
@@ -266,14 +266,6 @@ export abstract class ClassCompVN<TProps extends {} = {}, TEvents extends {} = {
         // return this.actRender();
         return this.watcher ? this.watcher.run() : this.comp.render();
 	}
-
-
-
-    /** This method is called by the component when it needs to be updated. */
-	public updateMe(): void
-    {
-        this.requestUpdate();
-    }
 
 
 

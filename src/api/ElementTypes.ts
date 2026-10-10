@@ -43,12 +43,6 @@ export type ReferrerPolicyPropType = "no-referrer" | "no-referrer-when-downgrade
 /** Type for `fetchpriority` attribute used for some HTML and SVG elements */
 export type FetchpriorityPropType = "high" | "low" | "auto";
 
-/**
- * Type for `dataset` attribute that Combines `data-*` properties into one object, so that it
- * is easier (less verbose) to specify them.
- */
-export type DatasetPropType = { [K: string]: any };
-
 
 
 /**
@@ -121,10 +115,14 @@ export interface IAriaset
 
 
 
+export type AriaAttrs = {[K in keyof IAriaset as K extends "role" ? "role" : `aria-${K}`]?: IAriaset[K]};
+
+
+
 /**
  * Represents standard element properties present on all elements
  */
-export interface IElementAttrs
+export interface IElementAttrs extends AriaAttrs
 {
 	accesskey?: string | string[];
 	autofocus?: boolean;
@@ -139,30 +137,7 @@ export interface IElementAttrs
 	tabIndex?: number;
 	title?: string;
     xmlns?: string;
-
-    /**
-     * Combines `data-*` properties into one object, so that it is easier (less verbose) to specify
-     * them. When this object is serialized to HTML element, each property name is converted to
-     * dash-style and prefixed with the `data-` string. The values are always converted to strings
-     * according to the following rules:
-     *   - strings are returned as is.
-     *   - arrays are converted by converting their items using these rules and joining them with spaces.
-     *   - everything else is converted by calling the toString method.
-     */
-    dataset?: DatasetPropType;
-
-    /**
-     * Combines `aria-*` properties into one object, so that it is easier (less verbose) to specify
-     * them. When this object is serialized to HTML element, each property name is converted to
-     * dash-style and prefixed with the `aria-` string. The values are always converted to strings
-     * according to the following rules:
-     *   - strings are returned as is.
-     *   - arrays are converted by converting their items using these rules and joining them with spaces.
-     *   - everything else is converted by calling the toString method.
-     */
-    aria?: IAriaset;
 }
-
 
 
 /**

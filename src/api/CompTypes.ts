@@ -834,11 +834,6 @@ export interface IClassCompVN<TProps extends {} = {}, TEvents extends {} = {}> e
      * Components can access the shadow root via their `vn.shadowRoot` property.
      */
     readonly shadowRoot?: ShadowRoot | null;
-
-	/**
-	 * This method is called by the component to request to be updated.
-     */
-	updateMe(): void;
 }
 
 
