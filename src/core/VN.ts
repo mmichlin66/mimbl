@@ -1,5 +1,5 @@
 ﻿import {
-    DN, IComponent, UpdateStrategy, TickSchedulingType, RefType, ISubscription, IPublication
+    DN, IComponent, UpdateStrategy, TickSchedulingType, RefPropType, ISubscription, IPublication
 } from "../api/CompTypes";
 import { IEventSlot, IEventSlotOwner } from "../api/EventSlotTypes";
 import { ITrigger } from "../api/TriggerTypes";
@@ -9,6 +9,7 @@ import { getCurrentClassComp, requestNodeUpdate, unmountSubNodes } from "./Recon
 
 /// #if USE_STATS
 import {StatsCategory} from "../utils/Stats"
+import { Ref } from "../api/CompAPI";
 /// #endif
 
 
@@ -331,6 +332,17 @@ function collectImmediateDNs(vn: IVN, arr: DN[]): void
 
 
 
+///////////////////////////////////////////////////////////////////////////////////////////////////
+//
+// Element and component references
+//
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Symbol under which the reference value is stored in the Ref<> object.
+ */
+export const symRef = Symbol("symRef");
+
 /**
  * Helper function to set the value of the reference that takes care of the different types of
  * references. The optional `onlyIf` parameter may specify a value so that only if the reference
@@ -341,15 +353,15 @@ function collectImmediateDNs(vn: IVN, arr: DN[]): void
  * @param onlyIf An optional value to which to compare the current (old) value of the reference.
  * The new value will be set only if the old value equals the `onlyIf` value.
  */
-export function setRef<T>(ref: RefType<T>, val: T | undefined, onlyIf?: T | null): void
+export function setRef<T extends object>(ref: RefPropType<T>, val: T | undefined, onlyIf?: T | null): void
 {
 	if (typeof ref === "function")
 		ref(val);
-	else if (!onlyIf || ref.r === onlyIf)
-        ref.r = val;
+	// else if (ref instanceof Ref && (!onlyIf || ref.r === onlyIf))
+	// 	ref.r = val;
+	else if (!onlyIf || ref[symRef] === onlyIf)
+        ref[symRef] = val;
 }
-
-
 
 /**
  * Helper function to handle reference update, which happens when a node holding an old reference
@@ -363,7 +375,7 @@ export function setRef<T>(ref: RefType<T>, val: T | undefined, onlyIf?: T | null
  *
  * Returns the new reference - just for convenience.
  */
-export function updateRef<T>(oldRef: RefType<T> | undefined, newRef: RefType<T> | undefined, val: T): RefType<T> | undefined
+export function updateRef<T extends object>(oldRef: RefPropType<T> | undefined, newRef: RefPropType<T> | undefined, val: T): RefPropType<T> | undefined
 {
     if (oldRef)
         setRef(oldRef, undefined, val);
@@ -379,7 +391,7 @@ export function updateRef<T>(oldRef: RefType<T> | undefined, newRef: RefType<T> 
  * Symbol that is attached to a render function to indicate that it should not be wrapped in a
  * watcher.
  */
-export let symRenderNoWatcher = Symbol();
+export let symRenderNoWatcher = Symbol("symRenderNoWatcher");
 
 
 

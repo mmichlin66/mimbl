@@ -1,6 +1,6 @@
 ﻿import {
-    IElmVN, ICustomAttributeHandler, EventPropType, RefType, ExtendedElement,
-    ElmRefType, TickSchedulingType, UpdateStrategy, PropType, DN
+    IElmVN, ICustomAttributeHandler, EventPropType, RefPropType, ExtendedElement,
+    ElmRefPropType, TickSchedulingType, UpdateStrategy, PropType, DN
 } from "../api/CompTypes"
 import { IVN, VNDisp } from "./VNTypes";
 
@@ -39,10 +39,10 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
 	public ownDN: T | null = null;
 
     // Reference to the element that is specified as a "ref" property.
-	private ref: RefType<T> | undefined = undefined;
+	private ref: RefPropType<T> | undefined = undefined;
 
     // Reference to this virtual node that is specified as a "vnref" property.
-	private vnref: ElmRefType<T> | undefined = undefined;
+	private vnref: ElmRefPropType<T> | undefined = undefined;
 
 	// Object that serves as a map between attribute names and their current values.
 	private attrs: { [name: string]: AttrRunTimeData } | undefined = undefined;
@@ -355,12 +355,12 @@ export class ElmVN<T extends Element = Element> extends VN implements IElmVN<T>
                 else if (propName === "ref")
                 {
                     if (this.ref !== propVal)
-                        this.ref = updateRef(this.ref, propVal as RefType<T>, this.ownDN!);
+                        this.ref = updateRef(this.ref, propVal, this.ownDN!);
                 }
                 else if (propName === "vnref")
                 {
                     if (this.vnref !== propVal)
-                        this.vnref = updateRef(this.vnref, propVal as ElmRefType<T>, this);
+                        this.vnref = updateRef(this.vnref, propVal, this);
                 }
                 else if (propName === "updateStrategy")
                     this.updateStrategy = propVal as UpdateStrategy;

@@ -14,7 +14,7 @@ import { ManagedCompVN } from "../core/ManagedCompVN";
 import { mountRoot, unmountRoot } from "../core/RootVN";
 import { content2VNs, setCurrentClassComp, symJsxToVNs, symToVNs, wrapFunc } from "../core/Reconciler";
 import { s_initStyleScheduler } from "../core/StyleScheduler";
-import { symRenderNoWatcher, VN } from "../core/VN";
+import { symRenderNoWatcher, VN, symRef } from "../core/VN";
 import { ComponentMixin } from "../core/CompImpl";
 import { applyMixins, symPropStorage } from "../utils/UtilFunc";
 import { registerElmProp } from "../core/Props";
@@ -65,33 +65,32 @@ export const wrapCallback = <T extends Function>(func: T, options?: CallbackWrap
  * Reference class to use whenever a reference to an object is needed - for example, with JSX `ref`
  * attributes and services.
  */
-export class Ref<T = any> extends EventSlot<RefFunc<T>> implements IRef<T>
+export class Ref<T extends object = any> extends EventSlot<RefFunc<T>> implements IRef<T>
 {
-	constructor(listener?: RefFunc<T>, initialReference?: T)
+	/** Current referenced value */
+	private [symRef]: T | undefined;
+
+    constructor(listener?: RefFunc<T>, initialReference?: T)
 	{
         super();
+		this[symRef] = initialReference;
 
         if (listener)
-            this.attach( listener);
-
-		this.v = initialReference;
+            this.attach(listener);
 	}
 
 	/** Get accessor for the reference value */
-	public get r(): T | undefined { return this.v; }
+	public get r(): T | undefined { return this[symRef]; }
 
 	/** Set accessor for the reference value */
-	public set r( v: T | undefined)
+	public set r(v: T | undefined)
 	{
-		if (this.v !== v)
+		if (this[symRef] !== v)
 		{
-			this.v = v;
-			this.fire(v as any);
+			this[symRef] = v;
+			this.fire(v);
 		}
 	}
-
-	/** Current referenced value */
-	private v?: T;
 }
 
 
@@ -114,24 +113,13 @@ export function ref(target: any, name: string)
 {
 	Object.defineProperty(target, name,
 		{
-            set(v: any) { ensureRefProxyHandler(this, name).obj = v; },
-            get() { return ensureRefProxyHandler(this, name).proxy; }
+            get()
+            {
+                let storage = this[symPropStorage] ??= {};
+                return storage[name] ??= new Proxy(new Ref(), new RefProxyHandler());
+            }
 		}
 	);
-}
-
-// Helper function that ensures that the RefProxyHandler exists for the given property name.
-function ensureRefProxyHandler(obj: any, name: string): RefProxyHandler
-{
-    let storage = obj[symPropStorage] ??= {};
-    let handler = storage[name];
-    if (!handler)
-    {
-        handler = storage[name] = new RefProxyHandler();
-        handler.proxy = new Proxy( {}, handler);
-    }
-
-    return handler;
 }
 
 /**
@@ -139,29 +127,24 @@ function ensureRefProxyHandler(obj: any, name: string): RefProxyHandler
  * the @mim.ref decorator. Only the "r" property has special handling (because it is used by the
  * setRef function); everything else is reflected from the remembered referenced object.
  */
-class RefProxyHandler implements ProxyHandler<any>
+class RefProxyHandler implements ProxyHandler<Ref>
 {
-    // Keeps the proxy object for which this is the handler
-    public proxy: any;
-
-    // Keeps the referenced object or undefined
-    public obj: any;
-
-    public get(target: any, prop: PropertyKey, receiver: any): any
+    public get(target: Ref, prop: PropertyKey, receiver: any): any
     {
-        if (prop === "r")
-            return this.obj;
+        let obj = target[symRef];
+        if (prop === symRef)
+            return obj;
 
-        let propVal = this.obj[prop];
-        return typeof propVal === "function" ? propVal.bind( this.obj) : propVal;
+        let propVal = obj[prop];
+        return typeof propVal === "function" ? propVal.bind(obj) : propVal;
     }
 
-    public set(target: any, prop: PropertyKey, value: any, receiver: any): boolean
+    public set(target: Ref, prop: PropertyKey, value: any, receiver: any): boolean
     {
-        if (prop === "r")
-            this.obj = value;
+        if (prop === symRef)
+            target[symRef] = value;
         else
-            this.obj[prop] = value;
+            target[symRef][prop] = value;
 
         return true;
     }

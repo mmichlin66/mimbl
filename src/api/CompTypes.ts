@@ -432,34 +432,21 @@ export type CallbackPropType<T extends Function = Function> =
 /**
  * Defines event handler that is invoked when reference value changes.
  */
-export type RefFunc<T = any> = (newRef: T | undefined) => void;
+export type RefFunc<T extends object = any> = (newRef: T | undefined) => void;
 
 /**
  * Defines event handler that is invoked when reference value changes.
  */
-export interface IRef<T = any> extends IEventSlot<RefFunc<T>>
+export interface IRef<T extends object = any> extends IEventSlot<RefFunc<T>>
 {
-    r?: T;
+    r: T | undefined;
 }
 
 /**
- * Type of ref property that can be passed to JSX elements and components. This can be either the
- * {@link IRef} interface or {@link RefFunc} function.
- */
-export type RefType<T = any> = IRef<T> | RefFunc<T>;
-
-/**
  * Type of ref property value. This can be either the {@link IRef} interface or {@link RefFunc} function
- * or the type itself.
+ * or the type itself, whcih is used with the @{@link CompAPI|ref} decorator.
  */
-export type RefPropType<T = any> = T | RefType<T>;
-
-
-
-/**
- * Type of the vnref property value.
- */
-export type ElmRefType<T extends Element = Element> = RefType<IElmVN<T>>;
+export type RefPropType<T extends object = any> = T | IRef<T> | RefFunc<T>;
 
 /**
  * Type of vnref property that can be passed to JSX elements.
