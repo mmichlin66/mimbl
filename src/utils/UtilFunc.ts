@@ -76,6 +76,16 @@ export const getElmRealName = (elmName: string): string => RealElementNames[elmN
 
 
 
+/**
+ * Symbol used to keep property values on the component instance for roperties augmented with a
+ * decorator that defines getters and/or setters. This is needed to provide a stable shape for the
+ * component instances, which is important for performance.
+ * @ignore
+ */
+export const symPropStorage = Symbol("propStorage");
+
+
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // Utility functions.
@@ -289,9 +299,9 @@ export function applyMixins(target: any, ...sources: any[]): void
     for (let source of sources)
     {
         let sourcePrototype = source.prototype;
-        copyMixinProp(targetPrototype, sourcePrototype, Object.getOwnPropertyNames(sourcePrototype)
+        copyMixinProps(targetPrototype, sourcePrototype, Object.getOwnPropertyNames(sourcePrototype)
             .filter(name => name !== "constructor"));
-        copyMixinProp(targetPrototype, sourcePrototype, Object.getOwnPropertySymbols(sourcePrototype));
+        copyMixinProps(targetPrototype, sourcePrototype, Object.getOwnPropertySymbols(sourcePrototype));
     }
 }
 
@@ -300,9 +310,11 @@ export function applyMixins(target: any, ...sources: any[]): void
  * can be used for copying instace methods and accessors from prototype to prototype; or for
  * copying static methods and accessors from class to class.
  */
-export const copyMixinProp = (target: object, source: object, props: PropertyKey[]) =>
-    props.forEach(prop =>
-        Object.defineProperty(target, prop, Object.getOwnPropertyDescriptor(source, prop)!));
+export function copyMixinProps(target: object, source: object, props: PropertyKey[]): void
+{
+    for (let prop of props)
+        Object.defineProperty(target, prop, Object.getOwnPropertyDescriptor(source, prop)!);
+}
 
 
 

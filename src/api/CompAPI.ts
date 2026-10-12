@@ -16,7 +16,7 @@ import { content2VNs, setCurrentClassComp, symJsxToVNs, symToVNs, wrapFunc } fro
 import { s_initStyleScheduler } from "../core/StyleScheduler";
 import { symRenderNoWatcher, VN } from "../core/VN";
 import { ComponentMixin } from "../core/CompImpl";
-import { applyMixins } from "../utils/UtilFunc";
+import { applyMixins, symPropStorage } from "../utils/UtilFunc";
 import { registerElmProp } from "../core/Props";
 import { Fragment } from "./jsx";
 
@@ -67,7 +67,7 @@ export const wrapCallback = <T extends Function>(func: T, options?: CallbackWrap
  */
 export class Ref<T = any> extends EventSlot<RefFunc<T>> implements IRef<T>
 {
-	constructor( listener?: RefFunc<T>, initialReference?: T)
+	constructor(listener?: RefFunc<T>, initialReference?: T)
 	{
         super();
 
@@ -110,27 +110,28 @@ export class Ref<T = any> extends EventSlot<RefFunc<T>> implements IRef<T>
  *
  * In the above example, the myDiv property will be set to point to the HTML div element.
  */
-export function ref( target: any, name: string)
+export function ref(target: any, name: string)
 {
-    let sym = Symbol( name + "_ref");
-    function ensureHandler( obj: any): RefProxyHandler
-    {
-        let handler = obj[sym];
-        if (!handler)
-        {
-            obj[sym] = handler = new RefProxyHandler();
-            handler.proxy = new Proxy( {}, handler);
-        }
-
-        return handler;
-    }
-
-	Object.defineProperty( target, name,
+	Object.defineProperty(target, name,
 		{
-            set( v: any) { ensureHandler(this).obj = v; },
-            get() { return ensureHandler(this).proxy; }
+            set(v: any) { ensureRefProxyHandler(this, name).obj = v; },
+            get() { return ensureRefProxyHandler(this, name).proxy; }
 		}
 	);
+}
+
+// Helper function that ensures that the RefProxyHandler exists for the given property name.
+function ensureRefProxyHandler(obj: any, name: string): RefProxyHandler
+{
+    let storage = obj[symPropStorage] ??= {};
+    let handler = storage[name];
+    if (!handler)
+    {
+        handler = storage[name] = new RefProxyHandler();
+        handler.proxy = new Proxy( {}, handler);
+    }
+
+    return handler;
 }
 
 /**
@@ -146,7 +147,7 @@ class RefProxyHandler implements ProxyHandler<any>
     // Keeps the referenced object or undefined
     public obj: any;
 
-    public get( target: any, prop: PropertyKey, receiver: any): any
+    public get(target: any, prop: PropertyKey, receiver: any): any
     {
         if (prop === "r")
             return this.obj;
@@ -155,7 +156,7 @@ class RefProxyHandler implements ProxyHandler<any>
         return typeof propVal === "function" ? propVal.bind( this.obj) : propVal;
     }
 
-    public set( target: any, prop: PropertyKey, value: any, receiver: any): boolean
+    public set(target: any, prop: PropertyKey, value: any, receiver: any): boolean
     {
         if (prop === "r")
             this.obj = value;
@@ -173,7 +174,7 @@ class RefProxyHandler implements ProxyHandler<any>
  * element.
  * @param text Text to initialize the text node
  */
-export function createTextVN( text: string): ITextVN
+export function createTextVN(text: string): ITextVN
 {
     return new TextVN( text);
 }
@@ -218,10 +219,17 @@ export abstract class Component<TProps extends {} = {children?: any}, TEvents ex
 	 */
 	public props: ComponentProps<TProps,TEvents>;
 
-	constructor( props?: TProps)
+    /**
+     * Storage for property values for properties augmented with a decorator that defines getters
+     * and/or setters.
+     */
+    public [symPropStorage]: Record<string,any>;
+
+	constructor(props?: TProps)
 	{
         super();
         this.props = props ?? {} as ComponentProps<TProps,TEvents>;
+        this[symPropStorage] = {};
 	}
 
 	/**

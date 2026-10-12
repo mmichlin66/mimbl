@@ -1,6 +1,7 @@
 ﻿import { IContainerTrigger, ITrigger, IWatcher } from "./TriggerTypes";
 import { EventSlot } from "./EventSlotAPI";
 import { IEventSlot } from "./EventSlotTypes";
+import { symPropStorage } from "../utils/UtilFunc";
 
 
 
@@ -133,15 +134,17 @@ export function trigger(targetOrDepth: any, name?: string): any
  */
 const triggerDecorator = (depth: number | undefined, target: any, name: string): void =>
 {
-    let sym = Symbol( name + "_trigger");
-
-    const getTriggerObj = (obj: any, depth: number | undefined): ITrigger =>
-        obj[sym] ??= new Trigger(undefined, depth);
-
     Object.defineProperty( target, name, {
-        get() { return getTriggerObj(this, depth).get(); },
-        set(val) { getTriggerObj(this, depth).set(val); },
+        get() { return getTriggerObj(this, name, depth).get(); },
+        set(val) { getTriggerObj(this, name, depth).set(val); },
 	});
+}
+
+// Helper function that returns a trigger object stored in the property storage for the given property name.
+function getTriggerObj(obj: any, name: string, depth: number | undefined): ITrigger
+{
+    let storage = obj[symPropStorage] ??= {};
+    return storage[name] ??= new Trigger(undefined, depth);
 }
 
 
@@ -475,11 +478,6 @@ export class ComputedTrigger<T = any> extends Trigger<T>
  */
 export const computed = (target: any, name: string, propDescr: PropertyDescriptor): void =>
 {
-    let sym = Symbol(name + "_computed");
-
-    const getTriggerValue = (orgFunc: () => any, obj: any): any =>
-        (obj[sym] ??= new ComputedTrigger(orgFunc, obj) as ITrigger).get();
-
     // propDesc.value is undefined for accessors and defined for functions
     if (!propDescr.value)
     {
@@ -493,7 +491,7 @@ export const computed = (target: any, name: string, propDescr: PropertyDescripto
         }
 
         let orgGet = propDescr.get;
-        propDescr.get = function(): any { return getTriggerValue(orgGet, this); }
+        propDescr.get = function(): any { return getComputedTriggerValue(this, name, orgGet); }
 
         if (propDescr.set)
         {
@@ -510,8 +508,17 @@ export const computed = (target: any, name: string, propDescr: PropertyDescripto
     {
         // handle function case
         let orgFunc = propDescr.value;
-        propDescr.value = function(): any { return getTriggerValue(orgFunc, this); }
+        propDescr.value = function(): any { return getComputedTriggerValue(this, name, orgFunc); }
     }
+}
+
+// Helper function that returns the value of a trigger object stored in the property storage for
+// the given property name.
+function getComputedTriggerValue(obj: any, name: string, orgFunc: () => any): any
+{
+    let storage = obj[symPropStorage] ??= {};
+    let trigger = storage[name] ??= new ComputedTrigger(orgFunc, obj);
+    return trigger.get();
 }
 
 

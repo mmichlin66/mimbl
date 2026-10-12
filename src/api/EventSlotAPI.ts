@@ -10,13 +10,34 @@
 export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotOwner<TFunc>
 {
 	/**
+     * The first listener function. Since many times there is only one listener to an event, we
+     * optimize by not creating a set of listeners.
+     */
+	private listener?: TFunc = undefined;
+
+	/**
+     * Reference counter of the listener function.
+     */
+	private rc = 0;
+
+	// Map of listener functions to their respective reference counts. When there are no listeners,
+    // this field is set to null to preserve space.
+	private listeners?: Map<TFunc,number> = undefined;
+
+
+
+    /**
 	 * Method that raises the event and calls all the listeners (if any). It has the signature
 	 * of the template function so only proper-types parameters can be passed to it.
 	 */
-    public fire( ...args: Parameters<TFunc>): void
+    public fire(...args: Parameters<TFunc>): void
     {
         this.listener?.(...args);
-        this.listeners?.forEach((rc, listener) => listener(...args));
+        if (this.listeners)
+        {
+            for (let listener of this.listeners.keys())
+                listener(...args);
+        }
     }
 
 	/**
@@ -73,23 +94,6 @@ export class EventSlot<TFunc extends EventSlotFunc = any> implements IEventSlotO
         this.rc = 0;
 		this.listeners = undefined;
 	}
-
-
-
-	/**
-     * The first listener function. Since many times there is only one listener to an event, we
-     * optimize by not creating a set of listeners.
-     */
-	private listener?: TFunc = undefined;
-
-	/**
-     * Reference counter of the listener function.
-     */
-	private rc = 0;
-
-	// Map of listener functions to their respective reference counts. When there are no listeners,
-    // this field is set to null to preserve space.
-	private listeners?: Map<TFunc,number> = undefined;
 }
 
 

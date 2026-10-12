@@ -8,7 +8,7 @@ import { Trigger } from "./TriggerAPI";
 import { mimcss } from "../core/StyleScheduler";
 import { mount, unmount } from "./CompAPI";
 import { ComponentMixin } from "../core/CompImpl";
-import { applyMixins, copyMixinProp } from "../utils/UtilFunc";
+import { applyMixins, copyMixinProps, symPropStorage } from "../utils/UtilFunc";
 import { ariaPropToAttrName, ariaPropToString } from "../core/Props";
 import { symToVNs } from "../core/Reconciler";
 import { IndependentCompVN } from "../core/IndependentCompVN";
@@ -116,7 +116,7 @@ export function WebElm<TAttrs extends {} = {}, TEvents extends {} = {}>(): WebEl
  * }
  * ```
  *
- * @typeParam TElm Class deriving from HTMLElement, from which the resulting class will inherit.
+ * @typeParam TTag Tag name of the HTML lement, from which the resulting class will inherit.
  * @typeParam TAttrs Type that maps attribute names to attribute types.
  * @typeParam TEvents Type that maps event names (a.k.a event types) to either Event-derived
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
@@ -129,7 +129,7 @@ export function WebElm<TAttrs extends {} = {}, TEvents extends {} = {}>(): WebEl
  * the internal logic of custom Web elements.
  */
 export function WebElm<TTag extends keyof HTMLElementTagNameMap, TAttrs extends {} = {}, TEvents extends {} = {}>(
-        tag: TTag, elmClass: new() => HTMLElementTagNameMap[TTag]): WebElmConstructor<HTMLElementTagNameMap[TTag],TAttrs,TEvents>;
+    tag: TTag, elmClass: new() => HTMLElementTagNameMap[TTag]): WebElmConstructor<HTMLElementTagNameMap[TTag],TAttrs,TEvents>;
 
 
 
@@ -137,13 +137,10 @@ export function WebElm<TTag extends keyof HTMLElementTagNameMap, TAttrs extends 
 export function WebElm<TAttrs extends {}, TEvents extends {}>(tagToExtend?: string,
     elmClass?: new() => HTMLElement): WebElmConstructor<HTMLElement,TAttrs,TEvents>
 {
-    // tagToExtend is undefined for autonomous Web Elements that derive directly from HTMLElement
-    if (!tagToExtend)
-        elmClass = HTMLElement;
-
-    // dynamically build the actual element class, to which component and Web Element mixins
-    // will be applied
-    abstract class ActualClass extends elmClass!
+    // dynamically build the actual element class, to which component and Web Element mixins will
+    // be applied. Since elmClass is undefined for autonomous Web Elements, we derive directly
+    // from HTMLElement.
+    abstract class ActualClass extends (elmClass ?? HTMLElement)
     {
         constructor()
         {
@@ -157,7 +154,7 @@ export function WebElm<TAttrs extends {}, TEvents extends {}>(tagToExtend?: stri
     }
 
     applyMixins(ActualClass, ComponentMixin, WebElmMixin);
-    copyMixinProp(ActualClass, WebElmMixin, ["observedAttributes", "formAssociated"]);
+    copyMixinProps(ActualClass, WebElmMixin, ["observedAttributes", "formAssociated"]);
 
     // if we are customizing a built-in element, set its tag name into the definition
     if (tagToExtend)
@@ -169,7 +166,9 @@ export function WebElm<TAttrs extends {}, TEvents extends {}>(tagToExtend?: stri
 
 
 /**
- * Class whose methods are copied to every implementation of custom Web elements
+ * Class whose methods are copied to every custom Web element prototype. This class implements the
+ * internal logic of custom Web elements, including attribute/property synchronization, shadow DOM
+ * creation, form association and ARIA attributes.
  */
 abstract class WebElmMixin extends HTMLElement
 {
@@ -184,6 +183,12 @@ abstract class WebElmMixin extends HTMLElement
     {
         return (this[symWebElmDef] as WebElmDefinition).options?.formAssociated;
     }
+
+    /**
+     * Storage for property values for properties augmented with a decorator that defines getters
+     * and/or setters.
+     */
+    public [symPropStorage]!: Record<string,any>;
 
     /** WebElm definition taken from the class constructor */
     _def!: WebElmDefinition;
@@ -203,16 +208,22 @@ abstract class WebElmMixin extends HTMLElement
      * indicate that attribute change notification is called as a result from setting the
      * property.
      */
-    _isAttrSync: boolean = false;
+    _isAttrSync?: boolean;
 
 
 
     /** This method is invoked from the actual class constructor */
     init()
     {
+        // set default values to our properties so that the shape of the instances is always the same.
+        this[symPropStorage] = {};
+        let def: WebElmDefinition = this._def = this.constructor[symWebElmDef];
+        this._shadowRoot = undefined;
+        this._internals = undefined;
+        this._isAttrSync = false;
+
         // by the time the constructor is called, we have all the information setup via the
         // @webElm and @attr decorators
-        let def: WebElmDefinition = this._def = this.constructor[symWebElmDef];
         let options = def.options;
         if (options && !def.extends)
         {
@@ -233,19 +244,20 @@ abstract class WebElmMixin extends HTMLElement
                 }
             }
         }
+
     }
 
-    /** Gets the shadow DOM root node. It is created if it doesn' exist yet */
-    get shadowRoot(): ShadowRoot
-    {
-        return this._shadowRoot ??= this.attachShadow({mode: this._def?.options?.mode ?? "open"})
-    }
+    // /** Gets the shadow DOM root node. It is created if it doesn' exist yet */
+    // get shadowRoot(): ShadowRoot
+    // {
+    //     return this._shadowRoot ??= this.attachShadow({mode: this._def?.options?.mode ?? "open"})
+    // }
 
-    /** Gets the "internals" object. It is created if it doesn't exist yet */
-    get internals(): ElementInternals
-    {
-        return this._internals ??= this.attachInternals();
-    }
+    // /** Gets the "internals" object. It is created if it doesn't exist yet */
+    // get internals(): ElementInternals
+    // {
+    //     return this._internals ??= this.attachInternals();
+    // }
 
     connectedCallback(): void
     {
@@ -334,7 +346,7 @@ abstract class WebElmMixin extends HTMLElement
     setAttr(attrName: string, val: any): void
     {
         // if no such attribute is defined in our class, do nothing.
-        let attrDef = this._def.attrs[attrName];
+        let attrDef = this._def.attrs[attrName.toLowerCase()];
         if (!attrDef)
             return;
 
@@ -452,14 +464,9 @@ function attrDecorator(attrName: string | undefined, options: WebElmAttrOptions 
     let depth = options?.triggerDepth;
     if (propName)
     {
-        let sym = Symbol( propName + "_attr");
-
-        const getTriggerObj = (obj: any, depth: number | undefined): ITrigger =>
-            obj[sym] ??= new Trigger(undefined, depth) as ITrigger;
-
         Object.defineProperty( target, propName, {
             // in this context, "this" is the custom element object
-            get() { return getTriggerObj(this, depth).get(); },
+            get() { return getAttrTriggerObj(this, propName, depth).get(); },
             set(this: WebElmMixin, val)
             {
                 if (this._isAttrSync)
@@ -468,7 +475,7 @@ function attrDecorator(attrName: string | undefined, options: WebElmAttrOptions 
                 try
                 {
                     this._isAttrSync = true;
-                    getTriggerObj(this, depth).set(val);
+                    getAttrTriggerObj(this, propName, depth).set(val);
                     this.setAttr(attrName ?? propName, val);
                 }
                 finally
@@ -480,6 +487,12 @@ function attrDecorator(attrName: string | undefined, options: WebElmAttrOptions 
     }
 }
 
+// Helper function that returns a trigger object stored in the property storage for the given property name.
+function getAttrTriggerObj(obj: any, name: string, depth: number | undefined): ITrigger
+{
+    let storage = obj[symPropStorage] ??= {};
+    return storage[name] ??= new Trigger(undefined, depth);
+}
 
 
 /**
@@ -525,7 +538,7 @@ export function registerWebElm(webElmClass: WebElmConstructor, name?: string,
     // by now the definition has been adjusted, so we can register the custom element according
     // to the definition values.
     const tagToExtend = definition.extends;
-    customElements.define( definition.name, webElmClass, tagToExtend ? {extends: tagToExtend} : undefined);
+    customElements.define(definition.name, webElmClass, tagToExtend ? {extends: tagToExtend} : undefined);
 }
 
 

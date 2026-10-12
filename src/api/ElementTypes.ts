@@ -1,4 +1,4 @@
-﻿import {Styleset, IIDRule, ClassMoniker} from "mimcss"
+﻿import type {Styleset, IIDRule, ClassMoniker} from "mimcss"
 
 
 
@@ -115,6 +115,12 @@ export interface IAriaset
 
 
 
+/**
+ * Type encapsulating ARIA attributes. All properties in this type except `role` are serialized by
+ * appending `"aria-"` to the property name. The `role` attribute is added here for convenience to
+ * keep all ARIA-related attributes in one place. Ths type is used for defining ARIA properties in
+ * the `IElementAttrs` interface so that all DOM elements - HTML, SVG and MathML - can have them.
+ */
 export type AriaAttrs = {[K in keyof IAriaset as K extends "role" ? "role" : `aria-${K}`]?: IAriaset[K]};
 
 
@@ -132,7 +138,6 @@ export interface IElementAttrs extends AriaAttrs
 	id?: IDPropType;
 	hidden?: boolean | "" | "hidden" | "until-found";
 	lang?: string;
-	role?: string;
 	style?: string | Styleset;
 	tabIndex?: number;
 	title?: string;

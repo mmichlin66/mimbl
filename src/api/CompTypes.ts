@@ -108,7 +108,7 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
 
 	/**
 	 * Component properties. This is normally used only by managed components and is usually
-     * undefined for independent components. This object can contains every property from the
+     * undefined for independent components. This object contains every property from the
      * *TProps* type and `$on_` property for every event defined in the *TEvents* type.
 	 */
 	props: ComponentProps<TProps,TEvents>;
