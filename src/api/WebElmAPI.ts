@@ -97,7 +97,7 @@ const symWebElmDef = Symbol("webElmDef");
  * @returns Class that inherits from the HTMLElement class that imlements all the internal logic
  * of custom Web elements.
  */
-export function WebElm<TAttrs extends {} = {}, TEvents extends {} = {}>(): WebElmConstructor<HTMLElement,TAttrs,TEvents>;
+export function WebElm<TAttrs extends Record<string, any> = {}, TEvents extends {} = {}>(): WebElmConstructor<HTMLElement,TAttrs,TEvents>;
 
 
 
@@ -128,13 +128,13 @@ export function WebElm<TAttrs extends {} = {}, TEvents extends {} = {}>(): WebEl
  * @returns Class that inherits from the given HTMLElement-derived class that imlements all
  * the internal logic of custom Web elements.
  */
-export function WebElm<TTag extends keyof HTMLElementTagNameMap, TAttrs extends {} = {}, TEvents extends {} = {}>(
+export function WebElm<TTag extends keyof HTMLElementTagNameMap, TAttrs extends Record<string, any> = {}, TEvents extends {} = {}>(
     tag: TTag, elmClass: new() => HTMLElementTagNameMap[TTag]): WebElmConstructor<HTMLElementTagNameMap[TTag],TAttrs,TEvents>;
 
 
 
 // Implementation
-export function WebElm<TAttrs extends {}, TEvents extends {}>(tagToExtend?: string,
+export function WebElm<TAttrs extends Record<string, any>, TEvents extends {}>(tagToExtend?: string,
     elmClass?: new() => HTMLElement): WebElmConstructor<HTMLElement,TAttrs,TEvents>
 {
     // dynamically build the actual element class, to which component and Web Element mixins will
@@ -247,18 +247,6 @@ abstract class WebElmMixin extends HTMLElement
 
     }
 
-    // /** Gets the shadow DOM root node. It is created if it doesn' exist yet */
-    // get shadowRoot(): ShadowRoot
-    // {
-    //     return this._shadowRoot ??= this.attachShadow({mode: this._def?.options?.mode ?? "open"})
-    // }
-
-    // /** Gets the "internals" object. It is created if it doesn't exist yet */
-    // get internals(): ElementInternals
-    // {
-    //     return this._internals ??= this.attachInternals();
-    // }
-
     connectedCallback(): void
     {
         mount(this, this._shadowRoot ?? this);
@@ -355,19 +343,19 @@ abstract class WebElmMixin extends HTMLElement
         let toHtml = attrDef.options?.toHtml;
         let attrVal = toHtml ? toHtml(val, attrName) : String(val);
         if (attrVal == null)
-            this.removeAttribute(attrName);
+            super.removeAttribute(attrName);
         else
-            this.setAttribute(attrName, attrVal);
+            super.setAttribute(attrName, attrVal);
     }
 
     getAttr(attrName: string): string | null
     {
-        return this.getAttribute(attrName);
+        return super.getAttribute(attrName);
     }
 
     hasAttr(attrName: string): boolean
     {
-        return this.hasAttribute(attrName);
+        return super.hasAttribute(attrName);
     }
 
     // Add toVNs method to the actual class. This method is invoked to convert rendered content to

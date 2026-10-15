@@ -118,9 +118,16 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
 	 *  1. Before the component is rendered for the first time: the component must remember the
 	 *    passed object.
 	 *  2. Before the component is destroyed: undefined is passed as a parameter and the component
-     *     must release the remembered object.
+     *    must release the remembered object.
 	 */
 	vn?: IClassCompVN;
+
+    /**
+     * Determines whether the component is currently mounted. If a component has asynchronous
+     * functionality (e.g. fetching data from a server), component's code may be executed after
+     * it was already unmounted. This property allows the component to handle this situation.
+     */
+	readonly isMounted: boolean;
 
 	/**
 	 * Optional update strategy object that determines different aspects of component behavior
@@ -144,7 +151,7 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
      * Notifies the component that it replaced the given component. This allows the new
      * component to copy whatever internal state it needs from the old component.
      */
-    didReplace?(oldComp: IComponent<TProps>): void;
+    didReplace?(oldComp: IComponent<TProps, TEvents>): void;
 
     /**
 	 * Notifies that the component's content is going to be removed from the DOM tree. After
@@ -169,7 +176,7 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
 	 * @param newProps The new properties that the parent component provides to this component.
 	 * @returns True if the component should have its render method called and false otherwise.
 	 */
-	shouldUpdate?(newProps: TProps): boolean;
+	shouldUpdate?(newProps: ComponentProps<TProps,TEvents>): boolean;
 
 	/**
 	 * Handles an exception that occurred during the rendering of one of the component's children.
@@ -205,49 +212,6 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
      * this method.
 	 */
 	afterUpdate?(): void;
-}
-
-
-
-/**
- * Type for the `shadow` property in the {@link IComponent} interface. This can be one of the following:
- * - boolean - if the value is true, a `<div>` element will be created and shadow root attached to
- *   it with mode "open".
- * - string - an element with this name will be created and shadow root attached to
- *   it with mode "open".
- * - ShadowRootInit - a `<div>` element will be created and shadow root attached to
- *   it with the given initialization prameters.
- * - two-item tuple - the first item is the name of the element to create and attach a shadow
- *   root to; the second item specifies the shadow root initialization prameters.
- */
-export type ComponentShadowOptions = boolean | string | ShadowRootInit |
-    [tag: string, init: ShadowRootInit]
-
-
-
-/**
- * Represents component functionality that is implemented by the Mimbl base classes for
- * regular components and custom Web element.
- *
- * @typeParam TEvents Type that maps event names (a.k.a event types) to either Event-derived
- * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
- * `detail` property of a CustomEvent.
- */
-export interface IComponentEx<TEvents extends {} = {}>
-{
-	/**
-	 * Remembered virtual node object through which the component can request services. This
-	 * is undefined in the component's costructor but will be defined before the call to the
-	 * (optional) willMount method.
-	 */
-	vn?: IClassCompVN;
-
-    /**
-     * Determines whether the component is currently mounted. If a component has asynchronous
-     * functionality (e.g. fetching data from a server), component's code may be executed after
-     * it was already unmounted. This property allows the component to handle this situation.
-     */
-	readonly isMounted: boolean;
 
 	/**
 	 * This method is called by the component to request to be updated.
@@ -347,6 +311,22 @@ export interface IComponentEx<TEvents extends {} = {}>
      */
     fireEvent<K extends string & keyof TEvents>(eventType: K, detail: TEvents[K]): boolean;
 }
+
+
+
+/**
+ * Type for the `shadow` property in the {@link IComponent} interface. This can be one of the following:
+ * - boolean - if the value is true, a `<div>` element will be created and shadow root attached to
+ *   it with mode "open".
+ * - string - an element with this name will be created and shadow root attached to
+ *   it with mode "open".
+ * - ShadowRootInit - a `<div>` element will be created and shadow root attached to
+ *   it with the given initialization prameters.
+ * - two-item tuple - the first item is the name of the element to create and attach a shadow
+ *   root to; the second item specifies the shadow root initialization prameters.
+ */
+export type ComponentShadowOptions = boolean | string | ShadowRootInit |
+    [tag: string, init: ShadowRootInit]
 
 
 

@@ -1,4 +1,4 @@
-﻿import { IComponent, IComponentEx } from "./CompTypes";
+﻿import { IComponent } from "./CompTypes";
 import { IAriaset } from "./ElementTypes";
 
 
@@ -116,8 +116,8 @@ export type OnPropChangeHandlers<TEvents> =
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
  */
-export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}>
-    extends IComponent<TAttrs,TEvents>, IComponentEx<TEvents>
+export interface IWebElm<TAttrs extends Record<string, any> = {}, TEvents extends {} = {}>
+    extends IComponent<TAttrs,TEvents>
 {
     /**
      * Invokes the given function in the "style adoption context"; which allows all Mimcss style
@@ -138,7 +138,7 @@ export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}>
      * @param attrName Attribute name, which is a key from the `TAttrs` type
      * @param value Value to set to the attribute. It is converted to string if necessary.
      */
-    setAttr<K extends string & keyof TAttrs>(attrName: K, value: TAttrs[K]): void;
+    setAttr<K extends keyof TAttrs>(attrName: K, value: TAttrs[K]): void;
 
     /**
      * Gets the current string value of the given attribute.
@@ -147,7 +147,7 @@ export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}>
      * @param attrName Attribute name, which is a key from the `TAttrs` type
      * @returns The current value of the attribute.
      */
-    getAttr<K extends string & keyof TAttrs>(attrName: K): string | null;
+    getAttr<K extends keyof TAttrs>(attrName: K): string | null;
 
     /**
      * Determines whether the element has the attribute with the given name.
@@ -156,20 +156,7 @@ export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}>
      * @param attrName Attribute name, which is a key from the `TAttrs` type
      * @returns True if the attribute with the given name exists on the element.
      */
-    hasAttr<K extends string & keyof TAttrs>(attrName: K): boolean;
-
-    /**
-     * Fires an event of the given type. The `detail` parameter is interpreted differently for
-     * built-in and custom events. For built-in events (that is, events whose type derives from
-     * Event), this is the event object itself. For custom events, it becomes the value of the
-     * `detail` property of the CustomEvent object.
-     * @typeParam K Defines a range of possible values for the `eventType` parameter. K is a key
-     * from the `TEvent` type.
-     * @param eventType Event type name, which is a key from the `TEvents` type
-     * @param detail Event data, whose type is defined by the type mapped to the key
-     * in the `TEvents` type.
-     */
-    fireEvent<K extends string & keyof TEvents>(eventType: K, detail: TEvents[K]): boolean;
+    hasAttr<K extends keyof TAttrs>(attrName: K): boolean;
 }
 
 
@@ -184,7 +171,7 @@ export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}>
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
  */
-export interface WebElmConstructor<TElm extends HTMLElement = HTMLElement, TAttrs extends {} = {}, TEvents extends {} = {}>
+export interface WebElmConstructor<TElm extends HTMLElement = HTMLElement, TAttrs extends Record<string, any> = {}, TEvents extends {} = {}>
 {
     new (): TElm & IWebElm<TAttrs, TEvents>;
 }

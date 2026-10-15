@@ -92,7 +92,7 @@ let symRootMountPoint = Symbol("rootMountPoint");
 
 // Renders the given content (usually a result of JSX expression or a component instance)
 // under the given HTML element.
-export function mountRoot( content: any, anchorDN: DN): IRootVN | null
+export function mountRoot(content: any, anchorDN?: DN): IRootVN | null
 {
 	let realAnchorDN = anchorDN ?? document.body;
 	if (!realAnchorDN)
@@ -122,7 +122,7 @@ export function mountRoot( content: any, anchorDN: DN): IRootVN | null
 
 
 // Unmounts a root node that was created using mountRoot.
-export function unmountRoot( anchorDN: DN): void
+export function unmountRoot(anchorDN?: DN): void
 {
 	let realAnchorDN: DN = anchorDN ?? document.body;
 	if (!realAnchorDN)
