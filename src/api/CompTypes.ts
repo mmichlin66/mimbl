@@ -57,7 +57,7 @@ export type DN = Node | null;
  */
 export type ComponentProps<TProps extends {} = {}, TEvents extends {} = {}> =
     Readonly<TProps> &
-    {key?: any} &
+    { readonly key?: any } &
     { readonly [K in keyof TEvents & string as `$on_${K}`]?:
         EventPropType<TEvents[K] extends Event ? TEvents[K] : CustomEvent<TEvents[K]>> }
 
@@ -107,11 +107,11 @@ export interface IComponent<TProps extends {} = {}, TEvents extends {} = {}> ext
 	readonly displayName?: string;
 
 	/**
-	 * Component properties. This is normally used only by managed components and is usually
-     * undefined for independent components. This object contains every property from the
-     * *TProps* type and `$on_` property for every event defined in the *TEvents* type.
+	 * Component properties. This is normally used only by managed components and is undefined for
+     * independent components. This object contains every property from the _TProps_ type and
+     * `$on_` property for every event defined in the _TEvents_ type.
 	 */
-	props: ComponentProps<TProps,TEvents>;
+	props?: ComponentProps<TProps,TEvents>;
 
 	/**
 	 * Sets, gets or clears the virtual node object of the component. This property is set twice:

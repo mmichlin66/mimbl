@@ -1,5 +1,5 @@
 ﻿import {
-    ComponentProps, IComponent, IPublication, IServiceDefinitions, ISubscription,
+    IComponent, IPublication, IServiceDefinitions, ISubscription,
     ScheduledFuncType, TickSchedulingType, UpdateStrategy
 } from "../api/CompTypes";
 import { symPropStorage } from "../utils/UtilFunc";
@@ -18,10 +18,16 @@ import { scheduleFunc, wrapFunc } from "./Reconciler";
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
  */
-export function ComponentMixin<TProps extends {} = {children?: any}, TEvents extends {} = {}>(Base: new () => EventTarget):
-    abstract new (props?: ComponentProps<TProps,TEvents>) => IComponent<TProps,TEvents>
+export function ComponentMixin
+    <
+        TProps extends {} = {children?: any},
+        TEvents extends {} = {},
+        TBase extends new (...args: any[]) => EventTarget = new (...args: any[]) => EventTarget,
+    >
+    (Base: TBase):
+    TBase & (abstract new (...args: any[]) => IComponent<TProps,TEvents>)
 {
-    abstract class Internal<TProps extends {} = {children?: any}, TEvents extends {} = {}> extends Base implements IComponent<TProps,TEvents>
+    abstract class Internal extends Base implements IComponent<TProps,TEvents>
     {
         /**
          * Storage for property values for properties augmented with a decorator that defines getters
@@ -31,15 +37,14 @@ export function ComponentMixin<TProps extends {} = {children?: any}, TEvents ext
 
     	displayName?: string;
         vn?: ClassCompVN;
-        props: ComponentProps<TProps,TEvents>;
         updateStrategy?: UpdateStrategy;
 
-        constructor(props?: ComponentProps<TProps,TEvents>)
+        constructor(...args: any[])
         {
-            super();
+            super(...args);
             this[symPropStorage] = {};
             this.vn = undefined;
-            this.props = props ?? {} as ComponentProps<TProps,TEvents>;
+            this.updateStrategy = undefined;
         }
 
         get isMounted(): boolean { return !!this.vn; };
@@ -78,20 +83,13 @@ export function ComponentMixin<TProps extends {} = {children?: any}, TEvents ext
             return this.vn!.subscribeService(id, defaultValue, useSelf);
         }
 
-        fireEvent<K extends string & keyof TEvents>(key: K, eventOrDetail: TEvents[K]): boolean
+        fireEvent<K extends string & keyof TEvents>(eventType: K, detail: TEvents[K]): boolean
         {
-            let event = eventOrDetail instanceof Event ? eventOrDetail : new CustomEvent(key, {detail: eventOrDetail});
+            let event = detail instanceof Event ? detail : new CustomEvent(eventType, {detail});
             return this.dispatchEvent(event);
         }
 
-        // the following properties and methods are defined here to satisfy the implemented interfaces.
-        // they are not actually part of the mixin, because they are not transfered to the classes to
-        // which the mixin is applied. Instead, these classes implement these properties and methods
-        // on their own.
         abstract render(): any;
-        // abstract addEventListener(type: string, callback: EventListenerOrEventListenerObject | null, options?: AddEventListenerOptions | boolean): void;
-        // abstract dispatchEvent(event: Event): boolean;
-        // abstract removeEventListener(type: string, callback: EventListenerOrEventListenerObject | null, options?: EventListenerOptions | boolean): void;
     }
 
     return Internal;

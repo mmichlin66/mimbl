@@ -116,7 +116,7 @@ export type OnPropChangeHandlers<TEvents> =
  * classes (e.g. MouseEvent) or any other type. The latter will be interpreted as a type of the
  * `detail` property of a CustomEvent.
  */
-export interface IWebElm<TAttrs extends Record<string, any> = {}, TEvents extends {} = {}>
+export interface IWebElm<TAttrs extends {} = {}, TEvents extends {} = {}>
     extends IComponent<TAttrs,TEvents>
 {
     /**
@@ -138,25 +138,25 @@ export interface IWebElm<TAttrs extends Record<string, any> = {}, TEvents extend
      * @param attrName Attribute name, which is a key from the `TAttrs` type
      * @param value Value to set to the attribute. It is converted to string if necessary.
      */
-    setAttr<K extends keyof TAttrs>(attrName: K, value: TAttrs[K]): void;
+    setAttr<K extends string & keyof TAttrs>(attrName: K, value: TAttrs[K]): void;
 
-    /**
-     * Gets the current string value of the given attribute.
-     * @typeParam K Defines a range of possible values for the `attrName` parameter. K is a key
-     * from the `TAttr` type.
-     * @param attrName Attribute name, which is a key from the `TAttrs` type
-     * @returns The current value of the attribute.
-     */
-    getAttr<K extends keyof TAttrs>(attrName: K): string | null;
+    // /**
+    //  * Gets the current string value of the given attribute.
+    //  * @typeParam K Defines a range of possible values for the `attrName` parameter. K is a key
+    //  * from the `TAttr` type.
+    //  * @param attrName Attribute name, which is a key from the `TAttrs` type
+    //  * @returns The current value of the attribute.
+    //  */
+    // getAttr<K extends string & keyof TAttrs>(attrName: K): string | null;
 
-    /**
-     * Determines whether the element has the attribute with the given name.
-     * @typeParam K Defines a range of possible values for the `attrName` parameter. K is a key
-     * from the `TAttr` type.
-     * @param attrName Attribute name, which is a key from the `TAttrs` type
-     * @returns True if the attribute with the given name exists on the element.
-     */
-    hasAttr<K extends keyof TAttrs>(attrName: K): boolean;
+    // /**
+    //  * Determines whether the element has the attribute with the given name.
+    //  * @typeParam K Defines a range of possible values for the `attrName` parameter. K is a key
+    //  * from the `TAttr` type.
+    //  * @param attrName Attribute name, which is a key from the `TAttrs` type
+    //  * @returns True if the attribute with the given name exists on the element.
+    //  */
+    // hasAttr<K extends string & keyof TAttrs>(attrName: K): boolean;
 }
 
 

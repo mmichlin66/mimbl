@@ -1,6 +1,6 @@
 ﻿import {
-    CallbackWrappingOptions, ComponentShadowOptions, IComponent, ICustomAttributeHandlerClass,
-    IRef, ITextVN, PropType, RefFunc, RenderMethodType, DN, ComponentProps, ExtendedElement,
+    CallbackWrappingOptions, ComponentShadowOptions, ICustomAttributeHandlerClass,
+    IRef, ITextVN, PropType, RefFunc, RenderMethodType, ComponentProps, ExtendedElement,
     AwaiterProps, AwaiterEvents, FunctorProps, IComponentClass
 } from "./CompTypes";
 import { IVN } from "../core/VNTypes";
@@ -196,12 +196,18 @@ export function registerCustomAttribute<T>(attrName: string, handlerClass: ICust
 export abstract class Component<TProps extends {} = {children?: any}, TEvents extends {} = {}>
     extends ComponentMixin(EventTarget)
 {
+    props: ComponentProps<TProps,TEvents>;
+
+    constructor(props?: ComponentProps<TProps,TEvents>)
+    {
+        super();
+        this.props = props ?? {} as ComponentProps<TProps,TEvents>;
+    }
+
     // The following properties are declared here to make them visible to the TypeScript compiler
     // because they depend on Component's class type parameters, wchih could not be passed to the
     // mixin. They are actually implemented in the ComponentMixin function. Methods are declared
     // as properties because methods cannot be declared.
-    declare props: ComponentProps<TProps,TEvents>;
-
     declare fireEvent: <K extends string & keyof TEvents>(key: K, eventOrDetail: TEvents[K]) => boolean;
 }
 
@@ -211,8 +217,8 @@ export abstract class Component<TProps extends {} = {children?: any}, TEvents ex
  * Renders the given content (usually result of JSX expression) under the given HTML element
  * asynchronously.
  * @param content Content to render.
- * @param anchorDN DOM element under which to render the content. If null or undefined,then
- *				render under the document.body tag.
+ * @param anchorDN DOM element under which to render the content. If null or undefined, then
+ * render under the document.body tag.
  */
 export const mount = mountRoot;
 
