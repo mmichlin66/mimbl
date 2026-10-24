@@ -104,14 +104,8 @@ function WebElmMixin
             return (this[symWebElmDef] as WebElmDefinition).options?.formAssociated;
         }
 
-        /**
-         * Storage for property values for properties augmented with a decorator that defines getters
-         * and/or setters.
-         */
-        public [symPropStorage]!: Record<string,any>;
-
         /** WebElm definition taken from the class constructor */
-        elmDef!: WebElmDefinition;
+        #elmDef: WebElmDefinition;
 
         /** Shadow DOM root node - can be undefined if "noShadow" was specified in the options */
         #shadowRoot?: ShadowRoot;
@@ -123,12 +117,24 @@ function WebElmMixin
         #internals?: ElementInternals;
 
         /**
-         * Flag indicating that we don't need to call setAttribute() in a property's set() accessor
-         * when a property is set as a result of the attribute change. This same flag is used to
-         * indicate that attribute change notification is called as a result from setting the
-         * property.
+         * Flag indicating that an attribute is being changed as a result of a call to setAttribute().
+         * For observable attributes, this call usually ends up setting the element's property
+         * corresponding to the attribute. This flag indicates that in such case, we don't need to call
+         * setAttribute() again from the property setter.
          */
-        _isAttrSync?: boolean;
+        #inSetAttr: boolean;
+        get inSetAttr(): boolean { return this.#inSetAttr; }
+        set inSetAttr(value: boolean) { this.#inSetAttr = value; }
+
+        /**
+         * Flag indicating that a property is being changed as a result of a direct assignment.
+         * Usually, this assignment ends up calling setAttribute() to change the element's attribute
+         * corresponding to the property. For observable attributes, this flag indicates that we
+         * don't need to set the property again.
+         */
+        #inSetProp: boolean;
+        get inSetProp(): boolean { return this.#inSetProp; }
+        set inSetProp(value: boolean) { this.#inSetProp = value; }
 
 
 
@@ -137,11 +143,11 @@ function WebElmMixin
             super(...args);
 
             // set default values to our properties so that the shape of the instances is always the same.
-            this[symPropStorage] = {};
-            let def: WebElmDefinition = this.elmDef = this.constructor[symWebElmDef];
+            let def: WebElmDefinition = this.#elmDef = this.constructor[symWebElmDef];
             this.#shadowRoot = undefined;
             this.#internals = undefined;
-            this._isAttrSync = false;
+            this.#inSetAttr = false;
+            this.#inSetProp = false;
 
             // by the time the constructor is called, we have all the information setup via the
             // @webElm and @attr decorators
@@ -179,24 +185,21 @@ function WebElmMixin
 
         attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void
         {
-            // Ignore this call if the attribute has been changed as a result of setting property value.
-            if (this._isAttrSync)
-                return;
-
             // if no such attribute is defined in our class, do nothing (this shouldn't happen because
             // the callback is only called for defined attributes).
-            let attrDef = this.elmDef.attrs[name];
+            let attrDef = this.#elmDef.attrs[name];
 
-            /// #if DEBUG
             if (!attrDef)
             {
+                /// #if DEBUG
                 console.error(`Attribute definition not found for attribute '${name}'`)
+                /// #endif
+
                 return;
             }
-            /// #endif
 
             // get attributes parameters and check whether we actually need to do anything with
-            // the new attribute value
+            // the new attribute value (either set property value or call onchanged handler).
             let {propName, options} = attrDef;
             let onchanged = options?.onchanged;
             if (!propName && !onchanged)
@@ -204,26 +207,45 @@ function WebElmMixin
 
             // determine the actual new value that should be set to the property and convert it to
             // the proper type if necessary
+            let realNewValue: any = newValue;
+            let attrRemoved = newValue === null;
+            let defaultValue = options?.defaultValue;
             let fromHtml = options?.fromHtml;
-            if (fromHtml)
-                newValue = fromHtml(newValue, attrDef.attrName);
+            if (attrRemoved)
+                realNewValue = defaultValue;
+            else if (fromHtml)
+                realNewValue = fromHtml(newValue, attrDef.attrName) ?? defaultValue;
+            else if (propName)
+            {
+                // if no converter is specified, we try to use the type of the current property
+                // value. If this is null or undefined, we just use the value of the attribute.
+                let currentPropValue = this[propName];
+                let t = typeof currentPropValue;
+                realNewValue =
+                    t === "boolean" ? attrRemoved ? false : true :
+                    t === "number" ? attrToNumber(newValue, defaultValue) :
+                    t === "string" ? attrRemoved ? defaultValue ?? "" : newValue :
+                    newValue;
+            }
 
             // set the new value to the property. Since by default properties with the @attr
-            // decorators are reactive, this will trigger re-rendering. Note that property may not be
-            // specified if the attribute was only declared for notification or writing purpose.
-            if (propName)
+            // decorators are reactive, this will trigger re-rendering. Note that property may not
+            // be specified if the attribute was only declared for notification or writing purpose.
+            // Also, if the attribute has been changed as a result of setting property value, don't
+            // do it again.
+            if (propName && !this.inSetProp)
             {
-                // since we are setting the property because the attribute has been changed,
+                // since we are setting the property as a result of the attribute change,
                 // indicate that we don't need to call setAttribute from the property's set
                 // accessor.
-                this._isAttrSync = true;
-                try { this[propName] = newValue; }
-                finally { this._isAttrSync = false; }
+                this.inSetAttr = true;
+                try { this[propName] = realNewValue; }
+                finally { this.inSetAttr = false; }
             }
 
             // call the `onchanged` method if defined. Note that it is called bound to the instance
             // of our custom element.
-            onchanged?.call(this, newValue, attrDef.attrName);
+            onchanged?.call(this, realNewValue, attrDef.attrName);
         }
 
         /** The render() function should be overridden in the derived classes */
@@ -254,14 +276,20 @@ function WebElmMixin
         setAttr<K extends string & keyof TAttrs>(attrName: K, val: TAttrs[K]): void
         {
             // if no such attribute is defined in our class, do nothing.
-            let attrDef = this.elmDef.attrs[attrName.toLowerCase()];
+            let attrDef = this.#elmDef.attrs[attrName.toLowerCase()];
             if (!attrDef)
                 return;
 
-            // determine the actual new value that should be set to the attribute and
-            // convert it to the proper type if necessary.
+            // determine the actual new value that should be set to the attribute and convert it
+            // to the proper type if necessary. if no converter is specified, we try to use the
+            // type of the value.
             let toHtml = attrDef.options?.toHtml;
-            let attrVal = toHtml ? toHtml(val, attrName) : String(val);
+            let attrVal: string | null =
+                toHtml ? toHtml(val, attrName) :
+                val === true ? "" :
+                val == null || val === false ? null :
+                String(val);
+
             if (attrVal == null)
                 super.removeAttribute(attrName);
             else
@@ -284,7 +312,7 @@ function WebElmMixin
         {
             // if the component (this can only be an Instance component) is already attached to VN,
             // return this existing VN; otherwise create a new one.
-            return this.vn as ClassCompVN ?? new IndependentCompVN( this);
+            return this.vn as ClassCompVN ?? new IndependentCompVN(this);
         }
     }
 
@@ -471,29 +499,25 @@ function attrDecorator(attrName: string | undefined, options: WebElmAttrOptions 
 
     // make it a trigger
     let depth = options?.triggerDepth;
-    if (propName)
+    Object.defineProperty(target, propName,
     {
-        Object.defineProperty( target, propName, {
-            // in this context, "this" is the custom element object
-            get() { return getAttrTriggerObj(this, propName, depth).get(); },
-            set(this: any, val)
-            {
-                if (this._isAttrSync)
-                    return;
+        // in this context, "this" is the custom element object
+        get() { return getAttrTriggerObj(this, propName, depth).get(); },
+        set(val)
+        {
+            // set the value to the property
+            getAttrTriggerObj(this, propName, depth).set(val);
 
-                try
-                {
-                    this._isAttrSync = true;
-                    getAttrTriggerObj(this, propName, depth).set(val);
-                    this.setAttr(attrName ?? propName, val);
-                }
-                finally
-                {
-                    this._isAttrSync = false;
-                }
-            },
-        });
-    }
+            // if this call was made as a result of setting the attribute, we don't need to
+            // set the attribute again
+            if (this.inSetAttr)
+                return;
+
+            this.inSetProp = true;
+            try { this.setAttr(attrName ?? propName, val); }
+            finally { this.inSetProp = false; }
+        },
+    });
 }
 
 // Helper function that returns a trigger object stored in the property storage for the given property name.
@@ -624,58 +648,18 @@ function addWebElmAttr(definition: WebElmDefinition, attrDef: WebElmAttrDefiniti
 /**
  * Built-in attribute converter that converts string value to a number.
  */
-export const attrToFloat: WebElmFromHtmlConverter = (stringValue: string | null | undefined): number =>
-    parseFloat(stringValue!);
-
-
-
-/**
- * Built-in attribute converter that converts string value to an integer number.
- */
-export const attrToInt: WebElmFromHtmlConverter = (stringValue: string | null | undefined): number =>
-    parseInt(stringValue!);
-
-
-
-/**
- * Built-in attribute converter that converts string value to a Boolean value.
- */
-export const attrToBool: WebElmFromHtmlConverter = (stringValue: string | null | undefined): boolean =>
-    stringValue != null;
-
-
-
-/**
- * Built-in converter that converts property object value to a unique string mapped to the object
- * itself in the "transit object registry".
- */
-export const objToAttr: WebElmToHtmlConverter = (obj: object | null | undefined): string | null =>
+function attrToNumber(stringValue: string | null, defaultValue?: any): number
 {
-    if (!obj)
-        return null;
+    let retVal = Number(stringValue!);
+    if (isNaN(retVal))
+    {
+        retVal = Number(defaultValue);
+        if (isNaN(retVal))
+            retVal = 0;
+    }
 
-    // generate unique key
-    let key = Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
-    transitObjectRegistry[key] = obj;
-    return key;
+    return retVal;
 }
 
 
 
-/**
- * Built-in attribute converter that converts string value to an Object value by looking it up in
- * the "transit object registry".
- */
-export const attrToObj: WebElmFromHtmlConverter = (stringValue: string | null | undefined): any =>
-{
-    if (!stringValue)
-        return null;
-
-    let obj = transitObjectRegistry[stringValue];
-    delete transitObjectRegistry[stringValue];
-    return obj;
-}
-
-
-
-const transitObjectRegistry: Record<string, any> = {}

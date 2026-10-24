@@ -11,8 +11,7 @@ import { IAriaset } from "./ElementTypes";
  * @param stringValue Attribute's string value to convert to the corresponding type.
  * @param attrName Name of the attribute whose value is being converted from string
  */
-export type WebElmFromHtmlConverter = (stringValue: string | null | undefined,
-    attrName: string) => any;
+export type WebElmFromHtmlConverter = (stringValue: string | null | undefined, attrName: string) => any;
 
 
 
@@ -46,13 +45,8 @@ export type WebElmAttrOptions =
      */
     triggerDepth?: number;
 
-    /**
-     * Type of the property behind the attribute. This allows having non-string properties in the
-     * Web Element class while converting them to/from strings or null as HTML requires. Specifying
-     * type engages type-spcific conversion functions, so fromHtml and toHtml are not needed (unless
-     * some non-standard conversion is required).
-     */
-    type?: String | Boolean | Number | BigInt | Object;
+    /** Default value of the attribute. If the attribute is not set, the property will have this value */
+    defaultValue?: any;
 
     /** Converter function that converts the string attribute value to a property native type */
     fromHtml?: WebElmFromHtmlConverter;
