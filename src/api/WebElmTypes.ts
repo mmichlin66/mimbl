@@ -30,7 +30,7 @@ export type WebElmToHtmlConverter = (value: any, attrName: string) => string | n
 /**
  * Defines function signature for attribute change notification handler.
  */
-export type WebElmAttrChangeHandler<T = any> = (newValue: T, attrName: string) => any;
+export type WebElmAttrChangeHandler<T = any> = (newValue: T, removed: boolean) => any;
 
 
 
@@ -48,14 +48,11 @@ export type WebElmAttrOptions =
     /** Default value of the attribute. If the attribute is not set, the property will have this value */
     defaultValue?: any;
 
-    /** Converter function that converts the string attribute value to a property native type */
-    fromHtml?: WebElmFromHtmlConverter;
-
     /** Converter function that converts a value to a string that can be set to the HTML attribute */
     toHtml?: WebElmToHtmlConverter;
 
-    /** Notification function that is called when the attribute value changes */
-    onchanged?: WebElmAttrChangeHandler;
+    /** Converter function that converts the string attribute value to a property native type */
+    fromHtml?: WebElmFromHtmlConverter;
 }
 
 
@@ -88,17 +85,6 @@ export type WebElmOptions = Partial<ShadowRootInit> &
      * undefined or false, shadow DOM is created. If true, shadow DOM is not created.
      */
     noShadow?: boolean;
-}
-
-
-
-/**
- * Maps every property of the given type to an optional "onchanged" function that accepts the old
- * and the new values of a changed property.
- */
-export type OnPropChangeHandlers<TEvents> =
-{
-    [P in keyof TEvents & string as `onchanged_${P}`]?: (oldValue: TEvents[P], newValue?: TEvents[P]) => any
 }
 
 
